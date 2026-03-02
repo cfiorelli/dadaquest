@@ -1,10 +1,9 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H, COLORS } from '../gameConfig.js';
-import { PlayerBaby } from '../entities/PlayerBaby.js';
+import { GAME_H } from '../gameConfig.js';
+import { PlayerDepth } from '../entities/PlayerDepth.js';
 import { HUD } from '../ui/HUD.js';
-import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
-import { getStamina, setStamina } from '../utils/state.js';
+import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 
 const SCENE_WIDTH = 1100;
@@ -15,9 +14,6 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.gravity.y = 500;
-    this.physics.world.setBounds(0, 0, SCENE_WIDTH, GAME_H);
-
     // Background
     this.add.rectangle(SCENE_WIDTH / 2, GAME_H / 2, SCENE_WIDTH, GAME_H, 0xe8eaf6)
       .setScrollFactor(1);
@@ -32,11 +28,9 @@ export class BedroomScene extends Phaser.Scene {
 
     // Room furniture
     this.setupFurniture();
-    this.setupPlatforms();
     this.setupMom();
-    this.setupPlayer();
     this.setupExit();
-    this.setupCollisions();
+    this.setupPlayer();
     this.setupHUD();
     this.setupCamera();
     this.setupEvents();
@@ -56,7 +50,7 @@ export class BedroomScene extends Phaser.Scene {
     });
 
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
-    if (isTestMode) setTimeout(() => this.scene.start('KitchenScene'), 600);
+    if (isTestMode) this.time.delayedCall(600, () => this.scene.start('KitchenScene'));
   }
 
   setupFurniture() {
@@ -82,49 +76,17 @@ export class BedroomScene extends Phaser.Scene {
     this.add.ellipse(SCENE_WIDTH / 2, GAME_H - 22, 500, 30, 0xce93d8, 0.7);
   }
 
-  setupPlatforms() {
-    this.staticGroup = this.physics.add.staticGroup();
-
-    // Main floor
-    this.staticGroup.create(SCENE_WIDTH / 2, GAME_H - 10, null)
-      .setSize(SCENE_WIDTH, 20).setVisible(false);
-
-    // Bed top (slightly raised)
-    this.staticGroup.create(160, GAME_H - 78, null)
-      .setSize(200, 12).setVisible(false);
-
-    // Chair for mom
-    this.chair = this.staticGroup.create(this.pianoX - 60, GAME_H - 42, null)
-      .setSize(50, 16).setVisible(false);
-
-    this.climbWalls = this.physics.add.staticGroup();
-  }
-
   setupMom() {
     // Mom seated at piano
-    this.mom = this.physics.add.staticSprite(this.pianoX - 45, GAME_H - 95, 'mom')
-      .setDisplaySize(50, 70);
-
-    // Mom hitbox (slightly smaller than visual)
-    this.mom.body.setSize(40, 60);
-    this.mom.body.setOffset(5, 5);
-
-    // Warning zone (wider than mom for "close" detection)
-    this.momWarningZone = this.add.zone(this.pianoX - 45, GAME_H - 95, 80, 80).setOrigin(0.5);
-    this.physics.world.enable(this.momWarningZone);
-    this.momWarningZone.body.setAllowGravity(false);
-  }
-
-  setupPlayer() {
-    this.player = new PlayerBaby(this, 100, GAME_H - 120);
-    this.player.setClimbWalls(this.climbWalls);
+    this.momX = this.pianoX - 45;
+    this.momY = GAME_H - 95;
+    this.mom = this.add.image(this.momX, this.momY, 'mom').setDisplaySize(50, 70).setDepth(6);
   }
 
   setupExit() {
     // Exit on right side
-    this.exitZone = this.add.zone(SCENE_WIDTH - 20, GAME_H - 50, 40, 80).setOrigin(0.5);
-    this.physics.world.enable(this.exitZone);
-    this.exitZone.body.setAllowGravity(false);
+    this.exitX = SCENE_WIDTH - 20;
+    this.exitY = GAME_H - 50;
 
     const arrow = this.add.text(SCENE_WIDTH - 30, GAME_H - 60, '→\nKITCHEN', {
       fontFamily: 'monospace',
@@ -136,16 +98,38 @@ export class BedroomScene extends Phaser.Scene {
     this.tweens.add({ targets: arrow, x: SCENE_WIDTH - 24, duration: 500, yoyo: true, repeat: -1 });
   }
 
-  setupCollisions() {
-    this.physics.add.collider(this.player, this.staticGroup);
-
-    // Mom collision -> reset to Scene 1 (disabled in test mode for determinism)
+  setupPlayer() {
+    const colliders = [
+      {
+        kind: 'exit',
+        x: this.exitX,
+        z: 108,
+        w: 44,
+        d: 70,
+        minWy: -999,
+        maxWy: 90,
+        onTouch: () => this.exitScene(),
+      },
+    ];
     if (!isTestMode) {
-      this.physics.add.overlap(this.player, this.mom, this.momCaught, null, this);
+      colliders.push({
+        kind: 'hazard',
+        x: this.momX,
+        z: 100,
+        w: 78,
+        d: 46,
+        minWy: -999,
+        maxWy: 70,
+        onTouch: () => this.momCaught(),
+      });
     }
 
-    // Exit
-    this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);
+    this.player = new PlayerDepth(this, {
+      start: { wx: 100, wz: 112, wy: 0 },
+      walkBounds: { minX: 28, maxX: SCENE_WIDTH - 28, minZ: 52, maxZ: 168 },
+      groundHeight: () => 0,
+      colliders,
+    });
   }
 
   setupHUD() {
@@ -172,17 +156,17 @@ export class BedroomScene extends Phaser.Scene {
     });
   }
 
-  momCaught(player, mom) {
+  momCaught() {
     if (this.caught) return;
     this.caught = true;
     sfx.bonk();
 
     // Pickup animation
-    this.hud.showBubble(mom.x, mom.y - 80, 'Back to bed, little one!', 0);
+    this.hud.showBubble(this.momX, this.momY - 80, 'Back to bed, little one!', 0);
     this.cameras.main.shake(200, 0.01);
 
     this.tweens.add({
-      targets: player,
+      targets: this.player.sprite,
       alpha: 0,
       duration: 600,
       onComplete: () => {
@@ -209,12 +193,5 @@ export class BedroomScene extends Phaser.Scene {
     if (!this.player) return;
     this.player.update(time, delta);
     this.hud.update(this.player);
-
-    // Out of bounds
-    if (this.player.y > GAME_H + 50) {
-      this.player.setPosition(100, GAME_H - 120);
-      this.player.body.setVelocity(0, 0);
-      this.player.setState(STATE.CRAWL);
-    }
   }
 }
