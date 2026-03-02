@@ -133,6 +133,23 @@ export class RooftopScene extends Phaser.Scene {
     });
 
     this.playerOnHorse = false;
+
+    // Ride progress bar (shown while holding Right on horse)
+    const BAR_W = 70;
+    const BAR_H = 8;
+    const barY = this.horseY - 52;
+    this.rideBarBg = this.add.rectangle(this.horseX, barY, BAR_W, BAR_H, 0x333333, 0.8)
+      .setDepth(8).setVisible(false);
+    this.rideBarFill = this.add.rectangle(this.horseX - BAR_W / 2, barY, 0, BAR_H, 0x00ff88)
+      .setOrigin(0, 0.5).setDepth(9).setVisible(false);
+    this.rideBarLabel = this.add.text(this.horseX, barY - 12, 'Hold RIGHT!', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(9).setVisible(false);
+    this._rideBarW = BAR_W;
   }
 
   setupDada() {
@@ -227,21 +244,39 @@ export class RooftopScene extends Phaser.Scene {
   updateHorseRide(delta) {
     const cursors = this.player.cursors;
     const onHorse = this.playerOnHorse && this.player.body.blocked.down;
+    const RIDE_DURATION = 2000;
 
     if (onHorse && cursors.right.isDown && !this.horseAtWindow) {
       this.ridingTimer += delta;
-      if (this.ridingTimer >= 2000) {
-        // Move horse to window
-        this.horseAtWindow = true;
-        const targetX = this.horseTargetX;
 
+      // Show + update progress bar
+      const pct = Math.min(this.ridingTimer / RIDE_DURATION, 1);
+      this.rideBarBg.setVisible(true).setX(this.horse.x);
+      this.rideBarFill.setVisible(true).setX(this.horse.x - this._rideBarW / 2);
+      this.rideBarFill.setDisplaySize(pct * this._rideBarW, this.rideBarFill.height);
+      this.rideBarLabel.setVisible(true).setX(this.horse.x);
+
+      // Color bar green→yellow→orange as it fills
+      const fillColor = pct < 0.5 ? 0x00ff88 : pct < 0.8 ? 0xffd93d : 0xff922b;
+      this.rideBarFill.setFillStyle(fillColor);
+
+      if (this.ridingTimer >= RIDE_DURATION) {
+        // Trigger horse slide
+        this.horseAtWindow = true;
+        this.rideBarBg.setVisible(false);
+        this.rideBarFill.setVisible(false);
+        this.rideBarLabel.setVisible(false);
+
+        sfx.pickup();
+        this.cameras.main.shake(120, 0.006);
+
+        const targetX = this.horseTargetX;
         this.tweens.add({
           targets: this.horse,
           x: targetX,
           duration: 1200,
           ease: 'Sine.easeInOut',
           onUpdate: () => {
-            // Carry player with horse
             if (this.playerOnHorse) {
               this.player.setX(this.horse.x);
               this.player.body.reset(this.horse.x, this.player.y);
@@ -249,19 +284,41 @@ export class RooftopScene extends Phaser.Scene {
             this.horse.body.reset(this.horse.x, this.horse.y);
           },
           onComplete: () => {
-            sfx.pickup();
-            this.hud.showFloatingText(this.player.x, this.player.y - 60, 'Climb up!', '#ffffff');
-          }
+            // Flash window to draw eye
+            this.flashWindow();
+            this.hud.showFloatingText(this.player.x, this.player.y - 60, 'Climb up!', '#ffff88');
+          },
         });
       } else {
-        // Horse rocks more vigorously
-        this.horseTween.timeScale = 2;
-        sfx.crawlTick();
+        // Rock more vigorously while building up
+        this.horseTween.timeScale = 1 + pct * 2;
+        if (Math.random() < 0.04) sfx.crawlTick();
       }
-    } else if (!onHorse) {
-      this.playerOnHorse = false;
-      this.ridingTimer = 0;
-      if (this.horseTween) this.horseTween.timeScale = 1;
+    } else {
+      if (!onHorse) {
+        this.playerOnHorse = false;
+        this.ridingTimer = Math.max(0, this.ridingTimer - delta * 2); // drain fast when off
+        if (this.horseTween) this.horseTween.timeScale = 1;
+      }
+      // Hide bar when not actively riding toward goal
+      if (!this.horseAtWindow) {
+        this.rideBarBg.setVisible(false);
+        this.rideBarFill.setVisible(false);
+        this.rideBarLabel.setVisible(false);
+      }
     }
+  }
+
+  flashWindow() {
+    // Brief bright flash on the window to signal "go here"
+    const flash = this.add.rectangle(this.windowX, this.windowY, 74, 100, 0xffffff, 0.9)
+      .setDepth(15);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 500,
+      ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
   }
 }

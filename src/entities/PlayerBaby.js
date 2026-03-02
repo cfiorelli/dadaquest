@@ -55,6 +55,9 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     // Wobble/tilt
     this.wobbleTween = null;
 
+    // Wall-touch recency buffer (ms) — allows pressing Up/Down a moment after contact
+    this.wallTouchBuffer = 0;
+
     // Checkpoint timer
     this.checkpointTimer = 0;
     this.checkpointNapFired = false;
@@ -339,27 +342,52 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
 
   checkWallClimb(cursors) {
     if (!this.climbWalls) return;
-    // Check if touching a climbable wall
-    const touching = this.body.touching;
-    const blocked = this.body.blocked;
 
-    let isOnWall = false;
+    const bl = this.body.blocked;
+    const to = this.body.touching;
+
+    // Primary: physical contact flags (blocked OR touching covers both static + dynamic)
+    let isOnWall = bl.left || bl.right || to.left || to.right;
     let side = 0;
+    if (bl.left || to.left)       side = -1;
+    else if (bl.right || to.right) side = 1;
 
-    if (blocked.left) {
-      side = -1;
-      isOnWall = true;
-    } else if (blocked.right) {
-      side = 1;
-      isOnWall = true;
+    // Secondary: proximity scan — lets player enter climb 80 ms after last wall contact
+    if (!isOnWall) {
+      const MARGIN = 10; // px beyond body edge
+      const bx  = this.body.x;
+      const by  = this.body.y;
+      const bw  = this.body.width;
+      const bh  = this.body.height;
+      this.climbWalls.getChildren().forEach(w => {
+        if (isOnWall) return;
+        const wb = w.body;
+        const overlapV = by < wb.y + wb.height && by + bh > wb.y;
+        if (!overlapV) return;
+        if (bx + bw >= wb.x - MARGIN && bx <= wb.x + MARGIN) {
+          isOnWall = true; side = -1; // left of wall → player on right side touching left
+        }
+        if (bx >= wb.x + wb.width - MARGIN && bx <= wb.x + wb.width + MARGIN) {
+          isOnWall = true; side = 1;
+        }
+      });
+    }
+
+    // Update buffer
+    if (isOnWall) {
+      this.wallTouchBuffer = 80; // ms
+      this.wallSide = side;
+    } else if (this.wallTouchBuffer > 0) {
+      this.wallTouchBuffer -= 16; // approx one frame
+      isOnWall = true; // grace window still active
     }
 
     this.onClimbableWall = isOnWall;
-    this.wallSide = side;
 
     if (isOnWall && (cursors.up.isDown || cursors.down.isDown)) {
       if (this.state === STATE.CRAWL || this.state === STATE.AIR) {
         this.setState(STATE.WALL_CLIMB);
+        sfx.wallGrab(); // distinct "grab wall" cue
       }
     }
   }
@@ -372,7 +400,7 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     const bobY = this.pendulum.getBobY();
     const dist = Phaser.Math.Distance.Between(this.x, this.y, bobX, bobY);
 
-    if (dist < 40) {
+    if (dist < 56) {
       this.swingActive = true;
       this.setState(STATE.SWING);
       sfx.swing();

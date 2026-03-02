@@ -102,6 +102,12 @@ export const sfx = {
     playTone(200, 'sine', 0.05, 0.05, 0.01, 0.05);
   },
 
+  // Distinct "grabbed wall" cue — short thwump
+  wallGrab() {
+    playTone(160, 'triangle', 0.06, 0.18, 0.005, 0.07);
+    setTimeout(() => playTone(110, 'triangle', 0.04, 0.12, 0.005, 0.05), 50);
+  },
+
   wakeUp() {
     playTone(300, 'triangle', 0.1, 0.2, 0.02, 0.1);
     setTimeout(() => playTone(400, 'triangle', 0.1, 0.25, 0.02, 0.15), 120);

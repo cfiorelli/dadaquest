@@ -127,8 +127,8 @@ export class CribScene extends Phaser.Scene {
       this.mobileLength, 0.3
     );
 
-    // Grab zone radius
-    this.grabRadius = 36;
+    // Grab zone radius (must match PlayerBaby.checkSwingGrab threshold)
+    this.grabRadius = 56;
     this.playerOnSwing = false;
   }
 
@@ -149,25 +149,48 @@ export class CribScene extends Phaser.Scene {
   }
 
   setupExit() {
-    // Exit trigger on far left of dresser
-    this.exitZone = this.add.zone(60, GAME_H - 175, 40, 40).setOrigin(0.5);
+    // Exit zone — wide doorway covering the entire left half of the dresser top
+    // Dresser platform collider is at y=GAME_H-165, surface top ~GAME_H-173
+    // Baby standing there has center y ≈ GAME_H-192; zone covers plenty of range
+    const EXIT_X = 80;
+    const EXIT_Y = GAME_H - 185;
+    this.exitZone = this.add.zone(EXIT_X, EXIT_Y, 90, 60).setOrigin(0.5);
     this.physics.world.enable(this.exitZone);
     this.exitZone.body.setAllowGravity(false);
 
-    // Visual indicator
-    const exitArrow = this.add.text(52, GAME_H - 170, '→\nEXIT', {
+    // Doorway arch visual behind the dresser area
+    const gfx = this.add.graphics().setDepth(3);
+    gfx.lineStyle(3, 0x00ff88, 1);
+    gfx.strokeRect(EXIT_X - 36, EXIT_Y - 22, 72, 44);
+    gfx.fillStyle(0x00ff88, 0.08);
+    gfx.fillRect(EXIT_X - 36, EXIT_Y - 22, 72, 44);
+
+    // Pulsing arrow + EXIT label
+    const exitLabel = this.add.text(EXIT_X, EXIT_Y - 36, '>> EXIT >>', {
       fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#00ff00',
-      align: 'center',
-    }).setOrigin(0.5).setDepth(5);
+      fontSize: '11px',
+      color: '#00ff88',
+      stroke: '#003300',
+      strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(6);
 
     this.tweens.add({
-      targets: exitArrow,
-      x: 60,
-      duration: 500,
+      targets: exitLabel,
+      alpha: 0.3,
+      duration: 600,
       yoyo: true,
       repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Subtle glow pulse on the box
+    this.tweens.add({
+      targets: gfx,
+      alpha: 0.4,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
   }
 
@@ -269,6 +292,16 @@ export class CribScene extends Phaser.Scene {
     // Draw anchor dot
     this.ropeGraphics.fillStyle(0x555555, 1);
     this.ropeGraphics.fillCircle(this.mobileAnchorX, this.mobileAnchorY, 5);
+
+    // Draw grab-zone hint ring around bob when player is airborne and not already swinging
+    if (this.player.state === STATE.AIR) {
+      const bobX = this.mobilePendulum.getBobX();
+      const bobY = this.mobilePendulum.getBobY();
+      const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, bobX, bobY);
+      const alpha = Phaser.Math.Clamp(1 - dist / 140, 0.1, 0.6);
+      this.ropeGraphics.lineStyle(1.5, 0xffffff, alpha);
+      this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius);
+    }
 
     // Update player
     this.player.update(time, delta);
