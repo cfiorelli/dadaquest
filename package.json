@@ -1,0 +1,16 @@
+{
+  "name": "dada-quest",
+  "version": "1.0.0",
+  "description": "Da Da Quest - A comedic 2D platformer",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.2"
+  }
+}
