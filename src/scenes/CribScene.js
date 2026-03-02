@@ -6,6 +6,7 @@ import { Pendulum } from '../utils/pendulum.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { getStamina, setStamina, addStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 export class CribScene extends Phaser.Scene {
   constructor() {
@@ -57,6 +58,9 @@ export class CribScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('BedroomScene'), 600);
   }
 
   setupPlatforms() {

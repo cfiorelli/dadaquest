@@ -153,7 +153,7 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     this.wasOnGround = onGround;
 
     // Check stamina = 0 -> NAP
-    if (getStamina(this) <= 0 && this.state !== STATE.NAP) {
+    if (getStamina(this.scene) <= 0 && this.state !== STATE.NAP) {
       this.setState(STATE.NAP);
     }
 

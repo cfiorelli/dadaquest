@@ -5,6 +5,7 @@ import { HUD } from '../ui/HUD.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 export class StairsScene extends Phaser.Scene {
   constructor() {
@@ -40,6 +41,9 @@ export class StairsScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('RooftopScene'), 600);
   }
 
   setupStairs() {
@@ -142,7 +146,10 @@ export class StairsScene extends Phaser.Scene {
 
   setupCollisions() {
     this.physics.add.collider(this.player, this.staticGroup);
-    this.physics.add.overlap(this.player, this.dog, this.dogWake, null, this);
+    // Dog block disabled in test mode for determinism
+    if (!isTestMode) {
+      this.physics.add.overlap(this.player, this.dog, this.dogWake, null, this);
+    }
     this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);
   }
 

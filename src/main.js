@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from './gameConfig.js';
+import { isTestMode } from './utils/testMode.js';
 import { BootScene } from './scenes/BootScene.js';
 import { TitleScene } from './scenes/TitleScene.js';
 import { CribScene } from './scenes/CribScene.js';
@@ -20,6 +21,9 @@ const config = {
       gravity: { y: 500 },
       debug: false,
     },
+  },
+  fps: {
+    forceSetTimeOut: isTestMode,
   },
   scene: [
     BootScene,

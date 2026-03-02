@@ -5,6 +5,7 @@ import { HUD } from '../ui/HUD.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { getStamina, setStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 const SCENE_WIDTH = 1200;
 
@@ -61,6 +62,9 @@ export class KitchenScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('StairsScene'), 600);
   }
 
   setupPlatforms() {
@@ -131,8 +135,11 @@ export class KitchenScene extends Phaser.Scene {
   setupCollisions() {
     this.physics.add.collider(this.player, this.staticGroup);
 
-    this.physics.add.overlap(this.player, this.spillZone, () => this.slip(this.player), null, this);
-    this.physics.add.overlap(this.player, this.spillZone2, () => this.slip(this.player), null, this);
+    // Puddle slips disabled in test mode for determinism
+    if (!isTestMode) {
+      this.physics.add.overlap(this.player, this.spillZone, () => this.slip(this.player), null, this);
+      this.physics.add.overlap(this.player, this.spillZone2, () => this.slip(this.player), null, this);
+    }
 
     this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);
   }

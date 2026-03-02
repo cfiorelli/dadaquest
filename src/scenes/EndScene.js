@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import { resetStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 export class EndScene extends Phaser.Scene {
   constructor() {
@@ -10,6 +11,7 @@ export class EndScene extends Phaser.Scene {
 
   create() {
     resetStamina(this);
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
 
     sfx.victory();
 

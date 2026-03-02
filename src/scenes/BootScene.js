@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../gameConfig.js';
+import '../utils/testMode.js'; // ensure window.__DADA_DEBUG__ is initialized early
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -7,6 +8,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
     this.generateTextures();
     this.scene.start('TitleScene');
   }

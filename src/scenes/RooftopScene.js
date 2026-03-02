@@ -5,6 +5,7 @@ import { HUD } from '../ui/HUD.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 export class RooftopScene extends Phaser.Scene {
   constructor() {
@@ -60,6 +61,9 @@ export class RooftopScene extends Phaser.Scene {
     this.time.delayedCall(500, () => {
       this.hud.showBubble(this.player.x, this.player.y - 60, 'da da?!', 3000);
     });
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('EndScene'), 600);
 
     // Rocking horse ride tracking
     this.ridingTimer = 0;

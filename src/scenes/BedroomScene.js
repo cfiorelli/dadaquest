@@ -5,6 +5,7 @@ import { HUD } from '../ui/HUD.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { getStamina, setStamina } from '../utils/state.js';
+import { isTestMode } from '../utils/testMode.js';
 
 const SCENE_WIDTH = 1100;
 
@@ -53,6 +54,9 @@ export class BedroomScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('KitchenScene'), 600);
   }
 
   setupFurniture() {
@@ -135,8 +139,10 @@ export class BedroomScene extends Phaser.Scene {
   setupCollisions() {
     this.physics.add.collider(this.player, this.staticGroup);
 
-    // Mom collision -> reset to Scene 1
-    this.physics.add.overlap(this.player, this.mom, this.momCaught, null, this);
+    // Mom collision -> reset to Scene 1 (disabled in test mode for determinism)
+    if (!isTestMode) {
+      this.physics.add.overlap(this.player, this.mom, this.momCaught, null, this);
+    }
 
     // Exit
     this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);

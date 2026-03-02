@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
+import { isTestMode } from '../utils/testMode.js';
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -92,6 +93,9 @@ export class TitleScene extends Phaser.Scene {
 
     this.input.keyboard.once('keydown-SPACE', proceed);
     this.input.keyboard.once('keydown-ENTER', proceed);
+
+    window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    if (isTestMode) setTimeout(() => this.scene.start('CribScene'), 400);
   }
 
   makeBubble(x, y, text) {
