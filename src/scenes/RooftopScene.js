@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H, COLORS } from '../gameConfig.js';
-import { PlayerBaby } from '../entities/PlayerBaby.js';
+import { GAME_W, GAME_H } from '../gameConfig.js';
+import { PlayerDepth } from '../entities/PlayerDepth.js';
 import { HUD } from '../ui/HUD.js';
-import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
@@ -13,8 +12,6 @@ export class RooftopScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.gravity.y = 500;
-
     // Sky gradient (blue)
     this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x87ceeb);
 
@@ -44,11 +41,11 @@ export class RooftopScene extends Phaser.Scene {
     this.setupWindow();
     this.setupRockingHorse();
     this.setupDada();
-    this.setupPlayer();
     this.setupExit();
-    this.setupCollisions();
+    this.setupPlayer();
     this.setupHUD();
     this.setupEvents();
+    this.setupCamera();
 
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', () => {
       setStamina(this, 2);
@@ -63,7 +60,7 @@ export class RooftopScene extends Phaser.Scene {
     });
 
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
-    if (isTestMode) setTimeout(() => this.scene.start('EndScene'), 600);
+    if (isTestMode) this.time.delayedCall(600, () => this.scene.start('EndScene'));
 
     // Rocking horse ride tracking
     this.ridingTimer = 0;
@@ -83,30 +80,10 @@ export class RooftopScene extends Phaser.Scene {
   }
 
   setupPlatforms() {
-    this.staticGroup = this.physics.add.staticGroup();
-
-    // Main floor (rooftop + interior)
-    this.staticGroup.create(GAME_W / 2, GAME_H - 10, null)
-      .setSize(GAME_W, 20).setVisible(false);
-
-    // Interior elevated floor
-    this.interiorFloor = this.staticGroup.create(120, GAME_H - 58, null)
-      .setSize(240, 16).setVisible(false);
-
-    // Window sill (ledge to stand on outside)
-    this.windowSill = this.staticGroup.create(400, GAME_H - 175, null)
-      .setSize(70, 14).setVisible(false);
     this.add.rectangle(400, GAME_H - 175, 70, 14, 0xd4a96a);
 
     // Rooftop wall (left room wall)
     this.add.rectangle(240, GAME_H - 130, 20, 220, 0xbcaaa4);
-    this.staticGroup.create(240, GAME_H - 130, null).setSize(20, 220).setVisible(false);
-
-    // Climbable walls
-    this.climbWalls = this.physics.add.staticGroup();
-    // Window frame sides (climbable to get from horse to sill)
-    this.climbWalls.create(368, GAME_H - 150, null).setSize(10, 80).setVisible(false);
-    this.climbWalls.create(434, GAME_H - 150, null).setSize(10, 80).setVisible(false);
   }
 
   setupWindow() {
@@ -117,14 +94,15 @@ export class RooftopScene extends Phaser.Scene {
   }
 
   setupRockingHorse() {
-    this.horseX = 200;
+    this.horseWX = 200;
+    this.horseWZ = 136;
+    this.horseTop = 52;
     this.horseY = GAME_H - 90;
 
     // Horse sprite (physics, so baby can stand on it)
-    this.horse = this.physics.add.staticSprite(this.horseX, this.horseY, 'rocking_horse')
-      .setDisplaySize(80, 70);
-    this.horse.body.setSize(80, 14);
-    this.horse.body.setOffset(0, 20);
+    this.horse = this.add.image(this.horseWX, this.horseY, 'rocking_horse')
+      .setDisplaySize(80, 70)
+      .setDepth(9);
 
     // Rocking tween
     this.horseTween = this.tweens.add({
@@ -142,11 +120,11 @@ export class RooftopScene extends Phaser.Scene {
     const BAR_W = 70;
     const BAR_H = 8;
     const barY = this.horseY - 52;
-    this.rideBarBg = this.add.rectangle(this.horseX, barY, BAR_W, BAR_H, 0x333333, 0.8)
+    this.rideBarBg = this.add.rectangle(this.horseWX, barY, BAR_W, BAR_H, 0x333333, 0.8)
       .setDepth(8).setVisible(false);
-    this.rideBarFill = this.add.rectangle(this.horseX - BAR_W / 2, barY, 0, BAR_H, 0x00ff88)
+    this.rideBarFill = this.add.rectangle(this.horseWX - BAR_W / 2, barY, 0, BAR_H, 0x00ff88)
       .setOrigin(0, 0.5).setDepth(9).setVisible(false);
-    this.rideBarLabel = this.add.text(this.horseX, barY - 12, 'Hold RIGHT!', {
+    this.rideBarLabel = this.add.text(this.horseWX, barY - 12, 'Hold RIGHT!', {
       fontFamily: 'monospace',
       fontSize: '10px',
       color: '#ffffff',
@@ -171,26 +149,52 @@ export class RooftopScene extends Phaser.Scene {
     });
 
     // Da Da trigger zone
-    this.dadaTrigger = this.add.zone(520, GAME_H - 90, 80, 80).setOrigin(0.5);
-    this.physics.world.enable(this.dadaTrigger);
-    this.dadaTrigger.body.setAllowGravity(false);
+    this.dadaX = 520;
+    this.dadaZ = 104;
   }
 
   setupPlayer() {
-    this.player = new PlayerBaby(this, 60, GAME_H - 100);
-    this.player.setClimbWalls(this.climbWalls);
+    this.horseCollider = {
+      kind: 'solid',
+      x: this.horseWX,
+      z: this.horseWZ,
+      w: 90,
+      d: 42,
+      minWy: -999,
+      maxWy: 999,
+    };
+
+    this.player = new PlayerDepth(this, {
+      start: { wx: 60, wz: 122, wy: 0 },
+      walkBounds: { minX: 30, maxX: GAME_W - 30, minZ: 48, maxZ: 176 },
+      groundHeight: (wx, wz) => {
+        const inHorse = Math.abs(wx - this.horseCollider.x) <= this.horseCollider.w / 2
+          && Math.abs(wz - this.horseCollider.z) <= this.horseCollider.d / 2;
+        return inHorse ? this.horseTop : 0;
+      },
+      colliders: [
+        this.horseCollider,
+        {
+          kind: 'exit',
+          x: this.dadaX,
+          z: this.dadaZ,
+          w: 82,
+          d: 58,
+          minWy: -999,
+          maxWy: 999,
+          onTouch: p => this.reachDada(p),
+        },
+      ],
+    });
   }
 
   setupExit() {
     // Exit = Da Da trigger
   }
 
-  setupCollisions() {
-    this.physics.add.collider(this.player, this.staticGroup);
-    this.physics.add.collider(this.player, this.horse, () => {
-      this.playerOnHorse = this.player.body.blocked.down && this.player.y < this.horse.y;
-    });
-    this.physics.add.overlap(this.player, this.dadaTrigger, this.reachDada, null, this);
+  setupCamera() {
+    this.cameras.main.setBounds(0, 0, GAME_W, GAME_H);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
   }
 
   setupHUD() {
@@ -208,7 +212,7 @@ export class RooftopScene extends Phaser.Scene {
     });
   }
 
-  reachDada(player, trigger) {
+  reachDada(player) {
     if (this.ending) return;
     this.ending = true;
 
@@ -238,16 +242,11 @@ export class RooftopScene extends Phaser.Scene {
     // Rocking horse ride mechanic
     this.updateHorseRide(delta);
 
-    if (this.player.y > GAME_H + 50) {
-      this.player.setPosition(60, GAME_H - 100);
-      this.player.body.setVelocity(0, 0);
-      this.player.setState(STATE.CRAWL);
-    }
   }
 
   updateHorseRide(delta) {
     const cursors = this.player.cursors;
-    const onHorse = this.playerOnHorse && this.player.body.blocked.down;
+    const onHorse = this.isPlayerOnHorse();
     const RIDE_DURATION = 2000;
 
     if (onHorse && cursors.right.isDown && !this.horseAtWindow) {
@@ -255,10 +254,10 @@ export class RooftopScene extends Phaser.Scene {
 
       // Show + update progress bar
       const pct = Math.min(this.ridingTimer / RIDE_DURATION, 1);
-      this.rideBarBg.setVisible(true).setX(this.horse.x);
-      this.rideBarFill.setVisible(true).setX(this.horse.x - this._rideBarW / 2);
+      this.rideBarBg.setVisible(true).setX(this.horseWX);
+      this.rideBarFill.setVisible(true).setX(this.horseWX - this._rideBarW / 2);
       this.rideBarFill.setDisplaySize(pct * this._rideBarW, this.rideBarFill.height);
-      this.rideBarLabel.setVisible(true).setX(this.horse.x);
+      this.rideBarLabel.setVisible(true).setX(this.horseWX);
 
       // Color bar green→yellow→orange as it fills
       const fillColor = pct < 0.5 ? 0x00ff88 : pct < 0.8 ? 0xffd93d : 0xff922b;
@@ -276,16 +275,16 @@ export class RooftopScene extends Phaser.Scene {
 
         const targetX = this.horseTargetX;
         this.tweens.add({
-          targets: this.horse,
-          x: targetX,
+          targets: this,
+          horseWX: targetX,
           duration: 1200,
           ease: 'Sine.easeInOut',
           onUpdate: () => {
+            this.horse.setX(this.horseWX);
+            this.horseCollider.x = this.horseWX;
             if (this.playerOnHorse) {
-              this.player.setX(this.horse.x);
-              this.player.body.reset(this.horse.x, this.player.y);
+              this.player.setWorldPosition(this.horseWX, this.horseWZ, this.horseTop);
             }
-            this.horse.body.reset(this.horse.x, this.horse.y);
           },
           onComplete: () => {
             // Flash window to draw eye
@@ -324,5 +323,13 @@ export class RooftopScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       onComplete: () => flash.destroy(),
     });
+  }
+
+  isPlayerOnHorse() {
+    const dx = Math.abs(this.player.wx - this.horseCollider.x);
+    const dz = Math.abs(this.player.wz - this.horseCollider.z);
+    const inFootprint = dx <= this.horseCollider.w / 2 && dz <= this.horseCollider.d / 2;
+    this.playerOnHorse = inFootprint && this.player.onGround && this.player.wy >= this.horseTop - 2;
+    return this.playerOnHorse;
   }
 }
