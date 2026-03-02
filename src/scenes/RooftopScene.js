@@ -5,6 +5,12 @@ import { HUD } from '../ui/HUD.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  addContactShadow,
+  addDepthHazeOverlay,
+  addWarmLightAndVignette,
+  applyDepthHaze,
+} from '../utils/sceneFx.js';
 
 export class RooftopScene extends Phaser.Scene {
   constructor() {
@@ -24,13 +30,16 @@ export class RooftopScene extends Phaser.Scene {
 
     // Interior floor section (inside room)
     this.add.rectangle(120, GAME_H - 30, 240, 60, 0xd7b99e);
+    addContactShadow(this, 120, GAME_H - 2, 220, 18, 0.13, 2);
 
     // Plants on rooftop
     [-20, 30, 80].forEach(offset => {
-      this.add.image(600 + offset, GAME_H - 80, 'plant').setDisplaySize(32, 50);
+      addContactShadow(this, 600 + offset, GAME_H - 58, 26, 10, 0.16, 2);
+      applyDepthHaze(this.add.image(600 + offset, GAME_H - 80, 'plant').setDisplaySize(32, 50), 126);
     });
     [0, 50].forEach(offset => {
-      this.add.image(700 + offset, GAME_H - 78, 'plant').setDisplaySize(28, 44);
+      addContactShadow(this, 700 + offset, GAME_H - 56, 22, 9, 0.16, 2);
+      applyDepthHaze(this.add.image(700 + offset, GAME_H - 78, 'plant').setDisplaySize(28, 44), 132);
     });
 
     // Sun
@@ -43,6 +52,7 @@ export class RooftopScene extends Phaser.Scene {
     this.setupDada();
     this.setupExit();
     this.setupPlayer();
+    this.setupAtmosphere();
     this.setupHUD();
     this.setupEvents();
     this.setupCamera();
@@ -90,7 +100,8 @@ export class RooftopScene extends Phaser.Scene {
     // Window in the wall at x=370
     this.windowX = 380;
     this.windowY = GAME_H - 200;
-    this.add.image(this.windowX, this.windowY, 'window').setDisplaySize(70, 100);
+    addContactShadow(this, this.windowX, this.windowY + 52, 66, 14, 0.1, 2);
+    applyDepthHaze(this.add.image(this.windowX, this.windowY, 'window').setDisplaySize(70, 100), 146);
   }
 
   setupRockingHorse() {
@@ -100,9 +111,10 @@ export class RooftopScene extends Phaser.Scene {
     this.horseY = GAME_H - 90;
 
     // Horse sprite (physics, so baby can stand on it)
-    this.horse = this.add.image(this.horseWX, this.horseY, 'rocking_horse')
+    this.horseShadow = addContactShadow(this, this.horseWX, this.horseY + 28, 74, 20, 0.2, 8);
+    this.horse = applyDepthHaze(this.add.image(this.horseWX, this.horseY, 'rocking_horse')
       .setDisplaySize(80, 70)
-      .setDepth(9);
+      .setDepth(9), 136);
 
     // Rocking tween
     this.horseTween = this.tweens.add({
@@ -136,8 +148,11 @@ export class RooftopScene extends Phaser.Scene {
 
   setupDada() {
     // Da Da is outside the window on rooftop
-    this.dadaSprite = this.add.image(520, GAME_H - 90, 'dada')
-      .setDisplaySize(50, 68).setDepth(5);
+    addContactShadow(this, 520, GAME_H - 54, 48, 12, 0.18, 4);
+    this.dadaSprite = applyDepthHaze(
+      this.add.image(520, GAME_H - 90, 'dada').setDisplaySize(50, 68).setDepth(5),
+      104
+    );
 
     // Da Da waves
     this.tweens.add({
@@ -199,6 +214,15 @@ export class RooftopScene extends Phaser.Scene {
 
   setupHUD() {
     this.hud = new HUD(this);
+  }
+
+  setupAtmosphere() {
+    addDepthHazeOverlay(this, 0.12, 35);
+    addWarmLightAndVignette(this, {
+      warmColor: 0xffe3b8,
+      warmAlpha: 0.16,
+      vignetteAlpha: 0.1,
+    });
   }
 
   setupEvents() {
@@ -281,6 +305,7 @@ export class RooftopScene extends Phaser.Scene {
           ease: 'Sine.easeInOut',
           onUpdate: () => {
             this.horse.setX(this.horseWX);
+            this.horseShadow.setX(this.horseWX);
             this.horseCollider.x = this.horseWX;
             if (this.playerOnHorse) {
               this.player.setWorldPosition(this.horseWX, this.horseWZ, this.horseTop);

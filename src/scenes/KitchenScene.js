@@ -6,6 +6,12 @@ import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  addContactShadow,
+  addDepthHazeOverlay,
+  addWarmLightAndVignette,
+  applyDepthHaze,
+} from '../utils/sceneFx.js';
 
 const SCENE_WIDTH = 1200;
 
@@ -27,17 +33,21 @@ export class KitchenScene extends Phaser.Scene {
     }
 
     // Countertops
+    addContactShadow(this, 300, GAME_H - 50, 340, 20, 0.14, 2);
     this.add.rectangle(300, GAME_H - 100, 400, 20, 0xd4a96a);
     this.add.rectangle(300, GAME_H - 120, 400, 120, 0xbcaaa4);
+    addContactShadow(this, 900, GAME_H - 50, 340, 20, 0.14, 2);
     this.add.rectangle(900, GAME_H - 100, 400, 20, 0xd4a96a);
     this.add.rectangle(900, GAME_H - 120, 400, 120, 0xbcaaa4);
 
     // Fridge
+    addContactShadow(this, 1080, GAME_H - 30, 62, 16, 0.14, 2);
     this.add.rectangle(1080, GAME_H - 130, 60, 200, 0xeeeeee);
     this.add.rectangle(1080, GAME_H - 200, 58, 80, 0xe0e0e0);
     this.add.circle(1070, GAME_H - 160, 4, 0xaaaaaa);
 
     // Stove
+    addContactShadow(this, 220, GAME_H - 42, 94, 18, 0.16, 2);
     this.add.rectangle(220, GAME_H - 105, 100, 20, 0x424242);
     for (let b = 0; b < 4; b++) {
       this.add.circle(180 + (b % 2) * 60, GAME_H - 120 + Math.floor(b / 2) * 12, 10, 0x555555);
@@ -46,6 +56,7 @@ export class KitchenScene extends Phaser.Scene {
     this.setupHazards();
     this.setupExit();
     this.setupPlayer();
+    this.setupAtmosphere();
     this.setupHUD();
     this.setupCamera();
     this.setupEvents();
@@ -64,16 +75,23 @@ export class KitchenScene extends Phaser.Scene {
 
   setupHazards() {
     // Sourdough jar (visual obstacle, not blocking)
-    const jar = this.add.image(600, GAME_H - 80, 'sourdough').setDisplaySize(36, 44);
+    addContactShadow(this, 600, GAME_H - 50, 32, 10, 0.18, 2);
+    const jar = applyDepthHaze(this.add.image(600, GAME_H - 80, 'sourdough').setDisplaySize(36, 44), 118);
 
     // Puddle (slippery zone)
     this.puddleX = 580;
     this.puddleY = GAME_H - 37;
-    this.puddle = this.add.image(this.puddleX, this.puddleY, 'puddle').setDisplaySize(130, 28).setDepth(2);
+    this.puddle = applyDepthHaze(
+      this.add.image(this.puddleX, this.puddleY, 'puddle').setDisplaySize(130, 28).setDepth(2),
+      118
+    );
 
     // Spill zone collider (wide but thin)
     // Second puddle
-    this.puddle2 = this.add.image(820, GAME_H - 37, 'puddle').setDisplaySize(100, 24).setDepth(2);
+    this.puddle2 = applyDepthHaze(
+      this.add.image(820, GAME_H - 37, 'puddle').setDisplaySize(100, 24).setDepth(2),
+      124
+    );
 
     // "Slippery" label
     this.add.text(this.puddleX, GAME_H - 55, '~slippery~', {
@@ -150,6 +168,15 @@ export class KitchenScene extends Phaser.Scene {
 
   setupHUD() {
     this.hud = new HUD(this);
+  }
+
+  setupAtmosphere() {
+    addDepthHazeOverlay(this, 0.09, 35);
+    addWarmLightAndVignette(this, {
+      warmColor: 0xffd6ad,
+      warmAlpha: 0.12,
+      vignetteAlpha: 0.1,
+    });
   }
 
   setupCamera() {

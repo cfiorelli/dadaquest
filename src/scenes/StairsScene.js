@@ -6,6 +6,12 @@ import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  addContactShadow,
+  addDepthHazeOverlay,
+  addWarmLightAndVignette,
+  applyDepthHaze,
+} from '../utils/sceneFx.js';
 
 export class StairsScene extends Phaser.Scene {
   constructor() {
@@ -28,6 +34,7 @@ export class StairsScene extends Phaser.Scene {
     this.setupDog();
     this.setupExit();
     this.setupPlayer();
+    this.setupAtmosphere();
     this.setupHUD();
     this.setupEvents();
     this.setupCamera();
@@ -59,6 +66,7 @@ export class StairsScene extends Phaser.Scene {
 
     steps.forEach(s => {
       // Visual
+      addContactShadow(this, s.x, s.y + 10, s.w - 18, 12, 0.1, 2);
       this.add.rectangle(s.x, s.y, s.w, 20, 0xbcaaa4);
       this.add.rectangle(s.x, s.y - 10, s.w, 6, 0xd7ccc8);
       this.add.rectangle(s.x, s.y + 5, s.w, 2, 0x8d6e63);
@@ -82,7 +90,11 @@ export class StairsScene extends Phaser.Scene {
     this.dogX = step.x - 20;
     this.dogY = step.y - 30;
 
-    this.dog = this.add.image(this.dogX, this.dogY, 'dog').setDisplaySize(52, 36).setDepth(8);
+    addContactShadow(this, this.dogX, this.dogY + 14, 42, 12, 0.22, 7);
+    this.dog = applyDepthHaze(
+      this.add.image(this.dogX, this.dogY, 'dog').setDisplaySize(52, 36).setDepth(8),
+      110
+    );
 
     // Zzz animation above dog
     this.dogZzz = this.add.text(this.dogX + 30, this.dogY - 20, 'zzz', {
@@ -172,6 +184,15 @@ export class StairsScene extends Phaser.Scene {
 
   setupHUD() {
     this.hud = new HUD(this);
+  }
+
+  setupAtmosphere() {
+    addDepthHazeOverlay(this, 0.11, 35);
+    addWarmLightAndVignette(this, {
+      warmColor: 0xffd7be,
+      warmAlpha: 0.11,
+      vignetteAlpha: 0.12,
+    });
   }
 
   setupEvents() {

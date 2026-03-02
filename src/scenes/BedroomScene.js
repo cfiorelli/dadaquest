@@ -5,6 +5,12 @@ import { HUD } from '../ui/HUD.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  addContactShadow,
+  addDepthHazeOverlay,
+  addWarmLightAndVignette,
+  applyDepthHaze,
+} from '../utils/sceneFx.js';
 
 const SCENE_WIDTH = 1100;
 
@@ -31,6 +37,7 @@ export class BedroomScene extends Phaser.Scene {
     this.setupMom();
     this.setupExit();
     this.setupPlayer();
+    this.setupAtmosphere();
     this.setupHUD();
     this.setupCamera();
     this.setupEvents();
@@ -54,6 +61,7 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   setupFurniture() {
+    addContactShadow(this, 160, GAME_H - 48, 180, 24, 0.12, 2);
     // Bed (right side, where baby entered from)
     this.add.rectangle(160, GAME_H - 80, 200, 60, 0x90caf9);
     this.add.rectangle(160, GAME_H - 105, 200, 10, 0x5c8baa);  // headboard top
@@ -62,15 +70,18 @@ export class BedroomScene extends Phaser.Scene {
     this.add.ellipse(210, GAME_H - 88, 70, 30, 0xffffff);
 
     // Wardrobe left
+    addContactShadow(this, 30, GAME_H - 30, 56, 20, 0.16, 2);
     this.add.rectangle(30, GAME_H - 120, 50, 180, 0x8d6e63);
     this.add.line(30, GAME_H - 30, 30, GAME_H - 210, 30, GAME_H - 30, 0xffffff, 0.3);
 
     // Piano setup (mom sits here)
     this.pianoX = 700;
-    this.add.image(this.pianoX, GAME_H - 90, 'piano').setDisplaySize(140, 80);
+    addContactShadow(this, this.pianoX, GAME_H - 50, 130, 24, 0.16, 2);
+    applyDepthHaze(this.add.image(this.pianoX, GAME_H - 90, 'piano').setDisplaySize(140, 80), 120);
 
     // Window
-    this.add.image(950, GAME_H - 200, 'window').setDisplaySize(80, 120);
+    addContactShadow(this, 950, GAME_H - 142, 66, 16, 0.1, 2);
+    applyDepthHaze(this.add.image(950, GAME_H - 200, 'window').setDisplaySize(80, 120), 175);
 
     // Rug
     this.add.ellipse(SCENE_WIDTH / 2, GAME_H - 22, 500, 30, 0xce93d8, 0.7);
@@ -80,7 +91,20 @@ export class BedroomScene extends Phaser.Scene {
     // Mom seated at piano
     this.momX = this.pianoX - 45;
     this.momY = GAME_H - 95;
-    this.mom = this.add.image(this.momX, this.momY, 'mom').setDisplaySize(50, 70).setDepth(6);
+    addContactShadow(this, this.momX, GAME_H - 53, 42, 14, 0.18, 4);
+    this.mom = applyDepthHaze(
+      this.add.image(this.momX, this.momY, 'mom').setDisplaySize(50, 70).setDepth(6),
+      110
+    );
+  }
+
+  setupAtmosphere() {
+    addDepthHazeOverlay(this, 0.1, 35);
+    addWarmLightAndVignette(this, {
+      warmColor: 0xffdfbf,
+      warmAlpha: 0.14,
+      vignetteAlpha: 0.11,
+    });
   }
 
   setupExit() {
