@@ -41,10 +41,13 @@ export class PlayerDepth {
     this.onGround = true;
     this.jumpBufferMs = 0;
     this.coyoteMs = 0;
+    this.jumpHoldMs = 0;
+    this.jumpCutApplied = false;
     this.lastTransitions = [];
 
     this.sprite = scene.add.image(0, 0, 'baby').setDepth(10).setScale(1.4);
-    this.shadow = scene.add.ellipse(0, 0, 26, 12, 0x000000, 0.22).setDepth(8);
+    this.shadowSoft = scene.add.ellipse(0, 0, 36, 16, 0x000000, 0.11).setDepth(7);
+    this.shadow = scene.add.ellipse(0, 0, 24, 10, 0x000000, 0.18).setDepth(8);
 
     this.cursors = scene.input.keyboard.createCursorKeys();
     this.spaceKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -124,8 +127,12 @@ export class PlayerDepth {
     const zDir = (this.cursors.up.isDown ? 1 : 0) - (this.cursors.down.isDown ? 1 : 0);
     const move = new Phaser.Math.Vector2(xDir, zDir).normalize();
     const control = this.onGround ? 1 : AIR_CONTROL;
-    this.vx = move.x * MOVE_SPEED * control;
-    this.vz = move.y * MOVE_SPEED * control;
+    const targetVx = move.x * MOVE_SPEED * control;
+    const targetVz = move.y * MOVE_SPEED * control;
+    const accel = this.onGround ? 980 : 760;
+    const decel = this.onGround ? 1400 : 520;
+    this.vx = this.approachVelocity(this.vx, targetVx, dt, accel, decel);
+    this.vz = this.approachVelocity(this.vz, targetVz, dt, accel, decel);
     if (move.x !== 0) this.sprite.setFlipX(move.x < 0);
 
     this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
@@ -138,6 +145,8 @@ export class PlayerDepth {
       this.jumpBufferMs = 0;
       this.coyoteMs = 0;
       this.vy = JUMP_VEL;
+      this.jumpHoldMs = 120;
+      this.jumpCutApplied = false;
       this.onGround = false;
       this.setState(STATE.AIR);
     }
@@ -147,7 +156,18 @@ export class PlayerDepth {
     this.applyWalkBounds();
     this.resolveSolids();
 
-    this.vy -= GRAVITY * dt;
+    const jumpHeld = this.spaceKey.isDown || this.cursors.up.isDown;
+    if (this.vy > 0 && jumpHeld && this.jumpHoldMs > 0) {
+      this.vy -= GRAVITY * 0.58 * dt;
+      this.jumpHoldMs = Math.max(0, this.jumpHoldMs - delta);
+    } else {
+      if (this.vy > 0 && !jumpHeld && !this.jumpCutApplied) {
+        this.vy = Math.min(this.vy, JUMP_VEL * 0.42);
+        this.jumpCutApplied = true;
+      }
+      this.vy -= GRAVITY * dt;
+      this.jumpHoldMs = 0;
+    }
     this.vy = Math.max(this.vy, -MAX_FALL);
     this.wy += this.vy * dt;
 
@@ -156,6 +176,8 @@ export class PlayerDepth {
       const justLanded = !this.onGround && this.vy < -120;
       this.wy = ground;
       this.vy = 0;
+      this.jumpHoldMs = 0;
+      this.jumpCutApplied = false;
       this.onGround = true;
       this.coyoteMs = COYOTE_MS;
       this.setState(STATE.CRAWL);
@@ -168,6 +190,20 @@ export class PlayerDepth {
 
     this.checkTriggers();
     this.syncVisual();
+  }
+
+  approachVelocity(current, target, dt, accel, decel) {
+    if (Math.abs(target) > 0.0001) {
+      const turnBoost = Math.sign(current) !== Math.sign(target) && current !== 0 ? 1.28 : 1;
+      const maxDelta = accel * turnBoost * dt;
+      if (current < target) return Math.min(current + maxDelta, target);
+      if (current > target) return Math.max(current - maxDelta, target);
+      return current;
+    }
+
+    const stopDelta = decel * dt;
+    if (Math.abs(current) <= stopDelta) return 0;
+    return current - Math.sign(current) * stopDelta;
   }
 
   updateNap(dt) {
@@ -239,8 +275,12 @@ export class PlayerDepth {
     const hover = Phaser.Math.Clamp(this.wy / 80, 0, 1);
     this.shadow.setPosition(groundProjected.x, groundProjected.y + 8);
     this.shadow.setScale(1 - hover * 0.3);
-    this.shadow.setAlpha(0.24 - hover * 0.12);
+    this.shadow.setAlpha(0.2 - hover * 0.1);
     this.shadow.setDepth(groundProjected.y + 1);
+    this.shadowSoft.setPosition(groundProjected.x, groundProjected.y + 8);
+    this.shadowSoft.setScale(1.1 - hover * 0.22);
+    this.shadowSoft.setAlpha(0.12 - hover * 0.06);
+    this.shadowSoft.setDepth(groundProjected.y);
   }
 
   getDebugInfo() {
@@ -259,6 +299,7 @@ export class PlayerDepth {
   }
 
   destroy() {
+    this.shadowSoft.destroy();
     this.shadow.destroy();
     this.sprite.destroy();
   }
