@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H, COLORS } from '../gameConfig.js';
-import { PlayerBaby } from '../entities/PlayerBaby.js';
+import { GAME_H } from '../gameConfig.js';
+import { PlayerDepth } from '../entities/PlayerDepth.js';
 import { HUD } from '../ui/HUD.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
-import { getStamina, setStamina } from '../utils/state.js';
+import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 
 const SCENE_WIDTH = 1200;
@@ -15,9 +15,6 @@ export class KitchenScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.gravity.y = 500;
-    this.physics.world.setBounds(0, 0, SCENE_WIDTH, GAME_H);
-
     // Background
     this.add.rectangle(SCENE_WIDTH / 2, GAME_H / 2, SCENE_WIDTH, GAME_H, 0xf5f5dc);
 
@@ -46,11 +43,9 @@ export class KitchenScene extends Phaser.Scene {
       this.add.circle(180 + (b % 2) * 60, GAME_H - 120 + Math.floor(b / 2) * 12, 10, 0x555555);
     }
 
-    this.setupPlatforms();
     this.setupHazards();
-    this.setupPlayer();
     this.setupExit();
-    this.setupCollisions();
+    this.setupPlayer();
     this.setupHUD();
     this.setupCamera();
     this.setupEvents();
@@ -64,18 +59,7 @@ export class KitchenScene extends Phaser.Scene {
     });
 
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
-    if (isTestMode) setTimeout(() => this.scene.start('StairsScene'), 600);
-  }
-
-  setupPlatforms() {
-    this.staticGroup = this.physics.add.staticGroup();
-
-    // Floor
-    this.staticGroup.create(SCENE_WIDTH / 2, GAME_H - 10, null)
-      .setSize(SCENE_WIDTH, 20).setVisible(false);
-
-    // Climbable walls
-    this.climbWalls = this.physics.add.staticGroup();
+    if (isTestMode) this.time.delayedCall(600, () => this.scene.start('StairsScene'));
   }
 
   setupHazards() {
@@ -88,15 +72,8 @@ export class KitchenScene extends Phaser.Scene {
     this.puddle = this.add.image(this.puddleX, this.puddleY, 'puddle').setDisplaySize(130, 28).setDepth(2);
 
     // Spill zone collider (wide but thin)
-    this.spillZone = this.add.zone(this.puddleX, this.puddleY, 130, 20).setOrigin(0.5);
-    this.physics.world.enable(this.spillZone);
-    this.spillZone.body.setAllowGravity(false);
-
     // Second puddle
     this.puddle2 = this.add.image(820, GAME_H - 37, 'puddle').setDisplaySize(100, 24).setDepth(2);
-    this.spillZone2 = this.add.zone(820, GAME_H - 37, 100, 20).setOrigin(0.5);
-    this.physics.world.enable(this.spillZone2);
-    this.spillZone2.body.setAllowGravity(false);
 
     // "Slippery" label
     this.add.text(this.puddleX, GAME_H - 55, '~slippery~', {
@@ -111,17 +88,8 @@ export class KitchenScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(3);
   }
 
-  setupPlayer() {
-    this.player = new PlayerBaby(this, 60, GAME_H - 60);
-    this.player.setClimbWalls(this.climbWalls);
-    this.startX = 60;
-    this.startY = GAME_H - 60;
-  }
-
   setupExit() {
-    this.exitZone = this.add.zone(SCENE_WIDTH - 20, GAME_H - 50, 40, 80).setOrigin(0.5);
-    this.physics.world.enable(this.exitZone);
-    this.exitZone.body.setAllowGravity(false);
+    this.exitX = SCENE_WIDTH - 20;
 
     const arrow = this.add.text(SCENE_WIDTH - 30, GAME_H - 65, '→\nSTAIRS', {
       fontFamily: 'monospace',
@@ -132,16 +100,52 @@ export class KitchenScene extends Phaser.Scene {
     this.tweens.add({ targets: arrow, x: SCENE_WIDTH - 24, duration: 500, yoyo: true, repeat: -1 });
   }
 
-  setupCollisions() {
-    this.physics.add.collider(this.player, this.staticGroup);
-
-    // Puddle slips disabled in test mode for determinism
+  setupPlayer() {
+    const colliders = [
+      {
+        kind: 'exit',
+        x: this.exitX,
+        z: 112,
+        w: 44,
+        d: 72,
+        minWy: -999,
+        maxWy: 90,
+        onTouch: () => this.exitScene(),
+      },
+    ];
     if (!isTestMode) {
-      this.physics.add.overlap(this.player, this.spillZone, () => this.slip(this.player), null, this);
-      this.physics.add.overlap(this.player, this.spillZone2, () => this.slip(this.player), null, this);
+      colliders.push(
+        {
+          kind: 'hazard',
+          x: this.puddleX,
+          z: 118,
+          w: 132,
+          d: 34,
+          minWy: -999,
+          maxWy: 70,
+          onTouch: p => this.slip(p),
+        },
+        {
+          kind: 'hazard',
+          x: 820,
+          z: 124,
+          w: 102,
+          d: 30,
+          minWy: -999,
+          maxWy: 70,
+          onTouch: p => this.slip(p),
+        }
+      );
     }
 
-    this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);
+    this.player = new PlayerDepth(this, {
+      start: { wx: 60, wz: 112, wy: 0 },
+      walkBounds: { minX: 28, maxX: SCENE_WIDTH - 28, minZ: 52, maxZ: 170 },
+      groundHeight: () => 0,
+      colliders,
+    });
+    this.startWX = 60;
+    this.startWZ = 112;
   }
 
   setupHUD() {
@@ -173,8 +177,8 @@ export class KitchenScene extends Phaser.Scene {
     this.hud.showFloatingText(player.x, player.y - 50, 'SLIP!', '#4fc3f7');
 
     // Send baby sliding
-    player.body.setVelocityX(player.flipX ? 200 : -200);
-    player.body.setVelocityY(-100);
+    player.vx = player.sprite.flipX ? 200 : -200;
+    player.vy = 130;
     player.setState(STATE.AIR);
 
     this.time.delayedCall(1200, () => {
@@ -183,8 +187,7 @@ export class KitchenScene extends Phaser.Scene {
       this.cameras.main.fadeOut(300, 0, 0, 0);
       this.time.delayedCall(350, () => {
         this.cameras.main.fadeIn(300);
-        player.setPosition(this.startX, this.startY);
-        player.body.setVelocity(0, 0);
+        player.setWorldPosition(this.startWX, this.startWZ, 0);
         player.setState(STATE.CRAWL);
         player.resetCheckpointTimer();
         this.slipping = false;
@@ -206,11 +209,5 @@ export class KitchenScene extends Phaser.Scene {
     if (!this.player) return;
     this.player.update(time, delta);
     this.hud.update(this.player);
-
-    if (this.player.y > GAME_H + 50) {
-      this.player.setPosition(this.startX, this.startY);
-      this.player.body.setVelocity(0, 0);
-      this.player.setState(STATE.CRAWL);
-    }
   }
 }
