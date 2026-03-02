@@ -6,8 +6,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "pw:install": "playwright install --with-deps chromium",
     "test:smoke": "playwright test",
-    "test": "playwright install --with-deps chromium && npm run test:smoke"
+    "test": "npm run build && npm run test:smoke"
   },
   "dependencies": {
     "phaser": "^3.80.1"

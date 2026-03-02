@@ -192,7 +192,21 @@ export class HUD {
 
   updateDebug(player) {
     if (!this.debugVisible || !player) return;
+    if (typeof player.getDebugInfo === 'function') {
+      const d = player.getDebugInfo();
+      this.debugText.setText(
+        `state: ${d.state}\n` +
+        `stamina: ${d.stamina}\n` +
+        `w: (${d.wx}, ${d.wz}, ${d.wy})\n` +
+        `v: (${d.vx}, ${d.vz}, ${d.vy})\n` +
+        `ground: ${d.onGround}\n` +
+        `last: ${(d.transitions?.slice(-2) || []).join(' | ')}`
+      );
+      return;
+    }
+
     const vb = player.body;
+    if (!vb) return;
     this.debugText.setText(
       `state: ${player.state}\n` +
       `stamina: ${getStamina(this.scene)}\n` +
