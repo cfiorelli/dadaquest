@@ -30,6 +30,10 @@ function playTone(freq, type, duration, volume = 0.3, attack = 0.01, decay = 0.1
   }
 }
 
+function playPluck(freq, duration = 0.08, volume = 0.12) {
+  playTone(freq, 'triangle', duration, volume, 0.015, duration * 0.8);
+}
+
 function playNoise(duration, volume = 0.1, highpass = 200) {
   try {
     const c = getCtx();
@@ -60,25 +64,26 @@ export const sfx = {
   },
 
   crawlTick() {
-    playTone(80, 'sine', 0.05, 0.08, 0.01, 0.04);
+    playPluck(170, 0.05, 0.06);
+    setTimeout(() => playPluck(130, 0.04, 0.04), 20);
   },
 
   bonk() {
-    playTone(120, 'square', 0.08, 0.25, 0.005, 0.1);
-    setTimeout(() => playTone(80, 'square', 0.06, 0.15, 0.005, 0.08), 60);
+    playTone(180, 'triangle', 0.07, 0.09, 0.015, 0.09);
+    playNoise(0.04, 0.025, 500);
+    setTimeout(() => playTone(130, 'sine', 0.06, 0.07, 0.02, 0.08), 55);
   },
 
   pickup() {
-    playTone(523, 'sine', 0.05, 0.3, 0.01, 0.05);
-    setTimeout(() => playTone(659, 'sine', 0.05, 0.3, 0.01, 0.05), 80);
-    setTimeout(() => playTone(784, 'sine', 0.1, 0.35, 0.01, 0.1), 160);
+    playTone(392, 'sine', 0.06, 0.12, 0.02, 0.08);
+    setTimeout(() => playTone(523, 'triangle', 0.06, 0.11, 0.02, 0.08), 70);
+    setTimeout(() => playTone(659, 'sine', 0.08, 0.12, 0.02, 0.1), 140);
   },
 
   nap() {
-    // Soft snore sound
-    playTone(150, 'sine', 0.3, 0.1, 0.1, 0.2);
-    setTimeout(() => playTone(120, 'sine', 0.4, 0.08, 0.1, 0.3), 500);
-    setTimeout(() => playTone(150, 'sine', 0.3, 0.1, 0.1, 0.2), 1000);
+    playTone(170, 'sine', 0.32, 0.065, 0.08, 0.22);
+    setTimeout(() => playTone(140, 'sine', 0.34, 0.06, 0.08, 0.24), 460);
+    setTimeout(() => playTone(162, 'triangle', 0.3, 0.055, 0.08, 0.2), 940);
   },
 
   whoosh() {
@@ -99,7 +104,8 @@ export const sfx = {
   },
 
   swing() {
-    playTone(200, 'sine', 0.05, 0.05, 0.01, 0.05);
+    playTone(520, 'triangle', 0.04, 0.09, 0.01, 0.04);
+    setTimeout(() => playTone(680, 'sine', 0.035, 0.07, 0.01, 0.03), 35);
   },
 
   // Distinct "grabbed wall" cue — short thwump

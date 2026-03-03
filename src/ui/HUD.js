@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_W } from '../gameConfig.js';
-import { getStamina } from '../utils/state.js';
+import { getStamina, getStaminaMax } from '../utils/state.js';
 import { SCENE_NAMES } from '../gameConfig.js';
 
 function drawStarShape(g, cx, cy, points, outer, inner) {
@@ -18,6 +18,7 @@ export class HUD {
   constructor(scene) {
     this.scene = scene;
     this.staminaIcons = [];
+    this.staminaLabel = null;
     this.currentBubble = null;
     this.debugText = null;
     this.debugVisible = false;
@@ -35,17 +36,11 @@ export class HUD {
     this.staminaBg.fillRoundedRect(6, 6, 122, 36, 6);
 
     // Stamina label
-    scene.add.text(12, 10, 'STAMINA', {
+    this.staminaLabel = scene.add.text(12, 10, 'STAMINA', {
       fontFamily: 'monospace',
       fontSize: '9px',
       color: '#aaaaaa',
     }).setScrollFactor(0).setDepth(100);
-
-    // Stamina icon graphics (4 max)
-    for (let i = 0; i < 4; i++) {
-      const icon = scene.add.graphics().setScrollFactor(0).setDepth(100);
-      this.staminaIcons.push(icon);
-    }
 
     // Scene name top-center
     const sceneName = SCENE_NAMES[scene.scene.key] || '';
@@ -71,7 +66,22 @@ export class HUD {
 
   updateStamina() {
     const stamina = getStamina(this.scene);
-    for (let i = 0; i < 4; i++) {
+    const maxStamina = getStaminaMax(this.scene);
+
+    while (this.staminaIcons.length < maxStamina) {
+      this.staminaIcons.push(this.scene.add.graphics().setScrollFactor(0).setDepth(100));
+    }
+    while (this.staminaIcons.length > maxStamina) {
+      const icon = this.staminaIcons.pop();
+      icon.destroy();
+    }
+
+    const panelW = 22 + maxStamina * 28;
+    this.staminaBg.clear();
+    this.staminaBg.fillStyle(0x000000, 0.55);
+    this.staminaBg.fillRoundedRect(6, 6, panelW, 36, 6);
+
+    for (let i = 0; i < maxStamina; i++) {
       const icon = this.staminaIcons[i];
       icon.clear();
       const filled = i < stamina;

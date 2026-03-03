@@ -1,12 +1,18 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H, COLORS } from '../gameConfig.js';
+import { GAME_W, GAME_H } from '../gameConfig.js';
 import { PlayerBaby } from '../entities/PlayerBaby.js';
 import { HUD } from '../ui/HUD.js';
 import { Pendulum } from '../utils/pendulum.js';
 import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
-import { getStamina, setStamina, addStamina } from '../utils/state.js';
+import { getStamina, setStamina, addStamina, setStaminaMax } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  addContactShadow,
+  addDepthHazeOverlay,
+  addWarmLightAndVignette,
+  applyDepthHaze,
+} from '../utils/sceneFx.js';
 
 export class CribScene extends Phaser.Scene {
   constructor() {
@@ -15,6 +21,12 @@ export class CribScene extends Phaser.Scene {
 
   create() {
     this.physics.world.gravity.y = 500;
+    this.createCraftedTextures();
+    setStaminaMax(this, 5);
+    setStamina(this, 3);
+    this.events.once('shutdown', () => setStaminaMax(this, 4));
+    this.failsafeGiven = false;
+    this.elapsedSceneMs = 0;
 
     // Background - nursery
     this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0xfce4ec);
@@ -36,6 +48,7 @@ export class CribScene extends Phaser.Scene {
     this.setupPlayer();
     this.setupExit();
     this.setupCollisions();
+    this.setupAtmosphere();
     this.setupHUD();
     this.setupHints();
     this.setupEvents();
@@ -50,7 +63,8 @@ export class CribScene extends Phaser.Scene {
 
     // R key
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R).on('down', () => {
-      setStamina(this, 2);
+      setStaminaMax(this, 5);
+      setStamina(this, 3);
       this.scene.restart();
     });
 
@@ -60,7 +74,35 @@ export class CribScene extends Phaser.Scene {
     });
 
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
-    if (isTestMode) setTimeout(() => this.scene.start('BedroomScene'), 600);
+    if (isTestMode) this.time.delayedCall(600, () => this.scene.start('BedroomScene'));
+  }
+
+  createCraftedTextures() {
+    if (!this.textures.exists('crib_wood_plank')) {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0xe7c79a, 0xe0bf91, 0xcfa574, 0xc79f71, 1, 1, 1, 1);
+      g.fillRoundedRect(0, 0, 180, 34, 6);
+      g.lineStyle(2, 0xb38556, 0.35);
+      g.strokeRoundedRect(1, 1, 178, 32, 6);
+      for (let i = 0; i < 22; i++) {
+        g.fillStyle(0xffffff, 0.04);
+        g.fillRect(Phaser.Math.Between(2, 176), Phaser.Math.Between(2, 30), 2, 1);
+      }
+      g.generateTexture('crib_wood_plank', 180, 34);
+      g.destroy();
+    }
+
+    if (!this.textures.exists('hero_onesie')) {
+      const g = this.add.graphics();
+      g.fillGradientStyle(0x8dd6ff, 0x66bff3, 0x3b98df, 0x2f7ec6, 1, 1, 1, 1);
+      g.fillRoundedRect(2, 2, 42, 42, 10);
+      g.fillStyle(0xffffff, 0.18);
+      g.fillCircle(16, 14, 9);
+      g.fillStyle(0xfff59d, 0.5);
+      g.fillCircle(30, 28, 6);
+      g.generateTexture('hero_onesie', 46, 46);
+      g.destroy();
+    }
   }
 
   setupPlatforms() {
@@ -70,32 +112,35 @@ export class CribScene extends Phaser.Scene {
     // Crib floor (baby starts here)
     this.cribFloor = this.staticGroup.create(GAME_W / 2, GAME_H - 70, null)
       .setSize(240, 20).setVisible(false);
-    this.add.rectangle(GAME_W / 2, GAME_H - 70, 240, 20, COLORS.CRIB_WOOD);
+    addContactShadow(this, GAME_W / 2, GAME_H - 48, 230, 18, 0.15, 2);
+    this.add.image(GAME_W / 2, GAME_H - 70, 'crib_wood_plank').setDisplaySize(240, 20);
 
     // Crib left wall
     this.cribLeftWall = this.staticGroup.create(GAME_W / 2 - 120, GAME_H - 150, null)
       .setSize(16, 160).setVisible(false);
-    const cribL = this.add.image(GAME_W / 2 - 120, GAME_H - 150, 'crib_wall')
-      .setDisplaySize(16, 160);
-    cribL.setTint(0xd4a96a);
+    const cribL = applyDepthHaze(this.add.image(GAME_W / 2 - 120, GAME_H - 150, 'crib_wall')
+      .setDisplaySize(16, 160), 140);
+    cribL.setTint(0xe3bb8a);
 
     // Crib right wall
     this.cribRightWall = this.staticGroup.create(GAME_W / 2 + 120, GAME_H - 150, null)
       .setSize(16, 160).setVisible(false);
-    const cribR = this.add.image(GAME_W / 2 + 120, GAME_H - 150, 'crib_wall')
-      .setDisplaySize(16, 160);
-    cribR.setTint(0xd4a96a);
+    const cribR = applyDepthHaze(this.add.image(GAME_W / 2 + 120, GAME_H - 150, 'crib_wall')
+      .setDisplaySize(16, 160), 140);
+    cribR.setTint(0xe3bb8a);
 
     // Crib top rail (baby can crawl across top)
     this.cribTopRail = this.staticGroup.create(GAME_W / 2, GAME_H - 225, null)
       .setSize(240, 12).setVisible(false);
-    this.add.rectangle(GAME_W / 2, GAME_H - 225, 240, 12, COLORS.CRIB_WOOD);
+    addContactShadow(this, GAME_W / 2, GAME_H - 208, 210, 10, 0.12, 2);
+    this.add.image(GAME_W / 2, GAME_H - 225, 'crib_wood_plank').setDisplaySize(240, 12);
 
     // === DRESSER (left side) ===
     // Dresser surface - platform for baby to land on
     this.dresser = this.staticGroup.create(120, GAME_H - 165, null)
       .setSize(120, 16).setVisible(false);
-    this.add.image(120, GAME_H - 135, 'dresser').setDisplaySize(120, 80);
+    addContactShadow(this, 120, GAME_H - 92, 110, 18, 0.18, 2);
+    applyDepthHaze(this.add.image(120, GAME_H - 135, 'dresser').setDisplaySize(120, 80), 116);
 
     // === Ground (below everything) ===
     this.ground = this.staticGroup.create(GAME_W / 2, GAME_H - 10, null)
@@ -122,8 +167,21 @@ export class CribScene extends Phaser.Scene {
     this.ropeGraphics = this.add.graphics().setDepth(5);
 
     // Mobile toy sprite (moves with pendulum)
-    this.mobileToy = this.add.image(this.mobileAnchorX, this.mobileAnchorY + this.mobileLength, 'mobile_toy')
-      .setDepth(6).setScale(0.9);
+    this.mobileToy = applyDepthHaze(
+      this.add.image(this.mobileAnchorX, this.mobileAnchorY + this.mobileLength, 'mobile_toy')
+        .setDepth(6)
+        .setScale(0.94),
+      170
+    );
+    this.tweens.add({
+      targets: this.mobileToy,
+      scaleX: 1.0,
+      scaleY: 0.88,
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
 
     // Pendulum state
     this.mobilePendulum = new Pendulum(
@@ -138,14 +196,26 @@ export class CribScene extends Phaser.Scene {
 
   setupOnesie() {
     // Onesie on dresser
-    this.onesieSprite = this.physics.add.staticSprite(100, GAME_H - 185, 'onesie')
+    addContactShadow(this, 100, GAME_H - 166, 32, 10, 0.2, 4);
+    this.onesieSprite = this.physics.add.staticSprite(100, GAME_H - 185, 'hero_onesie')
       .setDisplaySize(36, 36);
+    this.tweens.add({
+      targets: this.onesieSprite,
+      y: GAME_H - 188,
+      angle: 6,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   setupPlayer() {
     // Start baby in crib center
     this.player = new PlayerBaby(this, GAME_W / 2, GAME_H - 100);
     this.player.setClimbWalls(this.climbWalls);
+    this.player.setCheckpointNapEnabled(false);
+    this.playerShadow = addContactShadow(this, this.player.x, this.player.y + 20, 34, 12, 0.18, 8);
 
     // Give pendulum reference for swing detection
     this.player.pendulum = this.mobilePendulum;
@@ -156,18 +226,23 @@ export class CribScene extends Phaser.Scene {
     // Exit zone — wide doorway covering the entire left half of the dresser top
     // Dresser platform collider is at y=GAME_H-165, surface top ~GAME_H-173
     // Baby standing there has center y ≈ GAME_H-192; zone covers plenty of range
-    const EXIT_X = 80;
-    const EXIT_Y = GAME_H - 185;
-    this.exitZone = this.add.zone(EXIT_X, EXIT_Y, 90, 60).setOrigin(0.5);
+    const EXIT_X = 104;
+    const EXIT_Y = GAME_H - 196;
+    this.exitZone = this.add.zone(EXIT_X, EXIT_Y, 180, 120).setOrigin(0.5);
     this.physics.world.enable(this.exitZone);
     this.exitZone.body.setAllowGravity(false);
+
+    // Safety rail exit so first-time players can clear Scene 1 quickly.
+    this.railExitZone = this.add.zone(GAME_W / 2 - 92, GAME_H - 225, 90, 24).setOrigin(0.5);
+    this.physics.world.enable(this.railExitZone);
+    this.railExitZone.body.setAllowGravity(false);
 
     // Doorway arch visual behind the dresser area
     const gfx = this.add.graphics().setDepth(3);
     gfx.lineStyle(3, 0x00ff88, 1);
-    gfx.strokeRect(EXIT_X - 36, EXIT_Y - 22, 72, 44);
+    gfx.strokeRect(EXIT_X - 88, EXIT_Y - 52, 176, 104);
     gfx.fillStyle(0x00ff88, 0.08);
-    gfx.fillRect(EXIT_X - 36, EXIT_Y - 22, 72, 44);
+    gfx.fillRect(EXIT_X - 88, EXIT_Y - 52, 176, 104);
 
     // Pulsing arrow + EXIT label
     const exitLabel = this.add.text(EXIT_X, EXIT_Y - 36, '>> EXIT >>', {
@@ -196,6 +271,21 @@ export class CribScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
+
+    const railHint = this.add.text(GAME_W / 2 - 92, GAME_H - 248, 'ESCAPE RAIL', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#dcedc8',
+      stroke: '#2e7d32',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(6);
+    this.tweens.add({
+      targets: railHint,
+      alpha: 0.35,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+    });
   }
 
   setupCollisions() {
@@ -207,10 +297,20 @@ export class CribScene extends Phaser.Scene {
 
     // Exit overlap
     this.physics.add.overlap(this.player, this.exitZone, this.exitScene, null, this);
+    this.physics.add.overlap(this.player, this.railExitZone, this.exitScene, null, this);
   }
 
   setupHUD() {
     this.hud = new HUD(this);
+  }
+
+  setupAtmosphere() {
+    addDepthHazeOverlay(this, 0.1, 35);
+    addWarmLightAndVignette(this, {
+      warmColor: 0xffdfc2,
+      warmAlpha: 0.14,
+      vignetteAlpha: 0.11,
+    });
   }
 
   setupHints() {
@@ -244,6 +344,31 @@ export class CribScene extends Phaser.Scene {
         this.hud.clearZzz();
       }
     });
+
+    this.events.on('swing-grab', ({ x, y }) => {
+      const pulse = this.add.circle(x, y, 12, 0xffffff, 0.5).setDepth(20);
+      const txt = this.add.text(x, y - 20, 'GRAB!', {
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#fff8e1',
+        stroke: '#5d4037',
+        strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(21);
+      this.tweens.add({
+        targets: pulse,
+        alpha: 0,
+        scale: 2.2,
+        duration: 180,
+        onComplete: () => pulse.destroy(),
+      });
+      this.tweens.add({
+        targets: txt,
+        y: txt.y - 18,
+        alpha: 0,
+        duration: 260,
+        onComplete: () => txt.destroy(),
+      });
+    });
   }
 
   collectOnesie(player, onesie) {
@@ -262,6 +387,7 @@ export class CribScene extends Phaser.Scene {
     sfx.whoosh();
     this.cameras.main.fadeOut(400, 0, 0, 0);
     this.time.delayedCall(450, () => {
+      setStaminaMax(this, 4);
       setStamina(this, Math.max(1, getStamina(this)));
       this.scene.start('BedroomScene');
     });
@@ -302,16 +428,31 @@ export class CribScene extends Phaser.Scene {
       const bobX = this.mobilePendulum.getBobX();
       const bobY = this.mobilePendulum.getBobY();
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, bobX, bobY);
-      const alpha = Phaser.Math.Clamp(1 - dist / 140, 0.1, 0.6);
-      this.ropeGraphics.lineStyle(1.5, 0xffffff, alpha);
+      const alpha = Phaser.Math.Clamp(1 - dist / 140, 0.15, 0.78);
+      const pulse = 1 + Math.sin(time * 0.008) * 0.08;
+      this.ropeGraphics.lineStyle(1.8, 0xfff7c2, alpha);
       this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius);
+      this.ropeGraphics.lineStyle(1.2, 0xffffff, alpha * 0.5);
+      this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius * pulse);
     }
 
     // Update player
     this.player.update(time, delta);
+    this.playerShadow.setPosition(this.player.x, this.player.y + 22);
+    const vy = Math.abs(this.player.body.velocity.y);
+    this.playerShadow.setScale(1 + Phaser.Math.Clamp(vy / 420, 0, 0.22), 1);
+    this.playerShadow.setAlpha(0.18 - Phaser.Math.Clamp(vy / 900, 0, 0.08));
 
     // HUD update
     this.hud.update(this.player);
+
+    // Failsafe to avoid softlock pacing for first-time players.
+    this.elapsedSceneMs += delta;
+    if (!this.exiting && !this.failsafeGiven && this.elapsedSceneMs > 45000) {
+      this.failsafeGiven = true;
+      addStamina(this, 1);
+      this.hud.showFloatingText(this.player.x, this.player.y - 56, '+1 BOOST', '#fff59d');
+    }
 
     // Check out of bounds
     if (this.player.y > GAME_H + 50) {

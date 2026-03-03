@@ -48,6 +48,11 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     // Input tracking
     this.jumpPressed = false;
     this.wasOnGround = false;
+    this.jumpBufferMs = 0;
+    this.coyoteMs = 0;
+    this.jumpBufferWindowMs = 120;
+    this.coyoteWindowMs = 120;
+    this.jumpCutApplied = false;
 
     // Crawl sound timer
     this.crawlSoundTimer = 0;
@@ -61,6 +66,10 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     // Checkpoint timer
     this.checkpointTimer = 0;
     this.checkpointNapFired = false;
+    this.checkpointNapEnabled = true;
+    this.baseScale = 1.4;
+    this.lastPumpDir = 0;
+    this.swingPumpCounter = 0;
 
     // Input
     this.cursors = scene.input.keyboard.createCursorKeys();
@@ -81,6 +90,10 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
   setSwingAnchor(anchor, length, initAngle) {
     this.pendulum = new Pendulum(anchor.x, anchor.y, length, initAngle);
     this.swingAnchor = anchor;
+  }
+
+  setCheckpointNapEnabled(enabled) {
+    this.checkpointNapEnabled = enabled;
   }
 
   setState(newState) {
@@ -117,10 +130,18 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
 
     // Checkpoint timer
     this.checkpointTimer += dt;
-    if (this.checkpointTimer > 30 && !this.checkpointNapFired && this.state !== STATE.NAP) {
+    if (this.checkpointNapEnabled && this.checkpointTimer > 30 && !this.checkpointNapFired && this.state !== STATE.NAP) {
       this.checkpointNapFired = true;
       this.setState(STATE.NAP);
       return;
+    }
+
+    this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
+    this.coyoteMs = Math.max(0, this.coyoteMs - delta);
+    if (onGround) this.coyoteMs = this.coyoteWindowMs;
+    if (Phaser.Input.Keyboard.JustDown(spaceKey) || Phaser.Input.Keyboard.JustDown(cursors.up)) {
+      this.jumpBufferMs = this.jumpBufferWindowMs;
+      this.jumpCutApplied = false;
     }
 
     // Crawl sound
@@ -157,10 +178,23 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
       this.setState(STATE.NAP);
     }
 
-    // Tilt based on velocity
+    // Tilt and squash/stretch based on velocity
     if (this.state !== STATE.NAP && this.state !== STATE.SWING) {
       const tiltTarget = Phaser.Math.Clamp(this.body.velocity.x * 0.08, -15, 15);
       this.setAngle(Phaser.Math.Linear(this.angle, tiltTarget, 0.15));
+      const runStretch = Phaser.Math.Clamp(Math.abs(this.body.velocity.x) / 260, 0, 0.12);
+      const airStretch = Phaser.Math.Clamp(Math.abs(this.body.velocity.y) / 520, 0, 0.1);
+      const targetScaleX = this.baseScale + runStretch - airStretch * 0.3;
+      const targetScaleY = this.baseScale - runStretch * 0.55 + airStretch;
+      this.setScale(
+        Phaser.Math.Linear(this.scaleX, targetScaleX, 0.2),
+        Phaser.Math.Linear(this.scaleY, targetScaleY, 0.2)
+      );
+    } else if (this.state !== STATE.SWING) {
+      this.setScale(
+        Phaser.Math.Linear(this.scaleX, this.baseScale, 0.2),
+        Phaser.Math.Linear(this.scaleY, this.baseScale, 0.2)
+      );
     }
 
     // Debug D key (handled in scene/HUD)
@@ -173,8 +207,8 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     }
 
     // Horizontal movement with acceleration & drag
-    const accel = PLAYER.ACCEL;
-    const drag = PLAYER.DRAG;
+    const accel = PLAYER.ACCEL * 1.6;
+    const drag = PLAYER.DRAG * 2.8;
 
     if (cursors.left.isDown) {
       this.body.setAccelerationX(-accel);
@@ -184,20 +218,22 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
       this.setFlipX(false);
     } else {
       this.body.setAccelerationX(0);
-      // Apply drag manually for slidey feel
+      // Apply strong drag for a snappy crawl
       const vel = this.body.velocity.x;
       if (Math.abs(vel) < 5) {
         this.body.setVelocityX(0);
       } else {
-        this.body.setVelocityX(vel * (1 - drag * dt / 100));
+        this.body.setVelocityX(vel * Math.max(0, 1 - drag * dt / 100));
       }
     }
 
     // Wall climb transition check
     this.checkWallClimb(cursors);
 
-    // Jump
-    if (Phaser.Input.Keyboard.JustDown(spaceKey) || Phaser.Input.Keyboard.JustDown(cursors.up)) {
+    // Jump (buffer + coyote)
+    if (this.jumpBufferMs > 0 && (onGround || this.coyoteMs > 0)) {
+      this.jumpBufferMs = 0;
+      this.coyoteMs = 0;
       this.doJump();
     }
   }
@@ -211,13 +247,25 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
 
     // Slight air control
     if (cursors.left.isDown) {
-      this.body.setAccelerationX(-PLAYER.ACCEL * 0.5);
+      this.body.setAccelerationX(-PLAYER.ACCEL * 0.75);
       this.setFlipX(true);
     } else if (cursors.right.isDown) {
-      this.body.setAccelerationX(PLAYER.ACCEL * 0.5);
+      this.body.setAccelerationX(PLAYER.ACCEL * 0.75);
       this.setFlipX(false);
     } else {
       this.body.setAccelerationX(0);
+    }
+
+    if (!(this.spaceKey.isDown || this.cursors.up.isDown) && this.body.velocity.y < -80 && !this.jumpCutApplied) {
+      this.body.setVelocityY(this.body.velocity.y * 0.5);
+      this.jumpCutApplied = true;
+    }
+
+    if (this.jumpBufferMs > 0 && this.coyoteMs > 0) {
+      this.jumpBufferMs = 0;
+      this.coyoteMs = 0;
+      this.doJump();
+      return;
     }
 
     // Auto-grab swing check
@@ -240,10 +288,13 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     else if (bl.right) this.wallSide = 1;
 
     // Drain stamina
-    this.climbDrainAcc += PLAYER.CLIMB_DRAIN_RATE * dt;
-    if (this.climbDrainAcc >= 1) {
-      this.climbDrainAcc -= 1;
-      drainStamina(this.scene, 1);
+    const climbingMotion = cursors.up.isDown || cursors.down.isDown;
+    if (climbingMotion) {
+      this.climbDrainAcc += PLAYER.CLIMB_DRAIN_RATE * dt;
+      if (this.climbDrainAcc >= 1) {
+        this.climbDrainAcc -= 1;
+        drainStamina(this.scene, 1);
+      }
     }
 
     // Vertical movement
@@ -286,18 +337,22 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     this.pendulum.update(dt);
 
     // Pump
-    const pumpForce = 0.8;
-    if (cursors.left.isDown) {
-      this.pendulum.applyTorque(-pumpForce * dt);
-      this.swingPumpCount += dt;
-    } else if (cursors.right.isDown) {
-      this.pendulum.applyTorque(pumpForce * dt);
-      this.swingPumpCount += dt;
+    const pumpForce = 0.22;
+    let pumpDir = 0;
+    if (Phaser.Input.Keyboard.JustDown(cursors.left)) pumpDir = -1;
+    else if (Phaser.Input.Keyboard.JustDown(cursors.right)) pumpDir = 1;
+
+    if (pumpDir !== 0) {
+      this.pendulum.applyTorque(pumpDir * pumpForce);
+      if (pumpDir !== this.lastPumpDir) {
+        this.swingPumpCounter += 1;
+        this.lastPumpDir = pumpDir;
+      }
     }
 
-    // Drain stamina per pump time
-    if (this.swingPumpCount >= PLAYER.SWING_PUMP_DRAIN / 10) {
-      this.swingPumpCount = 0;
+    // Drain stamina at most once per six direction-change pumps
+    if (this.swingPumpCounter >= 6) {
+      this.swingPumpCounter = 0;
       drainStamina(this.scene, 1);
     }
 
@@ -319,7 +374,7 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
 
     if (this.napTimer >= PLAYER.NAP_DURATION / 1000) {
       // Wake up
-      setStamina(this.scene, 1);
+      setStamina(this.scene, 2);
       this.isNapping = false;
       sfx.wakeUp();
       this.scene.events.emit('nap-end');
@@ -331,6 +386,7 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
   doJump() {
     this.body.setVelocityY(PLAYER.JUMP_VEL);
     this.setState(STATE.AIR);
+    this.jumpCutApplied = false;
     // Small wobble
     this.scene.tweens.add({
       targets: this,
@@ -403,6 +459,15 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     if (dist < 56) {
       this.swingActive = true;
       this.setState(STATE.SWING);
+      this.scene.cameras.main.shake(70, 0.002);
+      this.scene.tweens.add({
+        targets: this,
+        scaleX: this.baseScale * 1.12,
+        scaleY: this.baseScale * 0.86,
+        duration: 90,
+        yoyo: true,
+      });
+      this.scene.events.emit('swing-grab', { x: bobX, y: bobY });
       sfx.swing();
     }
   }
@@ -410,10 +475,11 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
   releaseSwing() {
     if (!this.pendulum) return;
     this.swingActive = false;
-    const velX = this.pendulum.getBobVelX() * 60;
-    const velY = this.pendulum.getBobVelY() * 60;
+    const velX = this.pendulum.getBobVelX() * 48;
+    const velY = this.pendulum.getBobVelY() * 48;
     this.body.setAllowGravity(true);
     this.body.setVelocity(velX, velY);
+    this.lastPumpDir = 0;
     this.setState(STATE.AIR);
   }
 

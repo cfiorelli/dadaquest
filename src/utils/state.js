@@ -12,6 +12,9 @@ export function initRegistry(game) {
   if (!game.registry.has('stamina')) {
     game.registry.set('stamina', 2);
   }
+  if (!game.registry.has('staminaMax')) {
+    game.registry.set('staminaMax', 4);
+  }
   if (!game.registry.has('currentScene')) {
     game.registry.set('currentScene', 'CribScene');
   }
@@ -21,8 +24,21 @@ export function getStamina(scene) {
   return scene.game.registry.get('stamina') ?? 2;
 }
 
+export function getStaminaMax(scene) {
+  return scene.game.registry.get('staminaMax') ?? 4;
+}
+
+export function setStaminaMax(scene, val) {
+  const clamped = Math.max(1, Math.min(8, val));
+  scene.game.registry.set('staminaMax', clamped);
+  const cur = getStamina(scene);
+  if (cur > clamped) setStamina(scene, clamped);
+  return clamped;
+}
+
 export function setStamina(scene, val) {
-  const clamped = Math.max(0, Math.min(4, val));
+  const max = getStaminaMax(scene);
+  const clamped = Math.max(0, Math.min(max, val));
   scene.game.registry.set('stamina', clamped);
   return clamped;
 }

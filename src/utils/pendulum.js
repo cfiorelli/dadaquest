@@ -7,20 +7,29 @@ export class Pendulum {
     this.length = length;
     this.angle = angle;       // radians from vertical (0 = hanging straight down)
     this.angleVel = 0;
-    this.gravity = 9.8;
-    this.damping = 0.995;
+    this.gravity = 12.2;
+    this.angularDrag = 0.14;
+    this.maxAngularVel = 4.8;
   }
 
   update(dt) {
     // dt in seconds
-    const accel = -(this.gravity / this.length) * Math.sin(this.angle);
+    const restoring = -(this.gravity / this.length) * Math.sin(this.angle);
+    const damping = -this.angularDrag * this.angleVel;
+    const accel = restoring + damping;
     this.angleVel += accel * dt;
-    this.angleVel *= this.damping;
+    this.angleVel = Math.max(-this.maxAngularVel, Math.min(this.maxAngularVel, this.angleVel));
     this.angle += this.angleVel * dt;
+
+    // Avoid "sticking" at non-zero angle due to tiny velocities.
+    if (Math.abs(this.angleVel) < 0.002 && Math.abs(this.angle) > 0.004) {
+      this.angleVel += -Math.sign(this.angle) * 0.01 * dt;
+    }
   }
 
   applyTorque(torque) {
     this.angleVel += torque;
+    this.angleVel = Math.max(-this.maxAngularVel, Math.min(this.maxAngularVel, this.angleVel));
   }
 
   getBobX() {
