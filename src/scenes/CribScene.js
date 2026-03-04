@@ -106,55 +106,77 @@ export class CribScene extends Phaser.Scene {
   }
 
   setupPlatforms() {
+    const HW = 134; // crib half-width (+12% vs original 120)
+    const WALL_H = 178;
+    const WALL_CY = GAME_H - 70 - WALL_H / 2; // center y of walls
+    const TOP_Y = GAME_H - 70 - WALL_H;       // top rail center y
+
     this.staticGroup = this.physics.add.staticGroup();
 
     // === CRIB ===
-    // Crib floor (baby starts here)
+    // Crib floor
     this.cribFloor = this.staticGroup.create(GAME_W / 2, GAME_H - 70, null)
-      .setSize(240, 20).setVisible(false);
-    addContactShadow(this, GAME_W / 2, GAME_H - 48, 230, 18, 0.15, 2);
-    this.add.image(GAME_W / 2, GAME_H - 70, 'crib_wood_plank').setDisplaySize(240, 20);
+      .setSize(HW * 2, 20).setVisible(false);
+    addContactShadow(this, GAME_W / 2, GAME_H - 48, HW * 2 - 10, 18, 0.15, 2);
+    this.add.image(GAME_W / 2, GAME_H - 70, 'crib_wood_plank').setDisplaySize(HW * 2, 20);
+
+    // Mattress pad (cream pad inside crib, depth=2 so it sits above floor)
+    this.add.rectangle(GAME_W / 2, GAME_H - 83, HW * 2 - 22, 16, 0xf0e8d5).setDepth(2);
+
+    // Front bottom rail — thick face on the near side of the crib base
+    this.add.rectangle(GAME_W / 2, GAME_H - 61, HW * 2 + 12, 8, 0xc09042).setDepth(6);
 
     // Crib left wall
-    this.cribLeftWall = this.staticGroup.create(GAME_W / 2 - 120, GAME_H - 150, null)
-      .setSize(16, 160).setVisible(false);
-    const cribL = applyDepthHaze(this.add.image(GAME_W / 2 - 120, GAME_H - 150, 'crib_wall')
-      .setDisplaySize(16, 160), 140);
+    this.cribLeftWall = this.staticGroup.create(GAME_W / 2 - HW, WALL_CY, null)
+      .setSize(18, WALL_H).setVisible(false);
+    const cribL = applyDepthHaze(
+      this.add.image(GAME_W / 2 - HW, WALL_CY, 'crib_wall').setDisplaySize(18, WALL_H), 140
+    );
     cribL.setTint(0xe3bb8a);
 
     // Crib right wall
-    this.cribRightWall = this.staticGroup.create(GAME_W / 2 + 120, GAME_H - 150, null)
-      .setSize(16, 160).setVisible(false);
-    const cribR = applyDepthHaze(this.add.image(GAME_W / 2 + 120, GAME_H - 150, 'crib_wall')
-      .setDisplaySize(16, 160), 140);
+    this.cribRightWall = this.staticGroup.create(GAME_W / 2 + HW, WALL_CY, null)
+      .setSize(18, WALL_H).setVisible(false);
+    const cribR = applyDepthHaze(
+      this.add.image(GAME_W / 2 + HW, WALL_CY, 'crib_wall').setDisplaySize(18, WALL_H), 140
+    );
     cribR.setTint(0xe3bb8a);
 
-    // Crib top rail (baby can crawl across top)
-    this.cribTopRail = this.staticGroup.create(GAME_W / 2, GAME_H - 225, null)
-      .setSize(240, 12).setVisible(false);
-    addContactShadow(this, GAME_W / 2, GAME_H - 208, 210, 10, 0.12, 2);
-    this.add.image(GAME_W / 2, GAME_H - 225, 'crib_wood_plank').setDisplaySize(240, 12);
+    // Crib top rail
+    this.cribTopRail = this.staticGroup.create(GAME_W / 2, TOP_Y, null)
+      .setSize(HW * 2, 14).setVisible(false);
+    addContactShadow(this, GAME_W / 2, TOP_Y + 17, HW * 2 - 16, 10, 0.12, 2);
+    this.add.image(GAME_W / 2, TOP_Y, 'crib_wood_plank').setDisplaySize(HW * 2, 14);
+
+    // Corner posts at all 4 crib corners
+    [
+      [GAME_W / 2 - HW - 3, TOP_Y - 3],
+      [GAME_W / 2 + HW + 3, TOP_Y - 3],
+      [GAME_W / 2 - HW - 3, GAME_H - 67],
+      [GAME_W / 2 + HW + 3, GAME_H - 67],
+    ].forEach(([px, py]) => {
+      this.add.rectangle(px, py, 12, 12, 0xb07030).setDepth(7);
+    });
 
     // === DRESSER (left side) ===
-    // Dresser surface - platform for baby to land on
     this.dresser = this.staticGroup.create(120, GAME_H - 165, null)
       .setSize(120, 16).setVisible(false);
     addContactShadow(this, 120, GAME_H - 92, 110, 18, 0.18, 2);
     applyDepthHaze(this.add.image(120, GAME_H - 135, 'dresser').setDisplaySize(120, 80), 116);
 
-    // === Ground (below everything) ===
+    // === Ground ===
     this.ground = this.staticGroup.create(GAME_W / 2, GAME_H - 10, null)
       .setSize(GAME_W, 20).setVisible(false);
 
-    // === Climbable walls for WALL_CLIMB ===
+    // === Climbable walls ===
     this.climbWalls = this.physics.add.staticGroup();
+    this.climbWalls.create(GAME_W / 2 - HW + 9, WALL_CY, null)
+      .setSize(8, WALL_H).setVisible(false);
+    this.climbWalls.create(GAME_W / 2 + HW - 9, WALL_CY, null)
+      .setSize(8, WALL_H).setVisible(false);
 
-    // Crib inner left wall (climbable)
-    this.climbWalls.create(GAME_W / 2 - 112, GAME_H - 150, null)
-      .setSize(8, 160).setVisible(false);
-    // Crib inner right wall (climbable)
-    this.climbWalls.create(GAME_W / 2 + 112, GAME_H - 150, null)
-      .setSize(8, 160).setVisible(false);
+    // Store TOP_Y for use in setupExit
+    this._cribTopY = TOP_Y;
   }
 
   setupMobile() {
@@ -223,68 +245,49 @@ export class CribScene extends Phaser.Scene {
   }
 
   setupExit() {
-    // Exit zone — wide doorway covering the entire left half of the dresser top
-    // Dresser platform collider is at y=GAME_H-165, surface top ~GAME_H-173
-    // Baby standing there has center y ≈ GAME_H-192; zone covers plenty of range
     const EXIT_X = 104;
     const EXIT_Y = GAME_H - 196;
     this.exitZone = this.add.zone(EXIT_X, EXIT_Y, 180, 120).setOrigin(0.5);
     this.physics.world.enable(this.exitZone);
     this.exitZone.body.setAllowGravity(false);
 
-    // Safety rail exit so first-time players can clear Scene 1 quickly.
-    this.railExitZone = this.add.zone(GAME_W / 2 - 92, GAME_H - 225, 90, 24).setOrigin(0.5);
+    // Rail exit zone — position matches new crib top rail
+    this.railExitZone = this.add.zone(GAME_W / 2 - 92, this._cribTopY, 90, 24).setOrigin(0.5);
     this.physics.world.enable(this.railExitZone);
     this.railExitZone.body.setAllowGravity(false);
 
-    // Doorway arch visual behind the dresser area
-    const gfx = this.add.graphics().setDepth(3);
-    gfx.lineStyle(3, 0x00ff88, 1);
-    gfx.strokeRect(EXIT_X - 88, EXIT_Y - 52, 176, 104);
-    gfx.fillStyle(0x00ff88, 0.08);
-    gfx.fillRect(EXIT_X - 88, EXIT_Y - 52, 176, 104);
+    // Diegetic cardboard sign (replaces neon debug box)
+    const sx = EXIT_X + 4;
+    const sy = EXIT_Y - 20;
+    const sign = this.add.graphics().setDepth(4);
+    sign.fillStyle(0xd4aa6a, 1);
+    sign.fillRoundedRect(sx - 54, sy - 15, 108, 30, 5);
+    sign.lineStyle(2, 0x8b5e28, 0.85);
+    sign.strokeRoundedRect(sx - 54, sy - 15, 108, 30, 5);
+    // Arrow shaft
+    sign.lineStyle(2.5, 0x5c3510, 1);
+    sign.beginPath();
+    sign.moveTo(sx - 22, sy);
+    sign.lineTo(sx + 16, sy);
+    sign.strokePath();
+    // Arrow head
+    sign.fillStyle(0x5c3510);
+    sign.fillTriangle(sx + 15, sy - 5, sx + 27, sy, sx + 15, sy + 5);
 
-    // Pulsing arrow + EXIT label
-    const exitLabel = this.add.text(EXIT_X, EXIT_Y - 36, '>> EXIT >>', {
-      fontFamily: 'monospace',
+    this.add.text(sx - 46, sy - 8, 'OUT', {
+      fontFamily: 'Georgia, serif',
       fontSize: '11px',
-      color: '#00ff88',
-      stroke: '#003300',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(6);
+      color: '#5c3510',
+    }).setDepth(5);
 
+    // Subtle pulse (warm, not neon)
     this.tweens.add({
-      targets: exitLabel,
-      alpha: 0.3,
-      duration: 600,
+      targets: sign,
+      alpha: 0.68,
+      duration: 1400,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
-    });
-
-    // Subtle glow pulse on the box
-    this.tweens.add({
-      targets: gfx,
-      alpha: 0.4,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    const railHint = this.add.text(GAME_W / 2 - 92, GAME_H - 248, 'ESCAPE RAIL', {
-      fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#dcedc8',
-      stroke: '#2e7d32',
-      strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(6);
-    this.tweens.add({
-      targets: railHint,
-      alpha: 0.35,
-      duration: 500,
-      yoyo: true,
-      repeat: -1,
     });
   }
 
@@ -411,37 +414,43 @@ export class CribScene extends Phaser.Scene {
     );
     this.mobileToy.setAngle(Phaser.Math.RadToDeg(this.mobilePendulum.angle) * 0.5);
 
-    // Draw rope
+    // Draw rope (thicker, warmer)
     this.ropeGraphics.clear();
-    this.ropeGraphics.lineStyle(2, 0x888888, 1);
+    this.ropeGraphics.lineStyle(3, 0x8b6a3e, 1);
     this.ropeGraphics.beginPath();
     this.ropeGraphics.moveTo(this.mobileAnchorX, this.mobileAnchorY);
     this.ropeGraphics.lineTo(this.mobilePendulum.getBobX(), this.mobilePendulum.getBobY());
     this.ropeGraphics.strokePath();
 
-    // Draw anchor dot
-    this.ropeGraphics.fillStyle(0x555555, 1);
-    this.ropeGraphics.fillCircle(this.mobileAnchorX, this.mobileAnchorY, 5);
+    // Hanger arm + anchor knob
+    this.ropeGraphics.lineStyle(4, 0x7a5a30, 1);
+    this.ropeGraphics.beginPath();
+    this.ropeGraphics.moveTo(this.mobileAnchorX - 22, this.mobileAnchorY);
+    this.ropeGraphics.lineTo(this.mobileAnchorX + 22, this.mobileAnchorY);
+    this.ropeGraphics.strokePath();
+    this.ropeGraphics.fillStyle(0x5d3a1a, 1);
+    this.ropeGraphics.fillCircle(this.mobileAnchorX, this.mobileAnchorY, 6);
 
-    // Draw grab-zone hint ring around bob when player is airborne and not already swinging
+    // Soft glow ring — only when airborne and within grab range
     if (this.player.state === STATE.AIR) {
       const bobX = this.mobilePendulum.getBobX();
       const bobY = this.mobilePendulum.getBobY();
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, bobX, bobY);
-      const alpha = Phaser.Math.Clamp(1 - dist / 140, 0.15, 0.78);
-      const pulse = 1 + Math.sin(time * 0.008) * 0.08;
-      this.ropeGraphics.lineStyle(1.8, 0xfff7c2, alpha);
-      this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius);
-      this.ropeGraphics.lineStyle(1.2, 0xffffff, alpha * 0.5);
-      this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius * pulse);
+      if (dist < this.grabRadius * 2.2) {
+        const alpha = Phaser.Math.Clamp(1 - dist / (this.grabRadius * 2.2), 0, 0.82);
+        const pulse = 1 + Math.sin(time * 0.009) * 0.07;
+        this.ropeGraphics.lineStyle(2, 0xfff7c2, alpha);
+        this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius * pulse);
+      }
     }
 
     // Update player
     this.player.update(time, delta);
     this.playerShadow.setPosition(this.player.x, this.player.y + 22);
-    const vy = Math.abs(this.player.body.velocity.y);
-    this.playerShadow.setScale(1 + Phaser.Math.Clamp(vy / 420, 0, 0.22), 1);
-    this.playerShadow.setAlpha(0.18 - Phaser.Math.Clamp(vy / 900, 0, 0.08));
+    const heightAboveFloor = Math.max(0, (GAME_H - 78) - this.player.y);
+    const ht = Phaser.Math.Clamp(heightAboveFloor / 190, 0, 1);
+    this.playerShadow.setScale(1 - ht * 0.5, 1);
+    this.playerShadow.setAlpha(0.18 - ht * 0.12);
 
     // HUD update
     this.hud.update(this.player);
