@@ -338,7 +338,7 @@ export class RooftopScene extends Phaser.Scene {
       } else {
         // Rock more vigorously while building up
         this.horseTween.timeScale = 1 + pct * 2;
-        if (Math.random() < 0.04) sfx.crawlTick();
+        if (!isTestMode() && Math.random() < 0.04) sfx.crawlTick();
       }
     } else {
       if (!onHorse) {
