@@ -3,6 +3,8 @@ import { COLORS, GAME_W } from '../gameConfig.js';
 import { getStamina, getStaminaMax } from '../utils/state.js';
 import { SCENE_NAMES } from '../gameConfig.js';
 
+const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
+
 function drawStarShape(g, cx, cy, points, outer, inner) {
   const pts = [];
   for (let i = 0; i < points * 2; i++) {
@@ -51,6 +53,15 @@ export class HUD {
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
+
+    // Build stamp top-right
+    scene.add.text(GAME_W - 8, 8, `build ${BUILD_SHA}`, {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#cfd8dc',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(102);
 
     // Debug text
     this.debugText = scene.add.text(8, 48, '', {

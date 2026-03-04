@@ -2,12 +2,15 @@
 // Zero effect on normal gameplay when the query param is absent.
 export const isTestMode = typeof window !== 'undefined'
   && new URLSearchParams(window.location.search).get('test') === '1';
+export const buildSha = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
 
 // Global debug hook — updated by each scene on start.
 if (typeof window !== 'undefined') {
   window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {
     sceneKey: '',
     isTestMode,
+    buildSha,
   };
   window.__DADA_DEBUG__.isTestMode = isTestMode;
+  window.__DADA_DEBUG__.buildSha = buildSha;
 }

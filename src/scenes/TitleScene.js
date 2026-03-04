@@ -3,6 +3,8 @@ import { GAME_W, GAME_H } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import { isTestMode } from '../utils/testMode.js';
 
+const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
+
 export class TitleScene extends Phaser.Scene {
   constructor() {
     super('TitleScene');
@@ -48,6 +50,14 @@ export class TitleScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 3,
     }).setOrigin(0.5);
+
+    this.add.text(GAME_W - 12, 12, `build ${BUILD_SHA}`, {
+      fontFamily: 'monospace',
+      fontSize: '12px',
+      color: '#d6e9ff',
+      stroke: '#0d1b2a',
+      strokeThickness: 3,
+    }).setOrigin(1, 0).setDepth(40);
 
     // Word bubble from baby
     this.makeBubble(GAME_W / 2 - 30, GAME_H - 130, 'da da?');
