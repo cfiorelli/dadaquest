@@ -1,0 +1,103 @@
+{
+  "models": [
+    {
+      "id": "kenney_baby",
+      "path": "assets/packs/kenney/models/character-oobi.glb",
+      "scale": 0.72,
+      "yOffset": -0.44
+    },
+    {
+      "id": "kenney_dad",
+      "path": "assets/packs/kenney/models/character-oodi.glb",
+      "scale": 0.9,
+      "yOffset": -0.56
+    },
+    {
+      "id": "kenney_flag",
+      "path": "assets/packs/kenney/models/flag.glb",
+      "scale": 0.92,
+      "yOffset": -0.5
+    },
+    {
+      "id": "kenney_crate",
+      "path": "assets/packs/kenney/models/crate.glb",
+      "scale": 0.82,
+      "yOffset": -0.3
+    },
+    {
+      "id": "kenney_chest",
+      "path": "assets/packs/kenney/models/chest.glb",
+      "scale": 0.85,
+      "yOffset": -0.28
+    },
+    {
+      "id": "kenney_fence",
+      "path": "assets/packs/kenney/models/fence-straight.glb",
+      "scale": 1.3,
+      "yOffset": -0.74
+    },
+    {
+      "id": "kenney_coin",
+      "path": "assets/packs/kenney/models/coin-gold.glb",
+      "scale": 0.9,
+      "yOffset": -0.2
+    },
+    {
+      "id": "quaternius_character",
+      "path": "assets/packs/quaternius/Character.gltf",
+      "scale": 0.95,
+      "yOffset": -0.46
+    },
+    {
+      "id": "quaternius_character_gun",
+      "path": "assets/packs/quaternius/Character_Gun.gltf",
+      "scale": 0.95,
+      "yOffset": -0.46
+    },
+    {
+      "id": "quaternius_arrow",
+      "path": "assets/packs/quaternius/Arrow.gltf",
+      "scale": 0.78,
+      "yOffset": -0.2
+    },
+    {
+      "id": "quaternius_goal_flag",
+      "path": "assets/packs/quaternius/Goal_Flag.gltf",
+      "scale": 0.86,
+      "yOffset": -0.46
+    },
+    {
+      "id": "quaternius_coin",
+      "path": "assets/packs/quaternius/Coin.gltf",
+      "scale": 0.82,
+      "yOffset": -0.2
+    },
+    {
+      "id": "quaternius_plant_large",
+      "path": "assets/packs/quaternius/Plant_Large.gltf",
+      "scale": 0.85,
+      "yOffset": -0.45
+    },
+    {
+      "id": "quaternius_cloud",
+      "path": "assets/packs/quaternius/Cloud_1.gltf",
+      "scale": 1.1,
+      "yOffset": 0
+    },
+    {
+      "id": "quaternius_tree",
+      "path": "assets/packs/quaternius/Tree.gltf",
+      "scale": 0.82,
+      "yOffset": -0.58
+    },
+    {
+      "id": "quaternius_chest",
+      "path": "assets/packs/quaternius/Chest.gltf",
+      "scale": 0.82,
+      "yOffset": -0.36
+    }
+  ],
+  "hdri": {
+    "path": "assets/hdr/studio_small_09_1k.hdr"
+  }
+}
