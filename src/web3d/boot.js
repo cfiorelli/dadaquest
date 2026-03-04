@@ -241,6 +241,7 @@ export async function boot(options = {}) {
   let onesieBuffTimerMs = 0;
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
+  let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   window.__DADA_DEBUG__.lastRespawnReason = '';
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
@@ -513,6 +514,10 @@ export async function boot(options = {}) {
         input.consumeAll();
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
+        if (debugMode) {
+          debugIdleTimerMs = 1000; // suppress input for 1s so probe runs clean
+          player.beginSpawnProbe('initial');
+        }
       }
     } else if (state === 'gameplay') {
       if (respawnState) {
@@ -534,15 +539,22 @@ export async function boot(options = {}) {
           if (respawnState.timer <= 0) {
             ui.setFade(0);
             respawnState = null;
+            if (debugMode) {
+              debugIdleTimerMs = 1000;
+              player.beginSpawnProbe('respawn');
+            }
           }
         }
       } else {
         updateLevelInteractions(dt);
+        // Debug idle: suppress input for probe duration
+        const idleSuppressed = debugIdleTimerMs > 0;
+        if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);
         // Player update
-        const moveX = input.getMoveX();
-        const jumpPress = input.consumeJumpPress();
+        const moveX = idleSuppressed ? 0 : input.getMoveX();
+        const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpJustPressed = jumpPress.edge;
-        const jumpHeld = input.isJumpHeld();
+        const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
 
         const playerEvents = player.consumeEvents();

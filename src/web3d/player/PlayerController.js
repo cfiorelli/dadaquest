@@ -404,6 +404,62 @@ export class PlayerController {
     return this.mesh.position.clone();
   }
 
+  /**
+   * Spawn stability probe — records Y, vy, grounded for 60 frames (or 1000ms).
+   * Results stored on window.__DADA_DEBUG__.spawnProbe[label].
+   */
+  beginSpawnProbe(label) {
+    if (!isDebugMode()) return;
+    const t0 = performance.now();
+    const samples = [];
+    let frameCount = 0;
+    let groundedFlips = 0;
+    let lastGrounded = this.grounded;
+    const pos = this.mesh.position;
+
+    const checkProbe = () => {
+      const elapsed = performance.now() - t0;
+      if (frameCount >= 60 || elapsed >= 1000) {
+        // Compute stats
+        let minY = Infinity, maxY = -Infinity, maxAbsVy = 0;
+        for (const s of samples) {
+          if (s.y < minY) minY = s.y;
+          if (s.y > maxY) maxY = s.y;
+          if (Math.abs(s.vy) > maxAbsVy) maxAbsVy = Math.abs(s.vy);
+        }
+        const maxDeltaY = maxY - minY;
+        const stats = { maxDeltaY, groundedFlips, minY, maxY, maxAbsVy, frames: frameCount };
+        window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
+        window.__DADA_DEBUG__.spawnProbe = window.__DADA_DEBUG__.spawnProbe || {};
+        window.__DADA_DEBUG__.spawnProbe[label] = { stats, samples };
+        console.log(
+          `SPAWN PROBE ${label}: maxDeltaY=${maxDeltaY.toFixed(6)}, groundedFlips=${groundedFlips}, ` +
+          `maxAbsVy=${maxAbsVy.toFixed(6)}, minY=${minY.toFixed(6)}, maxY=${maxY.toFixed(6)}`
+        );
+        return; // stop
+      }
+
+      if (this.grounded !== lastGrounded) {
+        groundedFlips++;
+        lastGrounded = this.grounded;
+      }
+
+      samples.push({
+        t: elapsed,
+        y: pos.y,
+        vy: this.vy,
+        grounded: this.grounded,
+        timeSinceGround: this.timeSinceGround,
+        collisionHits: this.lastCollisionHits,
+        bottom: pos.y - PLAYER_HALF_H,
+        top: pos.y + PLAYER_HALF_H,
+      });
+      frameCount++;
+      requestAnimationFrame(checkProbe);
+    };
+    requestAnimationFrame(checkProbe);
+  }
+
   /** Returns debug snapshot for the debug HUD. */
   getDebugState() {
     const pos = this.mesh.position;
