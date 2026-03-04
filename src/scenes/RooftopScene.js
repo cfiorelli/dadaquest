@@ -27,6 +27,15 @@ export class RooftopScene extends Phaser.Scene {
     // Clouds
     this.makeClouds();
 
+    // Far skyline paper cutouts (low contrast)
+    const skylineColor = 0x76a7c9;
+    this.add.polygon(130, 170, [0, 28, 14, 4, 22, 28], skylineColor, 0.2).setDepth(1);
+    this.add.polygon(220, 168, [0, 30, 12, 0, 24, 30], skylineColor, 0.2).setDepth(1);
+    this.add.polygon(320, 172, [0, 26, 10, 6, 20, 26], skylineColor, 0.2).setDepth(1);
+    this.add.polygon(430, 170, [0, 28, 16, 2, 30, 28], skylineColor, 0.2).setDepth(1);
+    this.add.polygon(560, 171, [0, 27, 13, 5, 25, 27], skylineColor, 0.2).setDepth(1);
+    this.add.polygon(700, 169, [0, 29, 15, 1, 28, 29], skylineColor, 0.2).setDepth(1);
+
     // Rooftop floor
     this.add.rectangle(GAME_W / 2, GAME_H - 10, GAME_W, 20, 0x78909c);
     this.add.rectangle(GAME_W / 2, GAME_H - 20, GAME_W, 4, 0xb0bec5);
@@ -85,8 +94,13 @@ export class RooftopScene extends Phaser.Scene {
   }
 
   makeClouds() {
-    [[150, 80], [420, 50], [650, 100], [750, 60]].forEach(([x, y]) => {
-      const w = Phaser.Math.Between(80, 130);
+    const cloudData = [
+      [150, 80, 92],
+      [420, 50, 124],
+      [650, 100, 103],
+      [750, 60, 114],
+    ];
+    cloudData.forEach(([x, y, w]) => {
       this.add.ellipse(x, y, w, 45, 0xffffff, 0.9);
       this.add.ellipse(x - 25, y + 8, w * 0.6, 35, 0xffffff, 0.9);
       this.add.ellipse(x + 25, y + 8, w * 0.6, 35, 0xffffff, 0.9);
@@ -106,6 +120,15 @@ export class RooftopScene extends Phaser.Scene {
     this.windowY = GAME_H - 200;
     addContactShadow(this, this.windowX, this.windowY + 52, 66, 14, 0.1, 2);
     applyDepthHaze(this.add.image(this.windowX, this.windowY, 'window').setDisplaySize(70, 100), 146);
+
+    // Crafted wood frame + paper glow (visual only)
+    const frame = this.add.graphics().setDepth(147);
+    frame.lineStyle(5, 0x7a5a44, 0.95);
+    frame.strokeRoundedRect(this.windowX - 38, this.windowY - 54, 76, 108, 4);
+    frame.lineStyle(2, 0xd7b48f, 0.4);
+    frame.strokeRoundedRect(this.windowX - 34, this.windowY - 50, 68, 100, 3);
+    this.add.ellipse(this.windowX, this.windowY - 10, 86, 116, 0xffe7ad, 0.14).setDepth(145);
+    this.add.ellipse(this.windowX, this.windowY - 10, 74, 102, 0xffe7ad, 0.08).setDepth(145);
   }
 
   setupRockingHorse() {
@@ -130,6 +153,14 @@ export class RooftopScene extends Phaser.Scene {
       noiseDots: 130,
     });
     this.horseOverlay = addCraftedOverlay(this, horseTex, this.horseWX, this.horseY, 80, 70, 10, 0.22);
+
+    // Toy details: rocker rails + paper tag (visual only)
+    const horseDetail = this.add.graphics().setDepth(11);
+    horseDetail.lineStyle(4, 0x8a5a2f, 0.9);
+    horseDetail.strokeEllipse(this.horseWX, this.horseY + 24, 72, 24);
+    horseDetail.lineStyle(2, 0xe9c98d, 0.55);
+    horseDetail.strokeEllipse(this.horseWX, this.horseY + 24, 62, 16);
+    this.add.rectangle(this.horseWX + 24, this.horseY - 12, 8, 10, 0xf3e2c5, 0.95).setDepth(11);
 
     // Rocking tween
     this.horseTween = this.tweens.add({

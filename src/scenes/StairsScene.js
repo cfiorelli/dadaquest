@@ -112,6 +112,23 @@ export class StairsScene extends Phaser.Scene {
     });
     addCraftedOverlay(this, furTex, this.dogX, this.dogY, 52, 36, 9, 0.2);
 
+      // Dog collar with tag
+      this.add.circle(this.dogX + 8, this.dogY - 4, 18, 0xd9a76a, 0).setStrokeStyle(3, 0xc19a6b).setDepth(10);
+      const tagTex = ensureCraftedTexture(this, 'dog_tag', {
+        w: 10,
+        h: 12,
+        c1: 0xe8d4b8,
+        c2: 0xc4a373,
+        c3: 0xa0845a,
+        outline: 0x664d33,
+        radius: 2,
+        noiseDots: 8,
+      });
+      this.add.rectangle(this.dogX + 18, this.dogY - 8, 10, 12, 0xe8d4b8).setDepth(10);
+      addCraftedOverlay(this, tagTex, this.dogX + 18, this.dogY - 8, 10, 12, 11, 0.15);
+      // Tag hanging string
+      this.add.line(this.dogX + 14, this.dogY - 6, this.dogX + 18, this.dogY - 8, 0x999999, 0.5).setDepth(10);
+
     // Zzz animation above dog
     this.dogZzz = this.add.text(this.dogX + 30, this.dogY - 20, 'zzz', {
       fontFamily: 'monospace',
@@ -119,6 +136,11 @@ export class StairsScene extends Phaser.Scene {
       color: '#aaaaff',
     }).setDepth(5);
 
+      // Carpet runner on stairs (visual only, no physics change)
+      for (let i = 0; i < this.steps.length; i++) {
+        const step = this.steps[i];
+        this.add.rectangle(step.x, step.y - 1, step.w - 12, 18, 0xaa6b5b, 0.65).setDepth(5);
+      }
     this.tweens.add({
       targets: this.dogZzz,
       y: this.dogY - 30,

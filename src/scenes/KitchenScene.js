@@ -102,13 +102,37 @@ export class KitchenScene extends Phaser.Scene {
       118
     );
 
-    // Spill zone collider (wide but thin)
-    // Second puddle
-    this.puddle2 = applyDepthHaze(
-      this.add.image(820, GAME_H - 37, 'puddle').setDisplaySize(100, 24).setDepth(2),
-      124
-    );
+      // Puddle highlight (juice sheen)
+      const puddleHighlight = this.add.ellipse(this.puddleX - 20, this.puddleY - 6, 40, 12, 0xffd97d, 0.35);
+      puddleHighlight.setDepth(3);
+    
+      // Second puddle
+      this.puddle2 = applyDepthHaze(
+        this.add.image(820, GAME_H - 37, 'puddle').setDisplaySize(100, 24).setDepth(2),
+        124
+      );
+      // Puddle 2 highlight
+      this.add.ellipse(800, GAME_H - 42, 35, 10, 0xffd97d, 0.3).setDepth(3);
 
+      // Wood cabinet detail (cabinet face with handles)
+      addContactShadow(this, 240, GAME_H - 90, 60, 16, 0.12, 2);
+      const cabinetTex = ensureCraftedTexture(this, 'kitchen_cabinet', {
+        w: 56,
+        h: 90,
+        c1: 0xc19a6b,
+        c2: 0x9d7e4f,
+        c3: 0x6b5a3d,
+        outline: 0x4a3f2e,
+        radius: 6,
+        noiseDots: 45,
+      });
+      const cabinetG = this.add.graphics();
+      cabinetG.fillStyle(0xc19a6b, 1);
+      cabinetG.fillRect(212, GAME_H - 160, 56, 90);
+      addCraftedOverlay(this, cabinetTex, 240, GAME_H - 115, 56, 90, 3, 0.18);
+      // Cabinet handles
+      this.add.circle(232, GAME_H - 120, 2, 0x8b6f47).setDepth(4);
+      this.add.circle(248, GAME_H - 120, 2, 0x8b6f47).setDepth(4);
     // "Slippery" label — italic serif, softer than monospace
     this.add.text(this.puddleX, GAME_H - 55, '~ slippery ~', {
       fontFamily: 'Georgia, serif',
