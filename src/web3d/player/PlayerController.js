@@ -135,6 +135,7 @@ export class PlayerController {
     this.lastJumpPressIdUsed = 0;
     this.wasGroundedLastFrame = false;
     this.outOfBoundsEmitted = false;
+    this.skipPhysicsFrames = 0; // skip physics for N frames to prevent spawn bounce
 
     // Platform colliders (set externally via setColliders)
     this.colliders = [];  // array of {minX, maxX, minY, maxY}
@@ -233,6 +234,14 @@ export class PlayerController {
   }
 
   update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0) {
+    // Skip physics for initial frames to prevent spawn bounce
+    if (this.skipPhysicsFrames > 0) {
+      this.skipPhysicsFrames--;
+      this.grounded = true;
+      this.timeSinceGround = 0;
+      return;
+    }
+
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
 
