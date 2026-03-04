@@ -251,10 +251,11 @@ export class PlayerController {
       this.ignoreJumpUntilRelease = false;
     }
 
-    const canAcceptEdge = !this.ignoreJumpUntilRelease;
-    const isNewPressId = jumpPressId === 0 || jumpPressId !== this.lastJumpPressIdUsed;
-    if (jumpPressedEdge && canAcceptEdge && isNewPressId) {
+    const canAcceptPress = !this.ignoreJumpUntilRelease;
+    const isNewPressId = jumpPressId > 0 && jumpPressId !== this.lastJumpPressIdUsed;
+    if (jumpHeld && canAcceptPress && isNewPressId) {
       this.jumpBufferMs = JUMP_BUFFER_MS;
+      this.lastJumpPressIdUsed = jumpPressId;
     } else {
       this.jumpBufferMs = Math.max(0, this.jumpBufferMs - dt * 1000);
     }
@@ -263,12 +264,7 @@ export class PlayerController {
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
     const canBuffer = this.jumpBufferMs > 0;
     if (canCoyote && canBuffer && !this.jumping) {
-      let jumpReason = 'unknown';
-      if (jumpPressedEdge) {
-        jumpReason = 'input-edge';
-      } else if (canBuffer) {
-        jumpReason = 'buffer-consumed';
-      }
+      let jumpReason = canBuffer ? 'buffer-consumed' : 'unknown';
       
       recordJump(jumpReason, {
         jumpHeld,
@@ -284,7 +280,6 @@ export class PlayerController {
       this.jumpCutApplied = false;
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
       this.jumpBufferMs = 0; // consume buffer immediately
-      this.lastJumpPressIdUsed = jumpPressId || this.lastJumpPressIdUsed;
       this.grounded = false;
       this.emitEvent('jump');
     }

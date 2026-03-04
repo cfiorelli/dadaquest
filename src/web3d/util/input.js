@@ -1,25 +1,19 @@
 export class InputManager {
   constructor() {
     this.held = {};
-    this.prevDown = {};
-    this.pressedEdge = {};
     this.pressId = {};
     this._nextPressId = 1;
 
     document.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       const code = e.code;
-      const wasDown = !!this.held[code];
-      this.prevDown[code] = wasDown;
-      this.held[code] = true;
-      if (!wasDown) {
-        this.pressedEdge[code] = true;
+      if (!this.held[code]) {
+        this.held[code] = true;
         this.pressId[code] = this._nextPressId++;
       }
     });
     document.addEventListener('keyup', (e) => {
       const code = e.code;
-      this.prevDown[code] = !!this.held[code];
       this.held[code] = false;
     });
   }
@@ -39,45 +33,32 @@ export class InputManager {
 
   /** True only once per press (must be consumed each frame). */
   consumeJump() {
-    return this.consumePressEdge('Space');
+    return !!this.held['Space'];
   }
 
   /** Returns jump press edge + id for de-duping. */
   consumeJumpPress() {
-    const edge = this.consumePressEdge('Space');
+    const code = 'Space';
+    const isHeld = !!this.held[code];
+    const pressId = this.pressId[code] || 0;
     return {
-      edge,
-      pressId: edge ? (this.pressId.Space || 0) : 0,
+      edge: isHeld,
+      pressId,
     };
   }
 
   /** True only once per Enter press. */
   consumeEnter() {
-    return this.consumePressEdge('Enter');
+    return !!this.held['Enter'];
   }
 
   /** True only once per M press. */
   consumeMuteToggle() {
-    return this.consumePressEdge('KeyM');
-  }
-
-  consumePressEdge(code) {
-    const v = !!this.pressedEdge[code];
-    this.pressedEdge[code] = false;
-    return v;
+    return !!this.held['KeyM'];
   }
 
   consumeAll() {
-    const keys = new Set([
-      ...Object.keys(this.held),
-      ...Object.keys(this.prevDown),
-      ...Object.keys(this.pressedEdge),
-      ...Object.keys(this.pressId),
-    ]);
-
-    for (const key of keys) {
-      this.prevDown[key] = !!this.held[key];
-      this.pressedEdge[key] = false;
-    }
+    // Clear all press IDs to prevent stale presses from retriggering
+    this.pressId = {};
   }
 }
