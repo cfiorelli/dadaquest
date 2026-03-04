@@ -3,24 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Da Da Quest</title>
+  <title>Da Da Quest — Crafted 3D</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
+    html, body {
+      width: 100%;
+      height: 100%;
       background: #1a1a2e;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #renderCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+    #uiRoot {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #uiRoot > * {
+      pointer-events: auto;
+    }
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      overflow: hidden;
+      background: rgba(0, 0, 0, 0.3);
+      font-size: 24px;
+      color: white;
+      text-align: center;
+      z-index: 200;
     }
-    canvas {
-      display: block;
-      image-rendering: pixelated;
+    .overlay h1 { font-size: 48px; margin-bottom: 20px; }
+    .overlay p { margin: 10px 0; }
+    .overlay button {
+      margin-top: 20px;
+      padding: 12px 24px;
+      font-size: 18px;
+      background: #4a9eff;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
     }
+    .overlay button:hover { background: #2e7fd6; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
+  <canvas id="renderCanvas"></canvas>
+  <div id="uiRoot"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
