@@ -3,6 +3,7 @@ import { GAME_W, GAME_H } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import { resetStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import { makeStyleRng } from '../art/styleKit.js';
 
 export class EndScene extends Phaser.Scene {
   constructor() {
@@ -32,26 +33,27 @@ export class EndScene extends Phaser.Scene {
     // Big word bubble
     this.makeBigBubble(GAME_W / 2 + 60, GAME_H - 210, 'DA DA!!!');
 
-    // Confetti particles
+    // Confetti particles - deterministic
+    const confettiRng = makeStyleRng('EndScene', 'confetti');
     const colors = [0xff6b6b, 0xffd93d, 0x6bcb77, 0x4d96ff, 0xff922b, 0xcc5de8];
     for (let i = 0; i < 30; i++) {
-      const x = Phaser.Math.Between(50, GAME_W - 50);
-      const y = Phaser.Math.Between(0, GAME_H - 80);
-      const rect = this.add.rectangle(x, y, 10, 6, Phaser.Math.RND.pick(colors));
-      rect.setAngle(Phaser.Math.Between(0, 360));
+      const x = confettiRng.int(50, GAME_W - 50);
+      const y = confettiRng.int(0, GAME_H - 80);
+      const rect = this.add.rectangle(x, y, 10, 6, colors[confettiRng.int(0, colors.length - 1)]);
+      rect.setAngle(confettiRng.int(0, 360));
 
       this.tweens.add({
         targets: rect,
-        y: y + Phaser.Math.Between(60, 200),
-        angle: rect.angle + Phaser.Math.Between(-180, 180),
+        y: y + confettiRng.int(60, 200),
+        angle: rect.angle + confettiRng.int(-180, 180),
         alpha: 0,
-        duration: Phaser.Math.Between(1500, 3500),
+        duration: confettiRng.int(1500, 3500),
         repeat: -1,
-        delay: Phaser.Math.Between(0, 1000),
+        delay: confettiRng.int(0, 1000),
         ease: 'Quad.easeIn',
         onRepeat: (tween, target) => {
-          target.y = Phaser.Math.Between(0, 20);
-          target.x = Phaser.Math.Between(50, GAME_W - 50);
+          target.y = confettiRng.int(0, 20);
+          target.x = confettiRng.int(50, GAME_W - 50);
           target.alpha = 1;
         }
       });

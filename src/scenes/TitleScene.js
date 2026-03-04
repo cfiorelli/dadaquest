@@ -8,6 +8,7 @@ import {
   TEXT_STYLES,
   createStitchedLabel,
   generateCardboardTexture,
+  makeStyleRng,
 } from '../art/styleKit.js';
 
 const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
@@ -31,12 +32,13 @@ export class TitleScene extends Phaser.Scene {
       this.add.ellipse(cx + 15, cy - 5, 40, 22, 0xffffff, 0.3);
     });
     
-    // Star stickers (soft felt)
+    // Star stickers (soft felt) - deterministic
+    const starRng = makeStyleRng('TitleScene', 'stars');
     for (let i = 0; i < 20; i++) {
-      const x = Phaser.Math.Between(40, GAME_W - 40);
-      const y = Phaser.Math.Between(30, GAME_H * 0.5);
-      const r = Phaser.Math.FloatBetween(2, 5);
-      this.add.star(x, y, 5, r * 0.6, r, 0xffd97d, Phaser.Math.FloatBetween(0.25, 0.5));
+      const x = starRng.int(40, GAME_W - 40);
+      const y = starRng.int(30, GAME_H * 0.5);
+      const r = starRng.float(2, 5);
+      this.add.star(x, y, 5, r * 0.6, r, 0xffd97d, starRng.float(0.25, 0.5));
     }
     
     // Table edge (foreground framing)
@@ -44,10 +46,11 @@ export class TitleScene extends Phaser.Scene {
     const tableG = this.add.graphics();
     tableG.fillGradientStyle(PALETTE.woodMid, PALETTE.woodMid, PALETTE.woodDark, PALETTE.woodDark, 1, 1, 1, 1);
     tableG.fillRect(0, tableY, GAME_W, 60);
-    // Wood grain texture
+    // Wood grain texture - deterministic
+    const grainRng = makeStyleRng('TitleScene', 'table-grain');
     tableG.lineStyle(1, PALETTE.woodDark, 0.15);
     for (let i = 0; i < 8; i++) {
-      const gy = tableY + Phaser.Math.Between(5, 55);
+      const gy = tableY + grainRng.int(5, 55);
       tableG.beginPath();
       tableG.moveTo(0, gy);
       tableG.lineTo(GAME_W, gy);
