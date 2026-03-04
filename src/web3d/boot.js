@@ -3,7 +3,7 @@ import { buildWorld } from './world/buildWorld.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
-import { damp } from './util/math.js';
+import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 import { JuiceFx } from './util/juiceFx.js';
@@ -57,6 +57,16 @@ function updatePlayerShadow(player) {
   const heightAboveGround = Math.max(0, player.mesh.position.y - 0.5);
   const shadowScale = Math.max(0.4, 1.0 - heightAboveGround * 0.06);
   player.blobShadow.scaling.set(shadowScale, 1, shadowScale);
+}
+
+function prepareFadeMaterial(material) {
+  if (!material || material._dadaOcclusionPrepared) return;
+  material._dadaOcclusionPrepared = true;
+  material._dadaBaseAlpha = typeof material.alpha === 'number' ? material.alpha : 1;
+  material.alpha = material._dadaBaseAlpha;
+  if (material.transparencyMode === undefined || material.transparencyMode === null) {
+    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
 }
 
 function disableAnimationsForShotMode() {
@@ -153,6 +163,22 @@ export async function boot(options = {}) {
   }
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
+  const worldExtents = world.extents || { minX: -18, maxX: 24 };
+  const camTargetMinX = worldExtents.minX + 3.2;
+  const camTargetMaxX = worldExtents.maxX - 2.6;
+  const foregroundMeshes = (world.foregroundMeshes || [])
+    .filter((m) => m?.metadata?.layer === 'foreground');
+  const foregroundState = new Map();
+  for (const mesh of foregroundMeshes) {
+    const material = mesh.material;
+    prepareFadeMaterial(material);
+    foregroundState.set(mesh.uniqueId, {
+      target: 1,
+      current: 1,
+      seenMs: 0,
+      clearMs: 0,
+    });
+  }
 
   // Camera — fixed angle, smooth follow
   const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(-18, 7, -14), scene);
@@ -212,6 +238,51 @@ export async function boot(options = {}) {
     pendingResetReason = reason;
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     ui.showStatus('Try again!', 650);
+  }
+
+  function updateForegroundOcclusion(dt) {
+    if (!foregroundMeshes.length) return;
+
+    const playerPos = player.mesh.position;
+    const cameraPos = camera.position;
+    const toPlayer = playerPos.subtract(cameraPos);
+    const rayLength = toPlayer.length();
+    if (rayLength <= 0.001) return;
+
+    const rayDir = toPlayer.scale(1 / rayLength);
+    const ray = new BABYLON.Ray(cameraPos, rayDir, rayLength);
+
+    for (const mesh of foregroundMeshes) {
+      const stateInfo = foregroundState.get(mesh.uniqueId);
+      if (!stateInfo) continue;
+
+      const material = mesh.material;
+      if (!material) continue;
+      prepareFadeMaterial(material);
+
+      let occluding = false;
+      if (debugFlags.occlusionFade) {
+        const hit = ray.intersectsMesh(mesh, false);
+        occluding = !!(hit?.hit && hit.distance < rayLength - 0.35);
+      }
+
+      if (occluding) {
+        stateInfo.seenMs += dt * 1000;
+        stateInfo.clearMs = 0;
+        if (stateInfo.seenMs > 48) {
+          stateInfo.target = 0.25;
+        }
+      } else {
+        stateInfo.clearMs += dt * 1000;
+        stateInfo.seenMs = 0;
+        if (stateInfo.clearMs > 140) {
+          stateInfo.target = 1;
+        }
+      }
+
+      stateInfo.current = damp(stateInfo.current, stateInfo.target, 10, dt);
+      material.alpha = material._dadaBaseAlpha * stateInfo.current;
+    }
   }
 
   if (shotMode) {
@@ -320,11 +391,12 @@ export async function boot(options = {}) {
       // Smooth camera follow
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
-      camera.position.x = damp(camera.position.x, px - 6, 4, dt);
+      const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
+      camera.position.x = damp(camera.position.x, targetX - 8, 4, dt);
       camera.position.y = damp(camera.position.y, py + 4, 4, dt);
       camera.position.z = damp(camera.position.z, -14, 4, dt);
       camera.setTarget(new BABYLON.Vector3(
-        damp(camera.getTarget().x, px + 2, 4, dt),
+        damp(camera.getTarget().x, targetX, 4, dt),
         damp(camera.getTarget().y, py + 1.2, 4, dt),
         0,
       ));
@@ -340,6 +412,7 @@ export async function boot(options = {}) {
     }
 
     juiceFx.update(dt);
+    updateForegroundOcclusion(dt);
 
     // Debug HUD (dev only)
     if (debugHud) {

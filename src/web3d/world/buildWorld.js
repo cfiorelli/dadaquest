@@ -208,13 +208,15 @@ export function buildWorld(scene, options = {}) {
 
   // Foreground cutouts (offset to avoid blocking spawn/play area)
   const fgCutout1 = BABYLON.MeshBuilder.CreateBox('fgCutout1', { width: 8, height: 3, depth: 0.2 }, scene);
-  fgCutout1.position.set(-22, 1.5, -6);
+  fgCutout1.position.set(-22, 1.5, -8);
   fgCutout1.material = makeCardboard(scene, 'fgMat1', ...P.fgCutout);
+  fgCutout1.metadata = { layer: 'foreground' };
   shadowGen.addShadowCaster(fgCutout1);
 
   const fgCutout2 = BABYLON.MeshBuilder.CreateBox('fgCutout2', { width: 10, height: 2.5, depth: 0.2 }, scene);
-  fgCutout2.position.set(30, 1.2, -7);
+  fgCutout2.position.set(30, 1.2, -8.6);
   fgCutout2.material = makeCardboard(scene, 'fgMat2', ...P.fgCutout);
+  fgCutout2.metadata = { layer: 'foreground' };
   shadowGen.addShadowCaster(fgCutout2);
 
   // === PLATFORMS ===
@@ -288,5 +290,8 @@ export function buildWorld(scene, options = {}) {
     platforms: allPlatforms,
     goal: dada.goal,
     shadowGen,
+    foregroundMeshes: [fgCutout1, fgCutout2],
+    extents: { minX: -18, maxX: 24 },
+    spawn: { x: -12, y: 3, z: 0 },
   };
 }
