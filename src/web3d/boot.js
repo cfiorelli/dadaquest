@@ -8,6 +8,11 @@ import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 
 const SHOT_FRAMES_TARGET = 10;
+const DEFAULT_FLAGS = {
+  juice: true,
+  audio: true,
+  occlusionFade: true,
+};
 
 function isShotMode() {
   if (typeof window === 'undefined') return false;
@@ -69,6 +74,17 @@ export async function boot(options = {}) {
   // Debug hook (Playwright polls this)
   window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
   window.__DADA_DEBUG__.sceneKey = 'TitleScene';
+  const mergedFlags = {
+    ...DEFAULT_FLAGS,
+    ...(window.__DADA_DEBUG__.flags || {}),
+  };
+  if (shotMode) {
+    // Freeze non-essential effects for deterministic screenshot captures.
+    mergedFlags.juice = false;
+    mergedFlags.audio = false;
+    mergedFlags.occlusionFade = false;
+  }
+  window.__DADA_DEBUG__.flags = mergedFlags;
   window.__DADA_DEBUG__.isShotMode = shotMode;
   window.__DADA_DEBUG__.shotReady = false;
   window.__DADA_DEBUG__.shotFrames = 0;
