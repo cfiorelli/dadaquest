@@ -1,6 +1,6 @@
 export const LEVEL1 = {
   extents: { minX: -20, maxX: 33 },
-  spawn: { x: -15.2, y: 1.2, z: 0 },
+  spawn: { x: -15.2, y: 1.205, z: 0 },
   goal: { x: 30.2, y: 5.3, z: 0 },
   checkpoints: [
     { x: 12.8, y: 5.1, z: 0, label: 'Midway' },
