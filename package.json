@@ -4,8 +4,9 @@
   "description": "Da Da Quest - A comedic 2D platformer",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run check:dist-nozip",
     "preview": "vite preview",
+    "check:dist-nozip": "node -e \"const fs=require('fs');const p='dist';const bad=[];const walk=(d)=>{if(!fs.existsSync(d))return;for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=d+'/'+e.name;if(e.isDirectory())walk(f);else if(/\\.zip$/i.test(e.name))bad.push(f)}};walk(p);if(bad.length){console.error('Zip artifacts found in dist:');for(const f of bad)console.error(' - '+f);process.exit(1)}console.log('No zip artifacts in dist.');\"",
     "pw:install": "playwright install --with-deps chromium",
     "test:smoke": "playwright test -g smoke --project=chromium",
     "test": "npm run build && npm run test:smoke",

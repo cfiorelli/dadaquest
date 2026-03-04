@@ -570,16 +570,16 @@ export function buildWorld(scene, options = {}) {
   fillLight.groundColor = new BABYLON.Color3(0.34, 0.32, 0.34);
 
   const rimLight = new BABYLON.PointLight('rimLight', new BABYLON.Vector3(-8.5, 8.8, -13.8), scene);
-  rimLight.intensity = 0.24;
+  rimLight.intensity = 0.30;
   rimLight.diffuse = new BABYLON.Color3(0.80, 0.92, 1.0);
   rimLight.range = 40;
 
   const shadowGen = new BABYLON.ShadowGenerator(1024, keyLight);
   // Keep shadow filtering stable in swiftshader and local browsers.
-  shadowGen.useBlurExponentialShadowMap = true;
-  shadowGen.blurKernel = 14;
-  shadowGen.blurScale = 1;
-  shadowGen.setDarkness(0.32);
+  shadowGen.usePoissonSampling = true;
+  shadowGen.bias = 0.0006;
+  shadowGen.normalBias = 0.02;
+  shadowGen.setDarkness(0.36);
 
   // === DIORAMA BASE ===
   const groundDef = LEVEL1.ground;
@@ -606,9 +606,9 @@ export function buildWorld(scene, options = {}) {
   }, scene);
   backdrop.position.set(6, 9, 8.3);
   const backdropCard = [
-    Math.max(0, P.backdropCard[0] - 20),
-    Math.max(0, P.backdropCard[1] - 20),
-    Math.max(0, P.backdropCard[2] - 18),
+    Math.max(0, P.backdropCard[0] - 30),
+    Math.max(0, P.backdropCard[1] - 30),
+    Math.max(0, P.backdropCard[2] - 28),
   ];
   backdrop.material = makePaper(scene, 'backdropMat', ...backdropCard, {
     grainScale: 2.6,
@@ -666,6 +666,7 @@ export function buildWorld(scene, options = {}) {
   }
 
   const foregroundMeshes = [];
+  const foregroundCutouts = [];
   const foregroundDefs = [
     { x: -24.0, y: 1.4, z: -8.50, w: 7.2, h: 3.1, seed: 3301 },
     { x: -9.2, y: 1.0, z: -8.64, w: 6.0, h: 2.9, seed: 3302 },
@@ -691,6 +692,7 @@ export function buildWorld(scene, options = {}) {
     mesh.metadata = { layer: 'foreground' };
     shadowGen.addShadowCaster(mesh);
     foregroundMeshes.push(mesh);
+    foregroundCutouts.push(mesh);
   }
 
   // === PLATFORMS ===
@@ -849,24 +851,31 @@ export function buildWorld(scene, options = {}) {
   }
 
   // === DECORATIONS ===
+  const treeDecor = [];
   for (let i = 0; i < 6; i++) {
     const tx = -13 + i * 8;
+    const treeRoot = new BABYLON.TransformNode(`treeDecor_${i}`, scene);
+    treeRoot.position.set(tx, 2.5, 4.5);
+
     const trunk = BABYLON.MeshBuilder.CreateBox('trunk' + i, {
       width: 0.3, height: 1.5, depth: 0.25,
     }, scene);
-    trunk.position.set(tx, 2.5, 4.5);
+    trunk.position.set(0, 0, 0);
+    trunk.parent = treeRoot;
     trunk.material = makeFelt(scene, 'trunkMat' + i, ...P.trunk);
 
     const foliage = BABYLON.MeshBuilder.CreateSphere('foliage' + i, {
       diameter: 1.8, segments: 10,
     }, scene);
-    foliage.position.set(tx, 3.8, 4.5);
+    foliage.position.set(0, 1.3, 0);
+    foliage.parent = treeRoot;
     foliage.scaling.y = 0.8;
     const fR = P.foliageBase[0] + random() * 0.12;
     const fG = P.foliageBase[1] + random() * 0.12;
     const fB = P.foliageBase[2] + random() * 0.08;
     foliage.material = makeFelt(scene, 'foliageMat' + i, fR, fG, fB);
     shadowGen.addShadowCaster(foliage);
+    treeDecor.push(treeRoot);
   }
 
   const goalBanner = createGoalBanner(scene, 'goalBanner', {
@@ -911,6 +920,10 @@ export function buildWorld(scene, options = {}) {
       hangingRing,
       toyBlocks,
       goalBanner,
+      backHills,
+      midHedges,
+      foregroundCutouts,
+      treeDecor,
       cloudCutouts,
     },
   };

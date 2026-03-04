@@ -7,7 +7,11 @@ import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 import { JuiceFx } from './util/juiceFx.js';
-import { applyHdriEnvironment, getAvailableModels, loadModelById } from './util/assets.js';
+import {
+  applyHdriEnvironment,
+  getAvailableModels,
+  loadModelForRole,
+} from './util/assets.js';
 import { GameAudio } from './util/audio.js';
 
 const SHOT_FRAMES_TARGET = 10;
@@ -123,6 +127,17 @@ function resolveAttachParent(anchor) {
   return anchor;
 }
 
+function getAnchorWorldPosition(anchor) {
+  if (!anchor) return null;
+  if (typeof anchor.getAbsolutePosition === 'function') {
+    return anchor.getAbsolutePosition().clone();
+  }
+  if (anchor.position instanceof BABYLON.Vector3) {
+    return anchor.position.clone();
+  }
+  return null;
+}
+
 export async function boot(options = {}) {
   const { isTestMode = false } = options;
   const shotMode = isShotMode();
@@ -201,6 +216,29 @@ export async function boot(options = {}) {
   const availableModels = await getAvailableModels();
   window.__DADA_DEBUG__.assetModels = availableModels;
 
+  async function attachRoleModel(roleName, fallbackNode, options = {}) {
+    const result = await loadModelForRole(scene, roleName, options);
+    if (result.loaded) {
+      registerShadowCasters(world.shadowGen, result.meshes);
+      if (fallbackNode) hideProceduralVisuals(fallbackNode);
+      return result;
+    }
+    return result;
+  }
+
+  function pushForegroundMeshes(meshes) {
+    if (!Array.isArray(meshes)) return;
+    world.foregroundMeshes = world.foregroundMeshes || [];
+    for (const mesh of meshes) {
+      if (!(mesh instanceof BABYLON.Mesh)) continue;
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        layer: 'foreground',
+      };
+      world.foregroundMeshes.push(mesh);
+    }
+  }
+
   // Player
   const player = new PlayerController(scene, { x: -12, y: 3, z: 0 });
   player.setColliders(world.platforms);
@@ -210,92 +248,127 @@ export async function boot(options = {}) {
   }
 
   // Replace procedural player toy with authored model (visuals only).
-  hideProceduralVisuals(player.visual);
-  const babyModel = await loadModelById(scene, 'kenney_baby', {
+  await attachRoleModel('playerModel', player.visual, {
     parent: player.visual,
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
   });
-  registerShadowCasters(world.shadowGen, babyModel.meshes);
 
   // Replace DaDa mesh and key props with authored assets.
-  hideProceduralVisuals(world.goalRoot);
-  const dadModel = await loadModelById(scene, 'kenney_dad', {
+  await attachRoleModel('goalModel', world.goalRoot, {
     parent: world.goalRoot,
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
   });
-  registerShadowCasters(world.shadowGen, dadModel.meshes);
 
   for (const signRoot of world.signs || []) {
-    hideProceduralVisuals(signRoot);
-    const signModel = await loadModelById(scene, 'kenney_flag', {
+    await attachRoleModel('signModel', signRoot, {
       parent: resolveAttachParent(signRoot),
       fallbackMaterial: 'cardboard',
       scaling: 0.9,
     });
-    registerShadowCasters(world.shadowGen, signModel.meshes);
   }
 
   for (const checkpoint of world.checkpoints || []) {
-    hideProceduralVisuals(checkpoint.marker);
-    const checkpointModel = await loadModelById(scene, 'quaternius_goal_flag', {
+    await attachRoleModel('checkpointModel', checkpoint.marker, {
       parent: resolveAttachParent(checkpoint.marker),
       fallbackMaterial: 'cardboard',
       scaling: 0.72,
     });
-    registerShadowCasters(world.shadowGen, checkpointModel.meshes);
   }
 
   for (const pickup of world.pickups || []) {
-    hideProceduralVisuals(pickup.node);
-    const pickupModel = await loadModelById(scene, 'kenney_coin', {
+    await attachRoleModel('pickupModel', pickup.node, {
       parent: resolveAttachParent(pickup.node),
       fallbackMaterial: 'plastic',
       scaling: 0.9,
     });
-    registerShadowCasters(world.shadowGen, pickupModel.meshes);
   }
 
   const anchors = world.assetAnchors || {};
   for (const toy of anchors.toyBlocks || []) {
-    hideProceduralVisuals(toy);
-    const toyModel = await loadModelById(scene, 'kenney_crate', {
+    await attachRoleModel('toyBlockModel', toy, {
       parent: resolveAttachParent(toy),
       fallbackMaterial: 'cardboard',
       scaling: 0.7,
     });
-    registerShadowCasters(world.shadowGen, toyModel.meshes);
   }
 
   if (anchors.hangingRing) {
-    hideProceduralVisuals(anchors.hangingRing);
-    const ringModel = await loadModelById(scene, 'quaternius_coin', {
+    await attachRoleModel('hangingModel', anchors.hangingRing, {
       parent: resolveAttachParent(anchors.hangingRing),
       fallbackMaterial: 'plastic',
       scaling: 0.95,
     });
-    registerShadowCasters(world.shadowGen, ringModel.meshes);
   }
 
   if (anchors.goalBanner) {
-    hideProceduralVisuals(anchors.goalBanner);
-    const bannerModel = await loadModelById(scene, 'kenney_flag', {
+    await attachRoleModel('bannerModel', anchors.goalBanner, {
       parent: resolveAttachParent(anchors.goalBanner),
       fallbackMaterial: 'plastic',
       scaling: 1.2,
     });
-    registerShadowCasters(world.shadowGen, bannerModel.meshes);
   }
 
   if (anchors.cribRail) {
-    hideProceduralVisuals(resolveAttachParent(anchors.cribRail));
-    const cribModel = await loadModelById(scene, 'kenney_fence', {
+    await attachRoleModel('cribRailModel', resolveAttachParent(anchors.cribRail), {
       parent: resolveAttachParent(anchors.cribRail),
       fallbackMaterial: 'cardboard',
       scaling: [1.05, 0.9, 0.9],
     });
-    registerShadowCasters(world.shadowGen, cribModel.meshes);
+  }
+
+  for (const plant of anchors.foregroundCutouts || []) {
+    const pos = getAnchorWorldPosition(plant);
+    if (!pos) continue;
+    const result = await attachRoleModel('bushModel', plant, {
+      position: pos,
+      fallbackMaterial: 'felt',
+      scaling: [2.1, 1.9, 1.5],
+    });
+    if (result.loaded) {
+      pushForegroundMeshes(result.meshes);
+    }
+  }
+
+  for (const hill of anchors.backHills || []) {
+    const pos = getAnchorWorldPosition(hill);
+    if (!pos) continue;
+    await attachRoleModel('treeModel', hill, {
+      position: pos,
+      fallbackMaterial: 'felt',
+      scaling: [2.5, 2.6, 1.8],
+    });
+  }
+
+  for (const hedge of anchors.midHedges || []) {
+    const pos = getAnchorWorldPosition(hedge);
+    if (!pos) continue;
+    await attachRoleModel('bushModel', hedge, {
+      position: pos,
+      fallbackMaterial: 'felt',
+      scaling: [2.1, 2.0, 1.5],
+    });
+  }
+
+  for (const cloud of anchors.cloudCutouts || []) {
+    const pos = getAnchorWorldPosition(cloud);
+    if (!pos) continue;
+    await attachRoleModel('cloudModel', cloud, {
+      position: pos,
+      fallbackMaterial: 'paper',
+      scaling: [1.9, 1.4, 1.4],
+    });
+  }
+
+  for (const tree of anchors.treeDecor || []) {
+    const pos = getAnchorWorldPosition(tree);
+    if (!pos) continue;
+    await attachRoleModel('treeModel', tree, {
+      position: pos,
+      fallbackMaterial: 'felt',
+      scaling: [1.2, 1.2, 1.0],
+    });
   }
 
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
@@ -314,7 +387,7 @@ export async function boot(options = {}) {
   const camTargetMinX = worldExtents.minX + 3.2;
   const camTargetMaxX = worldExtents.maxX - 2.6;
   const foregroundMeshes = (world.foregroundMeshes || [])
-    .filter((m) => m?.metadata?.layer === 'foreground');
+    .filter((m) => m?.metadata?.layer === 'foreground' && m?.isEnabled?.() !== false);
   const foregroundState = new Map();
   for (const mesh of foregroundMeshes) {
     const material = mesh.material;

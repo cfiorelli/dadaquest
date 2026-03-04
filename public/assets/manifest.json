@@ -1,4 +1,19 @@
 {
+  "primaryPack": "kenney",
+  "roles": {
+    "playerModel": ["kenney_baby", "quaternius_character"],
+    "goalModel": ["kenney_dad", "quaternius_character_gun"],
+    "checkpointModel": ["kenney_flag", "quaternius_goal_flag"],
+    "pickupModel": ["kenney_coin", "quaternius_coin"],
+    "signModel": ["kenney_flag", "quaternius_arrow"],
+    "toyBlockModel": ["kenney_crate", "quaternius_chest"],
+    "cribRailModel": ["kenney_fence", "quaternius_plant_large"],
+    "hangingModel": ["kenney_coin", "quaternius_coin"],
+    "bannerModel": ["kenney_flag", "quaternius_goal_flag"],
+    "treeModel": ["kenney_tree", "kenney_tree_pine", "quaternius_tree"],
+    "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass", "quaternius_plant_large"],
+    "cloudModel": ["kenney_rocks", "quaternius_cloud"]
+  },
   "models": [
     {
       "id": "kenney_baby",
@@ -43,56 +58,92 @@
       "yOffset": -0.2
     },
     {
+      "id": "kenney_tree",
+      "path": "assets/packs/kenney/models/tree.glb",
+      "scale": 0.78,
+      "yOffset": -0.62
+    },
+    {
+      "id": "kenney_plant",
+      "path": "assets/packs/kenney/models/plant.glb",
+      "scale": 0.86,
+      "yOffset": -0.46
+    },
+    {
+      "id": "kenney_tree_pine",
+      "path": "assets/packs/kenney/models/tree-pine.glb",
+      "scale": 0.74,
+      "yOffset": -0.58
+    },
+    {
+      "id": "kenney_grass",
+      "path": "assets/packs/kenney/models/grass.glb",
+      "scale": 0.95,
+      "yOffset": -0.34
+    },
+    {
+      "id": "kenney_flowers_tall",
+      "path": "assets/packs/kenney/models/flowers-tall.glb",
+      "scale": 0.9,
+      "yOffset": -0.48
+    },
+    {
+      "id": "kenney_rocks",
+      "path": "assets/packs/kenney/models/rocks.glb",
+      "scale": 0.72,
+      "yOffset": -0.36
+    },
+    {
       "id": "quaternius_character",
-      "path": "assets/packs/quaternius/Character.gltf",
+      "path": "assets/packs/quaternius/Character.glb",
       "scale": 0.95,
       "yOffset": -0.46
     },
     {
       "id": "quaternius_character_gun",
-      "path": "assets/packs/quaternius/Character_Gun.gltf",
+      "path": "assets/packs/quaternius/Character_Gun.glb",
       "scale": 0.95,
       "yOffset": -0.46
     },
     {
       "id": "quaternius_arrow",
-      "path": "assets/packs/quaternius/Arrow.gltf",
+      "path": "assets/packs/quaternius/Arrow.glb",
       "scale": 0.78,
       "yOffset": -0.2
     },
     {
       "id": "quaternius_goal_flag",
-      "path": "assets/packs/quaternius/Goal_Flag.gltf",
+      "path": "assets/packs/quaternius/Goal_Flag.glb",
       "scale": 0.86,
       "yOffset": -0.46
     },
     {
       "id": "quaternius_coin",
-      "path": "assets/packs/quaternius/Coin.gltf",
+      "path": "assets/packs/quaternius/Coin.glb",
       "scale": 0.82,
       "yOffset": -0.2
     },
     {
       "id": "quaternius_plant_large",
-      "path": "assets/packs/quaternius/Plant_Large.gltf",
+      "path": "assets/packs/quaternius/Plant_Large.glb",
       "scale": 0.85,
       "yOffset": -0.45
     },
     {
       "id": "quaternius_cloud",
-      "path": "assets/packs/quaternius/Cloud_1.gltf",
+      "path": "assets/packs/quaternius/Cloud_1.glb",
       "scale": 1.1,
       "yOffset": 0
     },
     {
       "id": "quaternius_tree",
-      "path": "assets/packs/quaternius/Tree.gltf",
+      "path": "assets/packs/quaternius/Tree.glb",
       "scale": 0.82,
       "yOffset": -0.58
     },
     {
       "id": "quaternius_chest",
-      "path": "assets/packs/quaternius/Chest.gltf",
+      "path": "assets/packs/quaternius/Chest.glb",
       "scale": 0.82,
       "yOffset": -0.36
     }

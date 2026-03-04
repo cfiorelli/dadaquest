@@ -72,9 +72,23 @@ function normalizeManifest(data) {
     ? data.hdri.path
     : null;
 
+  const normalizedRoles = {};
+  if (data?.roles && typeof data.roles === 'object') {
+    for (const [roleName, value] of Object.entries(data.roles)) {
+      if (Array.isArray(value)) {
+        const ids = value.filter((v) => typeof v === 'string' && v.trim().length > 0);
+        if (ids.length) normalizedRoles[roleName] = ids;
+      } else if (typeof value === 'string' && value.trim().length > 0) {
+        normalizedRoles[roleName] = [value];
+      }
+    }
+  }
+
   return {
+    primaryPack: typeof data?.primaryPack === 'string' ? data.primaryPack : null,
     models: modelDefs,
     byId,
+    roles: normalizedRoles,
     hdri: hdriPath ? { path: hdriPath } : null,
   };
 }
@@ -182,6 +196,24 @@ async function loadContainer(scene, modelPath) {
   return promise;
 }
 
+export async function getAssetManifest() {
+  return getManifest();
+}
+
+export async function getRoleModelIds(roleName) {
+  const manifest = await getManifest();
+  return manifest.roles[roleName] || [];
+}
+
+export async function resolveModelIdForRole(roleName) {
+  const manifest = await getManifest();
+  const ids = manifest.roles[roleName] || [];
+  for (const id of ids) {
+    if (manifest.byId.has(id)) return id;
+  }
+  return null;
+}
+
 export async function loadModelById(scene, modelId, options = {}) {
   const {
     parent = null,
@@ -230,6 +262,32 @@ export async function loadGlbIfAvailable(scene, fileName, options = {}) {
     return { loaded: false, reason: 'not_in_manifest', meshes: [], roots: [] };
   }
   return loadModelById(scene, model.id, options);
+}
+
+export async function loadModelForRole(scene, roleName, options = {}) {
+  const manifest = await getManifest();
+  const ids = manifest.roles[roleName] || [];
+  if (!ids.length) {
+    return { loaded: false, reason: 'role_not_mapped', role: roleName, meshes: [], roots: [] };
+  }
+
+  let lastResult = null;
+  for (const modelId of ids) {
+    if (!manifest.byId.has(modelId)) continue;
+    const result = await loadModelById(scene, modelId, options);
+    if (result.loaded) {
+      return { ...result, role: roleName, usedModelId: modelId };
+    }
+    lastResult = result;
+  }
+
+  return lastResult || {
+    loaded: false,
+    reason: 'role_models_missing',
+    role: roleName,
+    meshes: [],
+    roots: [],
+  };
 }
 
 export async function getAvailableModels() {

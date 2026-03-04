@@ -2,12 +2,12 @@
 
 - Kenney - Platformer Kit (CC0 1.0)
   - Source: https://kenney.nl/assets/platformer-kit
-  - Local pack: `public/assets/packs/kenney/kenney_platformer-kit.zip`
+  - Local source pack: `assets-src/packs/kenney/kenney_platformer-kit.zip`
   - Extracted runtime subset: `public/assets/packs/kenney/models/*.glb`
 
 - Quaternius - Platformer Game Kit (CC0 1.0)
   - Source: https://quaternius.com/packs/ultimateplatformer.html
-  - Local files: `public/assets/packs/quaternius/*.gltf`
+  - Local files: `public/assets/packs/quaternius/*.glb`
   - License file: `public/assets/packs/quaternius/License.txt`
 
 - Poly Haven - Studio Small 09 (HDRI, CC0)
