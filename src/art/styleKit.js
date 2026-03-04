@@ -7,6 +7,58 @@ import { GAME_W, GAME_H } from '../gameConfig.js';
  */
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DETERMINISTIC RNG — Seeded randomness for visual stability
+// ═══════════════════════════════════════════════════════════════════════════
+
+const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
+
+/**
+ * FNV-1a 32-bit hash
+ */
+function hash32(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Mulberry32 PRNG (deterministic)
+ */
+function mulberry32(seed) {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Create seeded RNG with int/float helpers
+ */
+function makeRng(seedStr) {
+  const seed = hash32(seedStr);
+  const rng = mulberry32(seed);
+  
+  return {
+    float: (min = 0, max = 1) => min + rng() * (max - min),
+    int: (min, max) => Math.floor(min + rng() * (max - min + 1)),
+  };
+}
+
+/**
+ * Create deterministic RNG for visual elements
+ * In test mode and production, uses buildSha + sceneKey + tag for stability
+ */
+export function makeStyleRng(sceneKey, tag = '') {
+  const seedStr = `${BUILD_SHA}:${sceneKey}:${tag}`;
+  return makeRng(seedStr);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PALETTE — Warm neutrals + accent colors
 // ═══════════════════════════════════════════════════════════════════════════
 export const PALETTE = {
@@ -50,6 +102,7 @@ export const PALETTE = {
 export function generateCardboardTexture(scene, key, w = 128, h = 96) {
   if (scene.textures.exists(key)) return key;
   
+  const rng = makeStyleRng('styleKit', `tex:${key}`);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   
   // Base gradient
@@ -64,15 +117,15 @@ export function generateCardboardTexture(scene, key, w = 128, h = 96) {
   g.lineStyle(2, PALETTE.cardboardEdge, 0.6);
   g.strokeRoundedRect(1, 1, w - 2, h - 2, 7);
   
-  // Fiber texture (random dots)
+  // Fiber texture (deterministic dots)
   const fiberCount = Math.floor((w * h) / 90);
   for (let i = 0; i < fiberCount; i++) {
-    const px = Phaser.Math.Between(2, w - 3);
-    const py = Phaser.Math.Between(2, h - 3);
-    const alpha = Phaser.Math.FloatBetween(0.04, 0.12);
-    const shade = Phaser.Math.Between(0x1a, 0x55);
+    const px = rng.int(2, w - 3);
+    const py = rng.int(2, h - 3);
+    const alpha = rng.float(0.04, 0.12);
+    const shade = rng.int(0x1a, 0x55);
     g.fillStyle(Phaser.Display.Color.GetColor(160 + shade, 140 + shade, 120 + shade), alpha);
-    g.fillRect(px, py, Phaser.Math.Between(1, 2), 1);
+    g.fillRect(px, py, rng.int(1, 2), 1);
   }
   
   // Edge darkening (vignette)
@@ -94,19 +147,20 @@ export function generateCardboardTexture(scene, key, w = 128, h = 96) {
 export function generateFeltTexture(scene, key, baseColor, w = 128, h = 96) {
   if (scene.textures.exists(key)) return key;
   
+  const rng = makeStyleRng('styleKit', `tex:${key}`);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   
   // Base color
   g.fillStyle(baseColor, 1);
   g.fillRect(0, 0, w, h);
   
-  // Soft noise
+  // Soft noise (deterministic)
   const noiseCount = Math.floor((w * h) / 50);
   for (let i = 0; i < noiseCount; i++) {
-    const px = Phaser.Math.Between(0, w - 1);
-    const py = Phaser.Math.Between(0, h - 1);
-    const alpha = Phaser.Math.FloatBetween(0.02, 0.08);
-    const bright = Phaser.Math.Between(-15, 25);
+    const px = rng.int(0, w - 1);
+    const py = rng.int(0, h - 1);
+    const alpha = rng.float(0.02, 0.08);
+    const bright = rng.int(-15, 25);
     const c = Phaser.Display.Color.IntegerToColor(baseColor);
     g.fillStyle(
       Phaser.Display.Color.GetColor(
@@ -130,6 +184,7 @@ export function generateFeltTexture(scene, key, baseColor, w = 128, h = 96) {
 export function generateWoodTexture(scene, key, w = 180, h = 34) {
   if (scene.textures.exists(key)) return key;
   
+  const rng = makeStyleRng('styleKit', `tex:${key}`);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
   
   // Base gradient
@@ -144,22 +199,22 @@ export function generateWoodTexture(scene, key, w = 180, h = 34) {
   g.lineStyle(2, PALETTE.woodDark, 0.4);
   g.strokeRoundedRect(1, 1, w - 2, h - 2, 6);
   
-  // Wood grain (horizontal lines)
+  // Wood grain (horizontal lines, deterministic)
   g.lineStyle(1, PALETTE.woodDark, 0.08);
   for (let i = 0; i < 8; i++) {
-    const y = Phaser.Math.Between(2, h - 3);
-    const xStart = Phaser.Math.Between(0, w * 0.1);
-    const xEnd = w - Phaser.Math.Between(0, w * 0.1);
+    const y = rng.int(2, h - 3);
+    const xStart = rng.int(0, Math.floor(w * 0.1));
+    const xEnd = w - rng.int(0, Math.floor(w * 0.1));
     g.beginPath();
     g.moveTo(xStart, y);
     g.lineTo(xEnd, y);
     g.strokePath();
   }
   
-  // Fiber noise
+  // Fiber noise (deterministic)
   for (let i = 0; i < 22; i++) {
     g.fillStyle(0xffffff, 0.04);
-    g.fillRect(Phaser.Math.Between(2, w - 3), Phaser.Math.Between(2, h - 3), 2, 1);
+    g.fillRect(rng.int(2, w - 3), rng.int(2, h - 3), 2, 1);
   }
   
   g.generateTexture(key, w, h);
@@ -177,6 +232,8 @@ export function generateWoodTexture(scene, key, w = 180, h = 34) {
 export function drawCardPanel(scene, x, y, w, h, opts = {}) {
   const depth = opts.depth ?? 10;
   const alpha = opts.alpha ?? 1;
+  const seedTag = opts.seedTag ?? `${x}_${y}_${w}_${h}`;
+  const rng = makeStyleRng(scene.scene.key, `panel:${seedTag}`);
   const container = scene.add.container(x, y).setDepth(depth).setAlpha(alpha);
   
   // Drop shadow
@@ -208,11 +265,11 @@ export function drawCardPanel(scene, x, y, w, h, opts = {}) {
   g.fillStyle(PALETTE.highlight, 0.35);
   g.fillRoundedRect(-w / 2 + 8, -h / 2 + 2, w - 16, 4, 2);
   
-  // Fiber texture
+  // Fiber texture (deterministic)
   for (let i = 0; i < Math.floor((w * h) / 120); i++) {
-    const px = Phaser.Math.Between(-w / 2 + 4, w / 2 - 4);
-    const py = Phaser.Math.Between(-h / 2 + 4, h / 2 - 4);
-    g.fillStyle(PALETTE.shadow, Phaser.Math.FloatBetween(0.02, 0.06));
+    const px = rng.int(-w / 2 + 4, w / 2 - 4);
+    const py = rng.int(-h / 2 + 4, h / 2 - 4);
+    g.fillStyle(PALETTE.shadow, rng.float(0.02, 0.06));
     g.fillRect(px, py, 1, 1);
   }
   
