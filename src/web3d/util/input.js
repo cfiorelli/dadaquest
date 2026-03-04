@@ -3,12 +3,14 @@ export class InputManager {
     this.held = {};
     this._jumpJustPressed = false;
     this._enterJustPressed = false;
+    this._muteJustPressed = false;
 
     document.addEventListener('keydown', (e) => {
       if (e.repeat) return;
       this.held[e.code] = true;
       if (e.code === 'Space') this._jumpJustPressed = true;
       if (e.code === 'Enter') this._enterJustPressed = true;
+      if (e.code === 'KeyM') this._muteJustPressed = true;
     });
     document.addEventListener('keyup', (e) => {
       this.held[e.code] = false;
@@ -39,6 +41,13 @@ export class InputManager {
   consumeEnter() {
     const v = this._enterJustPressed;
     this._enterJustPressed = false;
+    return v;
+  }
+
+  /** True only once per M press. */
+  consumeMuteToggle() {
+    const v = this._muteJustPressed;
+    this._muteJustPressed = false;
     return v;
   }
 }

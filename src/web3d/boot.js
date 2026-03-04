@@ -8,6 +8,7 @@ import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 import { JuiceFx } from './util/juiceFx.js';
 import { loadGlbIfAvailable, getAvailableModels } from './util/assets.js';
+import { GameAudio } from './util/audio.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -184,6 +185,8 @@ export async function boot(options = {}) {
   const pickups = world.pickups || [];
   const hazards = world.hazards || [];
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
+  const audio = new GameAudio({ enabled: !!debugFlags.audio && !shotMode });
+  audio.armOnFirstGesture();
   const worldExtents = world.extents || { minX: -18, maxX: 24 };
   const camTargetMinX = worldExtents.minX + 3.2;
   const camTargetMaxX = worldExtents.maxX - 2.6;
@@ -242,6 +245,7 @@ export async function boot(options = {}) {
       finishRun();
       return;
     }
+    audio.playWin();
     state = 'goal';
     goalTimer = GOAL_CELEBRATION_SEC;
     goalCamStartPos = camera.position.clone();
@@ -261,6 +265,7 @@ export async function boot(options = {}) {
       invulnMs: 800,
     });
     if (!applied) return;
+    audio.playReset();
     respawnState = { phase: 'fadeOut', timer: 0.16, reason };
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     ui.showStatus('Try again!', 650);
@@ -349,6 +354,7 @@ export async function boot(options = {}) {
         if (pickup.node) pickup.node.setEnabled(false);
         onesieBuffTimerMs = pickup.durationMs ?? 10000;
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
+        audio.playPickup();
         ui.showStatus('Onesie boost + jump', 1500);
       }
     }
@@ -481,9 +487,17 @@ export async function boot(options = {}) {
       return;
     }
 
+    if (input.consumeMuteToggle()) {
+      const muted = audio.toggleMute();
+      debugFlags.audio = !muted;
+      window.__DADA_DEBUG__.flags.audio = !muted;
+      ui.showStatus(muted ? 'Muted' : 'Sound on', 820);
+    }
+
     if (state === 'title') {
       // Wait for player input
       if (input.consumeJump() || input.consumeEnter()) {
+        audio.unlock();
         state = 'gameplay';
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
@@ -521,8 +535,10 @@ export async function boot(options = {}) {
         const playerEvents = player.consumeEvents();
         for (const ev of playerEvents) {
           if (ev.type === 'jump') {
+            audio.playJump();
             juiceFx.spawnJumpDust(player.mesh.position);
           } else if (ev.type === 'land') {
+            audio.playLand();
             juiceFx.spawnLandDust(player.mesh.position);
           } else if (ev.type === 'outOfBounds') {
             const reason = slipRecentTimerMs > 0 ? 'slip_fall' : 'fell_off_level';
