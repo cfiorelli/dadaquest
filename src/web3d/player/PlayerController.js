@@ -17,21 +17,27 @@ const PLAYER_HALF_W = 0.25;
 const PLAYER_HALF_H = 0.4;
 const SKIN_WIDTH = 0.005;     // separation buffer to prevent re-collision
 const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
+const LAND_SQUASH_MS = 95;
+const INVULN_BLINK_HZ = 20;
 
 export class PlayerController {
   constructor(scene, startPos = { x: -12, y: 3, z: 0 }) {
     this.scene = scene;
 
-    // Root transform for the baby (this.mesh is used by boot.js for position)
+    // Root transform for physics/collider position.
     this.mesh = new BABYLON.TransformNode('player', scene);
     this.mesh.position.set(startPos.x, startPos.y, startPos.z);
+
+    // Child transform for visual-only squash/stretch (does not affect collider root).
+    this.visual = new BABYLON.TransformNode('playerVisual', scene);
+    this.visual.parent = this.mesh;
 
     // Body (capsule-like: sphere + cylinder)
     const body = BABYLON.MeshBuilder.CreateCylinder('babyBody', {
       height: 0.4, diameterTop: 0.38, diameterBottom: 0.42, tessellation: 14,
     }, scene);
     body.position.y = -0.05;
-    body.parent = this.mesh;
+    body.parent = this.visual;
     body.material = makePlastic(scene, 'babyBodyMat', ...P.babyBody);
 
     // Head (larger relative to body — toy proportions)
@@ -39,7 +45,7 @@ export class PlayerController {
       diameter: 0.42, segments: 14,
     }, scene);
     head.position.y = 0.28;
-    head.parent = this.mesh;
+    head.parent = this.visual;
     head.material = makePlastic(scene, 'babyHeadMat', ...P.babyBody);
 
     // Diaper band
@@ -47,7 +53,7 @@ export class PlayerController {
       diameter: 0.42, thickness: 0.12, tessellation: 14,
     }, scene);
     diaper.position.y = -0.18;
-    diaper.parent = this.mesh;
+    diaper.parent = this.visual;
     diaper.material = makePlastic(scene, 'babyDiaperMat', ...P.babyDiaper, { roughness: 0.5 });
 
     // Face (DynamicTexture)
@@ -78,7 +84,7 @@ export class PlayerController {
 
     const facePlane = BABYLON.MeshBuilder.CreatePlane('babyFace', { size: 0.28 }, scene);
     facePlane.position.set(0, 0.28, -0.22);
-    facePlane.parent = this.mesh;
+    facePlane.parent = this.visual;
     const faceMat = new BABYLON.StandardMaterial('babyFaceMat', scene);
     faceMat.diffuseTexture = faceTex;
     faceMat.opacityTexture = faceTex;
@@ -102,10 +108,22 @@ export class PlayerController {
     this.jumpBufferTimer = -999; // ms since last jump press
     this.jumping = false;       // true while ascending from a jump
     this.jumpCutApplied = false;
+    this.wasGroundedLastFrame = false;
+    this.outOfBoundsEmitted = false;
 
     // Platform colliders (set externally via setColliders)
     this.colliders = [];  // array of {minX, maxX, minY, maxY}
     this.lastCollisionHits = 0; // debug: how many platforms we collided with last frame
+
+    // Gameplay modifiers (set by world/hazards)
+    this.surfaceAccelMultiplier = 1;
+    this.surfaceDecelMultiplier = 1;
+    this.jumpVelocityMultiplier = 1;
+
+    // Feedback state
+    this.landSquashTimerMs = 0;
+    this.invulnTimerMs = 0;
+    this.eventQueue = [];
   }
 
   setColliders(platforms) {
@@ -121,9 +139,61 @@ export class PlayerController {
     });
   }
 
+  setMovementModifiers({
+    surfaceAccelMultiplier = 1,
+    surfaceDecelMultiplier = 1,
+    jumpVelocityMultiplier = 1,
+  } = {}) {
+    this.surfaceAccelMultiplier = surfaceAccelMultiplier;
+    this.surfaceDecelMultiplier = surfaceDecelMultiplier;
+    this.jumpVelocityMultiplier = jumpVelocityMultiplier;
+  }
+
+  setPosition(x, y, z = 0) {
+    this.mesh.position.set(x, y, z);
+    this.vx = 0;
+    this.vy = 0;
+    this.grounded = false;
+    this.jumping = false;
+    this.jumpCutApplied = false;
+    this.outOfBoundsEmitted = false;
+  }
+
+  consumeEvents() {
+    const events = this.eventQueue;
+    this.eventQueue = [];
+    return events;
+  }
+
+  emitEvent(type, payload = {}) {
+    this.eventQueue.push({ type, ...payload });
+  }
+
+  triggerLandSquash() {
+    this.landSquashTimerMs = LAND_SQUASH_MS;
+  }
+
+  applyHit({ direction = 1, knockback = 4.5, upward = 4.0, invulnMs = 800 } = {}) {
+    if (this.invulnTimerMs > 0) return false;
+    const dir = direction >= 0 ? 1 : -1;
+    this.vx = clamp(this.vx + dir * knockback, -MAX_SPEED * 1.25, MAX_SPEED * 1.25);
+    this.vy = Math.max(this.vy, upward);
+    this.invulnTimerMs = invulnMs;
+    this.emitEvent('hit', { direction: dir });
+    return true;
+  }
+
+  isInvulnerable() {
+    return this.invulnTimerMs > 0;
+  }
+
   update(dt, moveX, jumpJustPressed, jumpHeld) {
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
+
+    if (this.invulnTimerMs > 0) {
+      this.invulnTimerMs = Math.max(0, this.invulnTimerMs - dt * 1000);
+    }
 
     // Timers
     if (this.grounded) {
@@ -142,12 +212,13 @@ export class PlayerController {
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
     const canBuffer = this.jumpBufferTimer <= JUMP_BUFFER_MS;
     if (canCoyote && canBuffer && !this.jumping) {
-      this.vy = JUMP_VEL;
+      this.vy = JUMP_VEL * this.jumpVelocityMultiplier;
       this.jumping = true;
       this.jumpCutApplied = false;
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
       this.jumpBufferTimer = JUMP_BUFFER_MS + 1; // consume buffer
       this.grounded = false;
+      this.emitEvent('jump');
     }
 
     // Variable jump: cut upward velocity if released early
@@ -158,8 +229,8 @@ export class PlayerController {
 
     // Horizontal movement
     const accelVal = this.grounded
-      ? (moveX !== 0 ? GROUND_ACCEL : GROUND_DECEL)
-      : (moveX !== 0 ? AIR_ACCEL : AIR_DECEL);
+      ? (moveX !== 0 ? GROUND_ACCEL * this.surfaceAccelMultiplier : GROUND_DECEL * this.surfaceDecelMultiplier)
+      : (moveX !== 0 ? AIR_ACCEL * this.surfaceAccelMultiplier : AIR_DECEL * this.surfaceDecelMultiplier);
     const targetVx = moveX * MAX_SPEED;
     const diff = targetVx - this.vx;
     const maxStep = accelVal * dt;
@@ -213,16 +284,47 @@ export class PlayerController {
       }
     }
 
+    // Landing transition events + squash
+    if (!this.wasGroundedLastFrame && this.grounded) {
+      this.triggerLandSquash();
+      this.emitEvent('land');
+    }
+    this.wasGroundedLastFrame = this.grounded;
+
     // Clamp tiny velocities to zero (prevents drift/jitter)
     if (Math.abs(this.vx) < VEL_DEADZONE) this.vx = 0;
     if (this.grounded && Math.abs(this.vy) < VEL_DEADZONE) this.vy = 0;
 
-    // Fell off world — respawn
+    // Out-of-bounds event emitted once until we're restored.
     if (pos.y < -10) {
-      pos.x = -12;
-      pos.y = 5;
-      this.vx = 0;
-      this.vy = 0;
+      if (!this.outOfBoundsEmitted) {
+        this.emitEvent('outOfBounds', { y: pos.y });
+        this.outOfBoundsEmitted = true;
+      }
+    } else if (pos.y > -6) {
+      this.outOfBoundsEmitted = false;
+    }
+
+    // Visual-only squash/stretch envelope.
+    if (this.landSquashTimerMs > 0) {
+      this.landSquashTimerMs = Math.max(0, this.landSquashTimerMs - dt * 1000);
+      const t = 1 - (this.landSquashTimerMs / LAND_SQUASH_MS);
+      const pulse = Math.sin(t * Math.PI);
+      const sx = 1 + 0.13 * pulse;
+      const sy = 1 - 0.16 * pulse;
+      const sz = 1 + 0.13 * pulse;
+      this.visual.scaling.set(sx, sy, sz);
+    } else {
+      this.visual.scaling.set(1, 1, 1);
+    }
+
+    // Blink while invulnerable for clear feedback.
+    if (this.invulnTimerMs > 0) {
+      const phase = this.invulnTimerMs / 1000;
+      const blinkOn = Math.sin(phase * Math.PI * INVULN_BLINK_HZ) > 0;
+      this.visual.setEnabled(blinkOn);
+    } else {
+      this.visual.setEnabled(true);
     }
   }
 
@@ -239,6 +341,7 @@ export class PlayerController {
       vx: this.vx.toFixed(2),
       vy: this.vy.toFixed(2),
       grounded: this.grounded,
+      invulnMs: this.invulnTimerMs.toFixed(0),
       coyoteMs: Math.max(0, COYOTE_MS - this.timeSinceGround).toFixed(0),
       bufferMs: Math.max(0, JUMP_BUFFER_MS - this.jumpBufferTimer).toFixed(0),
       jumping: this.jumping,

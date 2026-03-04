@@ -6,6 +6,7 @@ import { createUI } from './ui/ui.js';
 import { damp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
+import { JuiceFx } from './util/juiceFx.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -13,6 +14,12 @@ const DEFAULT_FLAGS = {
   audio: true,
   occlusionFade: true,
 };
+const GOAL_CELEBRATION_SEC = 0.48;
+
+function easeOutCubic(t) {
+  const v = Math.max(0, Math.min(1, t));
+  return 1 - ((1 - v) ** 3);
+}
 
 function isShotMode() {
   if (typeof window === 'undefined') return false;
@@ -85,6 +92,7 @@ export async function boot(options = {}) {
     mergedFlags.occlusionFade = false;
   }
   window.__DADA_DEBUG__.flags = mergedFlags;
+  const debugFlags = window.__DADA_DEBUG__.flags;
   window.__DADA_DEBUG__.isShotMode = shotMode;
   window.__DADA_DEBUG__.shotReady = false;
   window.__DADA_DEBUG__.shotFrames = 0;
@@ -143,6 +151,8 @@ export async function boot(options = {}) {
   for (const m of player._meshes) {
     world.shadowGen.addShadowCaster(m);
   }
+  const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
+  const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
 
   // Camera — fixed angle, smooth follow
   const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(-18, 7, -14), scene);
@@ -159,6 +169,50 @@ export async function boot(options = {}) {
   let state = 'title'; // title | gameplay | end
   let goalReached = false;
   let shotFrames = 0;
+  let goalTimer = 0;
+  let resetTimer = 0;
+  let pendingResetReason = '';
+  let goalCamStartPos = camera.position.clone();
+  let goalCamStartTarget = camera.getTarget().clone();
+  let goalCamEndPos = camera.position.clone();
+  let goalCamEndTarget = camera.getTarget().clone();
+  window.__DADA_DEBUG__.lastRespawnReason = '';
+
+  function finishRun() {
+    state = 'end';
+    window.__DADA_DEBUG__.sceneKey = 'EndScene';
+    ui.showEnd();
+  }
+
+  function startGoalCelebration(goalPos) {
+    if (!debugFlags.juice) {
+      finishRun();
+      return;
+    }
+    state = 'goal';
+    goalTimer = GOAL_CELEBRATION_SEC;
+    goalCamStartPos = camera.position.clone();
+    goalCamStartTarget = camera.getTarget().clone();
+    goalCamEndPos = new BABYLON.Vector3(goalPos.x - 3.0, goalPos.y + 2.0, -10.5);
+    goalCamEndTarget = new BABYLON.Vector3(goalPos.x, goalPos.y + 0.8, 0);
+    juiceFx.spawnGoalSparkles(goalPos);
+    ui.showPopText('Da Da!', 780);
+  }
+
+  function triggerReset(reason, direction = -1) {
+    if (resetTimer > 0) return;
+    const applied = player.applyHit({
+      direction,
+      knockback: 4.2,
+      upward: 3.8,
+      invulnMs: 800,
+    });
+    if (!applied) return;
+    resetTimer = 0.18;
+    pendingResetReason = reason;
+    window.__DADA_DEBUG__.lastRespawnReason = reason;
+    ui.showStatus('Try again!', 650);
+  }
 
   if (shotMode) {
     if (shotScene === 'crib') {
@@ -220,11 +274,33 @@ export async function boot(options = {}) {
         ui.hideTitle();
       }
     } else if (state === 'gameplay') {
-      // Player update
-      const moveX = input.getMoveX();
-      const jumpJustPressed = input.consumeJump();
-      const jumpHeld = input.isJumpHeld();
-      player.update(dt, moveX, jumpJustPressed, jumpHeld);
+      if (resetTimer > 0) {
+        resetTimer = Math.max(0, resetTimer - dt);
+        const fade = resetTimer > 0.08 ? 0.28 : 0.10;
+        ui.setFade(fade);
+        if (resetTimer === 0) {
+          ui.setFade(0);
+          player.setPosition(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
+          pendingResetReason = '';
+        }
+      } else {
+        // Player update
+        const moveX = input.getMoveX();
+        const jumpJustPressed = input.consumeJump();
+        const jumpHeld = input.isJumpHeld();
+        player.update(dt, moveX, jumpJustPressed, jumpHeld);
+
+        const playerEvents = player.consumeEvents();
+        for (const ev of playerEvents) {
+          if (ev.type === 'jump') {
+            juiceFx.spawnJumpDust(player.mesh.position);
+          } else if (ev.type === 'land') {
+            juiceFx.spawnLandDust(player.mesh.position);
+          } else if (ev.type === 'outOfBounds') {
+            triggerReset('fell_off_level', player.mesh.position.x < spawnPoint.x ? 1 : -1);
+          }
+        }
+      }
 
       // Update blob shadow position (follows player X, stays near ground)
       updatePlayerShadow(player);
@@ -238,9 +314,7 @@ export async function boot(options = {}) {
       );
       if (dist < 1.8 && !goalReached) {
         goalReached = true;
-        state = 'end';
-        window.__DADA_DEBUG__.sceneKey = 'EndScene';
-        ui.showEnd();
+        startGoalCelebration(gPos);
       }
 
       // Smooth camera follow
@@ -254,7 +328,18 @@ export async function boot(options = {}) {
         damp(camera.getTarget().y, py + 1.2, 4, dt),
         0,
       ));
+    } else if (state === 'goal') {
+      goalTimer = Math.max(0, goalTimer - dt);
+      const t = 1 - (goalTimer / GOAL_CELEBRATION_SEC);
+      const ease = easeOutCubic(t);
+      camera.position = BABYLON.Vector3.Lerp(goalCamStartPos, goalCamEndPos, ease);
+      camera.setTarget(BABYLON.Vector3.Lerp(goalCamStartTarget, goalCamEndTarget, ease));
+      if (goalTimer <= 0) {
+        finishRun();
+      }
     }
+
+    juiceFx.update(dt);
 
     // Debug HUD (dev only)
     if (debugHud) {

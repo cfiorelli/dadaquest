@@ -73,6 +73,55 @@ const CSS = `
   color: #ffffff;
   margin: 8px 0;
 }
+.dada-pop {
+  position: absolute;
+  left: 50%;
+  top: 18%;
+  transform: translate(-50%, -50%) scale(0.86);
+  font-family: 'Georgia', serif;
+  font-size: clamp(34px, 5vw, 54px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #ffe680;
+  text-shadow: 0 3px 0 #b57420, 0 0 20px rgba(255, 190, 80, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.16s ease;
+}
+.dada-pop.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.0);
+}
+.dada-status {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  font-family: 'Georgia', serif;
+  font-size: 15px;
+  color: #fff;
+  background: rgba(20, 30, 20, 0.52);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.dada-status.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.dada-fade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s linear;
+}
 `;
 
 export function createUI(uiRoot) {
@@ -90,7 +139,7 @@ export function createUI(uiRoot) {
     <div class="dada-controls">
       <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
       <span>Space</span> Jump &nbsp;\u00b7&nbsp;
-      <span>Esc</span> Pause
+      <span>M</span> Mute
     </div>
     <div class="dada-hint">Press SPACE or ENTER to start</div>
   `;
@@ -107,11 +156,26 @@ export function createUI(uiRoot) {
   `;
   uiRoot.appendChild(endEl);
 
+  const popEl = document.createElement('div');
+  popEl.className = 'dada-pop';
+  popEl.textContent = 'Da Da!';
+  uiRoot.appendChild(popEl);
+
+  const statusEl = document.createElement('div');
+  statusEl.className = 'dada-status';
+  uiRoot.appendChild(statusEl);
+
+  const fadeEl = document.createElement('div');
+  fadeEl.className = 'dada-fade';
+  uiRoot.appendChild(fadeEl);
+
   endEl.querySelector('#playAgainBtn').addEventListener('click', () => {
     location.reload();
   });
 
   let titleVisible = true;
+  let popTimer = null;
+  let statusTimer = null;
 
   return {
     showTitle() {
@@ -131,6 +195,25 @@ export function createUI(uiRoot) {
     },
     isEndVisible() {
       return !endEl.classList.contains('hidden');
+    },
+    showPopText(text, durationMs = 760) {
+      if (popTimer) clearTimeout(popTimer);
+      popEl.textContent = text;
+      popEl.classList.add('visible');
+      popTimer = setTimeout(() => {
+        popEl.classList.remove('visible');
+      }, durationMs);
+    },
+    showStatus(text, durationMs = 1600) {
+      if (statusTimer) clearTimeout(statusTimer);
+      statusEl.textContent = text;
+      statusEl.classList.add('visible');
+      statusTimer = setTimeout(() => {
+        statusEl.classList.remove('visible');
+      }, durationMs);
+    },
+    setFade(alpha) {
+      fadeEl.style.opacity = String(Math.max(0, Math.min(1, alpha)));
     },
   };
 }
