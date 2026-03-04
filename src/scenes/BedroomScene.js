@@ -9,6 +9,7 @@ import {
   addContactShadow,
   addCraftedOverlay,
   addDepthHazeOverlay,
+  addDiegieticSign,
   addWarmLightAndVignette,
   applyDepthHaze,
   ensureCraftedTexture,
@@ -121,18 +122,9 @@ export class BedroomScene extends Phaser.Scene {
   }
 
   setupExit() {
-    // Exit on right side
     this.exitX = SCENE_WIDTH - 20;
     this.exitY = GAME_H - 50;
-
-    const arrow = this.add.text(SCENE_WIDTH - 30, GAME_H - 60, '→\nKITCHEN', {
-      fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#00ff00',
-      align: 'center',
-    }).setOrigin(0.5).setDepth(5);
-
-    this.tweens.add({ targets: arrow, x: SCENE_WIDTH - 24, duration: 500, yoyo: true, repeat: -1 });
+    addDiegieticSign(this, SCENE_WIDTH - 52, GAME_H - 80, 'Kitchen →');
   }
 
   setupPlayer() {

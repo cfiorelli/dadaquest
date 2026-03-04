@@ -10,6 +10,7 @@ import {
   addContactShadow,
   addCraftedOverlay,
   addDepthHazeOverlay,
+  addDiegieticSign,
   addWarmLightAndVignette,
   applyDepthHaze,
   ensureCraftedTexture,
@@ -130,17 +131,9 @@ export class StairsScene extends Phaser.Scene {
   }
 
   setupExit() {
-    // Exit at top-right
     const topStep = this.steps[this.steps.length - 1];
     this.exitWX = GAME_W - 40;
-
-    const arrow = this.add.text(GAME_W - 55, topStep.y - 70, '→\nROOFTOP', {
-      fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#00ff00',
-      align: 'center',
-    }).setOrigin(0.5).setDepth(5);
-    this.tweens.add({ targets: arrow, x: GAME_W - 48, duration: 500, yoyo: true, repeat: -1 });
+    addDiegieticSign(this, GAME_W - 60, topStep.y - 80, 'Rooftop →');
   }
 
   setupPlayer() {

@@ -10,6 +10,7 @@ import {
   addContactShadow,
   addCraftedOverlay,
   addDepthHazeOverlay,
+  addDiegieticSign,
   addWarmLightAndVignette,
   applyDepthHaze,
   ensureCraftedTexture,
@@ -121,14 +122,7 @@ export class KitchenScene extends Phaser.Scene {
 
   setupExit() {
     this.exitX = SCENE_WIDTH - 20;
-
-    const arrow = this.add.text(SCENE_WIDTH - 30, GAME_H - 65, '→\nSTAIRS', {
-      fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#00ff00',
-      align: 'center',
-    }).setOrigin(0.5).setDepth(5);
-    this.tweens.add({ targets: arrow, x: SCENE_WIDTH - 24, duration: 500, yoyo: true, repeat: -1 });
+    addDiegieticSign(this, SCENE_WIDTH - 52, GAME_H - 80, 'Stairs →');
   }
 
   setupPlayer() {

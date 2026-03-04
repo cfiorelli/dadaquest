@@ -32,15 +32,25 @@ export class CribScene extends Phaser.Scene {
     this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0xfce4ec);
     // Floor
     this.add.rectangle(GAME_W / 2, GAME_H - 10, GAME_W, 20, 0xd7b99e);
-    // Wallpaper dots
-    for (let i = 0; i < 20; i++) {
-      this.add.circle(
-        Phaser.Math.Between(10, GAME_W - 10),
-        Phaser.Math.Between(10, GAME_H - 80),
-        Phaser.Math.Between(4, 10),
-        0xf8bbd0, 0.4
-      );
+    // Baseboard
+    this.add.rectangle(GAME_W / 2, GAME_H - 22, GAME_W, 12, 0xeecfb5).setDepth(1);
+    this.add.rectangle(GAME_W / 2, GAME_H - 27, GAME_W, 2, 0xfff0e0, 0.55).setDepth(1);
+    // Wallpaper dots (ordered grid, not random)
+    for (let col = 0; col < 10; col++) {
+      for (let row = 0; row < 5; row++) {
+        this.add.circle(col * 84 + 42, row * 76 + 50, 6, 0xf8bbd0, 0.32);
+      }
     }
+    // Wall sticker — crescent moon + stars above crib (right side)
+    const decal = this.add.graphics().setDepth(1);
+    decal.fillStyle(0xffd97d, 0.42);
+    decal.fillCircle(620, 96, 22);
+    decal.fillStyle(0xfce4ec, 1); // cut crescent
+    decal.fillCircle(632, 88, 17);
+    [[595, 70], [648, 112], [608, 120]].forEach(([sx, sy]) => {
+      decal.fillStyle(0xffd97d, 0.38);
+      decal.fillCircle(sx, sy, 5);
+    });
 
     this.setupPlatforms();
     this.setupMobile();
@@ -119,6 +129,8 @@ export class CribScene extends Phaser.Scene {
       .setSize(HW * 2, 20).setVisible(false);
     addContactShadow(this, GAME_W / 2, GAME_H - 48, HW * 2 - 10, 18, 0.15, 2);
     this.add.image(GAME_W / 2, GAME_H - 70, 'crib_wood_plank').setDisplaySize(HW * 2, 20);
+    // Top highlight — implies the top face of the floor rail
+    this.add.rectangle(GAME_W / 2, GAME_H - 79, HW * 2 - 6, 3, 0xf5ddb0, 0.7).setDepth(3);
 
     // Mattress pad (cream pad inside crib, depth=2 so it sits above floor)
     this.add.rectangle(GAME_W / 2, GAME_H - 83, HW * 2 - 22, 16, 0xf0e8d5).setDepth(2);
@@ -147,15 +159,21 @@ export class CribScene extends Phaser.Scene {
       .setSize(HW * 2, 14).setVisible(false);
     addContactShadow(this, GAME_W / 2, TOP_Y + 17, HW * 2 - 16, 10, 0.12, 2);
     this.add.image(GAME_W / 2, TOP_Y, 'crib_wood_plank').setDisplaySize(HW * 2, 14);
+    // Top highlight on top rail
+    this.add.rectangle(GAME_W / 2, TOP_Y - 6, HW * 2 - 6, 3, 0xf5ddb0, 0.7).setDepth(3);
 
-    // Corner posts at all 4 crib corners
+    // Corner posts (rounded) at all 4 crib corners
+    const postG = this.add.graphics().setDepth(7);
     [
-      [GAME_W / 2 - HW - 3, TOP_Y - 3],
-      [GAME_W / 2 + HW + 3, TOP_Y - 3],
-      [GAME_W / 2 - HW - 3, GAME_H - 67],
-      [GAME_W / 2 + HW + 3, GAME_H - 67],
+      [GAME_W / 2 - HW - 4, TOP_Y - 8],
+      [GAME_W / 2 + HW + 4, TOP_Y - 8],
+      [GAME_W / 2 - HW - 4, GAME_H - 64],
+      [GAME_W / 2 + HW + 4, GAME_H - 64],
     ].forEach(([px, py]) => {
-      this.add.rectangle(px, py, 12, 12, 0xb07030).setDepth(7);
+      postG.fillStyle(0xb07030);
+      postG.fillRoundedRect(px - 7, py - 9, 14, 18, 3);
+      postG.fillStyle(0xd4a060, 0.45);
+      postG.fillRoundedRect(px - 5, py - 8, 5, 5, 1); // highlight face
     });
 
     // === DRESSER (left side) ===
@@ -256,29 +274,19 @@ export class CribScene extends Phaser.Scene {
     this.physics.world.enable(this.railExitZone);
     this.railExitZone.body.setAllowGravity(false);
 
-    // Diegetic cardboard sign (replaces neon debug box)
+    // Diegetic cardboard sign
     const sx = EXIT_X + 4;
     const sy = EXIT_Y - 20;
     const sign = this.add.graphics().setDepth(4);
     sign.fillStyle(0xd4aa6a, 1);
-    sign.fillRoundedRect(sx - 54, sy - 15, 108, 30, 5);
+    sign.fillRoundedRect(sx - 62, sy - 15, 124, 30, 5);
     sign.lineStyle(2, 0x8b5e28, 0.85);
-    sign.strokeRoundedRect(sx - 54, sy - 15, 108, 30, 5);
-    // Arrow shaft
-    sign.lineStyle(2.5, 0x5c3510, 1);
-    sign.beginPath();
-    sign.moveTo(sx - 22, sy);
-    sign.lineTo(sx + 16, sy);
-    sign.strokePath();
-    // Arrow head
-    sign.fillStyle(0x5c3510);
-    sign.fillTriangle(sx + 15, sy - 5, sx + 27, sy, sx + 15, sy + 5);
-
-    this.add.text(sx - 46, sy - 8, 'OUT', {
+    sign.strokeRoundedRect(sx - 62, sy - 15, 124, 30, 5);
+    this.add.text(sx, sy, 'Bedroom →', {
       fontFamily: 'Georgia, serif',
       fontSize: '11px',
       color: '#5c3510',
-    }).setDepth(5);
+    }).setOrigin(0.5, 0.5).setDepth(5);
 
     // Subtle pulse (warm, not neon)
     this.tweens.add({

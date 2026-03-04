@@ -89,3 +89,34 @@ export function addCraftedOverlay(scene, key, x, y, w, h, depth = 8, alpha = 0.2
     .setBlendMode(Phaser.BlendModes.MULTIPLY)
     .setAlpha(alpha);
 }
+
+/**
+ * Diegetic cardboard exit sign — consistent across all scenes.
+ * @param {Phaser.Scene} scene
+ * @param {number} x  center x
+ * @param {number} y  center y
+ * @param {string} text  e.g. "Kitchen →"
+ * @param {number} [depth=5]
+ */
+export function addDiegieticSign(scene, x, y, text, depth = 5) {
+  const signW = Math.max(80, text.length * 8 + 24);
+  const g = scene.add.graphics().setDepth(depth);
+  g.fillStyle(0xd4aa6a, 1);
+  g.fillRoundedRect(x - signW / 2, y - 14, signW, 28, 5);
+  g.lineStyle(2, 0x8b5e28, 0.85);
+  g.strokeRoundedRect(x - signW / 2, y - 14, signW, 28, 5);
+  scene.add.text(x, y, text, {
+    fontFamily: 'Georgia, serif',
+    fontSize: '11px',
+    color: '#5c3510',
+  }).setOrigin(0.5, 0.5).setDepth(depth + 1);
+  scene.tweens.add({
+    targets: g,
+    alpha: 0.72,
+    duration: 1400,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut',
+  });
+  return g;
+}
