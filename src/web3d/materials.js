@@ -7,6 +7,18 @@ export const LEVEL1_PALETTE = {
   fogColor:     [0.94, 0.91, 0.85],
   ambientColor: [0.35, 0.32, 0.28],
 
+  // Unified Level 1 palette keys
+  backgroundSky:  [0.72, 0.83, 0.93],
+  backdropCard:   [230, 225, 215],
+  ground:         [200, 185, 155],
+  platformCard:   [185, 170, 140],
+  edgeDark:       [140, 125, 100],
+  feltGreen:      [165, 190, 155],
+  accentYellow:   [0.96, 0.78, 0.30],
+  accentRed:      [0.92, 0.30, 0.24],
+  characterBody:  [1.0, 0.82, 0.65],
+  characterAccent:[0.92, 0.92, 0.96],
+
   // Ground / platforms
   groundTop:    [200, 185, 155],
   groundEdge:   [155, 140, 110],
@@ -32,7 +44,7 @@ export const LEVEL1_PALETTE = {
   babyDiaper:   [0.92, 0.92, 0.96],
   dadBody:      [0.42, 0.72, 0.68],
   dadHead:      [1.0, 0.85, 0.72],
-  dadShirt:     [0.35, 0.55, 0.75],
+  dadShirt:     [0.92, 0.30, 0.24],
 };
 
 // ── Texture cache ────────────────────────────────────────────────

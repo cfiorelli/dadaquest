@@ -7,17 +7,18 @@ import {
   makePlastic,
 } from '../materials.js';
 import { LEVEL1 } from './level1.js';
+import { makeCutoutPolygonMesh, makeCloudCutout, seededRandom } from './cutouts.js';
 
 // ── Platform prefab ──────────────────────────────────────────────
 
 /**
- * Creates a thick cardboard platform with a darker edge strip.
+ * Creates a thick cardboard platform with stylized paper/card treatment.
  * Returns a TransformNode (parent) — the first child is the slab (used for collision).
  */
 function createCardboardPlatform(scene, name, {
   x, y, z = 0, w, h, d,
-  slabColor = P.platform,
-  edgeColor = P.platformEdge,
+  slabColor = P.platformCard,
+  edgeColor = P.edgeDark,
   shadowGen,
 }) {
   const root = new BABYLON.TransformNode(name, scene);
@@ -32,7 +33,11 @@ function createCardboardPlatform(scene, name, {
   }, scene);
   slab.position.y = edgeH / 2;
   slab.parent = root;
-  slab.material = makeCardboard(scene, name + '_slabMat', ...slabColor);
+  slab.material = makeCardboard(scene, name + '_slabMat', ...slabColor, {
+    grainScale: 1.8,
+    noiseAmt: 24,
+    roughness: 0.84,
+  });
   slab.receiveShadows = true;
   if (shadowGen) shadowGen.addShadowCaster(slab);
 
@@ -46,10 +51,91 @@ function createCardboardPlatform(scene, name, {
   edge.receiveShadows = true;
   if (shadowGen) shadowGen.addShadowCaster(edge);
 
+  // Faux bevel strip to remove flat boxy edges.
+  const bevelH = Math.min(0.07, h * 0.12);
+  const bevelStrip = BABYLON.MeshBuilder.CreateBox(name + '_bevel', {
+    width: w + 0.03,
+    height: bevelH,
+    depth: d + 0.03,
+  }, scene);
+  bevelStrip.position.y = (h * 0.5) - (bevelH * 0.5) - 0.035;
+  bevelStrip.parent = root;
+  bevelStrip.material = makeCardboard(scene, name + '_bevelMat', ...edgeColor, {
+    grainScale: 2.2,
+    noiseAmt: 12,
+    roughness: 0.92,
+  });
+  bevelStrip.receiveShadows = true;
+
+  // Thin top highlight strip for handcrafted card edge read.
+  const hiPlane = BABYLON.MeshBuilder.CreatePlane(name + '_topHi', {
+    width: Math.max(0.2, w - 0.1),
+    height: Math.max(0.2, d - 0.1),
+  }, scene);
+  hiPlane.rotation.x = Math.PI / 2;
+  hiPlane.position.y = (h * 0.5) + 0.006;
+  hiPlane.parent = root;
+  const hiColor = [
+    Math.min(255, slabColor[0] + 22),
+    Math.min(255, slabColor[1] + 20),
+    Math.min(255, slabColor[2] + 18),
+  ];
+  const hiMat = makePaper(scene, name + '_topHiMat', ...hiColor, {
+    grainScale: 2.0,
+    noiseAmt: 7,
+    roughness: 0.98,
+  });
+  hiMat.alpha = 0.32;
+  hiMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  hiPlane.material = hiMat;
+
+  // Very faint underside contact dirt shadow.
+  const underPlane = BABYLON.MeshBuilder.CreatePlane(name + '_dirtShadow', {
+    width: Math.max(0.25, w * 0.92),
+    height: Math.max(0.25, d * 0.74),
+  }, scene);
+  underPlane.rotation.x = Math.PI / 2;
+  underPlane.position.y = -(h * 0.5) - 0.024;
+  underPlane.parent = root;
+  const underMat = new BABYLON.StandardMaterial(name + '_dirtShadowMat', scene);
+  underMat.diffuseColor = new BABYLON.Color3(0.12, 0.10, 0.08);
+  underMat.specularColor = BABYLON.Color3.Black();
+  underMat.emissiveColor = new BABYLON.Color3(0.06, 0.05, 0.04);
+  underMat.alpha = 0.16;
+  underMat.disableLighting = true;
+  underMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  underPlane.material = underMat;
+
   // Expose the slab for collision (caller reads position + bounding)
   root._collisionMesh = slab;
 
   return root;
+}
+
+function createPropContactShadow(scene, name, {
+  x,
+  y,
+  z = 0,
+  w = 0.8,
+  d = 0.5,
+  alpha = 0.18,
+}) {
+  const mesh = BABYLON.MeshBuilder.CreatePlane(name, {
+    width: w,
+    height: d,
+  }, scene);
+  mesh.rotation.x = Math.PI / 2;
+  mesh.position.set(x, y, z);
+  const mat = new BABYLON.StandardMaterial(name + '_mat', scene);
+  mat.diffuseColor = new BABYLON.Color3(0.10, 0.09, 0.08);
+  mat.emissiveColor = new BABYLON.Color3(0.06, 0.05, 0.04);
+  mat.specularColor = BABYLON.Color3.Black();
+  mat.alpha = alpha;
+  mat.disableLighting = true;
+  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  mesh.material = mat;
+  mesh.isPickable = false;
+  return mesh;
 }
 
 // ── Toy character builders ───────────────────────────────────────
@@ -145,13 +231,13 @@ function createArrowSign(scene, name, { x, y, z, direction = 1, shadowGen }) {
   }, scene);
   pole.position.y = -0.35;
   pole.parent = root;
-  pole.material = makeCardboard(scene, name + '_poleMat', 138, 118, 92);
+  pole.material = makeCardboard(scene, name + '_poleMat', ...P.edgeDark);
 
   const board = BABYLON.MeshBuilder.CreateBox(name + '_board', {
     width: 0.9, height: 0.4, depth: 0.08,
   }, scene);
   board.parent = root;
-  board.material = makePlastic(scene, name + '_boardMat', 0.95, 0.75, 0.28, { roughness: 0.42 });
+  board.material = makePlastic(scene, name + '_boardMat', ...P.accentYellow, { roughness: 0.42 });
 
   const arrow = BABYLON.MeshBuilder.CreateCylinder(name + '_arrow', {
     diameterTop: 0,
@@ -162,7 +248,7 @@ function createArrowSign(scene, name, { x, y, z, direction = 1, shadowGen }) {
   arrow.rotation.z = direction > 0 ? -Math.PI / 2 : Math.PI / 2;
   arrow.position.set(direction * 0.23, 0, -0.08);
   arrow.parent = root;
-  arrow.material = makePlastic(scene, name + '_arrowMat', 0.93, 0.28, 0.2, { roughness: 0.45 });
+  arrow.material = makePlastic(scene, name + '_arrowMat', ...P.accentRed, { roughness: 0.45 });
 
   shadowGen.addShadowCaster(pole);
   shadowGen.addShadowCaster(board);
@@ -179,14 +265,14 @@ function createCheckpointMarker(scene, name, { x, y, z, shadowGen }) {
   }, scene);
   post.position.y = -0.35;
   post.parent = root;
-  post.material = makeCardboard(scene, name + '_postMat', 146, 122, 94);
+  post.material = makeCardboard(scene, name + '_postMat', ...P.edgeDark);
 
   const flag = BABYLON.MeshBuilder.CreateBox(name + '_flag', {
     width: 0.58, height: 0.32, depth: 0.06,
   }, scene);
   flag.position.set(0.35, 0.2, 0);
   flag.parent = root;
-  flag.material = makePlastic(scene, name + '_flagMat', 0.94, 0.56, 0.18, { roughness: 0.38 });
+  flag.material = makePlastic(scene, name + '_flagMat', ...P.accentYellow, { roughness: 0.38 });
 
   shadowGen.addShadowCaster(post);
   shadowGen.addShadowCaster(flag);
@@ -198,10 +284,10 @@ function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
   root.position.set(x, y, z);
 
   const torso = BABYLON.MeshBuilder.CreateBox(name + '_torso', {
-    width: 0.45, height: 0.48, depth: 0.22,
+    width: 0.5, height: 0.48, depth: 0.22,
   }, scene);
   torso.parent = root;
-  torso.material = makePlastic(scene, name + '_torsoMat', 0.95, 0.94, 1.0, { roughness: 0.33 });
+  torso.material = makeFelt(scene, name + '_torsoMat', 0.95, 0.94, 1.0, { roughness: 0.9 });
 
   const shoulderL = BABYLON.MeshBuilder.CreateSphere(name + '_shL', { diameter: 0.18 }, scene);
   shoulderL.position.set(-0.18, 0.18, 0);
@@ -213,9 +299,37 @@ function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
   shoulderR.parent = root;
   shoulderR.material = torso.material;
 
+  const hood = BABYLON.MeshBuilder.CreateTorus(name + '_hood', {
+    diameter: 0.44,
+    thickness: 0.08,
+    tessellation: 22,
+  }, scene);
+  hood.rotation.x = Math.PI / 2;
+  hood.position.set(0, 0.19, -0.02);
+  hood.parent = root;
+  hood.material = makeFelt(scene, name + '_hoodMat', 0.88, 0.90, 0.98, { roughness: 0.96 });
+
+  const zipper = BABYLON.MeshBuilder.CreateBox(name + '_zip', {
+    width: 0.06,
+    height: 0.34,
+    depth: 0.025,
+  }, scene);
+  zipper.position.set(0, 0.03, -0.12);
+  zipper.parent = root;
+  zipper.material = makePlastic(scene, name + '_zipMat', ...P.accentYellow, { roughness: 0.22 });
+
   shadowGen.addShadowCaster(torso);
   shadowGen.addShadowCaster(shoulderL);
   shadowGen.addShadowCaster(shoulderR);
+  shadowGen.addShadowCaster(hood);
+  createPropContactShadow(scene, name + '_shadow', {
+    x,
+    y: y - 0.48,
+    z,
+    w: 0.54,
+    d: 0.34,
+    alpha: 0.16,
+  });
   return root;
 }
 
@@ -243,6 +357,191 @@ function createSlipZone(scene, name, { x, y, z, width, depth }) {
   return { zone, puddle };
 }
 
+function createCribRailSegment(scene, name, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const railTop = BABYLON.MeshBuilder.CreateBox(name + '_top', {
+    width: 8.8, height: 0.2, depth: 0.34,
+  }, scene);
+  railTop.position.y = 0.78;
+  railTop.parent = root;
+  railTop.metadata = { layer: 'foreground' };
+  railTop.material = makeCardboard(scene, name + '_topMat', ...P.edgeDark, {
+    grainScale: 2.1,
+    noiseAmt: 18,
+    roughness: 0.82,
+  });
+
+  for (let i = 0; i < 7; i++) {
+    const post = BABYLON.MeshBuilder.CreateBox(name + `_post_${i}`, {
+      width: 0.16, height: 1.5, depth: 0.2,
+    }, scene);
+    post.position.set(-4.1 + (i * 1.35), 0, 0);
+    post.parent = root;
+    post.metadata = { layer: 'foreground' };
+    post.material = makeCardboard(scene, name + `_postMat_${i}`, ...P.ground, {
+      grainScale: 2.3,
+      noiseAmt: 14,
+      roughness: 0.86,
+    });
+    if (shadowGen) shadowGen.addShadowCaster(post);
+  }
+
+  if (shadowGen) shadowGen.addShadowCaster(railTop);
+  createPropContactShadow(scene, name + '_shadow', {
+    x,
+    y: y - 0.8,
+    z,
+    w: 8.2,
+    d: 1.3,
+    alpha: 0.12,
+  });
+  return railTop;
+}
+
+function createHangingPaperRing(scene, name, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const thread = BABYLON.MeshBuilder.CreateBox(name + '_thread', {
+    width: 0.05, height: 1.0, depth: 0.05,
+  }, scene);
+  thread.position.y = 0.45;
+  thread.parent = root;
+  thread.material = makePaper(scene, name + '_threadMat', 220, 210, 195, {
+    grainScale: 3.1,
+    noiseAmt: 6,
+    roughness: 0.96,
+  });
+
+  const ring = BABYLON.MeshBuilder.CreateTorus(name + '_ring', {
+    diameter: 0.9,
+    thickness: 0.12,
+    tessellation: 28,
+  }, scene);
+  ring.position.y = -0.1;
+  ring.parent = root;
+  ring.material = makePlastic(scene, name + '_ringMat', ...P.accentYellow, { roughness: 0.34 });
+
+  const inner = BABYLON.MeshBuilder.CreateDisc(name + '_ringInner', {
+    radius: 0.22, tessellation: 22,
+  }, scene);
+  inner.rotation.x = Math.PI / 2;
+  inner.position.y = -0.1;
+  inner.parent = root;
+  inner.material = makePaper(scene, name + '_ringInnerMat', 250, 246, 233, {
+    grainScale: 2.4,
+    noiseAmt: 8,
+  });
+
+  if (shadowGen) {
+    shadowGen.addShadowCaster(thread);
+    shadowGen.addShadowCaster(ring);
+  }
+  createPropContactShadow(scene, name + '_shadow', {
+    x,
+    y: y - 1.02,
+    z,
+    w: 1.2,
+    d: 0.7,
+    alpha: 0.13,
+  });
+  return root;
+}
+
+function createToyBlock(scene, name, { x, y, z, color, letter = 'D', shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const block = BABYLON.MeshBuilder.CreateBox(name + '_cube', {
+    width: 0.62, height: 0.62, depth: 0.62,
+  }, scene);
+  block.parent = root;
+  block.material = makePlastic(scene, name + '_cubeMat', ...color, { roughness: 0.42 });
+
+  const face = BABYLON.MeshBuilder.CreatePlane(name + '_face', {
+    width: 0.42, height: 0.42,
+  }, scene);
+  face.position.set(0, 0.02, -0.315);
+  face.parent = root;
+  const faceTex = new BABYLON.DynamicTexture(name + '_faceTex', 64, scene, true);
+  const ctx = faceTex.getContext();
+  ctx.fillStyle = 'rgba(252,246,226,0.92)';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = '#6b4e34';
+  ctx.font = 'bold 40px Georgia';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(letter, 32, 36);
+  faceTex.update();
+  const faceMat = new BABYLON.StandardMaterial(name + '_faceMat', scene);
+  faceMat.diffuseTexture = faceTex;
+  faceMat.opacityTexture = faceTex;
+  faceMat.useAlphaFromDiffuseTexture = true;
+  faceMat.specularColor = BABYLON.Color3.Black();
+  face.material = faceMat;
+
+  if (shadowGen) shadowGen.addShadowCaster(block);
+  createPropContactShadow(scene, name + '_shadow', {
+    x,
+    y: y - 0.34,
+    z,
+    w: 0.66,
+    d: 0.48,
+    alpha: 0.14,
+  });
+  return root;
+}
+
+function createGoalBanner(scene, name, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const leftPost = BABYLON.MeshBuilder.CreateBox(name + '_postL', {
+    width: 0.12, height: 1.4, depth: 0.12,
+  }, scene);
+  leftPost.position.set(-1.1, 0.4, 0);
+  leftPost.parent = root;
+  leftPost.material = makeCardboard(scene, name + '_postLMat', ...P.edgeDark);
+
+  const rightPost = BABYLON.MeshBuilder.CreateBox(name + '_postR', {
+    width: 0.12, height: 1.4, depth: 0.12,
+  }, scene);
+  rightPost.position.set(1.1, 0.4, 0);
+  rightPost.parent = root;
+  rightPost.material = makeCardboard(scene, name + '_postRMat', ...P.edgeDark);
+
+  const banner = BABYLON.MeshBuilder.CreatePlane(name + '_banner', {
+    width: 2.2,
+    height: 0.62,
+  }, scene);
+  banner.position.y = 1.1;
+  banner.parent = root;
+  const bannerTex = new BABYLON.DynamicTexture(name + '_bannerTex', 256, scene, true);
+  const bctx = bannerTex.getContext();
+  bctx.fillStyle = 'rgba(254,233,149,0.94)';
+  bctx.fillRect(0, 0, 256, 256);
+  bctx.fillStyle = '#cc4c3c';
+  bctx.font = 'bold 100px Georgia';
+  bctx.textAlign = 'center';
+  bctx.textBaseline = 'middle';
+  bctx.fillText('Da Da', 128, 138);
+  bannerTex.update();
+  const bannerMat = new BABYLON.StandardMaterial(name + '_bannerMat', scene);
+  bannerMat.diffuseTexture = bannerTex;
+  bannerMat.opacityTexture = bannerTex;
+  bannerMat.useAlphaFromDiffuseTexture = true;
+  bannerMat.specularColor = BABYLON.Color3.Black();
+  banner.material = bannerMat;
+
+  if (shadowGen) {
+    shadowGen.addShadowCaster(leftPost);
+    shadowGen.addShadowCaster(rightPost);
+  }
+  return root;
+}
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {
@@ -258,34 +557,37 @@ export function buildWorld(scene, options = {}) {
   scene.fogDensity = 0.010;
   scene.fogColor = new BABYLON.Color3(...P.fogColor);
 
-  // === LIGHTING ===
-  const hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0.2, 1, -0.3), scene);
-  hemi.intensity = 0.6;
-  hemi.groundColor = new BABYLON.Color3(0.55, 0.52, 0.48);
+  // === LIGHTING (crafted 3-light rig) ===
+  const keyLight = new BABYLON.DirectionalLight('keyLight', new BABYLON.Vector3(-0.56, -0.88, 0.22), scene);
+  keyLight.position = new BABYLON.Vector3(22, 26, -12);
+  keyLight.intensity = 1.02;
+  keyLight.diffuse = new BABYLON.Color3(1.0, 0.92, 0.80);
+  keyLight.specular = new BABYLON.Color3(0.55, 0.46, 0.34);
 
-  const dirLight = new BABYLON.DirectionalLight('dir', new BABYLON.Vector3(-0.6, -1, 0.4), scene);
-  dirLight.intensity = 0.8;
-  dirLight.position = new BABYLON.Vector3(10, 20, -10);
+  const fillLight = new BABYLON.HemisphericLight('fillLight', new BABYLON.Vector3(0.1, 1, -0.18), scene);
+  fillLight.intensity = 0.36;
+  fillLight.diffuse = new BABYLON.Color3(0.70, 0.80, 0.94);
+  fillLight.groundColor = new BABYLON.Color3(0.34, 0.32, 0.34);
 
-  const shadowGen = new BABYLON.ShadowGenerator(1024, dirLight);
+  const rimLight = new BABYLON.PointLight('rimLight', new BABYLON.Vector3(-8.5, 8.8, -13.8), scene);
+  rimLight.intensity = 0.24;
+  rimLight.diffuse = new BABYLON.Color3(0.80, 0.92, 1.0);
+  rimLight.range = 40;
+
+  const shadowGen = new BABYLON.ShadowGenerator(1024, keyLight);
+  // Keep shadow filtering stable in swiftshader and local browsers.
   shadowGen.useBlurExponentialShadowMap = true;
-  shadowGen.blurKernel = 24;
-  shadowGen.blurScale = 2;
-  shadowGen.setDarkness(0.35);
-
-  // Warm rim light
-  const rimLight = new BABYLON.PointLight('rim', new BABYLON.Vector3(5, 8, -14), scene);
-  rimLight.intensity = 0.2;
-  rimLight.diffuse = new BABYLON.Color3(1.0, 0.95, 0.85);
-  rimLight.range = 52;
+  shadowGen.blurKernel = 14;
+  shadowGen.blurScale = 1;
+  shadowGen.setDarkness(0.32);
 
   // === DIORAMA BASE ===
   const groundDef = LEVEL1.ground;
   createCardboardPlatform(scene, 'ground', {
     x: groundDef.x, y: groundDef.y, z: groundDef.z,
     w: groundDef.w, h: groundDef.h, d: groundDef.d,
-    slabColor: P.groundTop,
-    edgeColor: P.groundEdge,
+    slabColor: P.ground,
+    edgeColor: P.edgeDark,
     shadowGen,
   });
 
@@ -303,35 +605,93 @@ export function buildWorld(scene, options = {}) {
     width: 66, height: 21, depth: 0.5,
   }, scene);
   backdrop.position.set(6, 9, 8.3);
-  backdrop.material = makePaper(scene, 'backdropMat', ...P.backdrop, { grainScale: 2, noiseAmt: 8 });
+  const backdropCard = [
+    Math.max(0, P.backdropCard[0] - 20),
+    Math.max(0, P.backdropCard[1] - 20),
+    Math.max(0, P.backdropCard[2] - 18),
+  ];
+  backdrop.material = makePaper(scene, 'backdropMat', ...backdropCard, {
+    grainScale: 2.6,
+    noiseAmt: 14,
+    roughness: 0.98,
+  });
 
-  const skyMat = makeFelt(scene, 'skyMat', ...P.sky, { roughness: 1.0 });
+  const skyMat = makeFelt(scene, 'skyMat', ...P.backgroundSky, { roughness: 1.0 });
   skyMat.alpha = 0.25;
   skyMat.sheen.isEnabled = false;
   const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 64, height: 20 }, scene);
   skyPlane.position.set(6, 9.5, 7.98);
   skyPlane.material = skyMat;
 
-  // === PARALLAX LAYERS ===
-  const bgHills = BABYLON.MeshBuilder.CreateBox('bgHills', { width: 62, height: 6.6, depth: 0.3 }, scene);
-  bgHills.position.set(6, 3.1, 6.2);
-  bgHills.material = makeCardboard(scene, 'bgHillsMat', ...P.bgHills);
+  // === PARALLAX CUTOUT LAYERS (deterministic) ===
+  const decorativeRand = seededRandom(5021);
 
-  const bgMid = BABYLON.MeshBuilder.CreateBox('bgMid', { width: 58, height: 4.2, depth: 0.25 }, scene);
-  bgMid.position.set(4.5, 2.45, 4.2);
-  bgMid.material = makeCardboard(scene, 'bgMidMat', ...P.bgMid);
+  const backHills = [];
+  for (let i = 0; i < 6; i++) {
+    const mesh = makeCutoutPolygonMesh(scene, {
+      name: `hillCutout_${i}`,
+      seed: 1100 + i,
+      pointsCount: 11,
+      width: 8.5 + decorativeRand() * 3.4,
+      height: 3.8 + decorativeRand() * 1.6,
+      thickness: 0.09,
+      x: -18 + i * 10.4 + decorativeRand() * 1.2,
+      y: 1.3 + decorativeRand() * 1.0,
+      z: 6.36 + i * 0.03,
+      materialKind: 'paper',
+      color: P.bgHills,
+      noise: 0.17,
+      materialOptions: { grainScale: 2.6, noiseAmt: 12, roughness: 0.97 },
+    });
+    backHills.push(mesh);
+  }
 
-  const fgCutout1 = BABYLON.MeshBuilder.CreateBox('fgCutout1', { width: 8, height: 3, depth: 0.2 }, scene);
-  fgCutout1.position.set(-24, 1.5, -8.2);
-  fgCutout1.material = makeCardboard(scene, 'fgMat1', ...P.fgCutout);
-  fgCutout1.metadata = { layer: 'foreground' };
-  shadowGen.addShadowCaster(fgCutout1);
+  const midHedges = [];
+  for (let i = 0; i < 7; i++) {
+    const mesh = makeCutoutPolygonMesh(scene, {
+      name: `hedgeCutout_${i}`,
+      seed: 2200 + i,
+      pointsCount: 12,
+      width: 6.8 + decorativeRand() * 2.8,
+      height: 2.8 + decorativeRand() * 1.2,
+      thickness: 0.085,
+      x: -20 + i * 8.6 + decorativeRand() * 1.4,
+      y: 1.35 + decorativeRand() * 0.9,
+      z: 4.46 + i * 0.03,
+      materialKind: 'felt',
+      color: P.feltGreen,
+      noise: 0.2,
+    });
+    midHedges.push(mesh);
+  }
 
-  const fgCutout2 = BABYLON.MeshBuilder.CreateBox('fgCutout2', { width: 10, height: 2.5, depth: 0.2 }, scene);
-  fgCutout2.position.set(34, 1.2, -8.8);
-  fgCutout2.material = makeCardboard(scene, 'fgMat2', ...P.fgCutout);
-  fgCutout2.metadata = { layer: 'foreground' };
-  shadowGen.addShadowCaster(fgCutout2);
+  const foregroundMeshes = [];
+  const foregroundDefs = [
+    { x: -24.0, y: 1.4, z: -8.50, w: 7.2, h: 3.1, seed: 3301 },
+    { x: -9.2, y: 1.0, z: -8.64, w: 6.0, h: 2.9, seed: 3302 },
+    { x: 24.8, y: 1.2, z: -8.76, w: 7.4, h: 3.2, seed: 3303 },
+    { x: 34.2, y: 1.0, z: -8.88, w: 7.8, h: 2.8, seed: 3304 },
+  ];
+  for (let i = 0; i < foregroundDefs.length; i++) {
+    const def = foregroundDefs[i];
+    const mesh = makeCutoutPolygonMesh(scene, {
+      name: `foregroundPlant_${i}`,
+      seed: def.seed,
+      pointsCount: 10,
+      width: def.w,
+      height: def.h,
+      thickness: 0.10,
+      x: def.x,
+      y: def.y,
+      z: def.z,
+      materialKind: 'felt',
+      color: P.edgeDark,
+      noise: 0.23,
+    });
+    mesh.metadata = { layer: 'foreground' };
+    shadowGen.addShadowCaster(mesh);
+    foregroundMeshes.push(mesh);
+  }
 
   // === PLATFORMS ===
   const allPlatforms = [groundCollider];
@@ -344,6 +704,8 @@ export function buildWorld(scene, options = {}) {
       w: def.w,
       h: def.h,
       d: def.d,
+      slabColor: P.platformCard,
+      edgeColor: P.edgeDark,
       shadowGen,
     });
 
@@ -361,6 +723,23 @@ export function buildWorld(scene, options = {}) {
   // === GOAL (DaDa) ===
   const goalDef = LEVEL1.goal;
   const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+
+  // Foreground crib rail creates a toy-diorama frame for the start area.
+  const cribRail = createCribRailSegment(scene, 'cribRailFg', {
+    x: -15.2,
+    y: 1.35,
+    z: -8.95,
+    shadowGen,
+  });
+  foregroundMeshes.push(cribRail);
+
+  // A hanging ring near the early tutorial hop.
+  createHangingPaperRing(scene, 'hangingRing', {
+    x: -8.6,
+    y: 4.0,
+    z: -1.7,
+    shadowGen,
+  });
 
   // === LEVEL GUIDANCE SIGNS ===
   const signRoots = [];
@@ -417,6 +796,32 @@ export function buildWorld(scene, options = {}) {
     });
   }
 
+  // Toy blocks near spawn to make the first area feel inhabited.
+  createToyBlock(scene, 'toyBlockA', {
+    x: -17.2,
+    y: 0.34,
+    z: 1.25,
+    color: [0.91, 0.42, 0.32],
+    letter: 'D',
+    shadowGen,
+  });
+  createToyBlock(scene, 'toyBlockB', {
+    x: -16.35,
+    y: 0.34,
+    z: 1.05,
+    color: [0.93, 0.74, 0.30],
+    letter: 'A',
+    shadowGen,
+  });
+  createToyBlock(scene, 'toyBlockC', {
+    x: -15.48,
+    y: 0.34,
+    z: 1.3,
+    color: [0.36, 0.66, 0.82],
+    letter: 'D',
+    shadowGen,
+  });
+
   // === HAZARDS ===
   const hazards = [];
   for (let i = 0; i < LEVEL1.hazards.length; i++) {
@@ -463,17 +868,26 @@ export function buildWorld(scene, options = {}) {
     shadowGen.addShadowCaster(foliage);
   }
 
-  for (let i = 0; i < 4; i++) {
-    const cx = -14 + i * 12;
-    const cloud = BABYLON.MeshBuilder.CreateSphere('cloud' + i, {
-      diameter: 2 + random(), segments: 10,
-    }, scene);
-    cloud.position.set(cx, 10 + random() * 2, 6.6);
-    cloud.scaling.set(1.5, 0.6, 0.3);
-    const cloudMat = makeFelt(scene, 'cloudMat' + i, ...P.cloud, { roughness: 1.0 });
-    cloudMat.alpha = 0.7;
-    cloudMat.sheen.isEnabled = false;
-    cloud.material = cloudMat;
+  createGoalBanner(scene, 'goalBanner', {
+    x: goalDef.x - 0.7,
+    y: goalDef.y + 0.1,
+    z: -1.6,
+    shadowGen,
+  });
+
+  for (let i = 0; i < 5; i++) {
+    makeCloudCutout(scene, {
+      name: `cloudCutout_${i}`,
+      seed: 4400 + i,
+      width: 4.0 + random() * 1.2,
+      height: 1.8 + random() * 0.5,
+      thickness: 0.065,
+      x: -17 + i * 11.6 + random() * 0.6,
+      y: 9.8 + random() * 1.9,
+      z: 6.88 + i * 0.03,
+      color: [245, 245, 240],
+      alpha: 0.86,
+    });
   }
 
   return {
@@ -482,7 +896,7 @@ export function buildWorld(scene, options = {}) {
     goal: dada.goal,
     goalRoot: dada.root,
     shadowGen,
-    foregroundMeshes: [fgCutout1, fgCutout2],
+    foregroundMeshes,
     extents: LEVEL1.extents,
     spawn: LEVEL1.spawn,
     checkpoints,
