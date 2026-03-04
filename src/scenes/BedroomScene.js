@@ -95,10 +95,24 @@ export class BedroomScene extends Phaser.Scene {
     });
     addCraftedOverlay(this, pianoTex, this.pianoX, GAME_H - 90, 140, 80, 7, 0.26);
 
-    // Window
-    addContactShadow(this, 950, GAME_H - 142, 66, 16, 0.1, 2);
-    applyDepthHaze(this.add.image(950, GAME_H - 200, 'window').setDisplaySize(80, 120), 175);
+      // Piano keyboard detail (keys)
+      const keyW = 6;
+      const keyH = 24;
+      for (let k = 0; k < 14; k++) {
+        const keyX = this.pianoX - 38 + k * 5.5;
+        const keyColor = k % 2 === 0 ? 0xffffff : 0x333333;
+        this.add.rectangle(keyX, GAME_H - 65, keyW, keyH, keyColor).setDepth(8);
+      }
+      // Music sheet on stand
+      this.add.rectangle(this.pianoX + 50, GAME_H - 95, 22, 28, 0xf5e6d3).setDepth(5);
+      this.add.line(this.pianoX + 50, GAME_H - 100, this.pianoX + 50, GAME_H - 90, 0x999999, 0.4).setDepth(6);
+      this.add.line(this.pianoX + 50, GAME_H - 98, this.pianoX + 50, GAME_H - 92, 0x999999, 0.4).setDepth(6);
 
+      // Window
+      addContactShadow(this, 950, GAME_H - 142, 66, 16, 0.1, 2);
+      applyDepthHaze(this.add.image(950, GAME_H - 200, 'window').setDisplaySize(80, 120), 175);
+
+      // Felt rug prop (already exists as ellipse, enhance it)
     // Rug
     this.add.ellipse(SCENE_WIDTH / 2, GAME_H - 22, 500, 30, 0xce93d8, 0.7);
   }
