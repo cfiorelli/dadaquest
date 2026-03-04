@@ -4,6 +4,8 @@ import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
 import { damp } from './util/math.js';
+import { createDebugHud } from './ui/debugHud.js';
+import { installRestStabilityTest } from './util/restStabilityTest.js';
 
 export async function boot(options = {}) {
   const { isTestMode = false } = options;
@@ -43,7 +45,10 @@ export async function boot(options = {}) {
   // Player
   const player = new PlayerController(scene, { x: -12, y: 3, z: 0 });
   player.setColliders(world.platforms);
-  world.shadowGen.addShadowCaster(player.mesh);
+  // Register player child meshes as shadow casters (mesh is now a TransformNode)
+  for (const m of player._meshes) {
+    world.shadowGen.addShadowCaster(m);
+  }
 
   // Camera — fixed angle, smooth follow
   const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(-18, 7, -14), scene);
@@ -51,6 +56,10 @@ export async function boot(options = {}) {
   camera.minZ = 0.5;
   camera.maxZ = 100;
   // Do NOT attach controls — camera is game-controlled, not user-controlled
+
+  // Dev-only debug HUD + rest stability test
+  const debugHud = import.meta.env.DEV ? createDebugHud() : null;
+  if (import.meta.env.DEV) installRestStabilityTest(player);
 
   // Game state machine
   let state = 'title'; // title | gameplay | end
@@ -74,9 +83,17 @@ export async function boot(options = {}) {
       const jumpHeld = input.isJumpHeld();
       player.update(dt, moveX, jumpJustPressed, jumpHeld);
 
+      // Update blob shadow position (follows player X, stays near ground)
+      player.blobShadow.position.x = player.mesh.position.x;
+      player.blobShadow.position.z = player.mesh.position.z;
+      // Scale shadow slightly based on height above ground
+      const heightAboveGround = Math.max(0, player.mesh.position.y - 0.5);
+      const shadowScale = Math.max(0.4, 1.0 - heightAboveGround * 0.06);
+      player.blobShadow.scaling.set(shadowScale, 1, shadowScale);
+
       // Check goal
       const pPos = player.getPosition();
-      const gPos = world.goal.position;
+      const gPos = world.goal.getAbsolutePosition();
       const dist = Math.sqrt(
         (pPos.x - gPos.x) ** 2 +
         (pPos.y - gPos.y) ** 2,
@@ -99,6 +116,13 @@ export async function boot(options = {}) {
         damp(camera.getTarget().y, py + 1.2, 4, dt),
         0,
       ));
+    }
+
+    // Debug HUD (dev only)
+    if (debugHud) {
+      const fps = engine.getFps();
+      const pDebug = state !== 'title' ? player.getDebugState() : null;
+      debugHud.update(fps, pDebug, state, pDebug ? player.lastCollisionHits : 0);
     }
 
     scene.render();

@@ -1,5 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import { clamp } from '../util/math.js';
+import { makePlastic, createBlobShadow, LEVEL1_PALETTE as P } from '../materials.js';
 
 // Tuning constants
 const GROUND_ACCEL = 60;
@@ -14,18 +15,84 @@ const JUMP_BUFFER_MS = 100;
 const JUMP_CUT_MULT = 0.4;   // multiply vy when jump released early
 const PLAYER_HALF_W = 0.25;
 const PLAYER_HALF_H = 0.4;
+const SKIN_WIDTH = 0.005;     // separation buffer to prevent re-collision
+const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
 
 export class PlayerController {
   constructor(scene, startPos = { x: -12, y: 3, z: 0 }) {
     this.scene = scene;
 
-    // Visual mesh: small sphere (placeholder for baby)
-    this.mesh = BABYLON.MeshBuilder.CreateSphere('player', { diameter: 0.6, segments: 12 }, scene);
+    // Root transform for the baby (this.mesh is used by boot.js for position)
+    this.mesh = new BABYLON.TransformNode('player', scene);
     this.mesh.position.set(startPos.x, startPos.y, startPos.z);
-    const mat = new BABYLON.StandardMaterial('playerMat', scene);
-    mat.diffuseColor = new BABYLON.Color3(1.0, 0.82, 0.65);
-    mat.specularColor = new BABYLON.Color3(0.15, 0.15, 0.15);
-    this.mesh.material = mat;
+
+    // Body (capsule-like: sphere + cylinder)
+    const body = BABYLON.MeshBuilder.CreateCylinder('babyBody', {
+      height: 0.4, diameterTop: 0.38, diameterBottom: 0.42, tessellation: 14,
+    }, scene);
+    body.position.y = -0.05;
+    body.parent = this.mesh;
+    body.material = makePlastic(scene, 'babyBodyMat', ...P.babyBody);
+
+    // Head (larger relative to body — toy proportions)
+    const head = BABYLON.MeshBuilder.CreateSphere('babyHead', {
+      diameter: 0.42, segments: 14,
+    }, scene);
+    head.position.y = 0.28;
+    head.parent = this.mesh;
+    head.material = makePlastic(scene, 'babyHeadMat', ...P.babyBody);
+
+    // Diaper band
+    const diaper = BABYLON.MeshBuilder.CreateTorus('babyDiaper', {
+      diameter: 0.42, thickness: 0.12, tessellation: 14,
+    }, scene);
+    diaper.position.y = -0.18;
+    diaper.parent = this.mesh;
+    diaper.material = makePlastic(scene, 'babyDiaperMat', ...P.babyDiaper, { roughness: 0.5 });
+
+    // Face (DynamicTexture)
+    const faceSize = 64;
+    const faceTex = new BABYLON.DynamicTexture('babyFaceTex', faceSize, scene, true);
+    const fCtx = faceTex.getContext();
+    fCtx.clearRect(0, 0, faceSize, faceSize);
+    // Eyes (big round baby eyes)
+    fCtx.fillStyle = '#333';
+    fCtx.beginPath();
+    fCtx.arc(20, 24, 5, 0, Math.PI * 2);
+    fCtx.arc(44, 24, 5, 0, Math.PI * 2);
+    fCtx.fill();
+    // Eye highlights
+    fCtx.fillStyle = '#fff';
+    fCtx.beginPath();
+    fCtx.arc(22, 22, 2, 0, Math.PI * 2);
+    fCtx.arc(46, 22, 2, 0, Math.PI * 2);
+    fCtx.fill();
+    // Small smile
+    fCtx.strokeStyle = '#555';
+    fCtx.lineWidth = 1.5;
+    fCtx.beginPath();
+    fCtx.arc(32, 34, 7, 0.15 * Math.PI, 0.85 * Math.PI);
+    fCtx.stroke();
+    faceTex.update();
+    faceTex.hasAlpha = true;
+
+    const facePlane = BABYLON.MeshBuilder.CreatePlane('babyFace', { size: 0.28 }, scene);
+    facePlane.position.set(0, 0.28, -0.22);
+    facePlane.parent = this.mesh;
+    const faceMat = new BABYLON.StandardMaterial('babyFaceMat', scene);
+    faceMat.diffuseTexture = faceTex;
+    faceMat.opacityTexture = faceTex;
+    faceMat.specularColor = BABYLON.Color3.Black();
+    faceMat.useAlphaFromDiffuseTexture = true;
+    faceMat.emissiveColor = new BABYLON.Color3(0.12, 0.10, 0.08);
+    facePlane.material = faceMat;
+
+    // Store child meshes for shadow caster registration
+    this._meshes = [body, head, diaper];
+
+    // Blob shadow under the player
+    this.blobShadow = createBlobShadow(scene, 'babyShadow', { diameter: 0.7, opacity: 0.3 });
+    this.blobShadow.position.set(startPos.x, 0.01, startPos.z);
 
     // Physics state
     this.vx = 0;
@@ -38,6 +105,7 @@ export class PlayerController {
 
     // Platform colliders (set externally via setColliders)
     this.colliders = [];  // array of {minX, maxX, minY, maxY}
+    this.lastCollisionHits = 0; // debug: how many platforms we collided with last frame
   }
 
   setColliders(platforms) {
@@ -107,6 +175,7 @@ export class PlayerController {
 
     // Collision resolution (AABB vs platforms)
     this.grounded = false;
+    this.lastCollisionHits = 0;
     for (const c of this.colliders) {
       const pMinX = pos.x - PLAYER_HALF_W;
       const pMaxX = pos.x + PLAYER_HALF_W;
@@ -123,25 +192,30 @@ export class PlayerController {
       const overlapBottom = pMaxY - c.minY;
       const overlapTop = c.maxY - pMinY;
       const minOverlap = Math.min(overlapLeft, overlapRight, overlapBottom, overlapTop);
+      this.lastCollisionHits++;
 
       if (minOverlap === overlapBottom && this.vy <= 0) {
         // Landing on top
-        pos.y = c.maxY + PLAYER_HALF_H;
+        pos.y = c.maxY + PLAYER_HALF_H + SKIN_WIDTH;
         this.vy = 0;
         this.grounded = true;
         this.jumping = false;
       } else if (minOverlap === overlapTop && this.vy > 0) {
         // Hit ceiling
-        pos.y = c.minY - PLAYER_HALF_H;
+        pos.y = c.minY - PLAYER_HALF_H - SKIN_WIDTH;
         this.vy = 0;
       } else if (minOverlap === overlapLeft) {
-        pos.x = c.minX - PLAYER_HALF_W;
+        pos.x = c.minX - PLAYER_HALF_W - SKIN_WIDTH;
         this.vx = 0;
       } else if (minOverlap === overlapRight) {
-        pos.x = c.maxX + PLAYER_HALF_W;
+        pos.x = c.maxX + PLAYER_HALF_W + SKIN_WIDTH;
         this.vx = 0;
       }
     }
+
+    // Clamp tiny velocities to zero (prevents drift/jitter)
+    if (Math.abs(this.vx) < VEL_DEADZONE) this.vx = 0;
+    if (this.grounded && Math.abs(this.vy) < VEL_DEADZONE) this.vy = 0;
 
     // Fell off world — respawn
     if (pos.y < -10) {
@@ -154,5 +228,20 @@ export class PlayerController {
 
   getPosition() {
     return this.mesh.position.clone();
+  }
+
+  /** Returns debug snapshot for the debug HUD. */
+  getDebugState() {
+    const pos = this.mesh.position;
+    return {
+      x: pos.x.toFixed(2),
+      y: pos.y.toFixed(2),
+      vx: this.vx.toFixed(2),
+      vy: this.vy.toFixed(2),
+      grounded: this.grounded,
+      coyoteMs: Math.max(0, COYOTE_MS - this.timeSinceGround).toFixed(0),
+      bufferMs: Math.max(0, JUMP_BUFFER_MS - this.jumpBufferTimer).toFixed(0),
+      jumping: this.jumping,
+    };
   }
 }
