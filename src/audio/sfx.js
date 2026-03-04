@@ -1,6 +1,8 @@
 // WebAudio SFX — all procedural. Toybox-warm palette: low frequencies, soft attacks,
 // triangle/sine oscillators, clamped peaks to avoid harsh transients.
 
+import { isTestMode } from '../utils/testMode.js';
+
 let ctx = null;
 let masterGain = null;
 let _muted = false;
@@ -42,7 +44,10 @@ function playNoise(duration, volume = 0.1, highpass = 200) {
     const bufSize = c.sampleRate * duration;
     const buf = c.createBuffer(1, bufSize, c.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    // Deterministic noise in test mode
+    for (let i = 0; i < bufSize; i++) {
+      data[i] = isTestMode() ? (((i * 12345) % 32768) / 16384 - 1) : (Math.random() * 2 - 1);
+    }
     const src = c.createBufferSource();
     src.buffer = buf;
     const filter = c.createBiquadFilter();
@@ -77,7 +82,7 @@ export const sfx = {
 
   // Soft fabric tap — randomised pitch, very quiet
   crawlTick() {
-    const freq = 100 + Math.random() * 55;
+    const freq = isTestMode() ? 127.5 : (100 + Math.random() * 55);
     playTone(freq, 'sine', 0.02, 0.032, 0.004, 0.03);
   },
 
