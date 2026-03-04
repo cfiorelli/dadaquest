@@ -5,7 +5,7 @@ const CSS = `
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   text-align: center;
-  font-family: 'Georgia', serif;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
   color: #fff;
   transition: opacity 0.4s ease;
   pointer-events: auto;
@@ -15,27 +15,46 @@ const CSS = `
   pointer-events: none;
 }
 .dada-title-bg {
-  background: radial-gradient(ellipse at center, rgba(26,26,46,0.8) 0%, rgba(0,0,0,0.6) 100%);
+  background: radial-gradient(ellipse at center, rgba(66,54,42,0.45) 0%, rgba(24,20,17,0.55) 100%);
 }
 .dada-end-bg {
-  background: radial-gradient(ellipse at center, rgba(40,100,60,0.85) 0%, rgba(0,0,0,0.7) 100%);
+  background: radial-gradient(ellipse at center, rgba(72,88,62,0.52) 0%, rgba(20,18,16,0.58) 100%);
+}
+.dada-card {
+  min-width: min(88vw, 540px);
+  max-width: 92vw;
+  padding: 28px 32px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(110, 80, 50, 0.38);
+  background:
+    linear-gradient(170deg, rgba(249, 240, 221, 0.90), rgba(232, 218, 193, 0.84));
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(130, 102, 72, 0.22);
+  color: #3a2c1f;
 }
 .dada-h1 {
   font-size: clamp(36px, 6vw, 64px);
-  color: #ffd93d;
-  text-shadow: 3px 3px 0 #aa6600, 0 0 20px rgba(255,200,0,0.3);
-  margin-bottom: 12px;
-  letter-spacing: 2px;
+  color: #c84f34;
+  text-shadow: 0 2px 0 rgba(255, 246, 214, 0.72);
+  margin: 0 0 10px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  font-weight: 800;
 }
 .dada-sub {
   font-size: clamp(16px, 2.5vw, 24px);
-  color: #e0e0e0;
-  margin: 8px 0;
+  color: #4f3c2c;
+  margin: 8px 0 2px;
+  letter-spacing: 0.02em;
 }
 .dada-hint {
   font-size: clamp(12px, 1.8vw, 16px);
-  color: #aaffaa;
-  margin-top: 32px;
+  color: #245532;
+  margin-top: 22px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   animation: dadaPulse 1.4s ease-in-out infinite;
 }
 @keyframes dadaPulse {
@@ -44,34 +63,39 @@ const CSS = `
 }
 .dada-controls {
   font-size: clamp(11px, 1.5vw, 14px);
-  color: #bbb;
-  margin-top: 20px;
+  color: #5d4a36;
+  margin-top: 16px;
   line-height: 1.6;
+  letter-spacing: 0.02em;
 }
 .dada-controls span {
-  color: #ffd93d;
+  color: #b24733;
   font-family: monospace;
+  font-weight: 700;
 }
 .dada-btn {
   margin-top: 24px;
   padding: 14px 32px;
   font-size: 18px;
-  font-family: 'Georgia', serif;
-  background: linear-gradient(135deg, #4a9eff, #2970c0);
-  border: 2px solid rgba(255,255,255,0.2);
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  background: linear-gradient(135deg, #ce5739, #ad3d28);
+  border: 2px solid rgba(125,64,40,0.34);
   border-radius: 10px;
   color: white;
   cursor: pointer;
   transition: transform 0.15s, background 0.2s;
+  letter-spacing: 0.04em;
+  font-weight: 700;
 }
 .dada-btn:hover {
-  background: linear-gradient(135deg, #5ab0ff, #3580d0);
+  background: linear-gradient(135deg, #db6948, #b64930);
   transform: scale(1.05);
 }
 .dada-end-msg {
   font-size: clamp(18px, 3vw, 28px);
-  color: #ffffff;
+  color: #3f2e20;
   margin: 8px 0;
+  font-weight: 700;
 }
 .dada-pop {
   position: absolute;
@@ -96,11 +120,11 @@ const CSS = `
   position: absolute;
   left: 14px;
   top: 12px;
-  font-family: 'Georgia', serif;
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
   font-size: 15px;
-  color: #fff;
-  background: rgba(20, 30, 20, 0.52);
-  border: 1px solid rgba(255,255,255,0.25);
+  color: #fef7e7;
+  background: rgba(62, 48, 34, 0.68);
+  border: 1px solid rgba(255, 235, 202, 0.36);
   border-radius: 8px;
   padding: 6px 10px;
   opacity: 0;
@@ -134,14 +158,16 @@ export function createUI(uiRoot) {
   const titleEl = document.createElement('div');
   titleEl.className = 'dada-overlay dada-title-bg';
   titleEl.innerHTML = `
-    <div class="dada-h1">DA DA QUEST</div>
-    <div class="dada-sub">A baby's epic journey</div>
-    <div class="dada-controls">
-      <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
-      <span>Space</span> Jump &nbsp;\u00b7&nbsp;
-      <span>M</span> Mute
+    <div class="dada-card">
+      <div class="dada-h1">DA DA QUEST</div>
+      <div class="dada-sub">A baby's epic journey</div>
+      <div class="dada-controls">
+        <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
+        <span>Space</span> Jump &nbsp;\u00b7&nbsp;
+        <span>M</span> Mute
+      </div>
+      <div class="dada-hint">Press SPACE or ENTER to start</div>
     </div>
-    <div class="dada-hint">Press SPACE or ENTER to start</div>
   `;
   uiRoot.appendChild(titleEl);
 
@@ -149,10 +175,12 @@ export function createUI(uiRoot) {
   const endEl = document.createElement('div');
   endEl.className = 'dada-overlay dada-end-bg hidden';
   endEl.innerHTML = `
-    <div class="dada-h1">DA DA!</div>
-    <div class="dada-end-msg">You found Da Da!</div>
-    <div class="dada-sub">Great job, baby.</div>
-    <button class="dada-btn" id="playAgainBtn">Play Again</button>
+    <div class="dada-card">
+      <div class="dada-h1">DA DA!</div>
+      <div class="dada-end-msg">You found Da Da!</div>
+      <div class="dada-sub">Great job, baby.</div>
+      <button class="dada-btn" id="playAgainBtn">Play Again</button>
+    </div>
   `;
   uiRoot.appendChild(endEl);
 
