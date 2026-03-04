@@ -7,6 +7,7 @@ import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 import { JuiceFx } from './util/juiceFx.js';
+import { loadGlbIfAvailable, getAvailableModels } from './util/assets.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -153,6 +154,20 @@ export async function boot(options = {}) {
       animateGoal: false,
     }))
     : buildWorld(scene);
+
+  if (!shotMode) {
+    const availableModels = await getAvailableModels();
+    window.__DADA_DEBUG__.assetModels = availableModels;
+
+    await loadGlbIfAvailable(scene, 'dad-goal.glb', {
+      parent: world.goalRoot || null,
+      fallbackMaterial: 'plastic',
+    });
+    await loadGlbIfAvailable(scene, 'checkpoint-sign.glb', {
+      parent: world.checkpoints?.[0]?.marker || null,
+      fallbackMaterial: 'cardboard',
+    });
+  }
 
   // Player
   const player = new PlayerController(scene, { x: -12, y: 3, z: 0 });
