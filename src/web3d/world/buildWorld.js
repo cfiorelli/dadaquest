@@ -734,7 +734,7 @@ export function buildWorld(scene, options = {}) {
   foregroundMeshes.push(cribRail);
 
   // A hanging ring near the early tutorial hop.
-  createHangingPaperRing(scene, 'hangingRing', {
+  const hangingRing = createHangingPaperRing(scene, 'hangingRing', {
     x: -8.6,
     y: 4.0,
     z: -1.7,
@@ -797,30 +797,31 @@ export function buildWorld(scene, options = {}) {
   }
 
   // Toy blocks near spawn to make the first area feel inhabited.
-  createToyBlock(scene, 'toyBlockA', {
+  const toyBlocks = [];
+  toyBlocks.push(createToyBlock(scene, 'toyBlockA', {
     x: -17.2,
     y: 0.34,
     z: 1.25,
     color: [0.91, 0.42, 0.32],
     letter: 'D',
     shadowGen,
-  });
-  createToyBlock(scene, 'toyBlockB', {
+  }));
+  toyBlocks.push(createToyBlock(scene, 'toyBlockB', {
     x: -16.35,
     y: 0.34,
     z: 1.05,
     color: [0.93, 0.74, 0.30],
     letter: 'A',
     shadowGen,
-  });
-  createToyBlock(scene, 'toyBlockC', {
+  }));
+  toyBlocks.push(createToyBlock(scene, 'toyBlockC', {
     x: -15.48,
     y: 0.34,
     z: 1.3,
     color: [0.36, 0.66, 0.82],
     letter: 'D',
     shadowGen,
-  });
+  }));
 
   // === HAZARDS ===
   const hazards = [];
@@ -868,15 +869,16 @@ export function buildWorld(scene, options = {}) {
     shadowGen.addShadowCaster(foliage);
   }
 
-  createGoalBanner(scene, 'goalBanner', {
+  const goalBanner = createGoalBanner(scene, 'goalBanner', {
     x: goalDef.x - 0.7,
     y: goalDef.y + 0.1,
     z: -1.6,
     shadowGen,
   });
 
+  const cloudCutouts = [];
   for (let i = 0; i < 5; i++) {
-    makeCloudCutout(scene, {
+    cloudCutouts.push(makeCloudCutout(scene, {
       name: `cloudCutout_${i}`,
       seed: 4400 + i,
       width: 4.0 + random() * 1.2,
@@ -887,7 +889,7 @@ export function buildWorld(scene, options = {}) {
       z: 6.88 + i * 0.03,
       color: [245, 245, 240],
       alpha: 0.86,
-    });
+    }));
   }
 
   return {
@@ -904,5 +906,12 @@ export function buildWorld(scene, options = {}) {
     hazards,
     level: LEVEL1,
     signs: signRoots,
+    assetAnchors: {
+      cribRail,
+      hangingRing,
+      toyBlocks,
+      goalBanner,
+      cloudCutouts,
+    },
   };
 }
