@@ -9,6 +9,7 @@ import { KitchenScene } from './scenes/KitchenScene.js';
 import { StairsScene } from './scenes/StairsScene.js';
 import { RooftopScene } from './scenes/RooftopScene.js';
 import { EndScene } from './scenes/EndScene.js';
+import { PauseScene } from './ui/PauseScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -33,6 +34,7 @@ const config = {
     KitchenScene,
     StairsScene,
     RooftopScene,
+    PauseScene,
     EndScene,
   ],
 };

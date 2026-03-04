@@ -5,6 +5,7 @@ import { HUD } from '../ui/HUD.js';
 import { sfx } from '../audio/sfx.js';
 import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import { registerPauseHotkey } from '../utils/pause.js';
 import {
   addContactShadow,
   addCraftedOverlay,
@@ -66,6 +67,7 @@ export class RooftopScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+    registerPauseHotkey(this);
 
     this.time.delayedCall(500, () => {
       this.hud.showBubble(this.player.x, this.player.y - 60, 'da da?!', 3000);

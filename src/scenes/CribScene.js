@@ -7,6 +7,7 @@ import { STATE } from '../utils/state.js';
 import { sfx } from '../audio/sfx.js';
 import { getStamina, setStamina, addStamina, setStaminaMax } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
+import { registerPauseHotkey } from '../utils/pause.js';
 import {
   addContactShadow,
   addDepthHazeOverlay,
@@ -82,6 +83,7 @@ export class CribScene extends Phaser.Scene {
     this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D).on('down', () => {
       this.hud.toggleDebug(this.player);
     });
+    registerPauseHotkey(this);
 
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
     if (isTestMode) this.time.delayedCall(600, () => this.scene.start('BedroomScene'));
