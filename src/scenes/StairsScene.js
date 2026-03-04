@@ -8,9 +8,11 @@ import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 import {
   addContactShadow,
+  addCraftedOverlay,
   addDepthHazeOverlay,
   addWarmLightAndVignette,
   applyDepthHaze,
+  ensureCraftedTexture,
 } from '../utils/sceneFx.js';
 
 export class StairsScene extends Phaser.Scene {
@@ -95,6 +97,17 @@ export class StairsScene extends Phaser.Scene {
       this.add.image(this.dogX, this.dogY, 'dog').setDisplaySize(52, 36).setDepth(8),
       110
     );
+    const furTex = ensureCraftedTexture(this, 'hero_dog_fur', {
+      w: 56,
+      h: 38,
+      c1: 0xd7b889,
+      c2: 0xb58f64,
+      c3: 0x8e6d48,
+      outline: 0x4d3826,
+      radius: 12,
+      noiseDots: 90,
+    });
+    addCraftedOverlay(this, furTex, this.dogX, this.dogY, 52, 36, 9, 0.2);
 
     // Zzz animation above dog
     this.dogZzz = this.add.text(this.dogX + 30, this.dogY - 20, 'zzz', {

@@ -7,9 +7,11 @@ import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 import {
   addContactShadow,
+  addCraftedOverlay,
   addDepthHazeOverlay,
   addWarmLightAndVignette,
   applyDepthHaze,
+  ensureCraftedTexture,
 } from '../utils/sceneFx.js';
 
 export class RooftopScene extends Phaser.Scene {
@@ -115,6 +117,17 @@ export class RooftopScene extends Phaser.Scene {
     this.horse = applyDepthHaze(this.add.image(this.horseWX, this.horseY, 'rocking_horse')
       .setDisplaySize(80, 70)
       .setDepth(9), 136);
+    const horseTex = ensureCraftedTexture(this, 'hero_horse_wood', {
+      w: 90,
+      h: 74,
+      c1: 0xf0c996,
+      c2: 0xd5a56f,
+      c3: 0xb57f4b,
+      outline: 0x5f3f24,
+      radius: 14,
+      noiseDots: 130,
+    });
+    this.horseOverlay = addCraftedOverlay(this, horseTex, this.horseWX, this.horseY, 80, 70, 10, 0.22);
 
     // Rocking tween
     this.horseTween = this.tweens.add({
@@ -306,6 +319,7 @@ export class RooftopScene extends Phaser.Scene {
           onUpdate: () => {
             this.horse.setX(this.horseWX);
             this.horseShadow.setX(this.horseWX);
+            this.horseOverlay.setX(this.horseWX);
             this.horseCollider.x = this.horseWX;
             if (this.playerOnHorse) {
               this.player.setWorldPosition(this.horseWX, this.horseWZ, this.horseTop);

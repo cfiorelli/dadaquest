@@ -7,9 +7,11 @@ import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 import {
   addContactShadow,
+  addCraftedOverlay,
   addDepthHazeOverlay,
   addWarmLightAndVignette,
   applyDepthHaze,
+  ensureCraftedTexture,
 } from '../utils/sceneFx.js';
 
 const SCENE_WIDTH = 1100;
@@ -78,6 +80,17 @@ export class BedroomScene extends Phaser.Scene {
     this.pianoX = 700;
     addContactShadow(this, this.pianoX, GAME_H - 50, 130, 24, 0.16, 2);
     applyDepthHaze(this.add.image(this.pianoX, GAME_H - 90, 'piano').setDisplaySize(140, 80), 120);
+    const pianoTex = ensureCraftedTexture(this, 'hero_piano_polish', {
+      w: 140,
+      h: 80,
+      c1: 0x5d5045,
+      c2: 0x3d322b,
+      c3: 0x201914,
+      outline: 0xd9c9b5,
+      radius: 8,
+      noiseDots: 210,
+    });
+    addCraftedOverlay(this, pianoTex, this.pianoX, GAME_H - 90, 140, 80, 7, 0.26);
 
     // Window
     addContactShadow(this, 950, GAME_H - 142, 66, 16, 0.1, 2);

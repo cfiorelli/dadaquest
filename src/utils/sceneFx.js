@@ -48,3 +48,44 @@ export function applyDepthHaze(displayObject, fauxZ, zMax = 220) {
   if (displayObject.setAlpha) displayObject.setAlpha(1 - t * 0.08);
   return displayObject;
 }
+
+export function ensureCraftedTexture(scene, key, options = {}) {
+  if (scene.textures.exists(key)) return key;
+
+  const w = options.w ?? 128;
+  const h = options.h ?? 96;
+  const c1 = options.c1 ?? 0xf2e0c0;
+  const c2 = options.c2 ?? 0xd2b487;
+  const c3 = options.c3 ?? 0xb99765;
+  const outline = options.outline ?? 0x4a3420;
+  const radius = options.radius ?? 10;
+  const noiseDots = options.noiseDots ?? Math.floor((w * h) / 90);
+
+  const g = scene.make.graphics({ x: 0, y: 0, add: false });
+  g.fillGradientStyle(c1, c1, c2, c3, 1, 1, 1, 1);
+  g.fillRoundedRect(0, 0, w, h, radius);
+  g.lineStyle(2, outline, 0.5);
+  g.strokeRoundedRect(1, 1, w - 2, h - 2, Math.max(2, radius - 1));
+
+  for (let i = 0; i < noiseDots; i += 1) {
+    const px = Phaser.Math.Between(2, w - 3);
+    const py = Phaser.Math.Between(2, h - 3);
+    const alpha = Phaser.Math.FloatBetween(0.04, 0.12);
+    const shade = Phaser.Math.Between(0x1a, 0x55);
+    const color = Phaser.Display.Color.GetColor(160 + shade, 140 + shade, 120 + shade);
+    g.fillStyle(color, alpha);
+    g.fillRect(px, py, Phaser.Math.Between(1, 2), 1);
+  }
+
+  g.generateTexture(key, w, h);
+  g.destroy();
+  return key;
+}
+
+export function addCraftedOverlay(scene, key, x, y, w, h, depth = 8, alpha = 0.22) {
+  return scene.add.image(x, y, key)
+    .setDisplaySize(w, h)
+    .setDepth(depth)
+    .setBlendMode(Phaser.BlendModes.MULTIPLY)
+    .setAlpha(alpha);
+}

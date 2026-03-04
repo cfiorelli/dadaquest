@@ -8,9 +8,11 @@ import { setStamina } from '../utils/state.js';
 import { isTestMode } from '../utils/testMode.js';
 import {
   addContactShadow,
+  addCraftedOverlay,
   addDepthHazeOverlay,
   addWarmLightAndVignette,
   applyDepthHaze,
+  ensureCraftedTexture,
 } from '../utils/sceneFx.js';
 
 const SCENE_WIDTH = 1200;
@@ -77,6 +79,17 @@ export class KitchenScene extends Phaser.Scene {
     // Sourdough jar (visual obstacle, not blocking)
     addContactShadow(this, 600, GAME_H - 50, 32, 10, 0.18, 2);
     const jar = applyDepthHaze(this.add.image(600, GAME_H - 80, 'sourdough').setDisplaySize(36, 44), 118);
+    const glazeTex = ensureCraftedTexture(this, 'hero_jar_glaze', {
+      w: 42,
+      h: 50,
+      c1: 0xf7e5c7,
+      c2: 0xd7bb8f,
+      c3: 0xaa8f69,
+      outline: 0x4f3d2e,
+      radius: 9,
+      noiseDots: 70,
+    });
+    addCraftedOverlay(this, glazeTex, 600, GAME_H - 80, 34, 44, 4, 0.24);
 
     // Puddle (slippery zone)
     this.puddleX = 580;
