@@ -329,6 +329,8 @@ export class RooftopScene extends Phaser.Scene {
             // Flash window to draw eye
             this.flashWindow();
             this.hud.showFloatingText(this.player.x, this.player.y - 60, 'Climb up!', '#ffff88');
+            // Soft sparkle glow around DaDa — draws the player's eye to the goal
+            this.pulseGlowOnDada();
           },
         });
       } else {
@@ -349,6 +351,23 @@ export class RooftopScene extends Phaser.Scene {
         this.rideBarLabel.setVisible(false);
       }
     }
+  }
+
+  pulseGlowOnDada() {
+    // Warm glow ring that pulses 3× over ~2.4s, then fades — draws eye to Da Da
+    const glow = this.add.circle(this.dadaSprite.x, this.dadaSprite.y, 38, 0xffd93d, 0)
+      .setDepth(4);
+    this.tweens.add({
+      targets: glow,
+      alpha: 0.38,
+      scaleX: 1.45,
+      scaleY: 1.45,
+      duration: 380,
+      yoyo: true,
+      repeat: 2,
+      ease: 'Sine.easeInOut',
+      onComplete: () => glow.destroy(),
+    });
   }
 
   flashWindow() {
