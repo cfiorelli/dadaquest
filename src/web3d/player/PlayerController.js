@@ -187,6 +187,23 @@ export class PlayerController {
     return this.invulnTimerMs > 0;
   }
 
+  getCollisionHalfExtents() {
+    return { halfW: PLAYER_HALF_W, halfH: PLAYER_HALF_H };
+  }
+
+  wouldOverlapAt(x, y) {
+    const minX = x - PLAYER_HALF_W;
+    const maxX = x + PLAYER_HALF_W;
+    const minY = y - PLAYER_HALF_H;
+    const maxY = y + PLAYER_HALF_H;
+    for (const c of this.colliders) {
+      if (maxX <= c.minX || minX >= c.maxX) continue;
+      if (maxY <= c.minY || minY >= c.maxY) continue;
+      return true;
+    }
+    return false;
+  }
+
   update(dt, moveX, jumpJustPressed, jumpHeld) {
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;

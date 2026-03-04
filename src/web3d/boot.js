@@ -202,8 +202,7 @@ export async function boot(options = {}) {
   let goalReached = false;
   let shotFrames = 0;
   let goalTimer = 0;
-  let resetTimer = 0;
-  let pendingResetReason = '';
+  let respawnState = null;
   let goalCamStartPos = camera.position.clone();
   let goalCamStartTarget = camera.getTarget().clone();
   let goalCamEndPos = camera.position.clone();
@@ -239,7 +238,7 @@ export async function boot(options = {}) {
   }
 
   function triggerReset(reason, direction = -1) {
-    if (resetTimer > 0) return;
+    if (respawnState) return;
     const applied = player.applyHit({
       direction,
       knockback: 4.2,
@@ -247,10 +246,43 @@ export async function boot(options = {}) {
       invulnMs: 800,
     });
     if (!applied) return;
-    resetTimer = 0.18;
-    pendingResetReason = reason;
+    respawnState = { phase: 'fadeOut', timer: 0.16, reason };
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     ui.showStatus('Try again!', 650);
+  }
+
+  function resolveRespawnPosition(baseSpawn) {
+    const { halfW, halfH } = player.getCollisionHalfExtents();
+
+    const placeOnSurface = (x, fallbackY) => {
+      let highest = null;
+      for (const c of player.colliders) {
+        if ((x + halfW) <= c.minX || (x - halfW) >= c.maxX) continue;
+        if (highest === null || c.maxY > highest) highest = c.maxY;
+      }
+      return highest === null ? fallbackY : (highest + halfH + 0.02);
+    };
+
+    const minX = worldExtents.minX + 0.8;
+    const maxX = worldExtents.maxX - 0.8;
+    for (let i = 0; i < 24; i++) {
+      const lateralIndex = Math.floor((i + 1) / 2);
+      const lateralSign = i % 2 === 0 ? 1 : -1;
+      const offsetX = i === 0 ? 0 : lateralSign * lateralIndex * 0.28;
+      const x = clamp(baseSpawn.x + offsetX, minX, maxX);
+      const yBase = placeOnSurface(x, baseSpawn.y + Math.floor(i / 6) * 0.24);
+      const y = yBase + Math.floor(i / 8) * 0.2;
+      if (!player.wouldOverlapAt(x, y)) {
+        return { x, y, z: baseSpawn.z || 0 };
+      }
+    }
+
+    // Fallback: push above the world and let gravity settle safely.
+    return {
+      x: clamp(baseSpawn.x, minX, maxX),
+      y: baseSpawn.y + 2.4,
+      z: baseSpawn.z || 0,
+    };
   }
 
   function activateCheckpoint(checkpoint) {
@@ -442,15 +474,26 @@ export async function boot(options = {}) {
         ui.hideTitle();
       }
     } else if (state === 'gameplay') {
-      if (resetTimer > 0) {
-        resetTimer = Math.max(0, resetTimer - dt);
-        const fade = resetTimer > 0.08 ? 0.28 : 0.10;
-        ui.setFade(fade);
-        if (resetTimer === 0) {
-          ui.setFade(0);
-          player.setPosition(respawnPoint.x, respawnPoint.y, respawnPoint.z || 0);
-          player.setMovementModifiers();
-          pendingResetReason = '';
+      if (respawnState) {
+        if (respawnState.phase === 'fadeOut') {
+          respawnState.timer = Math.max(0, respawnState.timer - dt);
+          const t = 1 - (respawnState.timer / 0.16);
+          ui.setFade(0.42 * t);
+
+          if (respawnState.timer <= 0) {
+            const resolved = resolveRespawnPosition(respawnPoint);
+            player.setPosition(resolved.x, resolved.y, resolved.z || 0);
+            player.setMovementModifiers();
+            respawnState = { phase: 'fadeIn', timer: 0.22, reason: respawnState.reason };
+          }
+        } else {
+          respawnState.timer = Math.max(0, respawnState.timer - dt);
+          const t = respawnState.timer / 0.22;
+          ui.setFade(0.42 * t);
+          if (respawnState.timer <= 0) {
+            ui.setFade(0);
+            respawnState = null;
+          }
         }
       } else {
         updateLevelInteractions(dt);
