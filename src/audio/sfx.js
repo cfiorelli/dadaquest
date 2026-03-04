@@ -1,13 +1,21 @@
-// WebAudio SFX - all generated procedurally
+// WebAudio SFX — all procedural. Toybox-warm palette: low frequencies, soft attacks,
+// triangle/sine oscillators, clamped peaks to avoid harsh transients.
+
 let ctx = null;
+let masterGain = null;
+let _muted = false;
 
 function getCtx() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.72; // headroom buffer — all voices sum through this
+    masterGain.connect(ctx.destination);
+    // Restore mute preference from localStorage
+    try { _muted = localStorage.getItem('dada-muted') === '1'; } catch (e) {}
+    if (_muted) masterGain.gain.value = 0;
   }
-  if (ctx.state === 'suspended') {
-    ctx.resume();
-  }
+  if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
 
@@ -17,21 +25,15 @@ function playTone(freq, type, duration, volume = 0.3, attack = 0.01, decay = 0.1
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.connect(gain);
-    gain.connect(c.destination);
+    gain.connect(masterGain);
     osc.type = type;
     osc.frequency.setValueAtTime(freq, c.currentTime);
     gain.gain.setValueAtTime(0, c.currentTime);
-    gain.gain.linearRampToValueAtTime(volume, c.currentTime + attack);
+    gain.gain.linearRampToValueAtTime(Math.min(volume, 0.45), c.currentTime + attack);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + attack + decay + duration);
     osc.start(c.currentTime);
     osc.stop(c.currentTime + attack + decay + duration + 0.05);
-  } catch(e) {
-    // Audio context not ready yet
-  }
-}
-
-function playPluck(freq, duration = 0.08, volume = 0.12) {
-  playTone(freq, 'triangle', duration, volume, 0.015, duration * 0.8);
+  } catch (e) {}
 }
 
 function playNoise(duration, volume = 0.1, highpass = 200) {
@@ -51,78 +53,100 @@ function playNoise(duration, volume = 0.1, highpass = 200) {
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
     src.connect(filter);
     filter.connect(gain);
-    gain.connect(c.destination);
+    gain.connect(masterGain);
     src.start();
     src.stop(c.currentTime + duration);
-  } catch(e) {}
+  } catch (e) {}
 }
 
 export const sfx = {
   init() {
-    // Called on first user input
     getCtx();
   },
 
+  toggleMute() {
+    _muted = !_muted;
+    if (masterGain) {
+      masterGain.gain.setValueAtTime(_muted ? 0 : 0.72, ctx.currentTime);
+    }
+    try { localStorage.setItem('dada-muted', _muted ? '1' : '0'); } catch (e) {}
+    return _muted;
+  },
+
+  isMuted() { return _muted; },
+
+  // Soft fabric tap — randomised pitch, very quiet
   crawlTick() {
-    playPluck(170, 0.05, 0.06);
-    setTimeout(() => playPluck(130, 0.04, 0.04), 20);
+    const freq = 100 + Math.random() * 55;
+    playTone(freq, 'sine', 0.02, 0.032, 0.004, 0.03);
   },
 
+  // Muted thump — low freq, soft attack, short noise burst
   bonk() {
-    playTone(180, 'triangle', 0.07, 0.09, 0.015, 0.09);
-    playNoise(0.04, 0.025, 500);
-    setTimeout(() => playTone(130, 'sine', 0.06, 0.07, 0.02, 0.08), 55);
+    playTone(130, 'triangle', 0.10, 0.11, 0.006, 0.12);
+    playNoise(0.05, 0.016, 180);
   },
 
+  // Warm 3-note chime: C4 → E4 → G4 (major triad, toy-piano feel)
   pickup() {
-    playTone(392, 'sine', 0.06, 0.12, 0.02, 0.08);
-    setTimeout(() => playTone(523, 'triangle', 0.06, 0.11, 0.02, 0.08), 70);
-    setTimeout(() => playTone(659, 'sine', 0.08, 0.12, 0.02, 0.1), 140);
+    playTone(262, 'triangle', 0.09, 0.13, 0.008, 0.12);
+    setTimeout(() => playTone(330, 'triangle', 0.09, 0.13, 0.008, 0.12), 85);
+    setTimeout(() => playTone(392, 'sine', 0.14, 0.14, 0.008, 0.18), 170);
   },
 
+  // Soft puff + delayed hum — restful, not harsh
   nap() {
-    playTone(170, 'sine', 0.32, 0.065, 0.08, 0.22);
-    setTimeout(() => playTone(140, 'sine', 0.34, 0.06, 0.08, 0.24), 460);
-    setTimeout(() => playTone(162, 'triangle', 0.3, 0.055, 0.08, 0.2), 940);
+    playTone(155, 'sine', 0.45, 0.055, 0.14, 0.32);
+    setTimeout(() => playTone(130, 'sine', 0.50, 0.048, 0.16, 0.38), 520);
+    setTimeout(() => playNoise(0.26, 0.011, 320), 1050);
   },
 
+  // Soft downward triangle sweep — gentler than sawtooth
   whoosh() {
     try {
       const c = getCtx();
       const osc = c.createOscillator();
       const gain = c.createGain();
       osc.connect(gain);
-      gain.connect(c.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(400, c.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(100, c.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.2, c.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.35);
+      gain.connect(masterGain);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(300, c.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(85, c.currentTime + 0.28);
+      gain.gain.setValueAtTime(0, c.currentTime);
+      gain.gain.linearRampToValueAtTime(0.15, c.currentTime + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.32);
       osc.start(c.currentTime);
-      osc.stop(c.currentTime + 0.4);
-    } catch(e) {}
+      osc.stop(c.currentTime + 0.36);
+    } catch (e) {}
   },
 
+  // Rubbery grab + tiny jingle — non-fatiguing
   swing() {
-    playTone(520, 'triangle', 0.04, 0.09, 0.01, 0.04);
-    setTimeout(() => playTone(680, 'sine', 0.035, 0.07, 0.01, 0.03), 35);
+    playTone(240, 'triangle', 0.04, 0.11, 0.003, 0.05);
+    setTimeout(() => playTone(360, 'sine', 0.06, 0.07, 0.005, 0.08), 40);
   },
 
-  // Distinct "grabbed wall" cue — short thwump
+  // Rubbery grip — two-part thwump
   wallGrab() {
-    playTone(160, 'triangle', 0.06, 0.18, 0.005, 0.07);
-    setTimeout(() => playTone(110, 'triangle', 0.04, 0.12, 0.005, 0.05), 50);
+    playTone(185, 'triangle', 0.05, 0.13, 0.003, 0.06);
+    setTimeout(() => playTone(130, 'sine', 0.06, 0.09, 0.003, 0.07), 42);
   },
 
+  // Soft upward chirp — waking up
   wakeUp() {
-    playTone(300, 'triangle', 0.1, 0.2, 0.02, 0.1);
-    setTimeout(() => playTone(400, 'triangle', 0.1, 0.25, 0.02, 0.15), 120);
+    playTone(260, 'sine', 0.14, 0.14, 0.022, 0.13);
+    setTimeout(() => playTone(390, 'triangle', 0.12, 0.16, 0.018, 0.14), 140);
   },
 
+  // Toy-piano arpeggio: G4 C5 E5 G5 + sparkle — bright but not piercing
   victory() {
-    const notes = [523, 659, 784, 1047];
+    const notes = [392, 523, 659, 784];
     notes.forEach((n, i) => {
-      setTimeout(() => playTone(n, 'sine', 0.15, 0.4, 0.01, 0.15), i * 120);
+      setTimeout(() => playTone(n, 'triangle', 0.18, 0.27, 0.006, 0.18), i * 130);
     });
+    setTimeout(() => {
+      playTone(1047, 'sine', 0.12, 0.11, 0.004, 0.14);
+      setTimeout(() => playTone(1319, 'sine', 0.10, 0.08, 0.004, 0.12), 110);
+    }, 620);
   },
 };
