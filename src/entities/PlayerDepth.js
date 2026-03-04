@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { STATE, getStamina, setStamina } from '../utils/state.js';
+import { STATE, getStamina, setStamina, addStamina } from '../utils/state.js';
 import { PLAYER } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import {
@@ -48,6 +48,7 @@ export class PlayerDepth {
     this.jumpCutApplied = false;
     this.lastTransitions = [];
     this.landingSquash = 0;
+    this.sleepyBubbleShown = false;
 
     this.sprite = scene.add.image(0, 0, 'baby').setDepth(10).setScale(1.4);
     this.shadowSoft = scene.add.ellipse(0, 0, 36, 16, 0x000000, 0.11).setDepth(7);
@@ -105,16 +106,21 @@ export class PlayerDepth {
   resetCheckpointTimer() {
     this.checkpointTimer = 0;
     this.checkpointNapFired = false;
+    this.sleepyBubbleShown = false;
   }
 
   update(_time, delta) {
     const dt = delta / 1000;
     this.checkpointTimer += dt;
+    // Checkpoint fairness — warn at 15s, restore +1 stamina at 30s; no forced NAP lock
+    if (this.checkpointTimer > 15 && !this.sleepyBubbleShown) {
+      this.sleepyBubbleShown = true;
+      this.scene.hud?.showBubble(this.sprite.x, this.sprite.y - 60, 'sleepy…', 2500);
+    }
     if (this.checkpointTimer > 30 && !this.checkpointNapFired && this.state !== STATE.NAP) {
       this.checkpointNapFired = true;
-      this.setState(STATE.NAP);
-      this.syncVisual();
-      return;
+      addStamina(this.scene, 1);
+      this.scene.hud?.showFloatingText(this.sprite.x, this.sprite.y - 50, '+1 energy!', '#aaffaa');
     }
 
     if (getStamina(this.scene) <= 0 && this.state !== STATE.NAP) {
@@ -140,7 +146,8 @@ export class PlayerDepth {
 
     this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
     this.coyoteMs = Math.max(0, this.coyoteMs - delta);
-    if (Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+    // Jump is Space-only. cursors.up/down are reserved for depth (z) movement.
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
       this.jumpBufferMs = JUMP_BUFFER_MS;
     }
 
@@ -158,7 +165,7 @@ export class PlayerDepth {
     this.applyWalkBounds();
     this.resolveSolids();
 
-    const jumpHeld = this.spaceKey.isDown || this.cursors.up.isDown;
+    const jumpHeld = this.spaceKey.isDown;
     if (this.vy > JUMP_CUT_MIN_SPEED && !jumpHeld && !this.jumpCutApplied) {
       this.vy *= JUMP_CUT_FACTOR;
       this.jumpCutApplied = true;

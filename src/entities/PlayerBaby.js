@@ -3,7 +3,7 @@ import { STATE } from '../utils/state.js';
 import { Pendulum } from '../utils/pendulum.js';
 import { PLAYER } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
-import { getStamina, setStamina, drainStamina } from '../utils/state.js';
+import { getStamina, setStamina, drainStamina, addStamina } from '../utils/state.js';
 import {
   COYOTE_MS,
   JUMP_BUFFER_MS,
@@ -40,6 +40,9 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     this.napTimer = 0;
     this.isNapping = false;
 
+    // Checkpoint fairness
+    this.sleepyBubbleShown = false;
+
     // Wall climb
     this.onClimbableWall = false;
     this.wallSide = 0; // -1 left, 1 right
@@ -66,8 +69,8 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     // Wobble/tilt
     this.wobbleTween = null;
 
-    // Wall-touch recency buffer (ms) — allows pressing Up/Down a moment after contact
-    this.wallTouchBuffer = 0;
+    // Debug-only verbose logging (set true in console to trace climb entry)
+    this.debugVerbose = false;
 
     // Checkpoint timer
     this.checkpointTimer = 0;
@@ -134,12 +137,18 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     const { cursors, spaceKey } = this;
     const onGround = this.body.blocked.down;
 
-    // Checkpoint timer
+    // Checkpoint fairness timer (only when enabled — CribScene disables it)
     this.checkpointTimer += dt;
-    if (this.checkpointNapEnabled && this.checkpointTimer > 30 && !this.checkpointNapFired && this.state !== STATE.NAP) {
-      this.checkpointNapFired = true;
-      this.setState(STATE.NAP);
-      return;
+    if (this.checkpointNapEnabled) {
+      if (this.checkpointTimer > 15 && !this.sleepyBubbleShown) {
+        this.sleepyBubbleShown = true;
+        this.scene.hud?.showBubble(this.x, this.y - 60, 'sleepy…', 2500);
+      }
+      if (this.checkpointTimer > 30 && !this.checkpointNapFired) {
+        this.checkpointNapFired = true;
+        addStamina(this.scene, 1);
+        this.scene.hud?.showFloatingText(this.x, this.y - 50, '+1 energy!', '#aaffaa');
+      }
     }
 
     this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
@@ -413,50 +422,47 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     if (!this.climbWalls) return;
 
     const bl = this.body.blocked;
-    const to = this.body.touching;
 
-    // Primary: physical contact flags (blocked OR touching covers both static + dynamic)
-    let isOnWall = bl.left || bl.right || to.left || to.right;
-    let side = 0;
-    if (bl.left || to.left)       side = -1;
-    else if (bl.right || to.right) side = 1;
-
-    // Secondary: proximity scan — lets player enter climb 80 ms after last wall contact
-    if (!isOnWall) {
-      const MARGIN = 10; // px beyond body edge
-      const bx  = this.body.x;
-      const by  = this.body.y;
-      const bw  = this.body.width;
-      const bh  = this.body.height;
-      this.climbWalls.getChildren().forEach(w => {
-        if (isOnWall) return;
-        const wb = w.body;
-        const overlapV = by < wb.y + wb.height && by + bh > wb.y;
-        if (!overlapV) return;
-        if (bx + bw >= wb.x - MARGIN && bx <= wb.x + MARGIN) {
-          isOnWall = true; side = -1; // left of wall → player on right side touching left
-        }
-        if (bx >= wb.x + wb.width - MARGIN && bx <= wb.x + wb.width + MARGIN) {
-          isOnWall = true; side = 1;
-        }
-      });
+    // Strict physical contact required — no proximity scan, no grace buffer.
+    // body.blocked is set by the Phaser collision resolution, so this is
+    // frame-accurate and cannot fire when the player is mid-air near center.
+    if (!bl.left && !bl.right) {
+      this.onClimbableWall = false;
+      return;
     }
 
-    // Update buffer
-    if (isOnWall) {
-      this.wallTouchBuffer = 80; // ms
-      this.wallSide = side;
-    } else if (this.wallTouchBuffer > 0) {
-      this.wallTouchBuffer -= 16; // approx one frame
-      isOnWall = true; // grace window still active
-    }
+    // Confirm the blocking wall is one of the designated climbable bodies (≤6 px gap).
+    // This prevents a structural wall (e.g. crib outer rail) that also has a collider
+    // from being mistaken for a climbable surface.
+    const bx = this.body.x;
+    const by = this.body.y;
+    const bw = this.body.width;
+    const bh = this.body.height;
+    const side = bl.left ? -1 : 1;
+    let confirmedClimbable = false;
 
-    this.onClimbableWall = isOnWall;
+    this.climbWalls.getChildren().forEach(w => {
+      if (confirmedClimbable) return;
+      const wb = w.body;
+      const overlapV = by < wb.y + wb.height && by + bh > wb.y;
+      if (!overlapV) return;
+      // Left-blocked: player left edge (bx) near wall right edge (wb.x + wb.width)
+      if (bl.left  && bx          <= wb.x + wb.width + 6) confirmedClimbable = true;
+      // Right-blocked: player right edge near wall left edge (wb.x)
+      if (bl.right && bx + bw     >= wb.x - 6)            confirmedClimbable = true;
+    });
 
-    if (isOnWall && (cursors.up.isDown || cursors.down.isDown)) {
+    this.onClimbableWall = confirmedClimbable;
+
+    if (confirmedClimbable && (cursors.up.isDown || cursors.down.isDown)) {
       if (this.state === STATE.CRAWL || this.state === STATE.AIR) {
+        if (this.debugVerbose) {
+          // eslint-disable-next-line no-console
+          console.log(`[climb] enter side=${side} bl.left=${bl.left} bl.right=${bl.right} bx=${Math.round(bx)}`);
+        }
+        this.wallSide = side;
         this.setState(STATE.WALL_CLIMB);
-        sfx.wallGrab(); // distinct "grab wall" cue
+        sfx.wallGrab();
       }
     }
   }
@@ -499,5 +505,6 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
   resetCheckpointTimer() {
     this.checkpointTimer = 0;
     this.checkpointNapFired = false;
+    this.sleepyBubbleShown = false;
   }
 }
