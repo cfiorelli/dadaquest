@@ -2,6 +2,7 @@ export class InputManager {
   constructor() {
     this.held = {};
     this.pressId = {};
+    this.consumedPressId = {};
     this._nextPressId = 1;
 
     document.addEventListener('keydown', (e) => {
@@ -41,8 +42,15 @@ export class InputManager {
     const code = 'Space';
     const isHeld = !!this.held[code];
     const pressId = this.pressId[code] || 0;
+    const alreadyConsumed = this.consumedPressId[code] === pressId;
+    const isNewPress = isHeld && pressId > 0 && !alreadyConsumed;
+    
+    if (isNewPress) {
+      this.consumedPressId[code] = pressId;
+    }
+    
     return {
-      edge: isHeld,
+      edge: isNewPress,
       pressId,
     };
   }
@@ -58,7 +66,8 @@ export class InputManager {
   }
 
   consumeAll() {
-    // Clear all press IDs to prevent stale presses from retriggering
+    // Clear all press IDs and consumed tracking to prevent stale presses
     this.pressId = {};
+    this.consumedPressId = {};
   }
 }

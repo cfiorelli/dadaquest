@@ -252,10 +252,8 @@ export class PlayerController {
     }
 
     const canAcceptPress = !this.ignoreJumpUntilRelease;
-    const isNewPressId = jumpPressId > 0 && jumpPressId !== this.lastJumpPressIdUsed;
-    if (jumpHeld && canAcceptPress && isNewPressId) {
+    if (jumpPressedEdge && canAcceptPress) {
       this.jumpBufferMs = JUMP_BUFFER_MS;
-      this.lastJumpPressIdUsed = jumpPressId;
     } else {
       this.jumpBufferMs = Math.max(0, this.jumpBufferMs - dt * 1000);
     }
