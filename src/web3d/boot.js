@@ -499,6 +499,7 @@ export async function boot(options = {}) {
       if (input.consumeJump() || input.consumeEnter()) {
         audio.unlock();
         state = 'gameplay';
+        input.consumeAll();
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
       }
@@ -528,9 +529,10 @@ export async function boot(options = {}) {
         updateLevelInteractions(dt);
         // Player update
         const moveX = input.getMoveX();
-        const jumpJustPressed = input.consumeJump();
+        const jumpPress = input.consumeJumpPress();
+        const jumpJustPressed = jumpPress.edge;
         const jumpHeld = input.isJumpHeld();
-        player.update(dt, moveX, jumpJustPressed, jumpHeld);
+        player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
 
         const playerEvents = player.consumeEvents();
         for (const ev of playerEvents) {

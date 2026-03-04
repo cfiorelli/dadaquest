@@ -105,9 +105,11 @@ export class PlayerController {
     this.vy = 0;
     this.grounded = false;
     this.timeSinceGround = 999; // ms since last grounded
-    this.jumpBufferTimer = -999; // ms since last jump press
+    this.jumpBufferMs = 0; // ms remaining in jump buffer window
     this.jumping = false;       // true while ascending from a jump
     this.jumpCutApplied = false;
+    this.ignoreJumpUntilRelease = true;
+    this.lastJumpPressIdUsed = 0;
     this.wasGroundedLastFrame = false;
     this.outOfBoundsEmitted = false;
 
@@ -156,6 +158,9 @@ export class PlayerController {
     this.grounded = false;
     this.jumping = false;
     this.jumpCutApplied = false;
+    this.jumpBufferMs = 0;
+    this.ignoreJumpUntilRelease = true;
+    this.lastJumpPressIdUsed = 0;
     this.outOfBoundsEmitted = false;
   }
 
@@ -204,7 +209,7 @@ export class PlayerController {
     return false;
   }
 
-  update(dt, moveX, jumpJustPressed, jumpHeld) {
+  update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0) {
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
 
@@ -219,22 +224,38 @@ export class PlayerController {
       this.timeSinceGround += dt * 1000;
     }
 
-    if (jumpJustPressed) {
-      this.jumpBufferTimer = 0;
+    if (!jumpHeld) {
+      this.ignoreJumpUntilRelease = false;
+    }
+
+    const canAcceptEdge = !this.ignoreJumpUntilRelease;
+    const isNewPressId = jumpPressId === 0 || jumpPressId !== this.lastJumpPressIdUsed;
+    if (jumpPressedEdge && canAcceptEdge && isNewPressId) {
+      this.jumpBufferMs = JUMP_BUFFER_MS;
     } else {
-      this.jumpBufferTimer += dt * 1000;
+      this.jumpBufferMs = Math.max(0, this.jumpBufferMs - dt * 1000);
     }
 
     // Jump (coyote + buffer)
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
-    const canBuffer = this.jumpBufferTimer <= JUMP_BUFFER_MS;
+    const canBuffer = this.jumpBufferMs > 0;
     if (canCoyote && canBuffer && !this.jumping) {
       this.vy = JUMP_VEL * this.jumpVelocityMultiplier;
       this.jumping = true;
       this.jumpCutApplied = false;
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
-      this.jumpBufferTimer = JUMP_BUFFER_MS + 1; // consume buffer
+      this.jumpBufferMs = 0; // consume buffer immediately
+      this.lastJumpPressIdUsed = jumpPressId || this.lastJumpPressIdUsed;
       this.grounded = false;
+      if (import.meta.env.DEV) {
+        console.log('JUMP', {
+          edge: jumpPressedEdge,
+          held: jumpHeld,
+          buffer: this.jumpBufferMs,
+          coyote: this.timeSinceGround,
+          ignoreJumpUntilRelease: this.ignoreJumpUntilRelease,
+        });
+      }
       this.emitEvent('jump');
     }
 
@@ -360,7 +381,7 @@ export class PlayerController {
       grounded: this.grounded,
       invulnMs: this.invulnTimerMs.toFixed(0),
       coyoteMs: Math.max(0, COYOTE_MS - this.timeSinceGround).toFixed(0),
-      bufferMs: Math.max(0, JUMP_BUFFER_MS - this.jumpBufferTimer).toFixed(0),
+      bufferMs: this.jumpBufferMs.toFixed(0),
       jumping: this.jumping,
     };
   }

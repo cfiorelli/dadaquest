@@ -1,19 +1,26 @@
 export class InputManager {
   constructor() {
     this.held = {};
-    this._jumpJustPressed = false;
-    this._enterJustPressed = false;
-    this._muteJustPressed = false;
+    this.prevDown = {};
+    this.pressedEdge = {};
+    this.pressId = {};
+    this._nextPressId = 1;
 
     document.addEventListener('keydown', (e) => {
       if (e.repeat) return;
-      this.held[e.code] = true;
-      if (e.code === 'Space') this._jumpJustPressed = true;
-      if (e.code === 'Enter') this._enterJustPressed = true;
-      if (e.code === 'KeyM') this._muteJustPressed = true;
+      const code = e.code;
+      const wasDown = !!this.held[code];
+      this.prevDown[code] = wasDown;
+      this.held[code] = true;
+      if (!wasDown) {
+        this.pressedEdge[code] = true;
+        this.pressId[code] = this._nextPressId++;
+      }
     });
     document.addEventListener('keyup', (e) => {
-      this.held[e.code] = false;
+      const code = e.code;
+      this.prevDown[code] = !!this.held[code];
+      this.held[code] = false;
     });
   }
 
@@ -32,22 +39,45 @@ export class InputManager {
 
   /** True only once per press (must be consumed each frame). */
   consumeJump() {
-    const v = this._jumpJustPressed;
-    this._jumpJustPressed = false;
-    return v;
+    return this.consumePressEdge('Space');
+  }
+
+  /** Returns jump press edge + id for de-duping. */
+  consumeJumpPress() {
+    const edge = this.consumePressEdge('Space');
+    return {
+      edge,
+      pressId: edge ? (this.pressId.Space || 0) : 0,
+    };
   }
 
   /** True only once per Enter press. */
   consumeEnter() {
-    const v = this._enterJustPressed;
-    this._enterJustPressed = false;
-    return v;
+    return this.consumePressEdge('Enter');
   }
 
   /** True only once per M press. */
   consumeMuteToggle() {
-    const v = this._muteJustPressed;
-    this._muteJustPressed = false;
+    return this.consumePressEdge('KeyM');
+  }
+
+  consumePressEdge(code) {
+    const v = !!this.pressedEdge[code];
+    this.pressedEdge[code] = false;
     return v;
+  }
+
+  consumeAll() {
+    const keys = new Set([
+      ...Object.keys(this.held),
+      ...Object.keys(this.prevDown),
+      ...Object.keys(this.pressedEdge),
+      ...Object.keys(this.pressId),
+    ]);
+
+    for (const key of keys) {
+      this.prevDown[key] = !!this.held[key];
+      this.pressedEdge[key] = false;
+    }
   }
 }
