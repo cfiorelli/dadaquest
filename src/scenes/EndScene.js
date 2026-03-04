@@ -12,6 +12,9 @@ export class EndScene extends Phaser.Scene {
   create() {
     resetStamina(this);
     window.__DADA_DEBUG__.sceneKey = this.scene.key;
+    const { baby, family } = this.readGiftParams();
+    this.babyName = baby;
+    this.familyName = family;
 
     sfx.victory();
 
@@ -23,8 +26,8 @@ export class EndScene extends Phaser.Scene {
     // Da Da and baby together
     const dada = this.add.image(GAME_W / 2 + 40, GAME_H - 84, 'dada');
     dada.setScale(2.5);
-    const baby = this.add.image(GAME_W / 2 - 50, GAME_H - 65, 'baby');
-    baby.setScale(2.5);
+    const babySprite = this.add.image(GAME_W / 2 - 50, GAME_H - 65, 'baby');
+    babySprite.setScale(2.5);
 
     // Big word bubble
     this.makeBigBubble(GAME_W / 2 + 60, GAME_H - 210, 'DA DA!!!');
@@ -55,25 +58,33 @@ export class EndScene extends Phaser.Scene {
     }
 
     // Title
-    this.add.text(GAME_W / 2, 60, 'YOU FOUND DA DA!', {
+    this.add.text(GAME_W / 2, 58, 'Da Da!', {
       fontFamily: 'Georgia, serif',
-      fontSize: '48px',
+      fontSize: '52px',
       color: '#ffd93d',
       stroke: '#000000',
       strokeThickness: 6,
     }).setOrigin(0.5);
 
-    this.add.text(GAME_W / 2, 130, 'The baby made it! What a champ.', {
+    this.add.text(GAME_W / 2, 120, `Welcome, baby ${this.babyName}`, {
       fontFamily: 'Georgia, serif',
-      fontSize: '22px',
+      fontSize: '28px',
       color: '#ffffff',
       stroke: '#333333',
       strokeThickness: 3,
     }).setOrigin(0.5);
 
-    const restart = this.add.text(GAME_W / 2, 185, 'Press SPACE or ENTER to play again', {
+    this.add.text(GAME_W / 2, 160, `Made for ${this.familyName}`, {
+      fontFamily: 'Georgia, serif',
+      fontSize: '20px',
+      color: '#f5f5f5',
+      stroke: '#333333',
+      strokeThickness: 2,
+    }).setOrigin(0.5);
+
+    const restart = this.add.text(GAME_W / 2, 205, 'Press SPACE / ENTER to play again', {
       fontFamily: 'monospace',
-      fontSize: '17px',
+      fontSize: '16px',
       color: '#aaffaa',
     }).setOrigin(0.5);
 
@@ -91,6 +102,102 @@ export class EndScene extends Phaser.Scene {
     };
     this.input.keyboard.once('keydown-SPACE', proceed);
     this.input.keyboard.once('keydown-ENTER', proceed);
+
+    this.makeActionButton(GAME_W / 2 - 110, GAME_H - 78, 180, 40, 'Play again', proceed);
+    this.makeActionButton(GAME_W / 2 + 110, GAME_H - 78, 180, 40, 'Copy link', () => this.copyGiftLink());
+    this.copyNotice = this.add.text(GAME_W / 2, GAME_H - 32, '', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#fffde7',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(10);
+  }
+
+  readGiftParams() {
+    const p = new URLSearchParams(window.location.search);
+    return {
+      baby: this.sanitizeParam(p.get('baby'), 24, 'baby'),
+      family: this.sanitizeParam(p.get('family'), 28, 'family'),
+    };
+  }
+
+  sanitizeParam(raw, maxLen, fallback) {
+    const cleaned = String(raw ?? '')
+      .replace(/[^A-Za-z0-9 _-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxLen);
+    return cleaned || fallback;
+  }
+
+  buildGiftLink() {
+    const base = `${window.location.origin}${window.location.pathname}`;
+    const url = new URL(base);
+    url.searchParams.set('baby', this.babyName);
+    url.searchParams.set('family', this.familyName);
+    return url.toString();
+  }
+
+  async copyGiftLink() {
+    const link = this.buildGiftLink();
+    let copied = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        copied = true;
+      }
+    } catch (e) {}
+
+    if (!copied) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = link;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch (e) {}
+    }
+
+    if (!copied) {
+      window.prompt('Copy this link:', link);
+      this.showCopyNotice('Link ready to copy');
+      return;
+    }
+    this.showCopyNotice('Link copied!');
+  }
+
+  showCopyNotice(text) {
+    if (!this.copyNotice) return;
+    this.copyNotice.setText(text).setAlpha(1);
+    this.tweens.killTweensOf(this.copyNotice);
+    this.tweens.add({
+      targets: this.copyNotice,
+      alpha: 0,
+      duration: 1300,
+      delay: 900,
+    });
+  }
+
+  makeActionButton(x, y, w, h, label, onClick) {
+    const bg = this.add.rectangle(x, y, w, h, 0x21456f).setDepth(8).setInteractive({ useHandCursor: true });
+    const txt = this.add.text(x, y, label, {
+      fontFamily: 'Georgia, serif',
+      fontSize: '18px',
+      color: '#f3f8ff',
+      stroke: '#10253b',
+      strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(9);
+    bg.on('pointerover', () => bg.setFillStyle(0x2f5d93));
+    bg.on('pointerout', () => bg.setFillStyle(0x21456f));
+    bg.on('pointerdown', () => {
+      bg.setFillStyle(0x163250);
+      this.time.delayedCall(90, onClick);
+    });
+    return { bg, txt };
   }
 
   makeBigBubble(x, y, text) {
