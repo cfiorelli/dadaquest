@@ -184,11 +184,8 @@ export async function boot(options = {}) {
     world.shadowGen.addShadowCaster(m);
   }
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
-  // Move player to actual spawn point and skip physics for first 2 frames to prevent bounce
-  player.mesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
-  player.grounded = true;
-  player.timeSinceGround = 0;
-  player.skipPhysicsFrames = 2;
+  // Deterministic settle: snap player onto platform surface before first frame
+  player.spawnAt(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
   const checkpoints = [
     { index: 0, label: 'Start', spawn: { ...spawnPoint }, radius: 1.3, marker: null },
     ...(world.checkpoints || []),
@@ -528,7 +525,7 @@ export async function boot(options = {}) {
 
           if (respawnState.timer <= 0) {
             const resolved = resolveRespawnPosition(respawnPoint);
-            player.setPosition(resolved.x, resolved.y, resolved.z || 0);
+            player.spawnAt(resolved.x, resolved.y, resolved.z || 0);
             player.setMovementModifiers();
             respawnState = { phase: 'fadeIn', timer: 0.22, reason: respawnState.reason };
           }

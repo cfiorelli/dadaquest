@@ -135,7 +135,6 @@ export class PlayerController {
     this.lastJumpPressIdUsed = 0;
     this.wasGroundedLastFrame = false;
     this.outOfBoundsEmitted = false;
-    this.skipPhysicsFrames = 0; // skip physics for N frames to prevent spawn bounce
 
     // Platform colliders (set externally via setColliders)
     this.colliders = [];  // array of {minX, maxX, minY, maxY}
@@ -188,6 +187,43 @@ export class PlayerController {
     this.outOfBoundsEmitted = false;
   }
 
+  /**
+   * Deterministic spawn settle: place the player at (x, y, z), then snap
+   * downward onto the nearest platform surface so the very first rendered
+   * frame is already in stable resting contact.  No physics frames needed.
+   */
+  spawnAt(x, y, z = 0) {
+    this.setPosition(x, y, z);
+    const pos = this.mesh.position;
+
+    // Find the highest platform top that is directly beneath (or barely
+    // overlapping) the player's AABB at the given X.
+    const pMinX = x - PLAYER_HALF_W;
+    const pMaxX = x + PLAYER_HALF_W;
+    const playerBottom = y - PLAYER_HALF_H;
+    const SNAP_RANGE = 0.15; // how far below player bottom we search
+
+    let bestTop = null;
+    for (const c of this.colliders) {
+      // Must overlap horizontally
+      if (pMaxX <= c.minX || pMinX >= c.maxX) continue;
+      // Platform top must be within snap range below (or at) player bottom
+      if (c.maxY > playerBottom + SKIN_WIDTH) continue; // platform top is above player bottom (would overlap)
+      if (c.maxY < playerBottom - SNAP_RANGE) continue; // too far below
+      if (bestTop === null || c.maxY > bestTop) bestTop = c.maxY;
+    }
+
+    if (bestTop !== null) {
+      // Snap player so bottom sits exactly on platform top + skin
+      pos.y = bestTop + PLAYER_HALF_H + SKIN_WIDTH;
+      this.grounded = true;
+      this.timeSinceGround = 0;
+      this.vy = 0;
+      this.wasGroundedLastFrame = true;
+    }
+    // If no platform found, leave position as-is (will fall naturally)
+  }
+
   consumeEvents() {
     const events = this.eventQueue;
     this.eventQueue = [];
@@ -234,14 +270,6 @@ export class PlayerController {
   }
 
   update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0) {
-    // Skip physics for initial frames to prevent spawn bounce
-    if (this.skipPhysicsFrames > 0) {
-      this.skipPhysicsFrames--;
-      this.grounded = true;
-      this.timeSinceGround = 0;
-      return;
-    }
-
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
 
@@ -337,14 +365,14 @@ export class PlayerController {
       const minOverlap = Math.min(overlapLeft, overlapRight, overlapBottom, overlapTop);
       this.lastCollisionHits++;
 
-      if (minOverlap === overlapBottom && this.vy <= 0) {
-        // Landing on top
+      if (minOverlap === overlapTop && this.vy <= 0) {
+        // Landing on top — overlapTop is small when player barely penetrates from above
         pos.y = c.maxY + PLAYER_HALF_H + SKIN_WIDTH;
         this.vy = 0;
         this.grounded = true;
         this.jumping = false;
-      } else if (minOverlap === overlapTop && this.vy > 0) {
-        // Hit ceiling
+      } else if (minOverlap === overlapBottom && this.vy > 0) {
+        // Hit ceiling — overlapBottom is small when player barely penetrates from below
         pos.y = c.minY - PLAYER_HALF_H - SKIN_WIDTH;
         this.vy = 0;
       } else if (minOverlap === overlapLeft) {
