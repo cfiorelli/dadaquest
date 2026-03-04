@@ -253,6 +253,7 @@ export class PlayerController {
 
     const canAcceptPress = !this.ignoreJumpUntilRelease;
     if (jumpPressedEdge && canAcceptPress) {
+      console.log('[JUMP-DEBUG] Setting jumpBufferMs:', { jumpPressedEdge, canAcceptPress, jumpHeld, jumpPressId });
       this.jumpBufferMs = JUMP_BUFFER_MS;
     } else {
       this.jumpBufferMs = Math.max(0, this.jumpBufferMs - dt * 1000);
@@ -262,6 +263,7 @@ export class PlayerController {
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
     const canBuffer = this.jumpBufferMs > 0;
     if (canCoyote && canBuffer && !this.jumping) {
+      console.log('[JUMP-DEBUG] Executing jump:', { canCoyote, canBuffer, jumping: this.jumping, jumpBufferMs: this.jumpBufferMs, timeSinceGround: this.timeSinceGround });
       let jumpReason = canBuffer ? 'buffer-consumed' : 'unknown';
       
       recordJump(jumpReason, {

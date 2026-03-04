@@ -11,6 +11,9 @@ export class InputManager {
       if (!this.held[code]) {
         this.held[code] = true;
         this.pressId[code] = this._nextPressId++;
+        if (code === 'Space' || code === 'Enter') {
+          console.log('[INPUT-DEBUG] keydown:', code, 'pressId:', this.pressId[code]);
+        }
       }
     });
     document.addEventListener('keyup', (e) => {
@@ -46,6 +49,7 @@ export class InputManager {
     const isNewPress = isHeld && pressId > 0 && !alreadyConsumed;
     
     if (isNewPress) {
+      console.log('[INPUT-DEBUG] consumeJumpPress: new press detected', { isHeld, pressId, alreadyConsumed });
       this.consumedPressId[code] = pressId;
     }
     
@@ -66,6 +70,7 @@ export class InputManager {
   }
 
   consumeAll() {
+    console.log('[INPUT-DEBUG] consumeAll() called - clearing all press IDs');
     // Clear all press IDs and consumed tracking to prevent stale presses
     this.pressId = {};
     this.consumedPressId = {};
