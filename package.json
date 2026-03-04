@@ -9,7 +9,8 @@
     "pw:install": "playwright install --with-deps chromium",
     "test:smoke": "playwright test",
     "test": "npm run build && npm run test:smoke",
-    "screenshot": "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 & sleep 3 && playwright test --config playwright.screenshot.config.js; kill %1"
+    "screenshot": "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 & sleep 3 && playwright test --config playwright.screenshot.config.js; kill %1",
+    "shots": "npm run build && playwright test --config playwright.screenshot.config.js"
   },
   "dependencies": {
     "phaser": "^3.80.1"
