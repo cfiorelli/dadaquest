@@ -1,88 +1,53 @@
 import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../gameConfig.js';
+import {
+  drawContactShadow as _drawContactShadow,
+  applyWarmLightVignette as _applyWarmLightVignette,
+  applyDepthHaze as _applyDepthHazeOverlay,
+  applyDepthTint as _applyDepthTint,
+  drawSign,
+  generateCardboardTexture,
+  generateFeltTexture,
+  generateWoodTexture,
+  PALETTE,
+  drawCardPanel,
+  TEXT_STYLES,
+  createStitchedLabel,
+} from '../art/styleKit.js';
 
-export function addContactShadow(scene, x, y, w = 80, h = 18, alpha = 0.16, depth = 3) {
-  return scene.add.ellipse(x, y, w, h, 0x000000, alpha).setDepth(depth);
-}
+/**
+ * COMPATIBILITY LAYER
+ * Re-exports styleKit functions with legacy names for existing code
+ */
 
+// Contact shadow functions
+export const addContactShadow = _drawContactShadow;
+export const drawContactShadow = _drawContactShadow;
+
+// Depth haze overlay (atmospheric overlay)
 export function addDepthHazeOverlay(scene, strength = 0.1, depth = 30) {
-  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth);
-  g.fillGradientStyle(
-    0xffffff, 0xffffff, 0xeef2f7, 0xeef2f7,
-    strength, strength, 0, 0
-  );
-  g.fillRect(0, 0, GAME_W, Math.floor(GAME_H * 0.62));
-  return g;
+  return _applyDepthHazeOverlay(scene, strength, depth);
 }
 
+// Warm light and vignette
 export function addWarmLightAndVignette(scene, options = {}) {
-  const warmColor = options.warmColor ?? 0xffd8a7;
-  const warmAlpha = options.warmAlpha ?? 0.13;
-  const vignetteAlpha = options.vignetteAlpha ?? 0.12;
-
-  const warm = scene.add.ellipse(220, 130, 540, 320, warmColor, warmAlpha)
-    .setBlendMode(Phaser.BlendModes.SCREEN)
-    .setScrollFactor(0)
-    .setDepth(40);
-
-  const top = scene.add.rectangle(GAME_W / 2, 0, GAME_W, 64, 0x000000, vignetteAlpha)
-    .setOrigin(0.5, 0).setScrollFactor(0).setDepth(41);
-  const bottom = scene.add.rectangle(GAME_W / 2, GAME_H, GAME_W, 76, 0x000000, vignetteAlpha + 0.02)
-    .setOrigin(0.5, 1).setScrollFactor(0).setDepth(41);
-  const left = scene.add.rectangle(0, GAME_H / 2, 72, GAME_H, 0x000000, vignetteAlpha)
-    .setOrigin(0, 0.5).setScrollFactor(0).setDepth(41);
-  const right = scene.add.rectangle(GAME_W, GAME_H / 2, 72, GAME_H, 0x000000, vignetteAlpha)
-    .setOrigin(1, 0.5).setScrollFactor(0).setDepth(41);
-
-  return [warm, top, bottom, left, right];
+  return _applyWarmLightVignette(scene, options);
 }
 
-export function applyDepthHaze(displayObject, fauxZ, zMax = 220) {
-  const t = Phaser.Math.Clamp(fauxZ / zMax, 0, 1);
-  const c = Phaser.Display.Color.GetColor(
-    Math.round(Phaser.Math.Linear(255, 242, t)),
-    Math.round(Phaser.Math.Linear(255, 244, t)),
-    Math.round(Phaser.Math.Linear(255, 250, t))
-  );
-  if (displayObject.setTint) displayObject.setTint(c);
-  if (displayObject.setAlpha) displayObject.setAlpha(1 - t * 0.08);
-  return displayObject;
-}
+// Depth haze tint for objects (parallax tinting)
+export const applyDepthHaze = _applyDepthTint;
+export const applyDepthTint = _applyDepthTint;
 
+// Crafted texture generation
 export function ensureCraftedTexture(scene, key, options = {}) {
-  if (scene.textures.exists(key)) return key;
-
   const w = options.w ?? 128;
   const h = options.h ?? 96;
-  const c1 = options.c1 ?? 0xf2e0c0;
-  const c2 = options.c2 ?? 0xd2b487;
-  const c3 = options.c3 ?? 0xb99765;
-  const outline = options.outline ?? 0x4a3420;
-  const radius = options.radius ?? 10;
-  const noiseDots = options.noiseDots ?? Math.floor((w * h) / 90);
-
-  const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  g.fillGradientStyle(c1, c1, c2, c3, 1, 1, 1, 1);
-  g.fillRoundedRect(0, 0, w, h, radius);
-  g.lineStyle(2, outline, 0.5);
-  g.strokeRoundedRect(1, 1, w - 2, h - 2, Math.max(2, radius - 1));
-
-  for (let i = 0; i < noiseDots; i += 1) {
-    const px = Phaser.Math.Between(2, w - 3);
-    const py = Phaser.Math.Between(2, h - 3);
-    const alpha = Phaser.Math.FloatBetween(0.04, 0.12);
-    const shade = Phaser.Math.Between(0x1a, 0x55);
-    const color = Phaser.Display.Color.GetColor(160 + shade, 140 + shade, 120 + shade);
-    g.fillStyle(color, alpha);
-    g.fillRect(px, py, Phaser.Math.Between(1, 2), 1);
-  }
-
-  g.generateTexture(key, w, h);
-  g.destroy();
-  return key;
+  return generateCardboardTexture(scene, key, w, h);
 }
 
+// Crafted overlay (texture with multiply blend)
 export function addCraftedOverlay(scene, key, x, y, w, h, depth = 8, alpha = 0.22) {
+  ensureCraftedTexture(scene, key, { w, h });
   return scene.add.image(x, y, key)
     .setDisplaySize(w, h)
     .setDepth(depth)
@@ -90,33 +55,19 @@ export function addCraftedOverlay(scene, key, x, y, w, h, depth = 8, alpha = 0.2
     .setAlpha(alpha);
 }
 
-/**
- * Diegetic cardboard exit sign — consistent across all scenes.
- * @param {Phaser.Scene} scene
- * @param {number} x  center x
- * @param {number} y  center y
- * @param {string} text  e.g. "Kitchen →"
- * @param {number} [depth=5]
- */
+// Diegetic sign (legacy name)
 export function addDiegieticSign(scene, x, y, text, depth = 5) {
-  const signW = Math.max(80, text.length * 8 + 24);
-  const g = scene.add.graphics().setDepth(depth);
-  g.fillStyle(0xd4aa6a, 1);
-  g.fillRoundedRect(x - signW / 2, y - 14, signW, 28, 5);
-  g.lineStyle(2, 0x8b5e28, 0.85);
-  g.strokeRoundedRect(x - signW / 2, y - 14, signW, 28, 5);
-  scene.add.text(x, y, text, {
-    fontFamily: 'Georgia, serif',
-    fontSize: '11px',
-    color: '#5c3510',
-  }).setOrigin(0.5, 0.5).setDepth(depth + 1);
-  scene.tweens.add({
-    targets: g,
-    alpha: 0.72,
-    duration: 1400,
-    yoyo: true,
-    repeat: -1,
-    ease: 'Sine.easeInOut',
-  });
-  return g;
+  return drawSign(scene, x, y, text, 'right', depth);
 }
+
+// Re-export all styleKit exports
+export {
+  PALETTE,
+  generateCardboardTexture,
+  generateFeltTexture,
+  generateWoodTexture,
+  drawCardPanel,
+  drawSign,
+  TEXT_STYLES,
+  createStitchedLabel,
+};

@@ -9,11 +9,15 @@ import { getStamina, setStamina, addStamina, setStaminaMax } from '../utils/stat
 import { isTestMode } from '../utils/testMode.js';
 import { registerPauseHotkey } from '../utils/pause.js';
 import {
-  addContactShadow,
-  addDepthHazeOverlay,
-  addWarmLightAndVignette,
+  PALETTE,
+  drawContactShadow,
+  applyWarmLightVignette,
   applyDepthHaze,
-} from '../utils/sceneFx.js';
+  applyDepthTint,
+  generateWoodTexture,
+  generateFeltTexture,
+  drawSign,
+} from '../art/styleKit.js';
 
 export class CribScene extends Phaser.Scene {
   constructor() {
@@ -29,28 +33,35 @@ export class CribScene extends Phaser.Scene {
     this.failsafeGiven = false;
     this.elapsedSceneMs = 0;
 
-    // Background - nursery
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0xfce4ec);
-    // Floor
-    this.add.rectangle(GAME_W / 2, GAME_H - 10, GAME_W, 20, 0xd7b99e);
-    // Baseboard
+    // ═══ NURSERY BACKGROUND ═══
+    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, PALETTE.paperCream);
+    
+    // Floor (soft wood)
+    const floorG = this.add.graphics();
+    floorG.fillGradientStyle(0xd7b99e, 0xd7b99e, 0xc6a88d, 0xc6a88d, 1, 1, 1, 1);
+    floorG.fillRect(0, GAME_H - 20, GAME_W, 20);
+    
+    // Baseboard (crisp highlight)
     this.add.rectangle(GAME_W / 2, GAME_H - 22, GAME_W, 12, 0xeecfb5).setDepth(1);
-    this.add.rectangle(GAME_W / 2, GAME_H - 27, GAME_W, 2, 0xfff0e0, 0.55).setDepth(1);
-    // Wallpaper dots (ordered grid, not random)
+    this.add.rectangle(GAME_W / 2, GAME_H - 27, GAME_W, 2, PALETTE.highlight, 0.55).setDepth(1);
+    
+    // Wallpaper texture (subtle fabric dots, ordered grid)
     for (let col = 0; col < 10; col++) {
       for (let row = 0; row < 5; row++) {
-        this.add.circle(col * 84 + 42, row * 76 + 50, 6, 0xf8bbd0, 0.32);
+        this.add.circle(col * 84 + 42, row * 76 + 50, 6, PALETTE.feltPink, 0.28);
       }
     }
-    // Wall sticker — crescent moon + stars above crib (right side)
+    
+    // Wall decal cluster (moon + stars, tasteful placement above crib area)
     const decal = this.add.graphics().setDepth(1);
-    decal.fillStyle(0xffd97d, 0.42);
+    // Crescent moon
+    decal.fillStyle(0xffd97d, 0.45);
     decal.fillCircle(620, 96, 22);
-    decal.fillStyle(0xfce4ec, 1); // cut crescent
+    decal.fillStyle(PALETTE.paperCream, 1);
     decal.fillCircle(632, 88, 17);
+    // Stars (using Star game objects instead of graphics)
     [[595, 70], [648, 112], [608, 120]].forEach(([sx, sy]) => {
-      decal.fillStyle(0xffd97d, 0.38);
-      decal.fillCircle(sx, sy, 5);
+      this.add.star(sx, sy, 5, 3, 5, 0xffd97d, 0.4).setDepth(1);
     });
 
     this.setupPlatforms();
@@ -90,27 +101,17 @@ export class CribScene extends Phaser.Scene {
   }
 
   createCraftedTextures() {
-    if (!this.textures.exists('crib_wood_plank')) {
-      const g = this.add.graphics();
-      g.fillGradientStyle(0xe7c79a, 0xe0bf91, 0xcfa574, 0xc79f71, 1, 1, 1, 1);
-      g.fillRoundedRect(0, 0, 180, 34, 6);
-      g.lineStyle(2, 0xb38556, 0.35);
-      g.strokeRoundedRect(1, 1, 178, 32, 6);
-      for (let i = 0; i < 22; i++) {
-        g.fillStyle(0xffffff, 0.04);
-        g.fillRect(Phaser.Math.Between(2, 176), Phaser.Math.Between(2, 30), 2, 1);
-      }
-      g.generateTexture('crib_wood_plank', 180, 34);
-      g.destroy();
-    }
+    // Crib wood plank
+    generateWoodTexture(this, 'crib_wood_plank', 180, 34);
 
+    // Onesie icon (hero blue with felt texture)
     if (!this.textures.exists('hero_onesie')) {
       const g = this.add.graphics();
       g.fillGradientStyle(0x8dd6ff, 0x66bff3, 0x3b98df, 0x2f7ec6, 1, 1, 1, 1);
       g.fillRoundedRect(2, 2, 42, 42, 10);
-      g.fillStyle(0xffffff, 0.18);
+      g.fillStyle(0xffffff, 0.2);
       g.fillCircle(16, 14, 9);
-      g.fillStyle(0xfff59d, 0.5);
+      g.fillStyle(0xfff59d, 0.55);
       g.fillCircle(30, 28, 6);
       g.generateTexture('hero_onesie', 46, 46);
       g.destroy();
@@ -118,53 +119,70 @@ export class CribScene extends Phaser.Scene {
   }
 
   setupPlatforms() {
-    const HW = 134; // crib half-width (+12% vs original 120)
+    const HW = 134; // crib half-width
     const WALL_H = 178;
-    const WALL_CY = GAME_H - 70 - WALL_H / 2; // center y of walls
-    const TOP_Y = GAME_H - 70 - WALL_H;       // top rail center y
+    const WALL_CY = GAME_H - 70 - WALL_H / 2;
+    const TOP_Y = GAME_H - 70 - WALL_H;
 
     this.staticGroup = this.physics.add.staticGroup();
 
-    // === CRIB ===
-    // Crib floor
+    // ═══ CRIB ═══
+    // Floor rail
     this.cribFloor = this.staticGroup.create(GAME_W / 2, GAME_H - 70, null)
       .setSize(HW * 2, 20).setVisible(false);
-    addContactShadow(this, GAME_W / 2, GAME_H - 48, HW * 2 - 10, 18, 0.15, 2);
+    drawContactShadow(this, GAME_W / 2, GAME_H - 48, HW * 2 - 10, 18, 0.15, 2);
     this.add.image(GAME_W / 2, GAME_H - 70, 'crib_wood_plank').setDisplaySize(HW * 2, 20);
-    // Top highlight — implies the top face of the floor rail
+    // Top highlight (implies 3D thickness)
     this.add.rectangle(GAME_W / 2, GAME_H - 79, HW * 2 - 6, 3, 0xf5ddb0, 0.7).setDepth(3);
 
-    // Mattress pad (cream pad inside crib, depth=2 so it sits above floor)
-    this.add.rectangle(GAME_W / 2, GAME_H - 83, HW * 2 - 22, 16, 0xf0e8d5).setDepth(2);
+    // Mattress pad (felt, inside crib)
+    generateFeltTexture(this, 'crib_mattress', PALETTE.feltCream, HW * 2 - 22, 16);
+    this.add.image(GAME_W / 2, GAME_H - 83, 'crib_mattress').setDepth(2);
+    // Stitched seams (subtle)
+    const seamG = this.add.graphics().setDepth(2);
+    seamG.lineStyle(1, PALETTE.cardboardEdge, 0.3);
+    seamG.setLineDash([3, 3]);
+    seamG.beginPath();
+    seamG.moveTo(GAME_W / 2 - HW + 18, GAME_H - 83);
+    seamG.lineTo(GAME_W / 2 + HW - 18, GAME_H - 83);
+    seamG.strokePath();
 
-    // Front bottom rail — thick face on the near side of the crib base
+    // Front bottom rail (thick face, near side)
     this.add.rectangle(GAME_W / 2, GAME_H - 61, HW * 2 + 12, 8, 0xc09042).setDepth(6);
 
-    // Crib left wall
+    // Vertical spindles (left wall)
     this.cribLeftWall = this.staticGroup.create(GAME_W / 2 - HW, WALL_CY, null)
       .setSize(18, WALL_H).setVisible(false);
-    const cribL = applyDepthHaze(
-      this.add.image(GAME_W / 2 - HW, WALL_CY, 'crib_wall').setDisplaySize(18, WALL_H), 140
-    );
-    cribL.setTint(0xe3bb8a);
-
-    // Crib right wall
+    const spindleG = this.add.graphics().setDepth(4);
+    for (let i = 0; i < 10; i++) {
+      const sy = WALL_CY - WALL_H / 2 + 10 + i * 16;
+      spindleG.lineStyle(4, PALETTE.woodMid, 1);
+      spindleG.beginPath();
+      spindleG.moveTo(GAME_W / 2 - HW, sy);
+      spindleG.lineTo(GAME_W / 2 - HW, sy + 12);
+      spindleG.strokePath();
+    }
+    
+    // Right wall spindles
     this.cribRightWall = this.staticGroup.create(GAME_W / 2 + HW, WALL_CY, null)
       .setSize(18, WALL_H).setVisible(false);
-    const cribR = applyDepthHaze(
-      this.add.image(GAME_W / 2 + HW, WALL_CY, 'crib_wall').setDisplaySize(18, WALL_H), 140
-    );
-    cribR.setTint(0xe3bb8a);
+    for (let i = 0; i < 10; i++) {
+      const sy = WALL_CY - WALL_H / 2 + 10 + i * 16;
+      spindleG.lineStyle(4, PALETTE.woodMid, 1);
+      spindleG.beginPath();
+      spindleG.moveTo(GAME_W / 2 + HW, sy);
+      spindleG.lineTo(GAME_W / 2 + HW, sy + 12);
+      spindleG.strokePath();
+    }
 
-    // Crib top rail
+    // Top rail
     this.cribTopRail = this.staticGroup.create(GAME_W / 2, TOP_Y, null)
       .setSize(HW * 2, 14).setVisible(false);
-    addContactShadow(this, GAME_W / 2, TOP_Y + 17, HW * 2 - 16, 10, 0.12, 2);
+    drawContactShadow(this, GAME_W / 2, TOP_Y + 17, HW * 2 - 16, 10, 0.12, 2);
     this.add.image(GAME_W / 2, TOP_Y, 'crib_wood_plank').setDisplaySize(HW * 2, 14);
-    // Top highlight on top rail
     this.add.rectangle(GAME_W / 2, TOP_Y - 6, HW * 2 - 6, 3, 0xf5ddb0, 0.7).setDepth(3);
 
-    // Corner posts (rounded) at all 4 crib corners
+    // Corner posts (rounded, shaded)
     const postG = this.add.graphics().setDepth(7);
     [
       [GAME_W / 2 - HW - 4, TOP_Y - 8],
@@ -172,53 +190,75 @@ export class CribScene extends Phaser.Scene {
       [GAME_W / 2 - HW - 4, GAME_H - 64],
       [GAME_W / 2 + HW + 4, GAME_H - 64],
     ].forEach(([px, py]) => {
-      postG.fillStyle(0xb07030);
+      postG.fillGradientStyle(0xb07030, 0xb07030, 0x8a5520, 0x8a5520, 1, 1, 1, 1);
       postG.fillRoundedRect(px - 7, py - 9, 14, 18, 3);
-      postG.fillStyle(0xd4a060, 0.45);
-      postG.fillRoundedRect(px - 5, py - 8, 5, 5, 1); // highlight face
+      postG.fillStyle(PALETTE.highlight, 0.35);
+      postG.fillRoundedRect(px - 5, py - 8, 5, 5, 1);
     });
 
-    // === DRESSER (left side) ===
+    // ═══ DRESSER (left side, crafted look) ===
     this.dresser = this.staticGroup.create(120, GAME_H - 165, null)
       .setSize(120, 16).setVisible(false);
-    addContactShadow(this, 120, GAME_H - 92, 110, 18, 0.18, 2);
-    applyDepthHaze(this.add.image(120, GAME_H - 135, 'dresser').setDisplaySize(120, 80), 116);
+    drawContactShadow(this, 120, GAME_H - 92, 110, 18, 0.18, 2);
+    
+    const dresserG = this.add.graphics().setDepth(3);
+    dresserG.fillGradientStyle(PALETTE.cardboardLight, PALETTE.cardboardLight, PALETTE.cardboardMid, PALETTE.cardboardDark, 1, 1, 1, 1);
+    dresserG.fillRoundedRect(60, GAME_H - 175, 120, 80, 6);
+    dresserG.lineStyle(2, PALETTE.cardboardEdge, 0.5);
+    dresserG.strokeRoundedRect(60, GAME_H - 175, 120, 80, 6);
+    // Drawer handles (stitched dots)
+    [[90, GAME_H - 158], [150, GAME_H - 158], [90, GAME_H - 118], [150, GAME_H - 118]].forEach(([hx, hy]) => {
+      dresserG.fillStyle(PALETTE.cardboardEdge, 0.7);
+      dresserG.fillCircle(hx, hy, 3);
+    });
+    applyDepthTint(dresserG, 116);
 
-    // === Ground ===
+    // ═══ Ground ===
     this.ground = this.staticGroup.create(GAME_W / 2, GAME_H - 10, null)
       .setSize(GAME_W, 20).setVisible(false);
 
-    // === Climbable walls ===
+    // ═══ Climbable walls ===
     this.climbWalls = this.physics.add.staticGroup();
     this.climbWalls.create(GAME_W / 2 - HW + 9, WALL_CY, null)
       .setSize(8, WALL_H).setVisible(false);
     this.climbWalls.create(GAME_W / 2 + HW - 9, WALL_CY, null)
       .setSize(8, WALL_H).setVisible(false);
 
-    // Store TOP_Y for use in setupExit
     this._cribTopY = TOP_Y;
   }
 
   setupMobile() {
-    // Mobile anchor at ceiling center-ish
+    // Mobile anchor at ceiling
     this.mobileAnchorX = GAME_W / 2 + 10;
     this.mobileAnchorY = GAME_H - 310;
     this.mobileLength = 90;
 
-    // Visual anchor line (drawn each frame)
+    // Rope graphics
     this.ropeGraphics = this.add.graphics().setDepth(5);
 
-    // Mobile toy sprite (moves with pendulum)
-    this.mobileToy = applyDepthHaze(
-      this.add.image(this.mobileAnchorX, this.mobileAnchorY + this.mobileLength, 'mobile_toy')
-        .setDepth(6)
-        .setScale(0.94),
-      170
-    );
+    // Mobile toy (plush star with shading) - using Star game object
+    this.mobileToy = this.add.star(
+      this.mobileAnchorX,
+      this.mobileAnchorY + this.mobileLength,
+      5, 14, 18,
+      0xfff59d, 1
+    ).setDepth(6);
+    
+    // Add stroke for dimension
+    this.mobileToyStroke = this.add.star(
+      this.mobileAnchorX,
+      this.mobileAnchorY + this.mobileLength,
+      5, 13, 17,
+      0xe6c04e, 0.6
+    ).setDepth(5);
+    
+    applyDepthTint(this.mobileToy, 170);
+    applyDepthTint(this.mobileToyStroke, 170);
+    
     this.tweens.add({
-      targets: this.mobileToy,
-      scaleX: 1.0,
-      scaleY: 0.88,
+      targets: [this.mobileToy, this.mobileToyStroke],
+      scaleX: 1.08,
+      scaleY: 0.92,
       duration: 520,
       yoyo: true,
       repeat: -1,
@@ -231,14 +271,13 @@ export class CribScene extends Phaser.Scene {
       this.mobileLength, 0.3
     );
 
-    // Grab zone radius (must match PlayerBaby.checkSwingGrab threshold)
     this.grabRadius = 56;
     this.playerOnSwing = false;
   }
 
   setupOnesie() {
     // Onesie on dresser
-    addContactShadow(this, 100, GAME_H - 166, 32, 10, 0.2, 4);
+    drawContactShadow(this, 100, GAME_H - 166, 32, 10, 0.2, 4);
     this.onesieSprite = this.physics.add.staticSprite(100, GAME_H - 185, 'hero_onesie')
       .setDisplaySize(36, 36);
     this.tweens.add({
@@ -257,11 +296,11 @@ export class CribScene extends Phaser.Scene {
     this.player = new PlayerBaby(this, GAME_W / 2, GAME_H - 100);
     this.player.setClimbWalls(this.climbWalls);
     this.player.setCheckpointNapEnabled(false);
-    this.playerShadow = addContactShadow(this, this.player.x, this.player.y + 20, 34, 12, 0.18, 8);
+    this.playerShadow = drawContactShadow(this, this.player.x, this.player.y + 20, 34, 12, 0.18, 8);
 
     // Give pendulum reference for swing detection
     this.player.pendulum = this.mobilePendulum;
-    this.player.grabZone = true; // flag that we have a grab zone
+    this.player.grabZone = true;
   }
 
   setupExit() {
@@ -271,34 +310,13 @@ export class CribScene extends Phaser.Scene {
     this.physics.world.enable(this.exitZone);
     this.exitZone.body.setAllowGravity(false);
 
-    // Rail exit zone — position matches new crib top rail
+    // Rail exit zone
     this.railExitZone = this.add.zone(GAME_W / 2 - 92, this._cribTopY, 90, 24).setOrigin(0.5);
     this.physics.world.enable(this.railExitZone);
     this.railExitZone.body.setAllowGravity(false);
 
-    // Diegetic cardboard sign
-    const sx = EXIT_X + 4;
-    const sy = EXIT_Y - 20;
-    const sign = this.add.graphics().setDepth(4);
-    sign.fillStyle(0xd4aa6a, 1);
-    sign.fillRoundedRect(sx - 62, sy - 15, 124, 30, 5);
-    sign.lineStyle(2, 0x8b5e28, 0.85);
-    sign.strokeRoundedRect(sx - 62, sy - 15, 124, 30, 5);
-    this.add.text(sx, sy, 'Bedroom →', {
-      fontFamily: 'Georgia, serif',
-      fontSize: '11px',
-      color: '#5c3510',
-    }).setOrigin(0.5, 0.5).setDepth(5);
-
-    // Subtle pulse (warm, not neon)
-    this.tweens.add({
-      targets: sign,
-      alpha: 0.68,
-      duration: 1400,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+    // Crafted exit sign using styleKit
+    drawSign(this, EXIT_X + 4, EXIT_Y - 18, 'Bedroom', 'right', 4);
   }
 
   setupCollisions() {
@@ -318,22 +336,22 @@ export class CribScene extends Phaser.Scene {
   }
 
   setupAtmosphere() {
-    addDepthHazeOverlay(this, 0.1, 35);
-    addWarmLightAndVignette(this, {
+    applyDepthHaze(this, 0.12, 35);
+    applyWarmLightVignette(this, {
       warmColor: 0xffdfc2,
-      warmAlpha: 0.14,
-      vignetteAlpha: 0.11,
+      warmAlpha: 0.15,
+      vignetteAlpha: 0.12,
     });
   }
 
   setupHints() {
-    // Hint text (scene 1 only)
-    this.hintText = this.add.text(GAME_W / 2, 20, 'Arrows: move  |  Space: jump  |  Up/Down on wall: climb', {
+    // Hint text (crafted look, not debug overlay)
+    this.hintText = this.add.text(GAME_W / 2, 24, 'Arrows: move  |  Space: jump  |  Up/Down on wall: climb', {
       fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#666666',
-      backgroundColor: '#ffffff80',
-      padding: { x: 8, y: 4 },
+      fontSize: '11px',
+      color: '#555555',
+      backgroundColor: '#fff8ed90',
+      padding: { x: 10, y: 5 },
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
 
     this.time.delayedCall(6000, () => {
@@ -359,7 +377,30 @@ export class CribScene extends Phaser.Scene {
     });
 
     this.events.on('swing-grab', ({ x, y }) => {
-      const pulse = this.add.circle(x, y, 12, 0xffffff, 0.5).setDepth(20);
+      // Soft glow + sparkles (not harsh rings)
+      const glow = this.add.circle(x, y, 18, 0xfff7c2, 0.6).setDepth(20);
+      this.tweens.add({
+        targets: glow,
+        alpha: 0,
+        scale: 1.8,
+        duration: 200,
+        onComplete: () => glow.destroy(),
+      });
+      
+      // Sparkle particles
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const sparkle = this.add.circle(x, y, 2, 0xffffff, 0.9).setDepth(21);
+        this.tweens.add({
+          targets: sparkle,
+          x: x + Math.cos(angle) * 22,
+          y: y + Math.sin(angle) * 22,
+          alpha: 0,
+          duration: 300,
+          onComplete: () => sparkle.destroy(),
+        });
+      }
+      
       const txt = this.add.text(x, y - 20, 'GRAB!', {
         fontFamily: 'monospace',
         fontSize: '11px',
@@ -367,13 +408,6 @@ export class CribScene extends Phaser.Scene {
         stroke: '#5d4037',
         strokeThickness: 3,
       }).setOrigin(0.5).setDepth(21);
-      this.tweens.add({
-        targets: pulse,
-        alpha: 0,
-        scale: 2.2,
-        duration: 180,
-        onComplete: () => pulse.destroy(),
-      });
       this.tweens.add({
         targets: txt,
         y: txt.y - 18,
@@ -423,8 +457,14 @@ export class CribScene extends Phaser.Scene {
       this.mobilePendulum.getBobY()
     );
     this.mobileToy.setAngle(Phaser.Math.RadToDeg(this.mobilePendulum.angle) * 0.5);
+    
+    this.mobileToyStroke.setPosition(
+      this.mobilePendulum.getBobX(),
+      this.mobilePendulum.getBobY()
+    );
+    this.mobileToyStroke.setAngle(Phaser.Math.RadToDeg(this.mobilePendulum.angle) * 0.5);
 
-    // Draw rope (thicker, warmer)
+    // Draw rope (thicker, crafted string)
     this.ropeGraphics.clear();
     this.ropeGraphics.lineStyle(3, 0x8b6a3e, 1);
     this.ropeGraphics.beginPath();
@@ -432,25 +472,31 @@ export class CribScene extends Phaser.Scene {
     this.ropeGraphics.lineTo(this.mobilePendulum.getBobX(), this.mobilePendulum.getBobY());
     this.ropeGraphics.strokePath();
 
-    // Hanger arm + anchor knob
-    this.ropeGraphics.lineStyle(4, 0x7a5a30, 1);
+    // Hanger arm (horizontal bar + hook)
+    this.ropeGraphics.lineStyle(5, 0x7a5a30, 1);
     this.ropeGraphics.beginPath();
-    this.ropeGraphics.moveTo(this.mobileAnchorX - 22, this.mobileAnchorY);
-    this.ropeGraphics.lineTo(this.mobileAnchorX + 22, this.mobileAnchorY);
+    this.ropeGraphics.moveTo(this.mobileAnchorX - 26, this.mobileAnchorY);
+    this.ropeGraphics.lineTo(this.mobileAnchorX + 26, this.mobileAnchorY);
     this.ropeGraphics.strokePath();
+    // Knob/hook
     this.ropeGraphics.fillStyle(0x5d3a1a, 1);
-    this.ropeGraphics.fillCircle(this.mobileAnchorX, this.mobileAnchorY, 6);
+    this.ropeGraphics.fillCircle(this.mobileAnchorX, this.mobileAnchorY, 7);
+    this.ropeGraphics.fillStyle(PALETTE.highlight, 0.4);
+    this.ropeGraphics.fillCircle(this.mobileAnchorX - 2, this.mobileAnchorY - 2, 3);
 
-    // Soft glow ring — only when airborne and within grab range
+    // Soft glow + sparkles (grab cue, only when airborne and close)
     if (this.player.state === STATE.AIR) {
       const bobX = this.mobilePendulum.getBobX();
       const bobY = this.mobilePendulum.getBobY();
       const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, bobX, bobY);
       if (dist < this.grabRadius * 2.2) {
-        const alpha = Phaser.Math.Clamp(1 - dist / (this.grabRadius * 2.2), 0, 0.82);
-        const pulse = 1 + Math.sin(time * 0.009) * 0.07;
-        this.ropeGraphics.lineStyle(2, 0xfff7c2, alpha);
+        const alpha = Phaser.Math.Clamp(1 - dist / (this.grabRadius * 2.2), 0, 0.7);
+        const pulse = 1 + Math.sin(time * 0.009) * 0.08;
+        this.ropeGraphics.lineStyle(2, 0xfff7c2, alpha * 0.6);
         this.ropeGraphics.strokeCircle(bobX, bobY, this.grabRadius * pulse);
+        // Inner glow
+        this.ropeGraphics.fillStyle(0xfff7c2, alpha * 0.2);
+        this.ropeGraphics.fillCircle(bobX, bobY, this.grabRadius * 0.5 * pulse);
       }
     }
 

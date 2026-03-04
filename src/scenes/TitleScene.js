@@ -2,6 +2,13 @@ import Phaser from 'phaser';
 import { GAME_W, GAME_H } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import { isTestMode } from '../utils/testMode.js';
+import {
+  PALETTE,
+  drawCardPanel,
+  TEXT_STYLES,
+  createStitchedLabel,
+  generateCardboardTexture,
+} from '../art/styleKit.js';
 
 const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
 
@@ -11,73 +18,61 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    // Background gradient via rect
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x1a1a3e);
-
-    // Stars
-    for (let i = 0; i < 40; i++) {
-      const x = Phaser.Math.Between(0, GAME_W);
-      const y = Phaser.Math.Between(0, GAME_H * 0.6);
-      const r = Phaser.Math.FloatBetween(1, 3);
-      this.add.circle(x, y, r, 0xffffff, Phaser.Math.FloatBetween(0.4, 1.0));
+    // ═══ DIORAMA BACKGROUND ═══
+    // Sky gradient (warm nursery sky)
+    const g = this.add.graphics();
+    g.fillGradientStyle(0x7eb3d9, 0x7eb3d9, 0xb8d9ec, 0xe8f4f8, 1, 1, 1, 1);
+    g.fillRect(0, 0, GAME_W, GAME_H * 0.7);
+    
+    // Soft cloud stickers
+    [[180, 80], [420, 110], [640, 75]].forEach(([cx, cy]) => {
+      this.add.ellipse(cx, cy, 60, 30, 0xffffff, 0.35);
+      this.add.ellipse(cx - 15, cy - 5, 40, 22, 0xffffff, 0.3);
+      this.add.ellipse(cx + 15, cy - 5, 40, 22, 0xffffff, 0.3);
+    });
+    
+    // Star stickers (soft felt)
+    for (let i = 0; i < 20; i++) {
+      const x = Phaser.Math.Between(40, GAME_W - 40);
+      const y = Phaser.Math.Between(30, GAME_H * 0.5);
+      const r = Phaser.Math.FloatBetween(2, 5);
+      this.add.star(x, y, 5, r * 0.6, r, 0xffd97d, Phaser.Math.FloatBetween(0.25, 0.5));
     }
+    
+    // Table edge (foreground framing)
+    const tableY = GAME_H - 30;
+    const tableG = this.add.graphics();
+    tableG.fillGradientStyle(PALETTE.woodMid, PALETTE.woodMid, PALETTE.woodDark, PALETTE.woodDark, 1, 1, 1, 1);
+    tableG.fillRect(0, tableY, GAME_W, 60);
+    // Wood grain texture
+    tableG.lineStyle(1, PALETTE.woodDark, 0.15);
+    for (let i = 0; i < 8; i++) {
+      const gy = tableY + Phaser.Math.Between(5, 55);
+      tableG.beginPath();
+      tableG.moveTo(0, gy);
+      tableG.lineTo(GAME_W, gy);
+      tableG.strokePath();
+    }
+    // Edge highlight
+    tableG.fillStyle(PALETTE.highlight, 0.25);
+    tableG.fillRect(0, tableY, GAME_W, 4);
 
-    // Floor
-    this.add.rectangle(GAME_W / 2, GAME_H - 30, GAME_W, 60, 0x5d4037);
-
-    // Baby sprite on title
-    const baby = this.add.image(GAME_W / 2 - 80, GAME_H - 75, 'baby');
+    // Baby sprite on table
+    const baby = this.add.image(GAME_W / 2 - 80, tableY + 15, 'baby');
     baby.setScale(2);
+    this.add.ellipse(baby.x, baby.y + 28, 40, 12, 0x000000, 0.2); // shadow
 
     // Da Da on the other side
-    const dada = this.add.image(GAME_W / 2 + 120, GAME_H - 84, 'dada');
+    const dada = this.add.image(GAME_W / 2 + 120, tableY + 6, 'dada');
     dada.setScale(2);
+    this.add.ellipse(dada.x, dada.y + 32, 42, 13, 0x000000, 0.2); // shadow
 
-    // Title text
-    const title = this.add.text(GAME_W / 2, 120, 'DA DA QUEST', {
-      fontFamily: 'Georgia, serif',
-      fontSize: '56px',
-      color: '#ffd93d',
-      stroke: '#000000',
-      strokeThickness: 6,
-      shadow: { offsetX: 3, offsetY: 3, color: '#aa6600', blur: 0, fill: true },
-    }).setOrigin(0.5);
+    // ═══ TITLE ═══
+    const title = this.add.text(GAME_W / 2, 120, 'DA DA QUEST', TEXT_STYLES.title).setOrigin(0.5);
+    
+    const sub = this.add.text(GAME_W / 2, 185, 'A baby\'s epic journey', TEXT_STYLES.subtitle).setOrigin(0.5);
 
-    const sub = this.add.text(GAME_W / 2, 185, 'A baby\'s epic journey', {
-      fontFamily: 'Georgia, serif',
-      fontSize: '22px',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5);
-
-    this.add.text(GAME_W - 12, 12, `build ${BUILD_SHA}`, {
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      color: '#d6e9ff',
-      stroke: '#0d1b2a',
-      strokeThickness: 3,
-    }).setOrigin(1, 0).setDepth(40);
-
-    // Word bubble from baby
-    this.makeBubble(GAME_W / 2 - 30, GAME_H - 130, 'da da?');
-
-    // Press start
-    const pressStart = this.add.text(GAME_W / 2, GAME_H - 150, 'Press SPACE or ENTER to start', {
-      fontFamily: 'monospace',
-      fontSize: '18px',
-      color: '#aaffaa',
-    }).setOrigin(0.5);
-
-    this.tweens.add({
-      targets: pressStart,
-      alpha: 0.2,
-      duration: 700,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
+    // Floating animation
     this.tweens.add({
       targets: title,
       y: 115,
@@ -87,18 +82,48 @@ export class TitleScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    this.createControlsCard(GAME_W / 2, GAME_H - 74, {
-      title: 'Controls',
-      depth: 30,
-      scale: 0.98,
-      alpha: 0.9,
+    // ═══ BUILD STAMP (stitched label, subtle) ═══
+    createStitchedLabel(this, GAME_W - 80, 10, `build ${BUILD_SHA}`, 45);
+
+    // ═══ WORD BUBBLE FROM BABY ═══
+    this.makeBubble(GAME_W / 2 - 30, tableY - 40, 'da da?');
+
+    // ═══ HOW TO PLAY CARD (single clean panel) ═══
+    const cardY = GAME_H / 2 + 35;
+    const card = drawCardPanel(this, GAME_W / 2, cardY, 440, 140, { depth: 10 });
+    
+    const cardTitle = this.add.text(GAME_W / 2, cardY - 55, 'How To Play', TEXT_STYLES.heading).setOrigin(0.5).setDepth(11);
+    
+    const instructions = [
+      'Arrows: move (depth in Scenes 2-5)',
+      'Space: jump / grab / release',
+      'R: restart · M: mute · Esc: pause',
+    ];
+    
+    instructions.forEach((line, idx) => {
+      this.add.text(GAME_W / 2, cardY - 28 + idx * 20, line, TEXT_STYLES.keyLabel)
+        .setOrigin(0.5)
+        .setDepth(11);
     });
 
+    // ═══ PRESS START PROMPT ═══
+    const pressStart = this.add.text(GAME_W / 2, cardY + 85, 'Press SPACE or ENTER to start', TEXT_STYLES.hint).setOrigin(0.5).setDepth(11);
+
+    this.tweens.add({
+      targets: pressStart,
+      alpha: 0.3,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // ═══ FIRST-RUN OVERLAY (if needed, single fade) ═══
     if (!isTestMode && this.shouldShowFirstRunControls()) {
       this.showFirstRunControlsOverlay();
     }
 
-    // Input
+    // ═══ INPUT ═══
     const proceed = () => {
       sfx.init();
       sfx.pickup();
@@ -126,69 +151,33 @@ export class TitleScene extends Phaser.Scene {
     } catch (e) {}
   }
 
-  createControlsCard(x, y, opts = {}) {
-    const {
-      title = 'How To Play',
-      depth = 20,
-      scale = 1,
-      alpha = 1,
-    } = opts;
+  showFirstRunControlsOverlay() {
+    this.markControlsSeen();
+    
+    // Single card fade-in/out (no stacking)
+    const dim = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.5).setDepth(69);
+    
+    const overlayCard = drawCardPanel(this, GAME_W / 2, GAME_H / 2 - 20, 460, 170, { depth: 70 });
+    
+    const overlayTitle = this.add.text(GAME_W / 2, GAME_H / 2 - 75, 'Controls Guide', TEXT_STYLES.heading)
+      .setOrigin(0.5)
+      .setDepth(71);
+    
     const lines = [
-      'Arrows: move (Scenes 2-5 include depth)',
+      'Arrows: move (depth in Scenes 2-5)',
       'Space: jump / grab / release',
       'R: restart scene',
       'M: mute',
       'Esc: pause',
     ];
-
-    const cardW = Math.floor(430 * scale);
-    const cardH = Math.floor(132 * scale);
-    const lineH = Math.floor(18 * scale);
-    const card = this.add.container(x, y).setDepth(depth).setAlpha(alpha);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(0x1a2f56, 0.92);
-    bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 12);
-    bg.lineStyle(2, 0x5d86c6, 0.78);
-    bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 12);
-    bg.lineStyle(1, 0xa5c7f5, 0.34);
-    bg.beginPath();
-    bg.moveTo(-cardW / 2 + 16, -cardH / 2 + 1.5);
-    bg.lineTo(cardW / 2 - 16, -cardH / 2 + 1.5);
-    bg.strokePath();
-    card.add(bg);
-
-    const titleText = this.add.text(0, -cardH / 2 + Math.floor(15 * scale), title, {
-      fontFamily: 'Georgia, serif',
-      fontSize: `${Math.floor(17 * scale)}px`,
-      color: '#ffe39c',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5, 0);
-    card.add(titleText);
-
+    
     lines.forEach((line, idx) => {
-      const t = this.add.text(-cardW / 2 + Math.floor(16 * scale), -cardH / 2 + Math.floor(42 * scale) + idx * lineH, line, {
-        fontFamily: 'monospace',
-        fontSize: `${Math.floor(11 * scale)}px`,
-        color: '#d8e8ff',
-      }).setOrigin(0, 0);
-      card.add(t);
+      this.add.text(GAME_W / 2, GAME_H / 2 - 45 + idx * 22, line, TEXT_STYLES.keyLabel)
+        .setOrigin(0.5)
+        .setDepth(71);
     });
-
-    return card;
-  }
-
-  showFirstRunControlsOverlay() {
-    this.markControlsSeen();
-    const dim = this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0.45).setDepth(69);
-    const card = this.createControlsCard(GAME_W / 2, GAME_H / 2, {
-      title: 'How To Play',
-      depth: 70,
-      scale: 1.05,
-      alpha: 1,
-    });
-    const helper = this.add.text(GAME_W / 2, GAME_H / 2 + 102, 'This guide fades in 5 seconds', {
+    
+    const helper = this.add.text(GAME_W / 2, GAME_H / 2 + 72, 'This guide fades in 5 seconds', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#d5e6ff',
@@ -196,12 +185,13 @@ export class TitleScene extends Phaser.Scene {
 
     this.time.delayedCall(5000, () => {
       this.tweens.add({
-        targets: [dim, card, helper],
+        targets: [dim, overlayCard, overlayTitle, helper],
         alpha: 0,
         duration: 420,
         onComplete: () => {
           dim.destroy();
-          card.destroy();
+          overlayCard.destroy();
+          overlayTitle.destroy();
           helper.destroy();
         },
       });
