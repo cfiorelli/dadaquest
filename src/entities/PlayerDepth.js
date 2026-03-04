@@ -22,6 +22,7 @@ import {
   overlapsFootprint,
   resolveFootprint,
 } from '../utils/depth.js';
+import { JUMP_CUT_FACTOR, JUMP_CUT_MIN_SPEED } from '../utils/movementTuning.js';
 
 export class PlayerDepth {
   constructor(scene, config) {
@@ -46,6 +47,7 @@ export class PlayerDepth {
     this.coyoteMs = 0;
     this.jumpCutApplied = false;
     this.lastTransitions = [];
+    this.landingSquash = 0;
 
     this.sprite = scene.add.image(0, 0, 'baby').setDepth(10).setScale(1.4);
     this.shadowSoft = scene.add.ellipse(0, 0, 36, 16, 0x000000, 0.11).setDepth(7);
@@ -157,13 +159,18 @@ export class PlayerDepth {
     this.resolveSolids();
 
     const jumpHeld = this.spaceKey.isDown || this.cursors.up.isDown;
-    if (this.vy > 90 && !jumpHeld && !this.jumpCutApplied) {
-      this.vy *= 0.5;
+    if (this.vy > JUMP_CUT_MIN_SPEED && !jumpHeld && !this.jumpCutApplied) {
+      this.vy *= JUMP_CUT_FACTOR;
       this.jumpCutApplied = true;
     }
     this.vy -= GRAVITY * dt;
     this.vy = Math.max(this.vy, -MAX_FALL);
     this.wy += this.vy * dt;
+
+    // Decay landing squash each frame
+    if (this.landingSquash > 0) {
+      this.landingSquash = Math.max(0, this.landingSquash - dt * 9);
+    }
 
     const ground = this.getGroundHeight(this.wx, this.wz);
     if (this.wy <= ground) {
@@ -174,7 +181,10 @@ export class PlayerDepth {
       this.onGround = true;
       this.coyoteMs = COYOTE_MS;
       this.setState(STATE.CRAWL);
-      if (justLanded) sfx.bonk();
+      if (justLanded) {
+        sfx.bonk();
+        this.landingSquash = 1;
+      }
     } else {
       if (this.onGround) this.coyoteMs = COYOTE_MS;
       this.onGround = false;
@@ -262,8 +272,10 @@ export class PlayerDepth {
     const baseScale = 1.4 * scale;
     const runStretch = Phaser.Math.Clamp(Math.abs(this.vx) / 260, 0, 0.1) * scale;
     const airStretch = Phaser.Math.Clamp(Math.abs(this.vy) / 680, 0, 0.08) * scale;
-    const targetScaleX = baseScale + runStretch - airStretch * 0.3;
-    const targetScaleY = baseScale - runStretch * 0.55 + airStretch;
+    const squashX = 1 + this.landingSquash * 0.18;
+    const squashY = 1 - this.landingSquash * 0.25;
+    const targetScaleX = (baseScale + runStretch - airStretch * 0.3) * squashX;
+    const targetScaleY = (baseScale - runStretch * 0.55 + airStretch) * squashY;
     const depthT = Phaser.Math.Clamp(this.wz / Z_MAX, 0, 1);
     const tint = Phaser.Display.Color.GetColor(
       Math.round(Phaser.Math.Linear(255, 245, depthT)),

@@ -4,6 +4,12 @@ import { Pendulum } from '../utils/pendulum.js';
 import { PLAYER } from '../gameConfig.js';
 import { sfx } from '../audio/sfx.js';
 import { getStamina, setStamina, drainStamina } from '../utils/state.js';
+import {
+  COYOTE_MS,
+  JUMP_BUFFER_MS,
+  JUMP_CUT_FACTOR,
+  JUMP_CUT_MIN_SPEED,
+} from '../utils/movementTuning.js';
 
 export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y) {
@@ -50,8 +56,8 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
     this.wasOnGround = false;
     this.jumpBufferMs = 0;
     this.coyoteMs = 0;
-    this.jumpBufferWindowMs = 120;
-    this.coyoteWindowMs = 120;
+    this.jumpBufferWindowMs = JUMP_BUFFER_MS;
+    this.coyoteWindowMs = COYOTE_MS;
     this.jumpCutApplied = false;
 
     // Crawl sound timer
@@ -254,10 +260,17 @@ export class PlayerBaby extends Phaser.Physics.Arcade.Sprite {
       this.setFlipX(false);
     } else {
       this.body.setAccelerationX(0);
+      // Gentle air decel — prevents drifting at full speed with no input
+      const vel = this.body.velocity.x;
+      if (Math.abs(vel) > 8) {
+        this.body.setVelocityX(vel * Math.max(0, 1 - 2.0 * dt));
+      } else {
+        this.body.setVelocityX(0);
+      }
     }
 
-    if (!(this.spaceKey.isDown || this.cursors.up.isDown) && this.body.velocity.y < -80 && !this.jumpCutApplied) {
-      this.body.setVelocityY(this.body.velocity.y * 0.5);
+    if (!(this.spaceKey.isDown || this.cursors.up.isDown) && this.body.velocity.y < -JUMP_CUT_MIN_SPEED && !this.jumpCutApplied) {
+      this.body.setVelocityY(this.body.velocity.y * JUMP_CUT_FACTOR);
       this.jumpCutApplied = true;
     }
 
