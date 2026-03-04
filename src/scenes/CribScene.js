@@ -138,14 +138,12 @@ export class CribScene extends Phaser.Scene {
     // Mattress pad (felt, inside crib)
     generateFeltTexture(this, 'crib_mattress', PALETTE.feltCream, HW * 2 - 22, 16);
     this.add.image(GAME_W / 2, GAME_H - 83, 'crib_mattress').setDepth(2);
-    // Stitched seams (subtle)
+    // Stitched seams (subtle dots instead of dashed lines)
     const seamG = this.add.graphics().setDepth(2);
-    seamG.lineStyle(1, PALETTE.cardboardEdge, 0.3);
-    seamG.setLineDash([3, 3]);
-    seamG.beginPath();
-    seamG.moveTo(GAME_W / 2 - HW + 18, GAME_H - 83);
-    seamG.lineTo(GAME_W / 2 + HW - 18, GAME_H - 83);
-    seamG.strokePath();
+    for (let i = 0; i < 20; i++) {
+      seamG.fillStyle(PALETTE.cardboardEdge, 0.3);
+      seamG.fillCircle(GAME_W / 2 - HW + 18 + i * 12, GAME_H - 83, 1);
+    }
 
     // Front bottom rail (thick face, near side)
     this.add.rectangle(GAME_W / 2, GAME_H - 61, HW * 2 + 12, 8, 0xc09042).setDepth(6);

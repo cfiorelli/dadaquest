@@ -8,11 +8,13 @@ test('full run reaches EndScene in test mode without console errors', async ({ p
   page.on('console', msg => {
     if (msg.type() === 'error') {
       consoleErrors.push(msg.text());
+      console.log('Console error:', msg.text());
     }
   });
 
   page.on('pageerror', err => {
     pageErrors.push(err.message);
+    console.log('Page error:', err.message);
   });
 
   await page.goto('http://127.0.0.1:4173/?test=1');
