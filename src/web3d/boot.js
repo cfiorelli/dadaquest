@@ -23,6 +23,11 @@ function easeOutCubic(t) {
   return 1 - ((1 - v) ** 3);
 }
 
+function isDebugMode() {
+  if (typeof window === 'undefined') return false;
+  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
+}
+
 function isShotMode() {
   if (typeof window === 'undefined') return false;
   return new URLSearchParams(window.location.search).get('shot') === '1';
@@ -88,6 +93,7 @@ function disableAnimationsForShotMode() {
 export async function boot(options = {}) {
   const { isTestMode = false } = options;
   const shotMode = isShotMode();
+  const debugMode = isDebugMode();
   const shotScene = shotMode ? getShotScene() : 'title';
 
   // Debug hook (Playwright polls this)

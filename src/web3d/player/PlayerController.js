@@ -2,6 +2,29 @@ import * as BABYLON from '@babylonjs/core';
 import { clamp } from '../util/math.js';
 import { makePlastic, createBlobShadow, LEVEL1_PALETTE as P } from '../materials.js';
 
+function isDebugMode() {
+  if (typeof window === 'undefined') return false;
+  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
+}
+
+function recordJump(reason, input, grounded, pos) {
+  const debugMode = isDebugMode();
+  if (!debugMode) return;
+  
+  const record = {
+    t: performance.now(),
+    reason,
+    input: { ...input },
+    grounded,
+    pos: { x: pos.x, y: pos.y, z: pos.z },
+    stack: new Error().stack,
+  };
+  
+  window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
+  window.__DADA_DEBUG__.lastJump = record;
+  console.log('[JUMP TRACE]', reason, record);
+}
+
 // Tuning constants
 const GROUND_ACCEL = 60;
 const GROUND_DECEL = 80;
@@ -240,6 +263,22 @@ export class PlayerController {
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
     const canBuffer = this.jumpBufferMs > 0;
     if (canCoyote && canBuffer && !this.jumping) {
+      let jumpReason = 'unknown';
+      if (jumpPressedEdge) {
+        jumpReason = 'input-edge';
+      } else if (canBuffer) {
+        jumpReason = 'buffer-consumed';
+      }
+      
+      recordJump(jumpReason, {
+        jumpHeld,
+        jumpEdge: jumpPressedEdge,
+        jumpPressId,
+        lastUsed: this.lastJumpPressIdUsed,
+        bufferMs: this.jumpBufferMs,
+        coyoteMs: this.timeSinceGround,
+      }, this.grounded, pos);
+      
       this.vy = JUMP_VEL * this.jumpVelocityMultiplier;
       this.jumping = true;
       this.jumpCutApplied = false;
@@ -247,15 +286,6 @@ export class PlayerController {
       this.jumpBufferMs = 0; // consume buffer immediately
       this.lastJumpPressIdUsed = jumpPressId || this.lastJumpPressIdUsed;
       this.grounded = false;
-      if (import.meta.env.DEV) {
-        console.log('JUMP', {
-          edge: jumpPressedEdge,
-          held: jumpHeld,
-          buffer: this.jumpBufferMs,
-          coyote: this.timeSinceGround,
-          ignoreJumpUntilRelease: this.ignoreJumpUntilRelease,
-        });
-      }
       this.emitEvent('jump');
     }
 
