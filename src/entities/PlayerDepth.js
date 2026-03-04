@@ -6,7 +6,10 @@ import {
   PLAYER_RADIUS_X,
   PLAYER_RADIUS_Z,
   MOVE_SPEED,
+  GROUND_ACCEL,
+  GROUND_DECEL,
   AIR_CONTROL,
+  AIR_DECEL,
   JUMP_VEL,
   GRAVITY,
   MAX_FALL,
@@ -41,7 +44,6 @@ export class PlayerDepth {
     this.onGround = true;
     this.jumpBufferMs = 0;
     this.coyoteMs = 0;
-    this.jumpHoldMs = 0;
     this.jumpCutApplied = false;
     this.lastTransitions = [];
 
@@ -126,11 +128,10 @@ export class PlayerDepth {
     const xDir = (this.cursors.right.isDown ? 1 : 0) - (this.cursors.left.isDown ? 1 : 0);
     const zDir = (this.cursors.up.isDown ? 1 : 0) - (this.cursors.down.isDown ? 1 : 0);
     const move = new Phaser.Math.Vector2(xDir, zDir).normalize();
-    const control = this.onGround ? 1 : AIR_CONTROL;
-    const targetVx = move.x * MOVE_SPEED * control;
-    const targetVz = move.y * MOVE_SPEED * control;
-    const accel = this.onGround ? 980 : 760;
-    const decel = this.onGround ? 1400 : 520;
+    const targetVx = move.x * MOVE_SPEED;
+    const targetVz = move.y * MOVE_SPEED;
+    const accel = this.onGround ? GROUND_ACCEL : GROUND_ACCEL * AIR_CONTROL;
+    const decel = this.onGround ? GROUND_DECEL : AIR_DECEL;
     this.vx = this.approachVelocity(this.vx, targetVx, dt, accel, decel);
     this.vz = this.approachVelocity(this.vz, targetVz, dt, accel, decel);
     if (move.x !== 0) this.sprite.setFlipX(move.x < 0);
@@ -145,7 +146,6 @@ export class PlayerDepth {
       this.jumpBufferMs = 0;
       this.coyoteMs = 0;
       this.vy = JUMP_VEL;
-      this.jumpHoldMs = 120;
       this.jumpCutApplied = false;
       this.onGround = false;
       this.setState(STATE.AIR);
@@ -157,17 +157,11 @@ export class PlayerDepth {
     this.resolveSolids();
 
     const jumpHeld = this.spaceKey.isDown || this.cursors.up.isDown;
-    if (this.vy > 0 && jumpHeld && this.jumpHoldMs > 0) {
-      this.vy -= GRAVITY * 0.58 * dt;
-      this.jumpHoldMs = Math.max(0, this.jumpHoldMs - delta);
-    } else {
-      if (this.vy > 0 && !jumpHeld && !this.jumpCutApplied) {
-        this.vy = Math.min(this.vy, JUMP_VEL * 0.42);
-        this.jumpCutApplied = true;
-      }
-      this.vy -= GRAVITY * dt;
-      this.jumpHoldMs = 0;
+    if (this.vy > 90 && !jumpHeld && !this.jumpCutApplied) {
+      this.vy *= 0.5;
+      this.jumpCutApplied = true;
     }
+    this.vy -= GRAVITY * dt;
     this.vy = Math.max(this.vy, -MAX_FALL);
     this.wy += this.vy * dt;
 
@@ -176,7 +170,6 @@ export class PlayerDepth {
       const justLanded = !this.onGround && this.vy < -120;
       this.wy = ground;
       this.vy = 0;
-      this.jumpHoldMs = 0;
       this.jumpCutApplied = false;
       this.onGround = true;
       this.coyoteMs = COYOTE_MS;
@@ -266,11 +259,27 @@ export class PlayerDepth {
     const projected = projectWorldToScreen(this.wx, this.wz, this.wy);
     const groundProjected = projectWorldToScreen(this.wx, this.wz, 0);
     const scale = depthScale(this.wz);
+    const baseScale = 1.4 * scale;
+    const runStretch = Phaser.Math.Clamp(Math.abs(this.vx) / 260, 0, 0.1) * scale;
+    const airStretch = Phaser.Math.Clamp(Math.abs(this.vy) / 680, 0, 0.08) * scale;
+    const targetScaleX = baseScale + runStretch - airStretch * 0.3;
+    const targetScaleY = baseScale - runStretch * 0.55 + airStretch;
+    const depthT = Phaser.Math.Clamp(this.wz / Z_MAX, 0, 1);
+    const tint = Phaser.Display.Color.GetColor(
+      Math.round(Phaser.Math.Linear(255, 245, depthT)),
+      Math.round(Phaser.Math.Linear(255, 247, depthT)),
+      Math.round(Phaser.Math.Linear(255, 252, depthT))
+    );
 
     this.sprite.setPosition(projected.x, projected.y);
-    this.sprite.setScale(1.4 * scale);
+    this.sprite.setScale(
+      Phaser.Math.Linear(this.sprite.scaleX, targetScaleX, 0.2),
+      Phaser.Math.Linear(this.sprite.scaleY, targetScaleY, 0.2)
+    );
     this.sprite.setDepth(groundProjected.y + 20);
-    this.sprite.setAngle(this.isNapping ? 0 : Phaser.Math.Clamp(this.vx * 0.1, -12, 12));
+    this.sprite.setTint(tint);
+    const tilt = this.isNapping ? 0 : Phaser.Math.Clamp(this.vx * 0.11, -13, 13) + Phaser.Math.Clamp(this.vy * 0.01, -5, 5);
+    this.sprite.setAngle(Phaser.Math.Linear(this.sprite.angle, tilt, 0.22));
 
     const hover = Phaser.Math.Clamp(this.wy / 80, 0, 1);
     this.shadow.setPosition(groundProjected.x, groundProjected.y + 8);

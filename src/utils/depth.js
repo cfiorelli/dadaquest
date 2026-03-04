@@ -12,7 +12,10 @@ export const PLAYER_RADIUS_X = 14;
 export const PLAYER_RADIUS_Z = 8;
 
 export const MOVE_SPEED = 120;
-export const AIR_CONTROL = 0.82;
+export const GROUND_ACCEL = 640;
+export const GROUND_DECEL = 1680;
+export const AIR_CONTROL = 0.75;
+export const AIR_DECEL = 620;
 export const JUMP_VEL = 315;
 export const GRAVITY = 840;
 export const MAX_FALL = 640;
