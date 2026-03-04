@@ -6,6 +6,7 @@ import {
   makeFelt,
   makePlastic,
 } from '../materials.js';
+import { LEVEL1 } from './level1.js';
 
 // ── Platform prefab ──────────────────────────────────────────────
 
@@ -115,10 +116,11 @@ function createDaDa(scene, x, baseY, shadowGen, { animate = true } = {}) {
   facePlane.material = faceMat;
 
   // Goal trigger (invisible)
-  const goal = BABYLON.MeshBuilder.CreateSphere('goalTrigger', {
-    diameter: 2.5, segments: 8,
+  const goal = BABYLON.MeshBuilder.CreateBox('goalTrigger', {
+    width: 3.0, height: 7.0, depth: 3.0,
   }, scene);
-  goal.position.y = 0.6;
+  // Extended trigger volume keeps finish reliable while DaDa remains visibly on the rooftop.
+  goal.position.y = -1.8;
   goal.parent = root;
   goal.visibility = 0;
 
@@ -134,10 +136,120 @@ function createDaDa(scene, x, baseY, shadowGen, { animate = true } = {}) {
   return { root, goal };
 }
 
+function createArrowSign(scene, name, { x, y, z, direction = 1, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const pole = BABYLON.MeshBuilder.CreateBox(name + '_pole', {
+    width: 0.15, height: 1.0, depth: 0.15,
+  }, scene);
+  pole.position.y = -0.35;
+  pole.parent = root;
+  pole.material = makeCardboard(scene, name + '_poleMat', 138, 118, 92);
+
+  const board = BABYLON.MeshBuilder.CreateBox(name + '_board', {
+    width: 0.9, height: 0.4, depth: 0.08,
+  }, scene);
+  board.parent = root;
+  board.material = makePlastic(scene, name + '_boardMat', 0.95, 0.75, 0.28, { roughness: 0.42 });
+
+  const arrow = BABYLON.MeshBuilder.CreateCylinder(name + '_arrow', {
+    diameterTop: 0,
+    diameterBottom: 0.22,
+    height: 0.26,
+    tessellation: 3,
+  }, scene);
+  arrow.rotation.z = direction > 0 ? -Math.PI / 2 : Math.PI / 2;
+  arrow.position.set(direction * 0.23, 0, -0.08);
+  arrow.parent = root;
+  arrow.material = makePlastic(scene, name + '_arrowMat', 0.93, 0.28, 0.2, { roughness: 0.45 });
+
+  shadowGen.addShadowCaster(pole);
+  shadowGen.addShadowCaster(board);
+  shadowGen.addShadowCaster(arrow);
+  return root;
+}
+
+function createCheckpointMarker(scene, name, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const post = BABYLON.MeshBuilder.CreateBox(name + '_post', {
+    width: 0.16, height: 1.5, depth: 0.16,
+  }, scene);
+  post.position.y = -0.35;
+  post.parent = root;
+  post.material = makeCardboard(scene, name + '_postMat', 146, 122, 94);
+
+  const flag = BABYLON.MeshBuilder.CreateBox(name + '_flag', {
+    width: 0.58, height: 0.32, depth: 0.06,
+  }, scene);
+  flag.position.set(0.35, 0.2, 0);
+  flag.parent = root;
+  flag.material = makePlastic(scene, name + '_flagMat', 0.94, 0.56, 0.18, { roughness: 0.38 });
+
+  shadowGen.addShadowCaster(post);
+  shadowGen.addShadowCaster(flag);
+  return root;
+}
+
+function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const torso = BABYLON.MeshBuilder.CreateBox(name + '_torso', {
+    width: 0.45, height: 0.48, depth: 0.22,
+  }, scene);
+  torso.parent = root;
+  torso.material = makePlastic(scene, name + '_torsoMat', 0.95, 0.94, 1.0, { roughness: 0.33 });
+
+  const shoulderL = BABYLON.MeshBuilder.CreateSphere(name + '_shL', { diameter: 0.18 }, scene);
+  shoulderL.position.set(-0.18, 0.18, 0);
+  shoulderL.parent = root;
+  shoulderL.material = torso.material;
+
+  const shoulderR = BABYLON.MeshBuilder.CreateSphere(name + '_shR', { diameter: 0.18 }, scene);
+  shoulderR.position.set(0.18, 0.18, 0);
+  shoulderR.parent = root;
+  shoulderR.material = torso.material;
+
+  shadowGen.addShadowCaster(torso);
+  shadowGen.addShadowCaster(shoulderL);
+  shadowGen.addShadowCaster(shoulderR);
+  return root;
+}
+
+function createSlipZone(scene, name, { x, y, z, width, depth }) {
+  const zone = BABYLON.MeshBuilder.CreateBox(name + '_zone', {
+    width,
+    height: 0.2,
+    depth,
+  }, scene);
+  zone.position.set(x, y, z);
+  zone.visibility = 0;
+  zone.isPickable = false;
+
+  const puddle = BABYLON.MeshBuilder.CreateDisc(name + '_puddle', {
+    radius: width * 0.33,
+    tessellation: 28,
+  }, scene);
+  puddle.rotation.x = Math.PI / 2;
+  puddle.position.set(x, y + 0.12, z);
+  const puddleMat = makePlastic(scene, name + '_puddleMat', 0.48, 0.67, 0.92, { roughness: 0.15 });
+  puddleMat.alpha = 0.68;
+  puddleMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  puddle.material = puddleMat;
+
+  return { zone, puddle };
+}
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {
-  const { random = Math.random, animateGoal = true } = options;
+  const {
+    random = Math.random,
+    animateGoal = true,
+  } = options;
 
   // Scene setup
   scene.clearColor = new BABYLON.Color4(...P.clearColor);
@@ -165,56 +277,58 @@ export function buildWorld(scene, options = {}) {
   const rimLight = new BABYLON.PointLight('rim', new BABYLON.Vector3(5, 8, -14), scene);
   rimLight.intensity = 0.2;
   rimLight.diffuse = new BABYLON.Color3(1.0, 0.95, 0.85);
-  rimLight.range = 50;
+  rimLight.range = 52;
 
-  // === DIORAMA BASE (ground slab via prefab) ===
-  const groundNode = createCardboardPlatform(scene, 'ground', {
-    x: 5, y: -0.75, z: 0, w: 50, h: 1.5, d: 14,
-    slabColor: P.groundTop, edgeColor: P.groundEdge, shadowGen,
+  // === DIORAMA BASE ===
+  const groundDef = LEVEL1.ground;
+  createCardboardPlatform(scene, 'ground', {
+    x: groundDef.x, y: groundDef.y, z: groundDef.z,
+    w: groundDef.w, h: groundDef.h, d: groundDef.d,
+    slabColor: P.groundTop,
+    edgeColor: P.groundEdge,
+    shadowGen,
   });
-  // For collision, we need the absolute-positioned mesh. Since the slab is a child of
-  // the TransformNode, we need to get the world-space bounding. We'll handle this
-  // by creating a simple invisible collision proxy at the same position.
+
   const groundCollider = BABYLON.MeshBuilder.CreateBox('groundCol', {
-    width: 50, height: 1.5, depth: 14,
+    width: groundDef.w,
+    height: groundDef.h,
+    depth: groundDef.d,
   }, scene);
-  groundCollider.position.set(5, -0.75, 0);
+  groundCollider.position.set(groundDef.x, groundDef.y, groundDef.z);
   groundCollider.visibility = 0;
   groundCollider.isPickable = false;
 
   // === BACKDROP ===
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop', {
-    width: 60, height: 18, depth: 0.5,
+    width: 66, height: 21, depth: 0.5,
   }, scene);
-  backdrop.position.set(5, 8, 8);
+  backdrop.position.set(6, 9, 8.3);
   backdrop.material = makePaper(scene, 'backdropMat', ...P.backdrop, { grainScale: 2, noiseAmt: 8 });
 
-  // Sky tint directly on backdrop (no separate plane — avoids z-fighting banding)
   const skyMat = makeFelt(scene, 'skyMat', ...P.sky, { roughness: 1.0 });
   skyMat.alpha = 0.25;
-  skyMat.sheen.isEnabled = false; // no sheen on transparent overlay
-  const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 59, height: 17 }, scene);
-  skyPlane.position.set(5, 8.5, 7.74);
+  skyMat.sheen.isEnabled = false;
+  const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 64, height: 20 }, scene);
+  skyPlane.position.set(6, 9.5, 7.98);
   skyPlane.material = skyMat;
 
   // === PARALLAX LAYERS ===
-  const bgHills = BABYLON.MeshBuilder.CreateBox('bgHills', { width: 55, height: 6, depth: 0.3 }, scene);
-  bgHills.position.set(5, 3, 6);
+  const bgHills = BABYLON.MeshBuilder.CreateBox('bgHills', { width: 62, height: 6.6, depth: 0.3 }, scene);
+  bgHills.position.set(6, 3.1, 6.2);
   bgHills.material = makeCardboard(scene, 'bgHillsMat', ...P.bgHills);
 
-  const bgMid = BABYLON.MeshBuilder.CreateBox('bgMid', { width: 50, height: 4, depth: 0.25 }, scene);
-  bgMid.position.set(3, 2.5, 4);
+  const bgMid = BABYLON.MeshBuilder.CreateBox('bgMid', { width: 58, height: 4.2, depth: 0.25 }, scene);
+  bgMid.position.set(4.5, 2.45, 4.2);
   bgMid.material = makeCardboard(scene, 'bgMidMat', ...P.bgMid);
 
-  // Foreground cutouts (offset to avoid blocking spawn/play area)
   const fgCutout1 = BABYLON.MeshBuilder.CreateBox('fgCutout1', { width: 8, height: 3, depth: 0.2 }, scene);
-  fgCutout1.position.set(-22, 1.5, -8);
+  fgCutout1.position.set(-24, 1.5, -8.2);
   fgCutout1.material = makeCardboard(scene, 'fgMat1', ...P.fgCutout);
   fgCutout1.metadata = { layer: 'foreground' };
   shadowGen.addShadowCaster(fgCutout1);
 
   const fgCutout2 = BABYLON.MeshBuilder.CreateBox('fgCutout2', { width: 10, height: 2.5, depth: 0.2 }, scene);
-  fgCutout2.position.set(30, 1.2, -8.6);
+  fgCutout2.position.set(34, 1.2, -8.8);
   fgCutout2.material = makeCardboard(scene, 'fgMat2', ...P.fgCutout);
   fgCutout2.metadata = { layer: 'foreground' };
   shadowGen.addShadowCaster(fgCutout2);
@@ -222,23 +336,21 @@ export function buildWorld(scene, options = {}) {
   // === PLATFORMS ===
   const allPlatforms = [groundCollider];
 
-  const platDefs = [
-    { name: 'platStart', w: 8, h: 0.8, d: 5, x: -12, y: 0.4 },
-    { name: 'plat2',     w: 5, h: 0.7, d: 4, x: -5,  y: 1.5 },
-    { name: 'plat3',     w: 4, h: 0.6, d: 4, x: 0,   y: 3.0 },
-    { name: 'plat4',     w: 5, h: 0.7, d: 4, x: 6,   y: 2.0 },
-    { name: 'plat5',     w: 4, h: 0.8, d: 4, x: 11,  y: 4.0 },
-    { name: 'platFinal', w: 8, h: 0.8, d: 5, x: 18,  y: 2.5 },
-  ];
-
-  for (const def of platDefs) {
+  for (const def of LEVEL1.platforms) {
     createCardboardPlatform(scene, def.name, {
-      x: def.x, y: def.y, z: 0,
-      w: def.w, h: def.h, d: def.d, shadowGen,
+      x: def.x,
+      y: def.y,
+      z: 0,
+      w: def.w,
+      h: def.h,
+      d: def.d,
+      shadowGen,
     });
-    // Invisible collision proxy (PlayerController reads position + bounding box)
+
     const col = BABYLON.MeshBuilder.CreateBox(def.name + '_col', {
-      width: def.w, height: def.h, depth: def.d,
+      width: def.w,
+      height: def.h,
+      depth: def.d,
     }, scene);
     col.position.set(def.x, def.y, 0);
     col.visibility = 0;
@@ -247,12 +359,92 @@ export function buildWorld(scene, options = {}) {
   }
 
   // === GOAL (DaDa) ===
-  const dada = createDaDa(scene, 20, 3.2, shadowGen, { animate: animateGoal });
+  const goalDef = LEVEL1.goal;
+  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+
+  // === LEVEL GUIDANCE SIGNS ===
+  const signRoots = [];
+  for (let i = 0; i < LEVEL1.signs.length; i++) {
+    const s = LEVEL1.signs[i];
+    signRoots.push(createArrowSign(scene, `sign_${i}`, {
+      x: s.x,
+      y: s.y,
+      z: s.z,
+      direction: s.direction,
+      shadowGen,
+    }));
+  }
+
+  // === CHECKPOINTS ===
+  const checkpoints = [];
+  for (let i = 0; i < LEVEL1.checkpoints.length; i++) {
+    const cp = LEVEL1.checkpoints[i];
+    const marker = createCheckpointMarker(scene, `checkpoint_${i}`, {
+      x: cp.x,
+      y: cp.y,
+      z: 0.7,
+      shadowGen,
+    });
+
+    checkpoints.push({
+      index: i + 1,
+      label: cp.label || `Checkpoint ${i + 1}`,
+      spawn: { x: cp.x, y: cp.y, z: cp.z },
+      radius: 1.25,
+      marker,
+    });
+  }
+
+  // === PICKUPS ===
+  const pickups = [];
+  for (let i = 0; i < LEVEL1.pickups.length; i++) {
+    const pick = LEVEL1.pickups[i];
+    const node = createOnesiePickup(scene, `pickup_${i}`, {
+      x: pick.x,
+      y: pick.y,
+      z: pick.z,
+      shadowGen,
+    });
+
+    pickups.push({
+      type: pick.type,
+      radius: pick.radius,
+      durationMs: pick.durationMs,
+      jumpBoost: pick.jumpBoost,
+      position: new BABYLON.Vector3(pick.x, pick.y, pick.z),
+      node,
+      collected: false,
+    });
+  }
+
+  // === HAZARDS ===
+  const hazards = [];
+  for (let i = 0; i < LEVEL1.hazards.length; i++) {
+    const hz = LEVEL1.hazards[i];
+    if (hz.type === 'slip') {
+      const created = createSlipZone(scene, `hazard_slip_${i}`, {
+        x: hz.x,
+        y: hz.y,
+        z: hz.z,
+        width: hz.width,
+        depth: hz.depth,
+      });
+      hazards.push({
+        type: hz.type,
+        minX: hz.x - hz.width / 2,
+        maxX: hz.x + hz.width / 2,
+        minY: hz.y - 0.35,
+        maxY: hz.y + 0.35,
+        accelMultiplier: hz.accelMultiplier,
+        decelMultiplier: hz.decelMultiplier,
+        mesh: created.puddle,
+      });
+    }
+  }
 
   // === DECORATIONS ===
-  // Felt trees
-  for (let i = 0; i < 5; i++) {
-    const tx = -10 + i * 8;
+  for (let i = 0; i < 6; i++) {
+    const tx = -13 + i * 8;
     const trunk = BABYLON.MeshBuilder.CreateBox('trunk' + i, {
       width: 0.3, height: 1.5, depth: 0.25,
     }, scene);
@@ -271,13 +463,12 @@ export function buildWorld(scene, options = {}) {
     shadowGen.addShadowCaster(foliage);
   }
 
-  // Cloud cutouts
   for (let i = 0; i < 4; i++) {
-    const cx = -12 + i * 10;
+    const cx = -14 + i * 12;
     const cloud = BABYLON.MeshBuilder.CreateSphere('cloud' + i, {
       diameter: 2 + random(), segments: 10,
     }, scene);
-    cloud.position.set(cx, 10 + random() * 2, 6.5);
+    cloud.position.set(cx, 10 + random() * 2, 6.6);
     cloud.scaling.set(1.5, 0.6, 0.3);
     const cloudMat = makeFelt(scene, 'cloudMat' + i, ...P.cloud, { roughness: 1.0 });
     cloudMat.alpha = 0.7;
@@ -289,9 +480,15 @@ export function buildWorld(scene, options = {}) {
     ground: groundCollider,
     platforms: allPlatforms,
     goal: dada.goal,
+    goalRoot: dada.root,
     shadowGen,
     foregroundMeshes: [fgCutout1, fgCutout2],
-    extents: { minX: -18, maxX: 24 },
-    spawn: { x: -12, y: 3, z: 0 },
+    extents: LEVEL1.extents,
+    spawn: LEVEL1.spawn,
+    checkpoints,
+    pickups,
+    hazards,
+    level: LEVEL1,
+    signs: signRoots,
   };
 }

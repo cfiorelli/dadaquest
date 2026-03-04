@@ -162,6 +162,12 @@ export async function boot(options = {}) {
     world.shadowGen.addShadowCaster(m);
   }
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
+  const checkpoints = [
+    { index: 0, label: 'Start', spawn: { ...spawnPoint }, radius: 1.3, marker: null },
+    ...(world.checkpoints || []),
+  ];
+  const pickups = world.pickups || [];
+  const hazards = world.hazards || [];
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
   const worldExtents = world.extents || { minX: -18, maxX: 24 };
   const camTargetMinX = worldExtents.minX + 3.2;
@@ -202,7 +208,14 @@ export async function boot(options = {}) {
   let goalCamStartTarget = camera.getTarget().clone();
   let goalCamEndPos = camera.position.clone();
   let goalCamEndTarget = camera.getTarget().clone();
+  let activeCheckpointIndex = 0;
+  let respawnPoint = { ...spawnPoint };
+  let onesieBuffTimerMs = 0;
+  let onesieJumpBoost = 1;
+  let slipRecentTimerMs = 0;
   window.__DADA_DEBUG__.lastRespawnReason = '';
+  window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
+  window.__DADA_DEBUG__.onesieBuffMs = 0;
 
   function finishRun() {
     state = 'end';
@@ -238,6 +251,88 @@ export async function boot(options = {}) {
     pendingResetReason = reason;
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     ui.showStatus('Try again!', 650);
+  }
+
+  function activateCheckpoint(checkpoint) {
+    if (!checkpoint || checkpoint.index <= activeCheckpointIndex) return;
+    activeCheckpointIndex = checkpoint.index;
+    respawnPoint = { ...checkpoint.spawn };
+    window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
+    ui.showStatus(`${checkpoint.label} checkpoint`, 1200);
+
+    if (checkpoint.marker) {
+      for (const mesh of checkpoint.marker.getChildMeshes()) {
+        if (mesh.material && mesh.material.emissiveColor) {
+          mesh.material.emissiveColor = new BABYLON.Color3(0.35, 0.18, 0.05);
+        }
+      }
+    }
+  }
+
+  function updateLevelInteractions(dt) {
+    const pos = player.mesh.position;
+
+    if (onesieBuffTimerMs > 0) {
+      onesieBuffTimerMs = Math.max(0, onesieBuffTimerMs - dt * 1000);
+      if (onesieBuffTimerMs === 0) {
+        onesieJumpBoost = 1;
+        ui.showStatus('Onesie boost faded', 900);
+      }
+    }
+
+    // Checkpoint overlaps
+    for (const checkpoint of checkpoints) {
+      if (checkpoint.index <= activeCheckpointIndex) continue;
+      const dx = pos.x - checkpoint.spawn.x;
+      const dy = pos.y - checkpoint.spawn.y;
+      const r = checkpoint.radius ?? 1.2;
+      if ((dx * dx + dy * dy) <= (r * r)) {
+        activateCheckpoint(checkpoint);
+      }
+    }
+
+    // Pickup overlaps
+    for (const pickup of pickups) {
+      if (pickup.collected) continue;
+      const dx = pos.x - pickup.position.x;
+      const dy = pos.y - pickup.position.y;
+      const r = pickup.radius ?? 0.85;
+      if ((dx * dx + dy * dy) <= (r * r)) {
+        pickup.collected = true;
+        if (pickup.node) pickup.node.setEnabled(false);
+        onesieBuffTimerMs = pickup.durationMs ?? 10000;
+        onesieJumpBoost = pickup.jumpBoost ?? 1.2;
+        ui.showStatus('Onesie boost + jump', 1500);
+      }
+    }
+
+    // Hazard overlaps affect movement.
+    let accelMultiplier = 1;
+    let decelMultiplier = 1;
+    for (const hazard of hazards) {
+      const inside = pos.x >= hazard.minX
+        && pos.x <= hazard.maxX
+        && pos.y >= hazard.minY
+        && pos.y <= hazard.maxY;
+
+      if (inside && hazard.type === 'slip') {
+        accelMultiplier *= hazard.accelMultiplier ?? 0.78;
+        decelMultiplier *= hazard.decelMultiplier ?? 0.22;
+        slipRecentTimerMs = 900;
+      }
+    }
+
+    if (slipRecentTimerMs > 0) {
+      slipRecentTimerMs = Math.max(0, slipRecentTimerMs - dt * 1000);
+    }
+
+    player.setMovementModifiers({
+      surfaceAccelMultiplier: accelMultiplier,
+      surfaceDecelMultiplier: decelMultiplier,
+      jumpVelocityMultiplier: onesieJumpBoost,
+    });
+
+    window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
   }
 
   function updateForegroundOcclusion(dt) {
@@ -319,6 +414,8 @@ export async function boot(options = {}) {
 
     if (shotMode) {
       updatePlayerShadow(player);
+      window.__DADA_DEBUG__.playerX = player.mesh.position.x;
+      window.__DADA_DEBUG__.playerY = player.mesh.position.y;
 
       if (debugHud) {
         const fps = engine.getFps();
@@ -351,10 +448,12 @@ export async function boot(options = {}) {
         ui.setFade(fade);
         if (resetTimer === 0) {
           ui.setFade(0);
-          player.setPosition(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
+          player.setPosition(respawnPoint.x, respawnPoint.y, respawnPoint.z || 0);
+          player.setMovementModifiers();
           pendingResetReason = '';
         }
       } else {
+        updateLevelInteractions(dt);
         // Player update
         const moveX = input.getMoveX();
         const jumpJustPressed = input.consumeJump();
@@ -368,7 +467,8 @@ export async function boot(options = {}) {
           } else if (ev.type === 'land') {
             juiceFx.spawnLandDust(player.mesh.position);
           } else if (ev.type === 'outOfBounds') {
-            triggerReset('fell_off_level', player.mesh.position.x < spawnPoint.x ? 1 : -1);
+            const reason = slipRecentTimerMs > 0 ? 'slip_fall' : 'fell_off_level';
+            triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
           }
         }
       }
@@ -378,14 +478,14 @@ export async function boot(options = {}) {
 
       // Check goal
       const pPos = player.getPosition();
-      const gPos = world.goal.getAbsolutePosition();
-      const dist = Math.sqrt(
-        (pPos.x - gPos.x) ** 2 +
-        (pPos.y - gPos.y) ** 2,
-      );
-      if (dist < 1.8 && !goalReached) {
+      const goalBounds = world.goal.getBoundingInfo().boundingBox;
+      const goalInside = pPos.x >= goalBounds.minimumWorld.x
+        && pPos.x <= goalBounds.maximumWorld.x
+        && pPos.y >= goalBounds.minimumWorld.y
+        && pPos.y <= goalBounds.maximumWorld.y;
+      if (goalInside && !goalReached) {
         goalReached = true;
-        startGoalCelebration(gPos);
+        startGoalCelebration(world.goalRoot.getAbsolutePosition());
       }
 
       // Smooth camera follow
@@ -413,6 +513,8 @@ export async function boot(options = {}) {
 
     juiceFx.update(dt);
     updateForegroundOcclusion(dt);
+    window.__DADA_DEBUG__.playerX = player.mesh.position.x;
+    window.__DADA_DEBUG__.playerY = player.mesh.position.y;
 
     // Debug HUD (dev only)
     if (debugHud) {
