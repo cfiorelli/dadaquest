@@ -53,7 +53,7 @@ function createCardboardPlatform(scene, name, {
 
 // ── Toy character builders ───────────────────────────────────────
 
-function createDaDa(scene, x, baseY, shadowGen) {
+function createDaDa(scene, x, baseY, shadowGen, { animate = true } = {}) {
   const root = new BABYLON.TransformNode('dada', scene);
   root.position.set(x, baseY, 0);
 
@@ -123,18 +123,22 @@ function createDaDa(scene, x, baseY, shadowGen) {
   goal.visibility = 0;
 
   // Bob animation
-  scene.registerBeforeRender(() => {
-    const t = performance.now() / 1000;
-    const bob = Math.sin(t * 2) * 0.15;
-    root.position.y = baseY + bob;
-  });
+  if (animate) {
+    scene.registerBeforeRender(() => {
+      const t = performance.now() / 1000;
+      const bob = Math.sin(t * 2) * 0.15;
+      root.position.y = baseY + bob;
+    });
+  }
 
   return { root, goal };
 }
 
 // ── Main world builder ───────────────────────────────────────────
 
-export function buildWorld(scene) {
+export function buildWorld(scene, options = {}) {
+  const { random = Math.random, animateGoal = true } = options;
+
   // Scene setup
   scene.clearColor = new BABYLON.Color4(...P.clearColor);
   scene.ambientColor = new BABYLON.Color3(...P.ambientColor);
@@ -241,7 +245,7 @@ export function buildWorld(scene) {
   }
 
   // === GOAL (DaDa) ===
-  const dada = createDaDa(scene, 20, 3.2, shadowGen);
+  const dada = createDaDa(scene, 20, 3.2, shadowGen, { animate: animateGoal });
 
   // === DECORATIONS ===
   // Felt trees
@@ -258,9 +262,9 @@ export function buildWorld(scene) {
     }, scene);
     foliage.position.set(tx, 3.8, 4.5);
     foliage.scaling.y = 0.8;
-    const fR = P.foliageBase[0] + Math.random() * 0.12;
-    const fG = P.foliageBase[1] + Math.random() * 0.12;
-    const fB = P.foliageBase[2] + Math.random() * 0.08;
+    const fR = P.foliageBase[0] + random() * 0.12;
+    const fG = P.foliageBase[1] + random() * 0.12;
+    const fB = P.foliageBase[2] + random() * 0.08;
     foliage.material = makeFelt(scene, 'foliageMat' + i, fR, fG, fB);
     shadowGen.addShadowCaster(foliage);
   }
@@ -269,9 +273,9 @@ export function buildWorld(scene) {
   for (let i = 0; i < 4; i++) {
     const cx = -12 + i * 10;
     const cloud = BABYLON.MeshBuilder.CreateSphere('cloud' + i, {
-      diameter: 2 + Math.random(), segments: 10,
+      diameter: 2 + random(), segments: 10,
     }, scene);
-    cloud.position.set(cx, 10 + Math.random() * 2, 6.5);
+    cloud.position.set(cx, 10 + random() * 2, 6.5);
     cloud.scaling.set(1.5, 0.6, 0.3);
     const cloudMat = makeFelt(scene, 'cloudMat' + i, ...P.cloud, { roughness: 1.0 });
     cloudMat.alpha = 0.7;

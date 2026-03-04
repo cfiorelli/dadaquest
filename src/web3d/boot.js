@@ -7,12 +7,71 @@ import { damp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 
+const SHOT_FRAMES_TARGET = 10;
+
+function isShotMode() {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('shot') === '1';
+}
+
+function getShotScene() {
+  if (typeof window === 'undefined') return 'title';
+  const value = new URLSearchParams(window.location.search).get('scene');
+  if (value === 'crib' || value === 'end' || value === 'title') return value;
+  return 'title';
+}
+
+function createSeededRandom(seed = 1337) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function withPatchedRandom(randomFn, fn) {
+  const originalRandom = Math.random;
+  Math.random = randomFn;
+  try {
+    return fn();
+  } finally {
+    Math.random = originalRandom;
+  }
+}
+
+function updatePlayerShadow(player) {
+  player.blobShadow.position.x = player.mesh.position.x;
+  player.blobShadow.position.z = player.mesh.position.z;
+  const heightAboveGround = Math.max(0, player.mesh.position.y - 0.5);
+  const shadowScale = Math.max(0.4, 1.0 - heightAboveGround * 0.06);
+  player.blobShadow.scaling.set(shadowScale, 1, shadowScale);
+}
+
+function disableAnimationsForShotMode() {
+  if (document.getElementById('dada-shot-static-style')) return;
+  const style = document.createElement('style');
+  style.id = 'dada-shot-static-style';
+  style.textContent = `
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+      caret-color: transparent !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 export async function boot(options = {}) {
   const { isTestMode = false } = options;
+  const shotMode = isShotMode();
+  const shotScene = shotMode ? getShotScene() : 'title';
 
   // Debug hook (Playwright polls this)
   window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
   window.__DADA_DEBUG__.sceneKey = 'TitleScene';
+  window.__DADA_DEBUG__.isShotMode = shotMode;
+  window.__DADA_DEBUG__.shotReady = false;
+  window.__DADA_DEBUG__.shotFrames = 0;
 
   // Test mode fast-path: headless Chromium has no WebGL, so skip all rendering
   // and just advance the scene keys on timers for the smoke test.
@@ -25,12 +84,26 @@ export async function boot(options = {}) {
 
   const canvas = document.getElementById('renderCanvas');
   const uiRoot = document.getElementById('uiRoot');
+  if (shotMode) {
+    disableAnimationsForShotMode();
+  }
+  const fallbackWidth = Math.max(1, window.innerWidth || 800);
+  const fallbackHeight = Math.max(1, window.innerHeight || 500);
+  if (canvas.width <= 0 || canvas.height <= 0) {
+    canvas.width = fallbackWidth;
+    canvas.height = fallbackHeight;
+  }
 
   // Babylon engine
   const engine = new BABYLON.Engine(canvas, true, {
     preserveDrawingBuffer: false,
     stencil: true,
   });
+  if (engine.getRenderWidth() <= 0 || engine.getRenderHeight() <= 0) {
+    engine.setSize(fallbackWidth, fallbackHeight);
+    canvas.width = Math.max(1, engine.getRenderWidth() || fallbackWidth);
+    canvas.height = Math.max(1, engine.getRenderHeight() || fallbackHeight);
+  }
   const scene = new BABYLON.Scene(engine);
 
   // Input
@@ -40,7 +113,12 @@ export async function boot(options = {}) {
   const ui = createUI(uiRoot);
 
   // Build the diorama world
-  const world = buildWorld(scene);
+  const world = shotMode
+    ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
+      random: createSeededRandom(7331),
+      animateGoal: false,
+    }))
+    : buildWorld(scene);
 
   // Player
   const player = new PlayerController(scene, { x: -12, y: 3, z: 0 });
@@ -64,10 +142,59 @@ export async function boot(options = {}) {
   // Game state machine
   let state = 'title'; // title | gameplay | end
   let goalReached = false;
+  let shotFrames = 0;
+
+  if (shotMode) {
+    if (shotScene === 'crib') {
+      state = 'gameplay';
+      ui.hideTitle();
+      window.__DADA_DEBUG__.sceneKey = 'CribScene';
+      player.mesh.position.set(-5.25, 2.25, 0);
+      camera.position.set(-11.5, 6.6, -14);
+      camera.setTarget(new BABYLON.Vector3(-4.0, 2.1, 0));
+    } else if (shotScene === 'end') {
+      state = 'end';
+      ui.hideTitle();
+      ui.showEnd();
+      window.__DADA_DEBUG__.sceneKey = 'EndScene';
+      player.mesh.position.set(18.0, 3.35, 0);
+      camera.position.set(13.5, 7.2, -14);
+      camera.setTarget(new BABYLON.Vector3(20.0, 3.2, 0));
+    } else {
+      state = 'title';
+      window.__DADA_DEBUG__.sceneKey = 'TitleScene';
+      player.mesh.position.set(-12, 3, 0);
+      camera.position.set(-18, 7, -14);
+      camera.setTarget(new BABYLON.Vector3(-12, 2, 0));
+    }
+    player.vx = 0;
+    player.vy = 0;
+    updatePlayerShadow(player);
+  }
 
   // Main loop
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
+
+    if (shotMode) {
+      updatePlayerShadow(player);
+
+      if (debugHud) {
+        const fps = engine.getFps();
+        const pDebug = player.getDebugState();
+        debugHud.update(fps, pDebug, state, player.lastCollisionHits);
+      }
+
+      scene.render();
+      if (shotFrames < SHOT_FRAMES_TARGET) {
+        shotFrames += 1;
+        window.__DADA_DEBUG__.shotFrames = shotFrames;
+      }
+      if (shotFrames >= SHOT_FRAMES_TARGET) {
+        window.__DADA_DEBUG__.shotReady = true;
+      }
+      return;
+    }
 
     if (state === 'title') {
       // Wait for player input
@@ -84,12 +211,7 @@ export async function boot(options = {}) {
       player.update(dt, moveX, jumpJustPressed, jumpHeld);
 
       // Update blob shadow position (follows player X, stays near ground)
-      player.blobShadow.position.x = player.mesh.position.x;
-      player.blobShadow.position.z = player.mesh.position.z;
-      // Scale shadow slightly based on height above ground
-      const heightAboveGround = Math.max(0, player.mesh.position.y - 0.5);
-      const shadowScale = Math.max(0.4, 1.0 - heightAboveGround * 0.06);
-      player.blobShadow.scaling.set(shadowScale, 1, shadowScale);
+      updatePlayerShadow(player);
 
       // Check goal
       const pPos = player.getPosition();
