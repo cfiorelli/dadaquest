@@ -107,16 +107,18 @@ export class KitchenScene extends Phaser.Scene {
       124
     );
 
-    // "Slippery" label
-    this.add.text(this.puddleX, GAME_H - 55, '~slippery~', {
-      fontFamily: 'monospace',
+    // "Slippery" label — italic serif, softer than monospace
+    this.add.text(this.puddleX, GAME_H - 55, '~ slippery ~', {
+      fontFamily: 'Georgia, serif',
+      fontStyle: 'italic',
       fontSize: '10px',
-      color: '#4fc3f7',
+      color: '#64b5f6',
     }).setOrigin(0.5).setDepth(3);
-    this.add.text(820, GAME_H - 55, '~slippery~', {
-      fontFamily: 'monospace',
+    this.add.text(820, GAME_H - 55, '~ slippery ~', {
+      fontFamily: 'Georgia, serif',
+      fontStyle: 'italic',
       fontSize: '10px',
-      color: '#4fc3f7',
+      color: '#64b5f6',
     }).setOrigin(0.5).setDepth(3);
   }
 

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, GAME_W } from '../gameConfig.js';
 import { getStamina, getStaminaMax } from '../utils/state.js';
 import { SCENE_NAMES } from '../gameConfig.js';
+import { sfx } from '../audio/sfx.js';
 
 const BUILD_SHA = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : 'dev';
 
@@ -32,36 +33,43 @@ export class HUD {
   create() {
     const scene = this.scene;
 
-    // Stamina background panel (fixed to camera)
+    // Stamina panel — drawn as tan cardboard tag in updateStamina()
     this.staminaBg = scene.add.graphics().setScrollFactor(0).setDepth(99);
-    this.staminaBg.fillStyle(0x000000, 0.55);
-    this.staminaBg.fillRoundedRect(6, 6, 122, 36, 6);
 
-    // Stamina label
-    this.staminaLabel = scene.add.text(12, 10, 'STAMINA', {
-      fontFamily: 'monospace',
+    // Stamina label — warm serif, matches cardboard tag palette
+    this.staminaLabel = scene.add.text(13, 10, 'stamina', {
+      fontFamily: 'Georgia, serif',
       fontSize: '9px',
-      color: '#aaaaaa',
+      color: '#7a4a20',
     }).setScrollFactor(0).setDepth(100);
 
-    // Scene name top-center
+    // Scene name top-center — warm cream on brown stroke
     const sceneName = SCENE_NAMES[scene.scene.key] || '';
-    scene.add.text(GAME_W / 2, 10, sceneName, {
+    scene.add.text(GAME_W / 2, 8, sceneName, {
       fontFamily: 'Georgia, serif',
-      fontSize: '16px',
-      color: '#ffffff',
-      stroke: '#000000',
+      fontSize: '14px',
+      color: '#fde7c4',
+      stroke: '#4a2a08',
       strokeThickness: 3,
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(100);
 
-    // Build stamp top-right
+    // Build stamp top-right — very subtle
     scene.add.text(GAME_W - 8, 8, `build ${BUILD_SHA}`, {
       fontFamily: 'monospace',
-      fontSize: '10px',
-      color: '#cfd8dc',
+      fontSize: '9px',
+      color: '#b0bcc4',
       stroke: '#000000',
       strokeThickness: 2,
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(102);
+
+    // Mute indicator — shown when audio is silenced
+    this.muteTag = scene.add.text(GAME_W - 8, 22, 'MUTED', {
+      fontFamily: 'monospace',
+      fontSize: '9px',
+      color: '#ffcc88',
+      stroke: '#000000',
+      strokeThickness: 2,
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(102).setVisible(false);
 
     // Debug text
     this.debugText = scene.add.text(8, 48, '', {
@@ -71,6 +79,17 @@ export class HUD {
       backgroundColor: '#00000099',
       padding: { x: 4, y: 2 },
     }).setScrollFactor(0).setDepth(101).setVisible(false);
+
+    // M key — toggle mute
+    scene.input.keyboard.on('keydown-M', () => {
+      const muted = sfx.toggleMute();
+      this.muteTag.setVisible(muted);
+    });
+
+    // Sync mute tag to current state (e.g. restored from localStorage)
+    scene.time.delayedCall(80, () => {
+      this.muteTag.setVisible(sfx.isMuted());
+    });
 
     this.updateStamina();
   }
@@ -87,19 +106,29 @@ export class HUD {
       icon.destroy();
     }
 
-    const panelW = 22 + maxStamina * 28;
+    const panelW = 24 + maxStamina * 28;
     this.staminaBg.clear();
-    this.staminaBg.fillStyle(0x000000, 0.55);
-    this.staminaBg.fillRoundedRect(6, 6, panelW, 36, 6);
+    // Cardboard tan fill
+    this.staminaBg.fillStyle(0xd4a96a, 0.92);
+    this.staminaBg.fillRoundedRect(6, 6, panelW, 36, 5);
+    // Warm brown border
+    this.staminaBg.lineStyle(1.5, 0x7a5030, 0.75);
+    this.staminaBg.strokeRoundedRect(6, 6, panelW, 36, 5);
+    // Subtle top highlight
+    this.staminaBg.lineStyle(1, 0xf5d8a0, 0.5);
+    this.staminaBg.beginPath();
+    this.staminaBg.moveTo(11, 7);
+    this.staminaBg.lineTo(panelW - 1, 7);
+    this.staminaBg.strokePath();
 
     for (let i = 0; i < maxStamina; i++) {
       const icon = this.staminaIcons[i];
       icon.clear();
       const filled = i < stamina;
-      const cx = 16 + i * 28;
+      const cx = 18 + i * 28;
       const cy = 24;
-      icon.fillStyle(filled ? COLORS.STAMINA_FULL : COLORS.STAMINA_EMPTY, filled ? 1 : 0.4);
-      icon.lineStyle(1.5, 0x000000, filled ? 0.8 : 0.3);
+      icon.fillStyle(filled ? 0xffd93d : 0x8b6940, filled ? 1 : 0.35);
+      icon.lineStyle(1.5, filled ? 0xb08020 : 0x5a3a18, filled ? 0.9 : 0.25);
       drawStarShape(icon, cx, cy, 5, 10, 5);
     }
   }
