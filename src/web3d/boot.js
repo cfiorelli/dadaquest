@@ -184,6 +184,9 @@ export async function boot(options = {}) {
     world.shadowGen.addShadowCaster(m);
   }
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
+  // Move player to actual spawn point and set grounded to prevent initial bounce
+  player.mesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
+  player.grounded = true;
   const checkpoints = [
     { index: 0, label: 'Start', spawn: { ...spawnPoint }, radius: 1.3, marker: null },
     ...(world.checkpoints || []),
