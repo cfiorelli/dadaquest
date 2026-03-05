@@ -728,6 +728,7 @@ export async function boot(options = {}) {
 
   function finishRun() {
     state = 'end';
+    audio.stopMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     ui.showEnd();
   }
@@ -744,6 +745,7 @@ export async function boot(options = {}) {
     ui.showStatus('Ready!', 500);
     input.consumeAll();
     juiceFx.clear();
+    audio.stopMusic(0.2);
 
     state = 'title';
     goalReached = false;
@@ -1181,6 +1183,7 @@ export async function boot(options = {}) {
         audio.unlock();
         state = 'gameplay';
         input.consumeAll();
+        audio.startMusic(0.5);
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
         ui.showGameplayHud(coins.length);

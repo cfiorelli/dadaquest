@@ -4,6 +4,9 @@ export class GameAudio {
     this.muted = !enabled;
     this.ctx = null;
     this.master = null;
+    this.musicGain = null;
+    this.musicElement = null;
+    this.musicSource = null;
     this.cooldowns = new Map();
     this._unlockBound = null;
   }
@@ -16,6 +19,25 @@ export class GameAudio {
     this.master = this.ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 0.24;
     this.master.connect(this.ctx.destination);
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.value = 0;
+    this.musicGain.connect(this.master);
+  }
+
+  _ensureMusicElement() {
+    if (!this.enabled || this.musicElement) return;
+    this.musicElement = new Audio('assets/audio/music/level1.ogg');
+    this.musicElement.loop = true;
+    this.musicElement.preload = 'auto';
+    this.musicElement.crossOrigin = 'anonymous';
+  }
+
+  _ensureMusicSource() {
+    if (!this.ctx || !this.musicGain || this.musicSource) return;
+    this._ensureMusicElement();
+    if (!this.musicElement) return;
+    this.musicSource = this.ctx.createMediaElementSource(this.musicElement);
+    this.musicSource.connect(this.musicGain);
   }
 
   armOnFirstGesture() {
@@ -40,6 +62,34 @@ export class GameAudio {
       this.master.gain.setTargetAtTime(this.muted ? 0 : 0.24, this.ctx.currentTime, 0.01);
     }
     return this.muted;
+  }
+
+  startMusic(fadeSec = 0.5) {
+    if (!this.enabled) return;
+    this.unlock();
+    if (!this.ctx || !this.musicGain) return;
+    this._ensureMusicSource();
+    if (!this.musicElement || !this.musicSource) return;
+    if (this.musicElement.paused) {
+      this.musicElement.play().catch(() => {});
+    }
+    const t = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(t);
+    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+    this.musicGain.gain.linearRampToValueAtTime(0.55, t + Math.max(0.02, fadeSec));
+  }
+
+  stopMusic(fadeSec = 0.5) {
+    if (!this.ctx || !this.musicGain || !this.musicElement) return;
+    const t = this.ctx.currentTime;
+    this.musicGain.gain.cancelScheduledValues(t);
+    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+    this.musicGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
+    window.setTimeout(() => {
+      if (!this.musicElement) return;
+      this.musicElement.pause();
+      this.musicElement.currentTime = 0;
+    }, Math.ceil(Math.max(0.02, fadeSec) * 1000) + 40);
   }
 
   _allow(key, cooldownMs) {

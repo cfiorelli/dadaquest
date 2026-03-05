@@ -13,3 +13,7 @@
 - Poly Haven - Studio Small 09 (HDRI, CC0)
   - Source: https://polyhaven.com/a/studio_small_09
   - Local HDR: `public/assets/hdr/studio_small_09_1k.hdr`
+
+- OpenGameArt - "Menace" music loop (CC0)
+  - Source file: https://opengameart.org/sites/default/files/Menace.ogg
+  - Local audio: `public/assets/audio/music/level1.ogg`
