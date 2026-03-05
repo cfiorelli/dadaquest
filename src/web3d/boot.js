@@ -294,6 +294,7 @@ export async function boot(options = {}) {
   const { isTestMode = false } = options;
   const shotMode = isShotMode();
   const debugMode = isDebugMode();
+  const animationsEnabled = !shotMode && !isTestMode;
   const shotScene = shotMode ? getShotScene() : 'title';
   const shotToast = shotMode ? getShotToast() : '';
 
@@ -315,6 +316,7 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.isShotMode = shotMode;
   window.__DADA_DEBUG__.shotReady = false;
   window.__DADA_DEBUG__.shotFrames = 0;
+  window.__DADA_DEBUG__.playerAnimationsEnabled = animationsEnabled;
 
   // Test mode fast-path: headless Chromium has no WebGL, so skip all rendering
   // and just advance the scene keys on timers for the smoke test.
@@ -429,7 +431,12 @@ export async function boot(options = {}) {
   }
 
   // Player
-  const player = new PlayerController(scene, { x: -12, y: 3, z: 0 });
+  const player = new PlayerController(scene, {
+    x: -12,
+    y: 3,
+    z: 0,
+    animationsEnabled,
+  });
   player.setColliders(world.platforms);
   // Register player child meshes as shadow casters (mesh is now a TransformNode)
   for (const m of player._meshes) {

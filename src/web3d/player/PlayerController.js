@@ -42,14 +42,23 @@ const INVULN_BLINK_HZ = 20;
 export class PlayerController {
   constructor(scene, startPos = { x: -12, y: 3, z: 0 }) {
     this.scene = scene;
+    const {
+      x = -12,
+      y = 3,
+      z = 0,
+      animationsEnabled = true,
+    } = startPos;
 
     // Root transform for physics/collider position.
     this.mesh = new BABYLON.TransformNode('player', scene);
-    this.mesh.position.set(startPos.x, startPos.y, startPos.z);
+    this.mesh.position.set(x, y, z);
 
     // Child transform for visual-only squash/stretch (does not affect collider root).
     this.visual = new BABYLON.TransformNode('playerVisual', scene);
     this.visual.parent = this.mesh;
+    // Dedicated visual root used by animation/presentation systems.
+    this.playerVisualRoot = this.visual;
+    this.animationsEnabled = !!animationsEnabled;
 
     // Body (capsule-like: sphere + cylinder)
     const body = BABYLON.MeshBuilder.CreateCylinder('babyBody', {
@@ -117,7 +126,7 @@ export class PlayerController {
 
     // Blob shadow under the player
     this.blobShadow = createBlobShadow(scene, 'babyShadow', { diameter: 0.7, opacity: 0.3 });
-    this.blobShadow.position.set(startPos.x, 0.01, startPos.z);
+    this.blobShadow.position.set(x, 0.01, z);
 
     // Physics state
     this.vx = 0;
