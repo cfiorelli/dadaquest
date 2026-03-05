@@ -655,6 +655,30 @@ function createCoin(scene, name, { x, y, z }) {
   return root;
 }
 
+function setRenderingGroup(node, groupId) {
+  if (!node || typeof node.getChildMeshes !== 'function') return;
+  for (const mesh of node.getChildMeshes(false)) {
+    mesh.renderingGroupId = groupId;
+  }
+}
+
+function configureFoliageCutout(node) {
+  if (!node || typeof node.getChildMeshes !== 'function') return;
+  for (const mesh of node.getChildMeshes(false)) {
+    const mat = mesh.material;
+    if (!mat) continue;
+    if (mat.albedoTexture || mat.diffuseTexture || mat.opacityTexture) {
+      if (Object.prototype.hasOwnProperty.call(mat, 'transparencyMode')) {
+        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
+      }
+      if (Object.prototype.hasOwnProperty.call(mat, 'alphaCutOff')) {
+        mat.alphaCutOff = 0.4;
+      }
+      mat.needDepthPrePass = true;
+    }
+  }
+}
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {
@@ -757,6 +781,8 @@ export function buildWorld(scene, options = {}) {
   const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 64, height: 20 }, scene);
   skyPlane.position.set(6, 9.5, 7.98);
   skyPlane.material = skyMat;
+  backdrop.renderingGroupId = 0;
+  skyPlane.renderingGroupId = 0;
 
   // Backdrop seam lines (simulate paper join strips — deterministic, no random)
   const seamMat = makePaper(scene, 'seamMat', 190, 182, 168, { grainScale: 3.0, noiseAmt: 8, roughness: 0.99 });
@@ -768,6 +794,7 @@ export function buildWorld(scene, options = {}) {
     seam.position.set(6, seamY, 8.05);
     seam.material = seamMat;
     seam.isPickable = false;
+    seam.renderingGroupId = 0;
   }
 
   // === PARALLAX CUTOUT LAYERS (deterministic) ===
@@ -791,6 +818,7 @@ export function buildWorld(scene, options = {}) {
       materialOptions: { grainScale: 2.6, noiseAmt: 12, roughness: 0.97 },
     });
     backHills.push(mesh);
+    mesh.renderingGroupId = 0;
   }
 
   const midHedges = [];
@@ -810,6 +838,8 @@ export function buildWorld(scene, options = {}) {
       noise: 0.2,
     });
     midHedges.push(mesh);
+    mesh.renderingGroupId = 1;
+    configureFoliageCutout(mesh);
   }
 
   const foregroundMeshes = [];
@@ -837,6 +867,8 @@ export function buildWorld(scene, options = {}) {
       noise: 0.23,
     });
     mesh.metadata = { layer: 'foreground' };
+    mesh.renderingGroupId = 4;
+    configureFoliageCutout(mesh);
     shadowGen.addShadowCaster(mesh);
     foregroundMeshes.push(mesh);
     foregroundCutouts.push(mesh);
@@ -846,7 +878,7 @@ export function buildWorld(scene, options = {}) {
   const allPlatforms = [groundCollider];
 
   for (const def of LEVEL1.platforms) {
-    createCardboardPlatform(scene, def.name, {
+    const platformNode = createCardboardPlatform(scene, def.name, {
       x: def.x,
       y: def.y,
       z: 0,
@@ -857,6 +889,7 @@ export function buildWorld(scene, options = {}) {
       edgeColor: P.edgeDark,
       shadowGen,
     });
+    setRenderingGroup(platformNode, 2);
 
     const col = BABYLON.MeshBuilder.CreateBox(def.name + '_col', {
       width: def.w,
@@ -872,6 +905,7 @@ export function buildWorld(scene, options = {}) {
   // === GOAL (DaDa) ===
   const goalDef = LEVEL1.goal;
   const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  setRenderingGroup(dada.root, 3);
 
   // Foreground crib rail creates a toy-diorama frame for the start area.
   const cribRail = createCribRailSegment(scene, 'cribRailFg', {
@@ -880,6 +914,7 @@ export function buildWorld(scene, options = {}) {
     z: -8.95,
     shadowGen,
   });
+  cribRail.renderingGroupId = 4;
   foregroundMeshes.push(cribRail);
 
   // A hanging ring near the early tutorial hop.
@@ -889,6 +924,7 @@ export function buildWorld(scene, options = {}) {
     z: -1.7,
     shadowGen,
   });
+  setRenderingGroup(hangingRing, 3);
 
   // === LEVEL GUIDANCE SIGNS ===
   const signRoots = [];
@@ -901,6 +937,7 @@ export function buildWorld(scene, options = {}) {
       direction: s.direction,
       shadowGen,
     }));
+    setRenderingGroup(signRoots[signRoots.length - 1], 2);
   }
 
   // === CHECKPOINTS ===
@@ -913,6 +950,7 @@ export function buildWorld(scene, options = {}) {
       z: 0.7,
       shadowGen,
     });
+    setRenderingGroup(marker, 3);
 
     checkpoints.push({
       index: i + 1,
@@ -933,6 +971,7 @@ export function buildWorld(scene, options = {}) {
       z: pick.z,
       shadowGen,
     });
+    setRenderingGroup(node, 3);
 
     pickups.push({
       type: pick.type,
@@ -950,6 +989,7 @@ export function buildWorld(scene, options = {}) {
   for (let i = 0; i < LEVEL1.coins.length; i++) {
     const c = LEVEL1.coins[i];
     const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: c.z });
+    setRenderingGroup(node, 3);
     coins.push({
       position: new BABYLON.Vector3(c.x, c.y, c.z),
       radius: 0.45,
@@ -984,6 +1024,7 @@ export function buildWorld(scene, options = {}) {
     letter: 'D',
     shadowGen,
   }));
+  for (const toy of toyBlocks) setRenderingGroup(toy, 2);
 
   // === HAZARDS ===
   const hazards = [];
@@ -1007,6 +1048,7 @@ export function buildWorld(scene, options = {}) {
         decelMultiplier: hz.decelMultiplier,
         mesh: created.puddle,
       });
+      created.puddle.renderingGroupId = 2;
     }
   }
 
@@ -1020,6 +1062,7 @@ export function buildWorld(scene, options = {}) {
       shadowGen,
     });
     allPlatforms.push(crCol);
+    setRenderingGroup(crRoot, 2);
     crumbles.push({
       root: crRoot,
       colliderMesh: crCol,
@@ -1054,6 +1097,8 @@ export function buildWorld(scene, options = {}) {
     foliage.material = makeFelt(scene, 'foliageMat' + i, fR, fG, fB);
     shadowGen.addShadowCaster(foliage);
     treeDecor.push(treeRoot);
+    setRenderingGroup(treeRoot, 1);
+    configureFoliageCutout(treeRoot);
   }
 
   const goalBanner = createGoalBanner(scene, 'goalBanner', {
@@ -1062,6 +1107,7 @@ export function buildWorld(scene, options = {}) {
     z: -1.6,
     shadowGen,
   });
+  setRenderingGroup(goalBanner, 3);
 
   const cloudCutouts = [];
   for (let i = 0; i < 5; i++) {
@@ -1077,6 +1123,7 @@ export function buildWorld(scene, options = {}) {
       color: [245, 245, 240],
       alpha: 0.86,
     }));
+    cloudCutouts[cloudCutouts.length - 1].renderingGroupId = 0;
   }
 
   return {

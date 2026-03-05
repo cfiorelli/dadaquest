@@ -161,6 +161,32 @@ function applyRoleMetadata(meshes, roleName) {
   }
 }
 
+function setMeshesRenderingGroup(meshes, groupId) {
+  if (!Array.isArray(meshes)) return;
+  for (const mesh of meshes) {
+    if (mesh instanceof BABYLON.Mesh) {
+      mesh.renderingGroupId = groupId;
+    }
+  }
+}
+
+function configureMeshesAsAlphaCutout(meshes) {
+  if (!Array.isArray(meshes)) return;
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh) || !mesh.material) continue;
+    const mat = mesh.material;
+    if (mat.opacityTexture || mat.albedoTexture || mat.diffuseTexture) {
+      mat.needDepthPrePass = true;
+      if (Object.prototype.hasOwnProperty.call(mat, 'transparencyMode')) {
+        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
+      }
+      if (Object.prototype.hasOwnProperty.call(mat, 'alphaCutOff')) {
+        mat.alphaCutOff = 0.4;
+      }
+    }
+  }
+}
+
 function combineBounds(meshes) {
   let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
   let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
@@ -349,6 +375,12 @@ export async function boot(options = {}) {
     const result = await loadModelForRole(scene, roleName, options);
     if (result.loaded) {
       registerShadowCasters(world.shadowGen, result.meshes);
+      if (typeof options.renderingGroupId === 'number') {
+        setMeshesRenderingGroup(result.meshes, options.renderingGroupId);
+      }
+      if (options.alphaCutout) {
+        configureMeshesAsAlphaCutout(result.meshes);
+      }
       hideMeshList(fallbackMeshes);
       if (options.actorRole) {
         actorState[options.actorRole] = sanitizeLoadedRoleModel({
@@ -400,6 +432,8 @@ export async function boot(options = {}) {
   const goalFallbackMeshes = collectNodeMeshes(world.goalRoot).filter((mesh) => mesh.name !== 'goalTrigger');
   applyRoleMetadata(playerFallbackMeshes, 'player');
   applyRoleMetadata(goalFallbackMeshes, 'goal');
+  setMeshesRenderingGroup(playerFallbackMeshes, 3);
+  setMeshesRenderingGroup(goalFallbackMeshes, 3);
 
   const playerVisualRoot = new BABYLON.TransformNode('playerVisualRoot', scene);
   playerVisualRoot.parent = player.visual;
@@ -416,6 +450,7 @@ export async function boot(options = {}) {
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
     actorRole: 'player',
+    renderingGroupId: 3,
   });
 
   // Replace DaDa mesh and key props with authored assets.
@@ -425,6 +460,7 @@ export async function boot(options = {}) {
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
     actorRole: 'goal',
+    renderingGroupId: 3,
   });
 
   for (const signRoot of world.signs || []) {
@@ -432,6 +468,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(signRoot),
       fallbackMaterial: 'cardboard',
       scaling: 0.9,
+      renderingGroupId: 2,
     });
   }
 
@@ -440,6 +477,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(checkpoint.marker),
       fallbackMaterial: 'cardboard',
       scaling: 0.72,
+      renderingGroupId: 3,
     });
   }
 
@@ -448,6 +486,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(pickup.node),
       fallbackMaterial: 'plastic',
       scaling: 0.9,
+      renderingGroupId: 3,
     });
   }
 
@@ -457,6 +496,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(toy),
       fallbackMaterial: 'cardboard',
       scaling: 0.7,
+      renderingGroupId: 2,
     });
   }
 
@@ -465,6 +505,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.hangingRing),
       fallbackMaterial: 'plastic',
       scaling: 0.95,
+      renderingGroupId: 3,
     });
   }
 
@@ -473,6 +514,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.goalBanner),
       fallbackMaterial: 'plastic',
       scaling: 1.2,
+      renderingGroupId: 3,
     });
   }
 
@@ -481,6 +523,8 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.cribRail),
       fallbackMaterial: 'cardboard',
       scaling: [1.05, 0.9, 0.9],
+      renderingGroupId: 4,
+      alphaCutout: true,
     });
   }
 
@@ -491,6 +535,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 1.9, 1.5],
+      renderingGroupId: 4,
+      alphaCutout: true,
     });
     if (result.loaded) {
       pushForegroundMeshes(result.meshes);
@@ -504,6 +550,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.5, 2.6, 1.8],
+      renderingGroupId: 0,
+      alphaCutout: true,
     });
   }
 
@@ -514,6 +562,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 2.0, 1.5],
+      renderingGroupId: 1,
+      alphaCutout: true,
     });
   }
 
@@ -524,6 +574,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'paper',
       scaling: [1.9, 1.4, 1.4],
+      renderingGroupId: 0,
+      alphaCutout: true,
     });
   }
 
@@ -534,6 +586,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [1.2, 1.2, 1.0],
+      renderingGroupId: 1,
+      alphaCutout: true,
     });
   }
 
