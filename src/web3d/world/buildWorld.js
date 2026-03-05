@@ -542,6 +542,57 @@ function createGoalBanner(scene, name, { x, y, z, shadowGen }) {
   return root;
 }
 
+function createCoin(scene, name, { x, y, z }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  // Star-disc shape: slightly flattened sphere for a coin silhouette.
+  const disc = BABYLON.MeshBuilder.CreateSphere(name + '_disc', {
+    diameter: 0.32, segments: 10,
+  }, scene);
+  disc.scaling.z = 0.24;
+  disc.parent = root;
+  const discMat = new BABYLON.PBRMaterial(name + '_mat', scene);
+  discMat.albedoColor = new BABYLON.Color3(0.95, 0.78, 0.22);
+  discMat.roughness = 0.22;
+  discMat.metallic = 0.7;
+  discMat.environmentIntensity = 0.5;
+  disc.material = discMat;
+
+  // Star inner face
+  const star = BABYLON.MeshBuilder.CreatePlane(name + '_star', { size: 0.18 }, scene);
+  star.position.z = -0.06;
+  star.parent = root;
+  const starTex = new BABYLON.DynamicTexture(name + '_starTex', 32, scene, true);
+  const sCtx = starTex.getContext();
+  sCtx.fillStyle = 'rgba(255,242,150,0.0)';
+  sCtx.fillRect(0, 0, 32, 32);
+  sCtx.fillStyle = 'rgba(255,230,60,0.88)';
+  // 5-point star
+  const cx = 16, cy = 16, outerR = 14, innerR = 6;
+  sCtx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = (i * Math.PI / 5) - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    if (i === 0) sCtx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    else sCtx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+  }
+  sCtx.closePath();
+  sCtx.fill();
+  starTex.update();
+  starTex.hasAlpha = true;
+  const starMat = new BABYLON.StandardMaterial(name + '_starMat', scene);
+  starMat.diffuseTexture = starTex;
+  starMat.opacityTexture = starTex;
+  starMat.useAlphaFromDiffuseTexture = true;
+  starMat.specularColor = BABYLON.Color3.Black();
+  starMat.disableLighting = true;
+  starMat.emissiveColor = new BABYLON.Color3(1.0, 0.85, 0.3);
+  star.material = starMat;
+
+  return root;
+}
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {
@@ -832,6 +883,19 @@ export function buildWorld(scene, options = {}) {
     });
   }
 
+  // === COINS ===
+  const coins = [];
+  for (let i = 0; i < LEVEL1.coins.length; i++) {
+    const c = LEVEL1.coins[i];
+    const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: c.z });
+    coins.push({
+      position: new BABYLON.Vector3(c.x, c.y, c.z),
+      radius: 0.45,
+      node,
+      collected: false,
+    });
+  }
+
   // Toy blocks near spawn to make the first area feel inhabited.
   const toyBlocks = [];
   toyBlocks.push(createToyBlock(scene, 'toyBlockA', {
@@ -946,6 +1010,7 @@ export function buildWorld(scene, options = {}) {
     spawn: LEVEL1.spawn,
     checkpoints,
     pickups,
+    coins,
     hazards,
     level: LEVEL1,
     signs: signRoots,

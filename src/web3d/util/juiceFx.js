@@ -145,6 +145,20 @@ export class JuiceFx {
     }
   }
 
+  spawnCoinSparkle(pos) {
+    if (!this.enabled) return;
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      this._spawn(this.sparkleMat, 'coinSpark', pos.x + Math.cos(angle) * 0.18, pos.y + Math.sin(angle) * 0.18, pos.z, {
+        life: 0.28,
+        startScale: 0.10,
+        endScale: 0.32,
+        vx: Math.cos(angle) * 0.8,
+        vy: Math.sin(angle) * 0.8 + 0.3,
+      });
+    }
+  }
+
   spawnPickupSparkle(pos) {
     if (!this.enabled) return;
     for (let i = 0; i < SPARKLE_RING.length; i++) {

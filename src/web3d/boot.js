@@ -554,6 +554,7 @@ export async function boot(options = {}) {
     ...(world.checkpoints || []),
   ];
   const pickups = world.pickups || [];
+  const coins = world.coins || [];
   const hazards = world.hazards || [];
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
   const audio = new GameAudio({ enabled: !!debugFlags.audio && !shotMode });
@@ -709,6 +710,12 @@ export async function boot(options = {}) {
       }
     }
 
+    for (const coin of coins) {
+      coin.collected = false;
+      if (coin.node) coin.node.setEnabled(true);
+    }
+    coinsCollected = 0;
+
     for (const pickup of pickups) {
       pickup.collected = false;
       if (pickup.node) pickup.node.setEnabled(true);
@@ -836,6 +843,25 @@ export async function boot(options = {}) {
       const r = checkpoint.radius ?? 1.2;
       if ((dx * dx + dy * dy) <= (r * r)) {
         activateCheckpoint(checkpoint);
+      }
+    }
+
+    // Coin overlaps
+    for (const coin of coins) {
+      if (coin.collected) continue;
+      const dx = pos.x - coin.position.x;
+      const dy = pos.y - coin.position.y;
+      const r = coin.radius ?? 0.45;
+      if ((dx * dx + dy * dy) <= (r * r)) {
+        coin.collected = true;
+        if (coin.node) coin.node.setEnabled(false);
+        coinsCollected++;
+        audio.playCoin();
+        juiceFx.spawnCoinSparkle(coin.position);
+        ui.updateCoins(coinsCollected);
+        if (coinsCollected === coins.length) {
+          ui.showPopText('All stars!', 900);
+        }
       }
     }
 
@@ -1003,7 +1029,7 @@ export async function boot(options = {}) {
         input.consumeAll();
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
-        ui.showGameplayHud(world.coins ? world.coins.length : 0);
+        ui.showGameplayHud(coins.length);
         if (debugMode) {
           debugIdleTimerMs = 1000; // suppress input for 1s so probe runs clean
           player.beginSpawnProbe('initial');

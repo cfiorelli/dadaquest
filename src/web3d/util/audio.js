@@ -87,6 +87,14 @@ export class GameAudio {
     this._osc(170, 'triangle', t, 0.14, 0.07, 85);
   }
 
+  playCoin() {
+    if (!this.enabled || !this._allow('coin', 60)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(880, 'sine', t, 0.09, 0.055, 1200);
+  }
+
   playPickup() {
     if (!this.enabled || !this._allow('pickup', 180)) return;
     this.unlock();
