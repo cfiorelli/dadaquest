@@ -411,56 +411,6 @@ function createCribRailSegment(scene, name, { x, y, z, shadowGen }) {
   return railTop;
 }
 
-function createHangingPaperRing(scene, name, { x, y, z, shadowGen }) {
-  const root = new BABYLON.TransformNode(name, scene);
-  root.position.set(x, y, z);
-
-  const thread = BABYLON.MeshBuilder.CreateBox(name + '_thread', {
-    width: 0.05, height: 1.0, depth: 0.05,
-  }, scene);
-  thread.position.y = 0.45;
-  thread.parent = root;
-  thread.material = makePaper(scene, name + '_threadMat', 220, 210, 195, {
-    grainScale: 3.1,
-    noiseAmt: 6,
-    roughness: 0.96,
-  });
-
-  const ring = BABYLON.MeshBuilder.CreateTorus(name + '_ring', {
-    diameter: 0.9,
-    thickness: 0.12,
-    tessellation: 28,
-  }, scene);
-  ring.position.y = -0.1;
-  ring.parent = root;
-  ring.material = makePlastic(scene, name + '_ringMat', ...P.accentYellow, { roughness: 0.34 });
-
-  const inner = BABYLON.MeshBuilder.CreateDisc(name + '_ringInner', {
-    radius: 0.22, tessellation: 22,
-  }, scene);
-  inner.rotation.x = Math.PI / 2;
-  inner.position.y = -0.1;
-  inner.parent = root;
-  inner.material = makePaper(scene, name + '_ringInnerMat', 250, 246, 233, {
-    grainScale: 2.4,
-    noiseAmt: 8,
-  });
-
-  if (shadowGen) {
-    shadowGen.addShadowCaster(thread);
-    shadowGen.addShadowCaster(ring);
-  }
-  createPropContactShadow(scene, name + '_shadow', {
-    x,
-    y: y - 1.02,
-    z,
-    w: 1.2,
-    d: 0.7,
-    alpha: 0.13,
-  });
-  return root;
-}
-
 function createToyBlock(scene, name, { x, y, z, color, letter = 'D', shadowGen }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
@@ -939,15 +889,6 @@ export function buildWorld(scene, options = {}) {
   cribRail.renderingGroupId = 4;
   foregroundMeshes.push(cribRail);
 
-  // A hanging ring near the early tutorial hop.
-  const hangingRing = createHangingPaperRing(scene, 'hangingRing', {
-    x: -8.6,
-    y: 4.0,
-    z: -1.7,
-    shadowGen,
-  });
-  setRenderingGroup(hangingRing, 3);
-
   // === LEVEL GUIDANCE SIGNS ===
   const signRoots = [];
   for (let i = 0; i < LEVEL1.signs.length; i++) {
@@ -1182,7 +1123,6 @@ export function buildWorld(scene, options = {}) {
     signs: signRoots,
     assetAnchors: {
       cribRail,
-      hangingRing,
       toyBlocks,
       goalBanner,
       backHills,
