@@ -37,6 +37,12 @@ function getShotScene() {
   return 'title';
 }
 
+function getShotToast() {
+  if (typeof window === 'undefined') return '';
+  const value = new URLSearchParams(window.location.search).get('toast');
+  return value === 'onesie' || value === 'slippery' ? value : '';
+}
+
 function createSeededRandom(seed = 1337) {
   let state = seed >>> 0;
   return () => {
@@ -289,6 +295,7 @@ export async function boot(options = {}) {
   const shotMode = isShotMode();
   const debugMode = isDebugMode();
   const shotScene = shotMode ? getShotScene() : 'title';
+  const shotToast = shotMode ? getShotToast() : '';
 
   // Debug hook (Playwright polls this)
   window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
@@ -346,7 +353,7 @@ export async function boot(options = {}) {
   const input = new InputManager();
 
   // UI
-  const ui = createUI(uiRoot, { disableToasts: shotMode });
+  const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
 
   // Build the diorama world
   const world = shotMode
@@ -1136,6 +1143,11 @@ export async function boot(options = {}) {
       player.mesh.position.set(-12, 3, 0);
       camera.position.set(-18, 7, -14);
       camera.setTarget(new BABYLON.Vector3(-12, 2, 0));
+    }
+    if (shotToast === 'onesie') {
+      ui.showOnesieBoostToast();
+    } else if (shotToast === 'slippery') {
+      ui.showSlipperyToast();
     }
     player.vx = 0;
     player.vy = 0;
