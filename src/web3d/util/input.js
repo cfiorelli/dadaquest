@@ -1,3 +1,5 @@
+import { isDebugMode } from '../../utils/modes.js';
+
 export class InputManager {
   constructor() {
     this.held = {};
@@ -11,7 +13,7 @@ export class InputManager {
       if (!this.held[code]) {
         this.held[code] = true;
         this.pressId[code] = this._nextPressId++;
-        if (code === 'Space' || code === 'Enter') {
+        if (isDebugMode() && (code === 'Space' || code === 'Enter')) {
           console.log('[INPUT-DEBUG] keydown:', code, 'pressId:', this.pressId[code]);
         }
       }
@@ -48,10 +50,10 @@ export class InputManager {
     const alreadyConsumed = this.consumedPressId[code] === pressId;
     const isNewPress = isHeld && pressId > 0 && !alreadyConsumed;
     
-    if (isNewPress) {
+    if (isNewPress && isDebugMode()) {
       console.log('[INPUT-DEBUG] consumeJumpPress: new press detected', { isHeld, pressId, alreadyConsumed });
-      this.consumedPressId[code] = pressId;
     }
+    if (isNewPress) this.consumedPressId[code] = pressId;
     
     return {
       edge: isNewPress,
@@ -69,8 +71,14 @@ export class InputManager {
     return !!this.held['KeyM'];
   }
 
+  isSprintHeld() {
+    return !!this.held['ShiftLeft'] || !!this.held['ShiftRight'];
+  }
+
   consumeAll() {
-    console.log('[INPUT-DEBUG] consumeAll() called - clearing all press IDs');
+    if (isDebugMode()) {
+      console.log('[INPUT-DEBUG] consumeAll() called - clearing all press IDs');
+    }
     // Clear all press IDs and consumed tracking to prevent stale presses
     this.pressId = {};
     this.consumedPressId = {};

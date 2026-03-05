@@ -198,6 +198,19 @@ const CSS = `
   font-size: 11px;
   opacity: 0.78;
   margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dada-buff-cue {
+  display: none;
+  font-size: 10px;
+  color: #fef7e7;
+  background: rgba(58, 92, 220, 0.65);
+  border: 1px solid rgba(224, 236, 255, 0.6);
+  border-radius: 999px;
+  padding: 1px 6px;
+  letter-spacing: 0.02em;
 }
 .dada-buff-track {
   height: 5px;
@@ -241,9 +254,53 @@ const CSS = `
 .dada-ctrl-hint.fading {
   opacity: 0;
 }
+.dada-toast-wrap {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 5;
+}
+.dada-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 160px;
+  max-width: 260px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  letter-spacing: 0.03em;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0;
+  transform: translateY(-5px);
+}
+.dada-toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.dada-toast.small {
+  min-width: 124px;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.dada-toast-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex: none;
+}
 `;
 
-export function createUI(uiRoot) {
+export function createUI(uiRoot, options = {}) {
+  const { disableToasts = false } = options;
   // Inject CSS
   const style = document.createElement('style');
   style.textContent = CSS;
@@ -311,16 +368,21 @@ export function createUI(uiRoot) {
   const buffEl = document.createElement('div');
   buffEl.className = 'dada-hud-pill dada-buff';
   buffEl.innerHTML = `
-    <div class="dada-buff-label">🧸 Onesie boost</div>
+    <div class="dada-buff-label">Onesie boost <span class="dada-buff-cue">x2 jump</span></div>
     <div class="dada-buff-track"><div class="dada-buff-fill" style="width:100%"></div></div>
   `;
   uiRoot.appendChild(buffEl);
   const buffFill = buffEl.querySelector('.dada-buff-fill');
+  const buffCue = buffEl.querySelector('.dada-buff-cue');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
-  ctrlHintEl.innerHTML = `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump`;
+  ctrlHintEl.innerHTML = `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   uiRoot.appendChild(ctrlHintEl);
+
+  const toastWrap = document.createElement('div');
+  toastWrap.className = 'dada-toast-wrap';
+  uiRoot.appendChild(toastWrap);
 
   const canvasEl = document.getElementById('renderCanvas');
 
@@ -363,10 +425,65 @@ export function createUI(uiRoot) {
 
   // Coin pulse animation
   let pulseCancelTimer = null;
+  const toastTimers = new Map();
   function pulseCoin() {
     coinsEl.classList.add('pulse');
     if (pulseCancelTimer) clearTimeout(pulseCancelTimer);
     pulseCancelTimer = setTimeout(() => coinsEl.classList.remove('pulse'), 130);
+  }
+
+  function clearToast(id) {
+    if (toastTimers.has(id)) {
+      clearTimeout(toastTimers.get(id));
+      toastTimers.delete(id);
+    }
+    const existing = toastWrap.querySelector(`[data-toast-id="${id}"]`);
+    if (existing) existing.remove();
+  }
+
+  function showToast({
+    id,
+    title,
+    iconSrc = '',
+    bgColor = '#2B6DFF',
+    durationMs = 1200,
+    enterMs = 120,
+    exitMs = 180,
+    small = false,
+  }) {
+    if (disableToasts || !id) return;
+    clearToast(id);
+    const el = document.createElement('div');
+    el.className = `dada-toast${small ? ' small' : ''}`;
+    el.dataset.toastId = id;
+    el.style.background = bgColor;
+    el.style.transition = `opacity ${enterMs}ms ease, transform ${enterMs}ms ease`;
+    if (iconSrc) {
+      const icon = document.createElement('img');
+      icon.className = 'dada-toast-icon';
+      icon.src = iconSrc;
+      icon.alt = '';
+      el.appendChild(icon);
+    }
+    const text = document.createElement('span');
+    text.textContent = title;
+    el.appendChild(text);
+    toastWrap.appendChild(el);
+
+    requestAnimationFrame(() => {
+      el.classList.add('visible');
+    });
+
+    const hideAt = Math.max(0, durationMs - exitMs);
+    const hideTimer = setTimeout(() => {
+      el.style.transition = `opacity ${exitMs}ms ease, transform ${exitMs}ms ease`;
+      el.classList.remove('visible');
+      const removeTimer = setTimeout(() => {
+        clearToast(id);
+      }, exitMs + 16);
+      toastTimers.set(id, removeTimer);
+    }, hideAt);
+    toastTimers.set(id, hideTimer);
   }
 
   return {
@@ -477,17 +594,44 @@ export function createUI(uiRoot) {
     updateBuff(remainingMs, totalMs) {
       if (remainingMs <= 0) {
         buffEl.style.display = 'none';
+        buffCue.style.display = 'none';
         return;
       }
       buffEl.style.display = 'block';
       const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
       buffFill.style.width = `${pct}%`;
     },
+    updateDoubleJumpCue(available) {
+      buffCue.style.display = available ? 'inline-block' : 'none';
+    },
 
     /** Reset all gameplay HUD to initial state for restart. */
     resetGameplayHud() {
       this.hideGameplayHud();
       this.resetControlHints();
+    },
+    showToast,
+    showOnesieBoostToast() {
+      showToast({
+        id: 'onesie-boost',
+        title: 'ONESIE BOOST',
+        iconSrc: 'assets/ui/cheeseburger.svg',
+        bgColor: '#2B6DFF',
+        durationMs: 1200,
+        enterMs: 120,
+        exitMs: 180,
+      });
+    },
+    showSlipperyToast() {
+      showToast({
+        id: 'slippery',
+        title: 'SLIPPERY!',
+        bgColor: '#E7B431',
+        durationMs: 800,
+        enterMs: 90,
+        exitMs: 140,
+        small: true,
+      });
     },
   };
 }

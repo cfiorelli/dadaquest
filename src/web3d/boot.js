@@ -13,6 +13,7 @@ import {
   loadModelForRole,
 } from './util/assets.js';
 import { GameAudio } from './util/audio.js';
+import { isDebugMode, isShotMode } from '../utils/modes.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -29,21 +30,17 @@ function easeOutCubic(t) {
   return 1 - ((1 - v) ** 3);
 }
 
-function isDebugMode() {
-  if (typeof window === 'undefined') return false;
-  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
-}
-
-function isShotMode() {
-  if (typeof window === 'undefined') return false;
-  return new URLSearchParams(window.location.search).get('shot') === '1';
-}
-
 function getShotScene() {
   if (typeof window === 'undefined') return 'title';
   const value = new URLSearchParams(window.location.search).get('scene');
   if (value === 'crib' || value === 'end' || value === 'title') return value;
   return 'title';
+}
+
+function getShotToast() {
+  if (typeof window === 'undefined') return '';
+  const value = new URLSearchParams(window.location.search).get('toast');
+  return value === 'onesie' || value === 'slippery' ? value : '';
 }
 
 function createSeededRandom(seed = 1337) {
@@ -170,6 +167,32 @@ function applyRoleMetadata(meshes, roleName) {
   }
 }
 
+function setMeshesRenderingGroup(meshes, groupId) {
+  if (!Array.isArray(meshes)) return;
+  for (const mesh of meshes) {
+    if (mesh instanceof BABYLON.Mesh) {
+      mesh.renderingGroupId = groupId;
+    }
+  }
+}
+
+function configureMeshesAsAlphaCutout(meshes) {
+  if (!Array.isArray(meshes)) return;
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh) || !mesh.material) continue;
+    const mat = mesh.material;
+    if (mat.opacityTexture || mat.albedoTexture || mat.diffuseTexture) {
+      mat.needDepthPrePass = true;
+      if (Object.prototype.hasOwnProperty.call(mat, 'transparencyMode')) {
+        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
+      }
+      if (Object.prototype.hasOwnProperty.call(mat, 'alphaCutOff')) {
+        mat.alphaCutOff = 0.4;
+      }
+    }
+  }
+}
+
 function combineBounds(meshes) {
   let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
   let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
@@ -272,6 +295,7 @@ export async function boot(options = {}) {
   const shotMode = isShotMode();
   const debugMode = isDebugMode();
   const shotScene = shotMode ? getShotScene() : 'title';
+  const shotToast = shotMode ? getShotToast() : '';
 
   // Debug hook (Playwright polls this)
   window.__DADA_DEBUG__ = window.__DADA_DEBUG__ || {};
@@ -329,7 +353,7 @@ export async function boot(options = {}) {
   const input = new InputManager();
 
   // UI
-  const ui = createUI(uiRoot);
+  const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
 
   // Build the diorama world
   const world = shotMode
@@ -358,6 +382,12 @@ export async function boot(options = {}) {
     const result = await loadModelForRole(scene, roleName, options);
     if (result.loaded) {
       registerShadowCasters(world.shadowGen, result.meshes);
+      if (typeof options.renderingGroupId === 'number') {
+        setMeshesRenderingGroup(result.meshes, options.renderingGroupId);
+      }
+      if (options.alphaCutout) {
+        configureMeshesAsAlphaCutout(result.meshes);
+      }
       hideMeshList(fallbackMeshes);
       if (options.actorRole) {
         actorState[options.actorRole] = sanitizeLoadedRoleModel({
@@ -409,6 +439,8 @@ export async function boot(options = {}) {
   const goalFallbackMeshes = collectNodeMeshes(world.goalRoot).filter((mesh) => mesh.name !== 'goalTrigger');
   applyRoleMetadata(playerFallbackMeshes, 'player');
   applyRoleMetadata(goalFallbackMeshes, 'goal');
+  setMeshesRenderingGroup(playerFallbackMeshes, 3);
+  setMeshesRenderingGroup(goalFallbackMeshes, 3);
 
   const playerVisualRoot = new BABYLON.TransformNode('playerVisualRoot', scene);
   playerVisualRoot.parent = player.visual;
@@ -425,6 +457,7 @@ export async function boot(options = {}) {
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
     actorRole: 'player',
+    renderingGroupId: 3,
   });
 
   // Replace DaDa mesh and key props with authored assets.
@@ -434,6 +467,7 @@ export async function boot(options = {}) {
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
     actorRole: 'goal',
+    renderingGroupId: 3,
   });
 
   for (const signRoot of world.signs || []) {
@@ -441,6 +475,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(signRoot),
       fallbackMaterial: 'cardboard',
       scaling: 0.9,
+      renderingGroupId: 2,
     });
   }
 
@@ -449,6 +484,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(checkpoint.marker),
       fallbackMaterial: 'cardboard',
       scaling: 0.72,
+      renderingGroupId: 3,
     });
   }
 
@@ -457,6 +493,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(pickup.node),
       fallbackMaterial: 'plastic',
       scaling: 0.9,
+      renderingGroupId: 3,
     });
   }
 
@@ -466,6 +503,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(toy),
       fallbackMaterial: 'cardboard',
       scaling: 0.7,
+      renderingGroupId: 2,
     });
   }
 
@@ -474,6 +512,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.hangingRing),
       fallbackMaterial: 'plastic',
       scaling: 0.95,
+      renderingGroupId: 3,
     });
   }
 
@@ -482,6 +521,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.goalBanner),
       fallbackMaterial: 'plastic',
       scaling: 1.2,
+      renderingGroupId: 3,
     });
   }
 
@@ -490,6 +530,8 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.cribRail),
       fallbackMaterial: 'cardboard',
       scaling: [1.05, 0.9, 0.9],
+      renderingGroupId: 4,
+      alphaCutout: true,
     });
   }
 
@@ -500,6 +542,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 1.9, 1.5],
+      renderingGroupId: 4,
+      alphaCutout: true,
     });
     if (result.loaded) {
       pushForegroundMeshes(result.meshes);
@@ -513,6 +557,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.5, 2.6, 1.8],
+      renderingGroupId: 0,
+      alphaCutout: true,
     });
   }
 
@@ -523,6 +569,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 2.0, 1.5],
+      renderingGroupId: 1,
+      alphaCutout: true,
     });
   }
 
@@ -533,6 +581,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'paper',
       scaling: [1.9, 1.4, 1.4],
+      renderingGroupId: 0,
+      alphaCutout: true,
     });
   }
 
@@ -543,6 +593,8 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [1.2, 1.2, 1.0],
+      renderingGroupId: 1,
+      alphaCutout: true,
     });
   }
 
@@ -621,6 +673,8 @@ export async function boot(options = {}) {
   let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
+  let slipWasInside = false;
+  let slipToastCooldownMs = 0;
   let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
@@ -681,6 +735,7 @@ export async function boot(options = {}) {
 
   function finishRun() {
     state = 'end';
+    audio.stopMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     ui.showEnd();
   }
@@ -697,6 +752,7 @@ export async function boot(options = {}) {
     ui.showStatus('Ready!', 500);
     input.consumeAll();
     juiceFx.clear();
+    audio.stopMusic(0.2);
 
     state = 'title';
     goalReached = false;
@@ -898,6 +954,7 @@ export async function boot(options = {}) {
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
         audio.playPickup();
         juiceFx.spawnPickupSparkle(pickup.position);
+        ui.showOnesieBoostToast();
         ui.showStatus('Onesie boost!', 1400);
       }
     }
@@ -905,6 +962,10 @@ export async function boot(options = {}) {
     // Hazard overlaps affect movement.
     let accelMultiplier = 1;
     let decelMultiplier = 1;
+    let turnResponsiveness = 1;
+    let speedMultiplier = 1;
+    let accelBonusMultiplier = 1;
+    let inSlipHazard = false;
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
         && pos.x <= hazard.maxX
@@ -912,10 +973,28 @@ export async function boot(options = {}) {
         && pos.y <= hazard.maxY;
 
       if (inside && hazard.type === 'slip') {
-        accelMultiplier *= hazard.accelMultiplier ?? 0.78;
-        decelMultiplier *= hazard.decelMultiplier ?? 0.22;
+        inSlipHazard = true;
+        accelMultiplier *= hazard.accelMultiplier ?? 0.70;
+        decelMultiplier *= hazard.decelMultiplier ?? 0.25;
+        turnResponsiveness = Math.min(turnResponsiveness, 0.58);
         slipRecentTimerMs = 900;
       }
+    }
+
+    if (slipToastCooldownMs > 0) {
+      slipToastCooldownMs = Math.max(0, slipToastCooldownMs - dt * 1000);
+    }
+    if (inSlipHazard && !slipWasInside && slipToastCooldownMs <= 0) {
+      ui.showSlipperyToast();
+      audio.playSplash();
+      juiceFx.spawnSlipRipple(pos);
+      slipToastCooldownMs = 1000;
+    }
+    slipWasInside = inSlipHazard;
+    const sprinting = input.isSprintHeld();
+    if (sprinting && !inSlipHazard) {
+      speedMultiplier = 1.15;
+      accelBonusMultiplier = 1.10;
     }
 
     if (slipRecentTimerMs > 0) {
@@ -926,6 +1005,10 @@ export async function boot(options = {}) {
       surfaceAccelMultiplier: accelMultiplier,
       surfaceDecelMultiplier: decelMultiplier,
       jumpVelocityMultiplier: onesieJumpBoost,
+      maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
+      turnResponsiveness,
+      speedMultiplier,
+      accelBonusMultiplier,
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
@@ -1061,6 +1144,11 @@ export async function boot(options = {}) {
       camera.position.set(-18, 7, -14);
       camera.setTarget(new BABYLON.Vector3(-12, 2, 0));
     }
+    if (shotToast === 'onesie') {
+      ui.showOnesieBoostToast();
+    } else if (shotToast === 'slippery') {
+      ui.showSlipperyToast();
+    }
     player.vx = 0;
     player.vy = 0;
     updatePlayerShadow(player);
@@ -1107,6 +1195,7 @@ export async function boot(options = {}) {
         audio.unlock();
         state = 'gameplay';
         input.consumeAll();
+        audio.startMusic(0.5);
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
         ui.showGameplayHud(coins.length);
@@ -1160,6 +1249,9 @@ export async function boot(options = {}) {
             audio.playJump();
             juiceFx.spawnJumpDust(player.mesh.position);
             ui.fadeControlHints();
+          } else if (ev.type === 'doubleJump') {
+            audio.playJump();
+            juiceFx.spawnJumpDust(player.mesh.position);
           } else if (ev.type === 'land') {
             audio.playLand();
             juiceFx.spawnLandDust(player.mesh.position);
@@ -1173,6 +1265,7 @@ export async function boot(options = {}) {
         // HUD updates each frame
         ui.updateObjectiveDir(player.mesh.position.x, goalX);
         ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
+        ui.updateDoubleJumpCue(player.hasAirJumpAvailable() && onesieBuffTimerMs > 0);
       }
 
       // Update blob shadow position (follows player X, stays near ground)

@@ -1,11 +1,79 @@
-export const LEVEL1 = {
+const PLAYER_JUMP_VELOCITY = 14;
+const PLAYER_GRAVITY = 32;
+const REACHABLE_HEIGHT_FACTOR = 0.85;
+
+function isDebugMode() {
+  if (typeof window === 'undefined') return false;
+  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
+}
+
+function getPlatformTopY(plat) {
+  return plat.y + (plat.h * 0.5);
+}
+
+function getNearestPlatformTopY(x, platforms, ground) {
+  let nearest = null;
+  let bestDx = Number.POSITIVE_INFINITY;
+  for (const p of [...platforms, ground]) {
+    const halfW = p.w * 0.5;
+    const minX = p.x - halfW;
+    const maxX = p.x + halfW;
+    const clampedX = Math.max(minX, Math.min(maxX, x));
+    const dx = Math.abs(x - clampedX);
+    if (dx < bestDx) {
+      bestDx = dx;
+      nearest = p;
+    }
+  }
+  return nearest ? getPlatformTopY(nearest) : null;
+}
+
+function makeReachabilityReport(coins, platforms, ground, reachableHeight) {
+  const violations = [];
+  for (let i = 0; i < coins.length; i++) {
+    const c = coins[i];
+    const nearestTop = getNearestPlatformTopY(c.x, platforms, ground);
+    if (nearestTop === null) continue;
+    const delta = c.y - nearestTop;
+    if (delta > reachableHeight) {
+      violations.push({ index: i, x: c.x, y: c.y, delta: Number(delta.toFixed(3)) });
+    }
+  }
+  return violations;
+}
+
+function normalizeCoins(layout) {
+  const maxHeight = (PLAYER_JUMP_VELOCITY * PLAYER_JUMP_VELOCITY) / (2 * PLAYER_GRAVITY);
+  const reachableHeight = maxHeight * REACHABLE_HEIGHT_FACTOR;
+  const normalized = layout.coins.map((coin) => ({ ...coin }));
+
+  for (const coin of normalized) {
+    const nearestTop = getNearestPlatformTopY(coin.x, layout.platforms, layout.ground);
+    if (nearestTop === null) continue;
+    const maxY = nearestTop + reachableHeight;
+    if (coin.y > maxY) {
+      coin.y = Number((maxY - 0.08).toFixed(3));
+    }
+  }
+
+  if (isDebugMode()) {
+    const violations = makeReachabilityReport(normalized, layout.platforms, layout.ground, reachableHeight);
+    if (violations.length) {
+      console.warn('[level] unreachable coin placements detected', violations);
+    }
+  }
+
+  return normalized;
+}
+
+const BASE_LEVEL1 = {
   extents: { minX: -20, maxX: 33 },
   spawn: { x: -15.2, y: 1.205, z: 0 },
   goal: { x: 30.2, y: 5.3, z: 0 },
   // Beat 1 (Tutorial) ends at platVert1. Beat 2 (Challenge) starts at platBridge.
   checkpoints: [
-    { x: -2.1, y: 3.1, z: 0, label: 'First' },   // end of Beat 1 — tutorial clear
-    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },   // start of Beat 2 — before hazards
+    { x: -2.1, y: 3.1, z: 0, label: 'First' },
+    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },
   ],
   ground: { x: 6.5, y: -0.75, z: 0, w: 58, h: 1.5, d: 14 },
   platforms: [
@@ -38,8 +106,8 @@ export const LEVEL1 = {
       z: 0,
       width: 5.2,
       depth: 3.2,
-      accelMultiplier: 0.75,
-      decelMultiplier: 0.22,
+      accelMultiplier: 0.70,
+      decelMultiplier: 0.25,
     },
   ],
   signs: [
@@ -47,7 +115,6 @@ export const LEVEL1 = {
     { x: 0.6, y: 4.6, z: 1.7, direction: 1 },
     { x: 20.8, y: 4.4, z: 1.7, direction: 1 },
   ],
-  // Crumble platforms: shake after first step, fall after 0.6s, respawn after 2.5s.
   crumbles: [
     {
       name: 'crumbleA',
@@ -55,22 +122,24 @@ export const LEVEL1 = {
       w: 3.2, h: 0.65, d: 4.0,
     },
   ],
-  // 12 coins along the critical path.
-  // Beat 1 (tutorial): gentle arcs on first platforms.
-  // Beat 2 (challenge): near slip zone + optional risky coin above puddle.
-  // Beat 3 (victory): reward trail to DaDa.
+  // 12 coins along the critical path; coin 10 moved off puddle-only route.
   coins: [
     { x: -14.8, y: 1.65, z: 0 },
     { x: -13.2, y: 1.95, z: 0 },
     { x: -10.4, y: 2.55, z: 0 },
-    { x: -8.8,  y: 2.65, z: 0 },
-    { x: -2.6,  y: 3.65, z: 0 },
-    { x:  2.0,  y: 4.85, z: 0 },
-    { x:  7.6,  y: 5.55, z: 0 },
-    { x: 10.8,  y: 4.45, z: 0 },
-    { x: 16.8,  y: 3.65, z: 0 },
-    { x: 18.4,  y: 3.65, z: 0 },
-    { x: 24.2,  y: 4.80, z: 0 },
-    { x: 27.8,  y: 5.55, z: 0 },
+    { x: -8.8, y: 2.65, z: 0 },
+    { x: -2.6, y: 3.65, z: 0 },
+    { x: 2.0, y: 4.85, z: 0 },
+    { x: 7.6, y: 5.55, z: 0 },
+    { x: 10.8, y: 4.45, z: 0 },
+    { x: 16.8, y: 3.65, z: 0 },
+    { x: 21.7, y: 4.05, z: 0 },
+    { x: 24.2, y: 4.8, z: 0 },
+    { x: 27.8, y: 5.55, z: 0 },
   ],
+};
+
+export const LEVEL1 = {
+  ...BASE_LEVEL1,
+  coins: normalizeCoins(BASE_LEVEL1),
 };
