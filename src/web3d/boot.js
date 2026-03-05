@@ -977,7 +977,7 @@ export async function boot(options = {}) {
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
         audio.playPickup();
         juiceFx.spawnPickupSparkle(pickup.position);
-        ui.showOnesieBoostToast();
+        ui.showOnesieBoostCard();
         ui.showStatus('Onesie boost!', 1400);
       }
     }

@@ -297,6 +297,57 @@ const CSS = `
   object-fit: contain;
   flex: none;
 }
+/* Onesie boost card — centered pop-up overlay */
+.dada-boost-card {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.4);
+  background: linear-gradient(145deg, #2b6dff, #1a4fcc);
+  color: #fff;
+  border-radius: 22px;
+  padding: 22px 44px 18px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 14px 52px rgba(0,0,0,0.44), inset 0 1px 0 rgba(255,255,255,0.22);
+  opacity: 0;
+  z-index: 2100;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+@keyframes boostCardIn {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  65%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+}
+@keyframes boostCardOut {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.78); }
+}
+.dada-boost-card.bc-in {
+  animation: boostCardIn 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+.dada-boost-card.bc-out {
+  animation: boostCardOut 0.22s ease-in forwards;
+}
+.dada-boost-card-icon {
+  width: 56px; height: 56px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}
+.dada-boost-card-title {
+  font-size: clamp(22px, 5vw, 40px);
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  margin: 0 0 6px;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.22);
+}
+.dada-boost-card-sub {
+  font-size: clamp(13px, 2.2vw, 18px);
+  opacity: 0.88;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
 `;
 
 export function createUI(uiRoot, options = {}) {
@@ -383,6 +434,17 @@ export function createUI(uiRoot, options = {}) {
   const toastWrap = document.createElement('div');
   toastWrap.className = 'dada-toast-wrap';
   uiRoot.appendChild(toastWrap);
+
+  const boostCardEl = document.createElement('div');
+  boostCardEl.className = 'dada-boost-card';
+  boostCardEl.innerHTML = `
+    <img class="dada-boost-card-icon" src="assets/ui/cheeseburger.svg" alt="">
+    <div class="dada-boost-card-title">ONESIE BOOST!</div>
+    <div class="dada-boost-card-sub">Double jump unlocked ✦</div>
+  `;
+  document.body.appendChild(boostCardEl);
+
+  let boostCardTimer1 = null, boostCardTimer2 = null;
 
   const canvasEl = document.getElementById('renderCanvas');
 
@@ -621,6 +683,22 @@ export function createUI(uiRoot, options = {}) {
         enterMs: 120,
         exitMs: 180,
       });
+    },
+    showOnesieBoostCard() {
+      // Clear any in-flight card animation.
+      if (boostCardTimer1) { clearTimeout(boostCardTimer1); boostCardTimer1 = null; }
+      if (boostCardTimer2) { clearTimeout(boostCardTimer2); boostCardTimer2 = null; }
+      // Force reflow so animation restarts cleanly.
+      boostCardEl.classList.remove('bc-in', 'bc-out');
+      void boostCardEl.offsetWidth; // reflow
+      boostCardEl.classList.add('bc-in');
+      // After hold time, exit animation.
+      boostCardTimer1 = setTimeout(() => {
+        boostCardEl.classList.replace('bc-in', 'bc-out');
+        boostCardTimer2 = setTimeout(() => {
+          boostCardEl.classList.remove('bc-out');
+        }, 240);
+      }, 900);
     },
     showSlipperyToast() {
       showToast({
