@@ -2,8 +2,10 @@ export const LEVEL1 = {
   extents: { minX: -20, maxX: 33 },
   spawn: { x: -15.2, y: 1.205, z: 0 },
   goal: { x: 30.2, y: 5.3, z: 0 },
+  // Beat 1 (Tutorial) ends at platVert1. Beat 2 (Challenge) starts at platBridge.
   checkpoints: [
-    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },
+    { x: -2.1, y: 3.1, z: 0, label: 'First' },   // end of Beat 1 — tutorial clear
+    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },   // start of Beat 2 — before hazards
   ],
   ground: { x: 6.5, y: -0.75, z: 0, w: 58, h: 1.5, d: 14 },
   platforms: [
