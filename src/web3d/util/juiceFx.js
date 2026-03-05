@@ -145,6 +145,20 @@ export class JuiceFx {
     }
   }
 
+  spawnPickupSparkle(pos) {
+    if (!this.enabled) return;
+    for (let i = 0; i < SPARKLE_RING.length; i++) {
+      const [ox, oy] = SPARKLE_RING[i];
+      this._spawn(this.sparkleMat, 'pickupSparkle', pos.x + ox * 0.6, pos.y + oy * 0.6, pos.z, {
+        life: 0.38,
+        startScale: 0.12,
+        endScale: 0.40,
+        vx: ox * 0.5,
+        vy: 0.18 + i * 0.03,
+      });
+    }
+  }
+
   spawnGoalSparkles(pos) {
     if (!this.enabled) return;
     for (let i = 0; i < SPARKLE_RING.length; i++) {

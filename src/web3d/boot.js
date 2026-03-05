@@ -589,6 +589,8 @@ export async function boot(options = {}) {
   if (import.meta.env.DEV) installRestStabilityTest(player);
 
   // Game state machine
+  const goalX = world.goalRoot.position.x;
+
   let state = 'title'; // title | gameplay | end
   let goalReached = false;
   let shotFrames = 0;
@@ -601,8 +603,10 @@ export async function boot(options = {}) {
   let activeCheckpointIndex = 0;
   let respawnPoint = { ...spawnPoint };
   let onesieBuffTimerMs = 0;
+  let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
+  let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   const checkpointEmissiveBase = new Map();
   for (const checkpoint of checkpoints) {
@@ -672,6 +676,7 @@ export async function boot(options = {}) {
     ui.setFade(0);
     ui.hideEnd();
     ui.showTitle();
+    ui.resetGameplayHud();
     ui.showStatus('Ready!', 500);
     input.consumeAll();
     juiceFx.clear();
@@ -683,8 +688,10 @@ export async function boot(options = {}) {
     activeCheckpointIndex = 0;
     respawnPoint = { ...spawnPoint };
     onesieBuffTimerMs = 0;
+    onesieMaxDurationMs = 10000;
     onesieJumpBoost = 1;
     slipRecentTimerMs = 0;
+    coinsCollected = 0;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
     window.__DADA_DEBUG__.checkpointIndex = 0;
@@ -729,6 +736,7 @@ export async function boot(options = {}) {
   });
 
   function startGoalCelebration(goalPos) {
+    ui.hideObjective();
     if (!debugFlags.juice) {
       finishRun();
       return;
@@ -840,10 +848,12 @@ export async function boot(options = {}) {
       if ((dx * dx + dy * dy) <= (r * r)) {
         pickup.collected = true;
         if (pickup.node) pickup.node.setEnabled(false);
-        onesieBuffTimerMs = pickup.durationMs ?? 10000;
+        onesieMaxDurationMs = pickup.durationMs ?? 10000;
+        onesieBuffTimerMs = onesieMaxDurationMs;
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
         audio.playPickup();
-        ui.showStatus('Onesie boost + jump', 1500);
+        juiceFx.spawnPickupSparkle(pickup.position);
+        ui.showStatus('Onesie boost!', 1400);
       }
     }
 
@@ -993,6 +1003,7 @@ export async function boot(options = {}) {
         input.consumeAll();
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
+        ui.showGameplayHud(world.coins ? world.coins.length : 0);
         if (debugMode) {
           debugIdleTimerMs = 1000; // suppress input for 1s so probe runs clean
           player.beginSpawnProbe('initial');
@@ -1041,6 +1052,7 @@ export async function boot(options = {}) {
           if (ev.type === 'jump') {
             audio.playJump();
             juiceFx.spawnJumpDust(player.mesh.position);
+            ui.fadeControlHints();
           } else if (ev.type === 'land') {
             audio.playLand();
             juiceFx.spawnLandDust(player.mesh.position);
@@ -1049,6 +1061,10 @@ export async function boot(options = {}) {
             triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
           }
         }
+
+        // HUD updates each frame
+        ui.updateObjectiveDir(player.mesh.position.x, goalX);
+        ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
       }
 
       // Update blob shadow position (follows player X, stays near ground)

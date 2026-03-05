@@ -121,17 +121,18 @@ const CSS = `
 .dada-status {
   position: absolute;
   left: 14px;
-  top: 12px;
+  top: 46px;
   font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
-  font-size: 15px;
+  font-size: 13px;
   color: #fef7e7;
   background: rgba(62, 48, 34, 0.68);
   border: 1px solid rgba(255, 235, 202, 0.36);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   opacity: 0;
-  transform: translateY(-6px);
+  transform: translateY(-4px);
   transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
 }
 .dada-status.visible {
   opacity: 1;
@@ -147,6 +148,98 @@ const CSS = `
   opacity: 0;
   pointer-events: none !important;
   transition: opacity 0.18s linear;
+}
+
+/* ── Gameplay HUD ──────────────────────────────────────────────── */
+.dada-hud-pill {
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background: rgba(40, 30, 20, 0.62);
+  border: 1px solid rgba(255, 230, 190, 0.28);
+  border-radius: 8px;
+  padding: 5px 10px;
+  pointer-events: none;
+  color: #fef7e7;
+  position: absolute;
+}
+
+/* Coin counter — top-left */
+.dada-coins {
+  top: 12px;
+  left: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  display: none;
+  transition: transform 0.1s ease;
+}
+.dada-coins.pulse {
+  transform: scale(1.14);
+}
+
+/* Objective indicator — top-right */
+.dada-objective {
+  top: 12px;
+  right: 14px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  display: none;
+  white-space: nowrap;
+}
+
+/* Buff bar — bottom-left */
+.dada-buff {
+  bottom: 14px;
+  left: 14px;
+  font-size: 12px;
+  display: none;
+  min-width: 110px;
+}
+.dada-buff-label {
+  font-size: 11px;
+  opacity: 0.78;
+  margin-bottom: 3px;
+}
+.dada-buff-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.dada-buff-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f5c842, #f0983a);
+  border-radius: 3px;
+  transition: width 0.12s linear;
+}
+
+/* Control hints — bottom-center */
+.dada-ctrl-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  font-size: 12px;
+  color: rgba(254, 247, 231, 0.80);
+  background: rgba(30, 22, 14, 0.56);
+  border: 1px solid rgba(255, 220, 170, 0.20);
+  border-radius: 6px;
+  padding: 4px 14px;
+  pointer-events: none;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.7s ease;
+  display: none;
+}
+.dada-ctrl-hint span {
+  color: #f5c842;
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 11px;
+}
+.dada-ctrl-hint.fading {
+  opacity: 0;
 }
 `;
 
@@ -202,6 +295,33 @@ export function createUI(uiRoot) {
   const fadeEl = document.createElement('div');
   fadeEl.className = 'dada-fade';
   uiRoot.appendChild(fadeEl);
+
+  // ── Gameplay HUD ────────────────────────────────────────────────
+
+  const coinsEl = document.createElement('div');
+  coinsEl.className = 'dada-hud-pill dada-coins';
+  coinsEl.textContent = '✦ 0 / 0';
+  uiRoot.appendChild(coinsEl);
+
+  const objectiveEl = document.createElement('div');
+  objectiveEl.className = 'dada-hud-pill dada-objective';
+  objectiveEl.textContent = 'Find DaDa →';
+  uiRoot.appendChild(objectiveEl);
+
+  const buffEl = document.createElement('div');
+  buffEl.className = 'dada-hud-pill dada-buff';
+  buffEl.innerHTML = `
+    <div class="dada-buff-label">🧸 Onesie boost</div>
+    <div class="dada-buff-track"><div class="dada-buff-fill" style="width:100%"></div></div>
+  `;
+  uiRoot.appendChild(buffEl);
+  const buffFill = buffEl.querySelector('.dada-buff-fill');
+
+  const ctrlHintEl = document.createElement('div');
+  ctrlHintEl.className = 'dada-ctrl-hint';
+  ctrlHintEl.innerHTML = `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump`;
+  uiRoot.appendChild(ctrlHintEl);
+
   const canvasEl = document.getElementById('renderCanvas');
 
   function setCanvasInputEnabled(enabled) {
@@ -237,6 +357,17 @@ export function createUI(uiRoot) {
   let titleVisible = true;
   let popTimer = null;
   let statusTimer = null;
+  let ctrlHintTimer = null;
+  let ctrlHintFaded = false;
+  let coinTotal = 0;
+
+  // Coin pulse animation
+  let pulseCancelTimer = null;
+  function pulseCoin() {
+    coinsEl.classList.add('pulse');
+    if (pulseCancelTimer) clearTimeout(pulseCancelTimer);
+    pulseCancelTimer = setTimeout(() => coinsEl.classList.remove('pulse'), 130);
+  }
 
   return {
     showTitle() {
@@ -283,6 +414,80 @@ export function createUI(uiRoot) {
     },
     setFade(alpha) {
       fadeEl.style.opacity = String(Math.max(0, Math.min(1, alpha)));
+    },
+
+    // ── Gameplay HUD methods ─────────────────────────────────────
+
+    /** Show gameplay HUD elements (coin counter, objective, control hints). */
+    showGameplayHud(total) {
+      coinTotal = total;
+      coinsEl.textContent = `✦ 0 / ${total}`;
+      coinsEl.style.display = 'block';
+      objectiveEl.style.display = 'block';
+      // Show control hints; auto-fade after 5 s
+      if (!ctrlHintFaded) {
+        ctrlHintEl.style.display = 'block';
+        if (ctrlHintTimer) clearTimeout(ctrlHintTimer);
+        ctrlHintTimer = setTimeout(() => this.fadeControlHints(), 5000);
+      }
+    },
+
+    /** Hide gameplay HUD (on title screen, end screen). */
+    hideGameplayHud() {
+      coinsEl.style.display = 'none';
+      objectiveEl.style.display = 'none';
+      buffEl.style.display = 'none';
+      ctrlHintEl.style.display = 'none';
+    },
+
+    /** Update coin counter; provide collected count. */
+    updateCoins(collected) {
+      coinsEl.textContent = `✦ ${collected} / ${coinTotal}`;
+      pulseCoin();
+    },
+
+    /** Update objective arrow direction. playerX < goalX → '→', else '←'. */
+    updateObjectiveDir(playerX, goalX) {
+      const arrow = playerX < goalX ? '→' : '←';
+      objectiveEl.textContent = `Find DaDa ${arrow}`;
+    },
+
+    /** Hide the objective indicator (goal reached). */
+    hideObjective() {
+      objectiveEl.style.display = 'none';
+    },
+
+    /** Fade and remove control hints (called on first jump or after timer). */
+    fadeControlHints() {
+      if (ctrlHintFaded) return;
+      ctrlHintFaded = true;
+      if (ctrlHintTimer) clearTimeout(ctrlHintTimer);
+      ctrlHintEl.classList.add('fading');
+      setTimeout(() => { ctrlHintEl.style.display = 'none'; }, 720);
+    },
+
+    /** Reset control hints for a new game. */
+    resetControlHints() {
+      ctrlHintFaded = false;
+      ctrlHintEl.classList.remove('fading');
+      ctrlHintEl.style.display = 'none';
+    },
+
+    /** Update onesie buff bar. remainingMs=0 → hide. */
+    updateBuff(remainingMs, totalMs) {
+      if (remainingMs <= 0) {
+        buffEl.style.display = 'none';
+        return;
+      }
+      buffEl.style.display = 'block';
+      const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
+      buffFill.style.width = `${pct}%`;
+    },
+
+    /** Reset all gameplay HUD to initial state for restart. */
+    resetGameplayHud() {
+      this.hideGameplayHud();
+      this.resetControlHints();
     },
   };
 }
