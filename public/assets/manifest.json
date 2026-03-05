@@ -12,7 +12,20 @@
     "bannerModel": ["kenney_flag"],
     "treeModel": ["kenney_tree", "kenney_tree_pine"],
     "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass"],
-    "cloudModel": ["kenney_rocks"]
+    "cloudModel": ["kenney_rocks"],
+    "futureDadModel": ["local_dad"],
+    "futureMomModel": ["local_mom"],
+    "futureCribModel": ["local_baby_bed"],
+    "futureHighchairModel": ["local_baby_highchair"],
+    "futureBikeModel": ["local_balance_bike"],
+    "futureBiancaModel": ["local_bianca"],
+    "futurePianoModel": ["local_piano"],
+    "futureRockingHorseModel": ["local_rocking_horse"],
+    "futureChickenPropModel": ["local_baby_chicken"],
+    "futureDinoPropModel": ["local_baby_dino"],
+    "futureGoatPropModel": ["local_baby_goat"],
+    "futurePackPropModel": ["local_baby_pack"],
+    "futureBreadPropModel": ["local_rustic_bread"]
   },
   "models": [
     {
@@ -146,6 +159,84 @@
       "path": "assets/packs/quaternius/Chest.glb",
       "scale": 0.82,
       "yOffset": -0.36
+    },
+    {
+      "id": "local_dad",
+      "path": "assets/models/characters/dad.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_mom",
+      "path": "assets/models/characters/mom.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_bed",
+      "path": "assets/models/platforms/baby_bed.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_highchair",
+      "path": "assets/models/platforms/baby_highchair.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_balance_bike",
+      "path": "assets/models/platforms/balance_bike.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_bianca",
+      "path": "assets/models/platforms/bianca.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_piano",
+      "path": "assets/models/platforms/piano.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_rocking_horse",
+      "path": "assets/models/platforms/rocking_horse.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_chicken",
+      "path": "assets/models/props/baby_chicken.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_dino",
+      "path": "assets/models/props/baby_dino.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_goat",
+      "path": "assets/models/props/baby_goat.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_pack",
+      "path": "assets/models/props/baby_pack.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_rustic_bread",
+      "path": "assets/models/props/rustic_bread.glb",
+      "scale": 1,
+      "yOffset": 0
     }
   ],
   "hdri": {

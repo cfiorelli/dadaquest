@@ -17,3 +17,19 @@
 - OpenGameArt - "Menace" music loop (CC0)
   - Source file: https://opengameart.org/sites/default/files/Menace.ogg
   - Local audio: `public/assets/audio/music/level1.ogg`
+
+- User-supplied local model set (future levels; license/source pending confirmation)
+  - Local files:
+    - `public/assets/models/characters/dad.glb`
+    - `public/assets/models/characters/mom.glb`
+    - `public/assets/models/platforms/baby_bed.glb`
+    - `public/assets/models/platforms/baby_highchair.glb`
+    - `public/assets/models/platforms/balance_bike.glb`
+    - `public/assets/models/platforms/bianca.glb`
+    - `public/assets/models/platforms/piano.glb`
+    - `public/assets/models/platforms/rocking_horse.glb`
+    - `public/assets/models/props/baby_chicken.glb`
+    - `public/assets/models/props/baby_dino.glb`
+    - `public/assets/models/props/baby_goat.glb`
+    - `public/assets/models/props/baby_pack.glb`
+    - `public/assets/models/props/rustic_bread.glb`
