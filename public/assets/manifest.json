@@ -164,7 +164,7 @@
       "id": "local_dad",
       "path": "assets/models/characters/dad.glb",
       "scale": 0.9,
-      "yOffset": -0.5
+      "yOffset": 0.0
     },
     {
       "id": "local_mom",
