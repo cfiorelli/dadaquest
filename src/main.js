@@ -3,7 +3,7 @@ import { boot } from './web3d/boot.js';
 
 // Read ?level=N from URL (default 1)
 const _levelParam = new URLSearchParams(window.location.search).get('level');
-const levelId = _levelParam === '2' ? 2 : 1;
+const levelId = _levelParam === '3' ? 3 : _levelParam === '2' ? 2 : 1;
 
 // Boot Babylon.js engine
 boot({ isTestMode, levelId }).catch((err) => {

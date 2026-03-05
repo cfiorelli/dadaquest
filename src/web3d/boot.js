@@ -1,6 +1,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { buildWorld } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
+import { buildWorld3 } from './world/buildWorld3.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
@@ -526,14 +527,16 @@ export async function boot(options = {}) {
   // Build the diorama world (route by level)
   let world;
   try {
-    world = levelId === 2
-      ? buildWorld2(scene)
-      : shotMode
-        ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
-          random: createSeededRandom(7331),
-          animateGoal: false,
-        }))
-        : buildWorld(scene);
+    world = levelId === 3
+      ? buildWorld3(scene, { animateGoal: !shotMode })
+      : levelId === 2
+        ? buildWorld2(scene, { animateGoal: !shotMode })
+        : shotMode
+          ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
+            random: createSeededRandom(7331),
+            animateGoal: false,
+          }))
+          : buildWorld(scene);
   } catch (buildErr) {
     ui.showStartError(buildErr?.message || 'World build failed');
     console.error('[boot] World build failed:', buildErr);
@@ -909,7 +912,7 @@ export async function boot(options = {}) {
   playerRimLight.specular = new BABYLON.Color3(0.24, 0.26, 0.32);
   playerRimLight.range = 11;
   const cameraIgnoredMeshes = new Set([player.blobShadow]);
-  const useCameraOcclusionGuard = levelId === 2;
+  const useCameraOcclusionGuard = levelId === 2 || levelId === 3;
   let level2ProbeTimer = 0;
   let level2LastProbeMeshId = null;
   const level2ProbeRestoreTimers = new Map();
@@ -1189,6 +1192,7 @@ export async function boot(options = {}) {
     coinsCollected = 0;
     resetCrumbles();
     if (world.level2) world.level2.reset();
+    if (world.level3) world.level3.reset();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -1230,9 +1234,9 @@ export async function boot(options = {}) {
       state = 'loading'; // prevent re-entry while setTimeout is pending
       ui.showLoading(targetLevelId);
       ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
-      const url = targetLevelId === 2
-        ? `${window.location.pathname}?level=2`
-        : window.location.pathname;
+      const url = targetLevelId === 1
+        ? window.location.pathname
+        : `${window.location.pathname}?level=${targetLevelId}`;
       setTimeout(() => { window.location.href = url; }, 80);
       return;
     }
@@ -1445,6 +1449,8 @@ export async function boot(options = {}) {
         && pos.x <= hazard.maxX
         && pos.y >= hazard.minY
         && pos.y <= hazard.maxY;
+
+      if (hazard.handledByLevelRuntime) continue;
 
       if (inside && hazard.type === 'slip' && puddleInvulnMs <= 0 && !respawnState) {
         activeCheckpointIndex = 0;
@@ -1688,6 +1694,9 @@ export async function boot(options = {}) {
         updateCrumbles(dt);
         if (world.level2) {
           world.level2.update(dt, { pos: player.mesh.position, triggerReset, player });
+        }
+        if (world.level3) {
+          world.level3.update(dt, { pos: player.mesh.position, triggerReset, player });
         }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
