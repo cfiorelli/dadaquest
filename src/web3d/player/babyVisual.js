@@ -48,6 +48,7 @@ function createFaceTexture(scene) {
 function createSkinMaterial(scene) {
   const mat = makePlastic(scene, 'babySkinMat', ...P.characterBody, { roughness: 0.44 });
   mat.environmentIntensity = 0.22;
+  mat.emissiveColor = new BABYLON.Color3(0.03, 0.02, 0.02);
   return mat;
 }
 

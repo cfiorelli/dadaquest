@@ -24,6 +24,7 @@ const DEFAULT_FLAGS = {
 const GOAL_CELEBRATION_SEC = 0.48;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
+const CAMERA_FOLLOW_Z = -13.2;
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -71,8 +72,11 @@ function withPatchedRandom(randomFn, fn) {
 function updatePlayerShadow(player) {
   player.blobShadow.position.x = player.mesh.position.x;
   player.blobShadow.position.z = player.mesh.position.z;
-  const heightAboveGround = Math.max(0, player.mesh.position.y - 0.5);
-  const shadowScale = Math.max(0.4, 1.0 - heightAboveGround * 0.06);
+  const feetY = player.mesh.position.y - 0.39;
+  player.blobShadow.position.y = feetY + 0.01;
+  const shadowScale = player.grounded
+    ? 1.04
+    : Math.max(0.78, 1.04 - (Math.abs(player.vy) * 0.018));
   player.blobShadow.scaling.set(shadowScale, 1, shadowScale);
 }
 
@@ -670,13 +674,19 @@ export async function boot(options = {}) {
   }
 
   // Camera — fixed angle, smooth follow
-  const cameraStartPos = new BABYLON.Vector3(-18, 7, -14);
+  const cameraStartPos = new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
   const cameraStartTarget = new BABYLON.Vector3(-12, 2, 0);
   const camera = new BABYLON.FreeCamera('cam', cameraStartPos.clone(), scene);
   camera.setTarget(cameraStartTarget.clone());
   camera.minZ = 0.5;
   camera.maxZ = 100;
   // Do NOT attach controls — camera is game-controlled, not user-controlled
+
+  const playerRimLight = new BABYLON.PointLight('playerRimLight', new BABYLON.Vector3(-14, 4.5, -7), scene);
+  playerRimLight.intensity = shotMode ? 0.16 : 0.22;
+  playerRimLight.diffuse = new BABYLON.Color3(0.92, 0.94, 1.0);
+  playerRimLight.specular = new BABYLON.Color3(0.24, 0.26, 0.32);
+  playerRimLight.range = 11;
 
   // Dev-only debug HUD + rest stability test
   const debugHud = import.meta.env.DEV ? createDebugHud() : null;
@@ -782,6 +792,14 @@ export async function boot(options = {}) {
     };
   }
 
+  function updatePlayerReadabilityLight() {
+    playerRimLight.position.set(
+      player.mesh.position.x - 1.45,
+      player.mesh.position.y + 1.12,
+      -7.1,
+    );
+  }
+
   function finishRun() {
     state = 'end';
     player.setWinAnimationActive(false);
@@ -853,6 +871,7 @@ export async function boot(options = {}) {
     player.visual.scaling.set(1, 1, 1);
     player.visual.rotation.set(0, 0, 0);
     updatePlayerShadow(player);
+    updatePlayerReadabilityLight();
 
     camera.position.copyFrom(cameraStartPos);
     camera.setTarget(cameraStartTarget.clone());
@@ -1189,6 +1208,7 @@ export async function boot(options = {}) {
     player.vx = 0;
     player.vy = 0;
     updatePlayerShadow(player);
+    updatePlayerReadabilityLight();
     updateActorDebug();
   }
 
@@ -1198,6 +1218,7 @@ export async function boot(options = {}) {
 
     if (shotMode) {
       updatePlayerShadow(player);
+      updatePlayerReadabilityLight();
       updateActorDebug();
       window.__DADA_DEBUG__.playerX = player.mesh.position.x;
       window.__DADA_DEBUG__.playerY = player.mesh.position.y;
@@ -1308,6 +1329,7 @@ export async function boot(options = {}) {
 
       // Update blob shadow position (follows player X, stays near ground)
       updatePlayerShadow(player);
+      updatePlayerReadabilityLight();
 
       // Check goal
       const pPos = player.getPosition();
@@ -1327,7 +1349,7 @@ export async function boot(options = {}) {
       const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
       camera.position.x = damp(camera.position.x, targetX - 8, 4, dt);
       camera.position.y = damp(camera.position.y, py + 4, 4, dt);
-      camera.position.z = damp(camera.position.z, -14, 4, dt);
+      camera.position.z = damp(camera.position.z, CAMERA_FOLLOW_Z, 4, dt);
       camera.setTarget(new BABYLON.Vector3(
         damp(camera.getTarget().x, targetX, 4, dt),
         damp(camera.getTarget().y, py + 1.2, 4, dt),

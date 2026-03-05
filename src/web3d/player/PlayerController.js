@@ -73,7 +73,7 @@ export class PlayerController {
     this._meshes = babyVisual.shadowMeshes;
 
     // Blob shadow under the player
-    this.blobShadow = createBlobShadow(scene, 'babyShadow', { diameter: 0.7, opacity: 0.3 });
+    this.blobShadow = createBlobShadow(scene, 'babyShadow', { diameter: 0.92, opacity: 0.24 });
     this.blobShadow.position.set(x, 0.01, z);
 
     // Physics state
