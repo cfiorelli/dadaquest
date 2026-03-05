@@ -106,8 +106,8 @@ const BASE_LEVEL1 = {
       z: 0,
       width: 5.2,
       depth: 3.2,
-      accelMultiplier: 0.75,
-      decelMultiplier: 0.22,
+      accelMultiplier: 0.70,
+      decelMultiplier: 0.25,
     },
   ],
   signs: [
