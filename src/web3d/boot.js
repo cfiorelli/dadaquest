@@ -696,6 +696,24 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
   window.__DADA_DEBUG__.actors = actorState;
+  if (debugMode) {
+    const ph = hazards[0] || null;
+    window.__DADA_DEBUG__.levelAudit = {
+      onesiePos: pickups[0] ? [pickups[0].position.x, pickups[0].position.y] : 'missing',
+      puddleAabb: ph ? { minX: ph.minX, maxX: ph.maxX, minY: ph.minY, maxY: ph.maxY } : null,
+      coinPositions: coins.map((c) => [c.position.x, c.position.y]),
+      unreachableCoins: [],
+    };
+    window.__DADA_DEBUG__.dumpLevelAudit = () => {
+      const a = window.__DADA_DEBUG__.levelAudit;
+      console.log('[level-audit] onesie:', a.onesiePos);
+      console.log('[level-audit] puddle AABB:', a.puddleAabb);
+      a.coinPositions.forEach((p, i) => {
+        const inPuddle = a.puddleAabb && p[0] >= a.puddleAabb.minX && p[0] <= a.puddleAabb.maxX;
+        console.log(`[level-audit] coin[${i}]: (${p[0]}, ${p[1]})${inPuddle ? ' WARNING inside puddle X' : ''}`);
+      });
+    };
+  }
 
   function updateActorDebug() {
     const describe = (roleName, node) => {
