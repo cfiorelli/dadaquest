@@ -1,12 +1,7 @@
-// Am – F – C – G chord progression; 1.5 s per chord, looping forever.
-const PIANO_CHORDS = [
-  [220.00, 261.63, 329.63],  // Am: A3 C4 E4
-  [174.61, 220.00, 261.63],  // F:  F3 A3 C4
-  [261.63, 329.63, 392.00],  // C:  C4 E4 G4
-  [196.00, 246.94, 293.66],  // G:  G3 B3 D4
-];
-const PIANO_CHORD_DUR = 1.5;  // seconds per chord
-const PIANO_NOTE_VOL = 0.08;  // per-note amplitude through musicGain
+// C major melody: C4, E4, G4, E4 — one note per second.
+const PLINK_NOTES = [261.63, 329.63, 392.00, 329.63];
+const PLINK_VOL = 0.06;   // quiet pluck through musicGain
+const PLINK_MS = 1000;    // one plink per second
 
 export class GameAudio {
   constructor({ enabled = true } = {}) {
@@ -18,8 +13,7 @@ export class GameAudio {
     this.cooldowns = new Map();
     this._unlockBound = null;
     this._pianoRunning = false;
-    this._pianoChordIndex = 0;
-    this._pianoNextTime = 0;
+    this._plinkIndex = 0;
     this._pianoScheduleId = null;
     this._birdChirpId = null;
   }
@@ -61,7 +55,7 @@ export class GameAudio {
     return this.muted;
   }
 
-  // --- Procedural piano loop ---
+  // --- Piano plink metronome ---
 
   startMusic(fadeSec = 0.5) {
     if (!this.enabled) return;
@@ -69,13 +63,12 @@ export class GameAudio {
     if (!this.ctx || !this.musicGain) return;
     if (this._pianoRunning) return;
     this._pianoRunning = true;
-    this._pianoChordIndex = 0;
-    this._pianoNextTime = this.ctx.currentTime + 0.1;
+    this._plinkIndex = 0;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0.55, t + Math.max(0.02, fadeSec));
-    this._schedulePianoChunk();
+    this._schedulePlink();
     this._scheduleBirdChirp();
   }
 
@@ -92,34 +85,28 @@ export class GameAudio {
     this.musicGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
   }
 
-  _schedulePianoNote(freq, startTime, duration) {
+  _playPlinkNote() {
     if (!this.ctx || !this.musicGain) return;
+    const freq = PLINK_NOTES[this._plinkIndex % PLINK_NOTES.length];
+    this._plinkIndex++;
+    const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    osc.type = 'sine';
+    osc.type = 'triangle';
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.linearRampToValueAtTime(PIANO_NOTE_VOL, startTime + 0.06);
-    gain.gain.setValueAtTime(PIANO_NOTE_VOL, startTime + duration - 0.18);
-    gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(PLINK_VOL, t + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
     osc.connect(gain);
     gain.connect(this.musicGain);
-    osc.start(startTime);
-    osc.stop(startTime + duration + 0.05);
+    osc.start(t);
+    osc.stop(t + 0.26);
   }
 
-  _schedulePianoChunk() {
-    if (!this._pianoRunning || !this.ctx) return;
-    const LOOKAHEAD = 2.0; // seconds to schedule ahead
-    while (this._pianoNextTime < this.ctx.currentTime + LOOKAHEAD) {
-      const chord = PIANO_CHORDS[this._pianoChordIndex % PIANO_CHORDS.length];
-      for (const freq of chord) {
-        this._schedulePianoNote(freq, this._pianoNextTime, PIANO_CHORD_DUR - 0.05);
-      }
-      this._pianoNextTime += PIANO_CHORD_DUR;
-      this._pianoChordIndex++;
-    }
-    this._pianoScheduleId = window.setTimeout(() => this._schedulePianoChunk(), 500);
+  _schedulePlink() {
+    if (!this._pianoRunning) return;
+    this._playPlinkNote();
+    this._pianoScheduleId = window.setTimeout(() => this._schedulePlink(), PLINK_MS);
   }
 
   // --- Occasional bird chirps ---
