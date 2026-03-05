@@ -542,6 +542,68 @@ function createGoalBanner(scene, name, { x, y, z, shadowGen }) {
   return root;
 }
 
+function createCrumblePlatform(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  // Slightly lighter/more cracked look: lighter edge color, cracked-line overlay.
+  const edgeH = Math.min(0.10, h * 0.16);
+  const slabH = h - edgeH;
+
+  // Use a lighter version of the platform color to visually signal "different"
+  const slab = BABYLON.MeshBuilder.CreateBox(name + '_slab', {
+    width: w, height: slabH, depth: d,
+  }, scene);
+  slab.position.y = edgeH / 2;
+  slab.parent = root;
+  slab.material = makeCardboard(scene, name + '_slabMat', 208, 196, 168, {
+    grainScale: 1.6,
+    noiseAmt: 28,  // extra noise → visibly "weathered"
+    roughness: 0.88,
+  });
+  slab.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(slab);
+
+  const edge = BABYLON.MeshBuilder.CreateBox(name + '_edge', {
+    width: w + 0.06, height: edgeH, depth: d + 0.06,
+  }, scene);
+  edge.position.y = -(slabH / 2);
+  edge.parent = root;
+  edge.material = makeCardboard(scene, name + '_edgeMat', 160, 148, 118, { roughness: 0.92 });
+  edge.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(edge);
+
+  // Crack lines on top (3 diagonal planes to suggest fractures)
+  const crackMat = new BABYLON.StandardMaterial(name + '_crackMat', scene);
+  crackMat.diffuseColor = new BABYLON.Color3(0.28, 0.22, 0.16);
+  crackMat.specularColor = BABYLON.Color3.Black();
+  crackMat.disableLighting = true;
+  crackMat.emissiveColor = new BABYLON.Color3(0.14, 0.10, 0.07);
+  crackMat.alpha = 0.45;
+  crackMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  for (let ci = 0; ci < 3; ci++) {
+    const crack = BABYLON.MeshBuilder.CreateBox(name + `_crack${ci}`, {
+      width: w * (0.28 + ci * 0.12),
+      height: 0.008,
+      depth: 0.06,
+    }, scene);
+    crack.rotation.y = (ci * 0.62);
+    crack.position.y = (h * 0.5) + 0.005;
+    crack.parent = root;
+    crack.material = crackMat;
+  }
+
+  // Invisible collider mesh (separate from visual root — positions must match)
+  const colliderMesh = BABYLON.MeshBuilder.CreateBox(name + '_col', {
+    width: w, height: h, depth: d,
+  }, scene);
+  colliderMesh.position.set(x, y, z);
+  colliderMesh.visibility = 0;
+  colliderMesh.isPickable = false;
+
+  return { root, colliderMesh };
+}
+
 function createCoin(scene, name, { x, y, z }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
@@ -948,6 +1010,24 @@ export function buildWorld(scene, options = {}) {
     }
   }
 
+  // === CRUMBLE PLATFORMS ===
+  const crumbles = [];
+  for (let i = 0; i < (LEVEL1.crumbles || []).length; i++) {
+    const cr = LEVEL1.crumbles[i];
+    const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, cr.name, {
+      x: cr.x, y: cr.y, z: cr.z,
+      w: cr.w, h: cr.h, d: cr.d,
+      shadowGen,
+    });
+    allPlatforms.push(crCol);
+    crumbles.push({
+      root: crRoot,
+      colliderMesh: crCol,
+      x: cr.x, y: cr.y, z: cr.z,
+      w: cr.w, h: cr.h,
+    });
+  }
+
   // === DECORATIONS ===
   const treeDecor = [];
   for (let i = 0; i < 6; i++) {
@@ -1012,6 +1092,7 @@ export function buildWorld(scene, options = {}) {
     pickups,
     coins,
     hazards,
+    crumbles,
     level: LEVEL1,
     signs: signRoots,
     assetAnchors: {

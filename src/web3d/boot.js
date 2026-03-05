@@ -556,6 +556,20 @@ export async function boot(options = {}) {
   const pickups = world.pickups || [];
   const coins = world.coins || [];
   const hazards = world.hazards || [];
+  const crumbles = world.crumbles || [];
+  // Crumble state machine — each entry links to a player.colliders[] slot.
+  const crumbleStates = crumbles.map((cr) => {
+    const platformIndex = world.platforms.indexOf(cr.colliderMesh);
+    const collider = platformIndex >= 0 ? player.colliders[platformIndex] : null;
+    return {
+      cr,
+      collider,
+      savedMinY: collider ? collider.minY : 0,
+      savedMaxY: collider ? collider.maxY : 0,
+      state: 'idle',  // idle | shaking | falling
+      timer: 0,
+    };
+  });
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
   const audio = new GameAudio({ enabled: !!debugFlags.audio && !shotMode });
   audio.armOnFirstGesture();
@@ -715,6 +729,7 @@ export async function boot(options = {}) {
       if (coin.node) coin.node.setEnabled(true);
     }
     coinsCollected = 0;
+    resetCrumbles();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -912,6 +927,67 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
   }
 
+  function resetCrumbles() {
+    for (const cs of crumbleStates) {
+      cs.state = 'idle';
+      cs.timer = 0;
+      cs.cr.root.position.x = cs.cr.x;
+      cs.cr.root.position.y = cs.cr.y;
+      cs.cr.root.setEnabled(true);
+      if (cs.collider) {
+        cs.collider.minY = cs.savedMinY;
+        cs.collider.maxY = cs.savedMaxY;
+      }
+    }
+  }
+
+  function updateCrumbles(dt) {
+    const pos = player.mesh.position;
+    const { halfW, halfH } = player.getCollisionHalfExtents();
+    const SHAKE_DUR = 0.58;
+    const FALL_DUR = 2.5;
+
+    for (const cs of crumbleStates) {
+      if (cs.state === 'idle') {
+        if (!player.grounded || !cs.collider) continue;
+        const playerBottom = pos.y - halfH;
+        const onTop = Math.abs(playerBottom - cs.collider.maxY) < 0.05
+          && (pos.x + halfW) > cs.collider.minX
+          && (pos.x - halfW) < cs.collider.maxX;
+        if (onTop) {
+          cs.state = 'shaking';
+          cs.timer = SHAKE_DUR;
+          audio.playCrumbleWarn();
+        }
+      } else if (cs.state === 'shaking') {
+        cs.timer = Math.max(0, cs.timer - dt);
+        // Visual shake — oscillate root X
+        cs.cr.root.position.x = cs.cr.x + Math.sin(cs.timer * 72) * 0.038;
+        if (cs.timer <= 0) {
+          cs.state = 'falling';
+          cs.timer = FALL_DUR;
+          audio.playCrumbleFall();
+          cs.cr.root.position.x = cs.cr.x;
+          cs.cr.root.setEnabled(false);
+          if (cs.collider) {
+            cs.collider.minY = -1000;
+            cs.collider.maxY = -999;
+          }
+        }
+      } else if (cs.state === 'falling') {
+        cs.timer = Math.max(0, cs.timer - dt);
+        if (cs.timer <= 0) {
+          cs.state = 'idle';
+          cs.cr.root.setEnabled(true);
+          if (cs.collider) {
+            cs.collider.minY = cs.savedMinY;
+            cs.collider.maxY = cs.savedMaxY;
+          }
+        }
+      }
+    }
+  }
+
   function updateForegroundOcclusion(dt) {
     if (!foregroundMeshes.length) return;
 
@@ -1063,6 +1139,7 @@ export async function boot(options = {}) {
         }
       } else {
         updateLevelInteractions(dt);
+        updateCrumbles(dt);
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);

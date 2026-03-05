@@ -45,6 +45,14 @@ export const LEVEL1 = {
     { x: 0.6, y: 4.6, z: 1.7, direction: 1 },
     { x: 20.8, y: 4.4, z: 1.7, direction: 1 },
   ],
+  // Crumble platforms: shake after first step, fall after 0.6s, respawn after 2.5s.
+  crumbles: [
+    {
+      name: 'crumbleA',
+      x: 20.4, y: 3.1, z: 0,
+      w: 3.2, h: 0.65, d: 4.0,
+    },
+  ],
   // 12 coins along the critical path.
   // Beat 1 (tutorial): gentle arcs on first platforms.
   // Beat 2 (challenge): near slip zone + optional risky coin above puddle.
