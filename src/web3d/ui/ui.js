@@ -410,12 +410,14 @@ export function createUI(uiRoot, options = {}) {
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
       </div>
       <div class="dada-hint" id="titleHint">Press SPACE or ENTER to start</div>
+      <div id="titleDebug" style="font:10px/1.6 monospace;color:rgba(80,60,40,0.55);margin-top:8px;letter-spacing:0.03em;min-height:1.2em"></div>
     </div>
   `;
   uiRoot.appendChild(titleEl);
 
   let levelSelectHandler = null;
   const titleHintEl = titleEl.querySelector('#titleHint');
+  const titleDebugEl = titleEl.querySelector('#titleDebug');
   const btn1 = titleEl.querySelector('#levelBtn1');
   const btn2 = titleEl.querySelector('#levelBtn2');
 
@@ -430,8 +432,9 @@ export function createUI(uiRoot, options = {}) {
 
   // tabindex="-1" prevents buttons from capturing keyboard focus;
   // history.replaceState avoids page reload so Enter cannot loop back via click.
-  btn1?.addEventListener('click', (ev) => { ev.currentTarget.blur(); selectLevel(1); });
-  btn2?.addEventListener('click', (ev) => { ev.currentTarget.blur(); selectLevel(2); });
+  // preventDefault+stopPropagation ensures no implicit form/button behavior on click.
+  btn1?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(1); });
+  btn2?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(2); });
 
   // End overlay
   const endEl = document.createElement('div');
@@ -642,6 +645,10 @@ export function createUI(uiRoot, options = {}) {
         titleHintEl.style.animation = 'none';
         titleHintEl.textContent = `Error: ${msg}`;
       }
+    },
+    updateTitleDebug({ selectedLevel, currentLevel, titleState, lastKey } = {}) {
+      if (!titleDebugEl) return;
+      titleDebugEl.textContent = `sel:${selectedLevel ?? '?'} cur:${currentLevel ?? '?'} s:${titleState ?? '?'} k:${lastKey ?? '\u2014'}`;
     },
     showPopText(text, durationMs = 760) {
       if (popTimer) clearTimeout(popTimer);

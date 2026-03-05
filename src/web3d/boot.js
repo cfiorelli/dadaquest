@@ -733,27 +733,8 @@ export async function boot(options = {}) {
   // Game state machine
   const goalX = world.goalRoot.position.x;
 
-  let state = 'title'; // title | gameplay | end
-  let titleStartPending = false;
-
-  // Window-level keydown handler — fires regardless of which element has focus.
-  // Prevents Enter/Space from being silently swallowed by a focused level button.
-  window.addEventListener('keydown', (ev) => {
-    if (state !== 'title') return;
-    if (ev.code !== 'Space' && ev.code !== 'Enter') return;
-    ev.preventDefault();
-    if (selectedLevelId !== levelId) {
-      // User switched to a different level via buttons; navigate to load it.
-      const url = selectedLevelId === 2
-        ? `${window.location.pathname}?level=2`
-        : window.location.pathname;
-      ui.showLoading(selectedLevelId);
-      setTimeout(() => { window.location.href = url; }, 80);
-    } else {
-      ui.showLoading(selectedLevelId);
-      titleStartPending = true;
-    }
-  });
+  let state = 'title'; // title | gameplay | loading | end
+  let _lastKey = '—';
 
   let goalReached = false;
   let shotFrames = 0;
@@ -930,7 +911,7 @@ export async function boot(options = {}) {
     audio.stopMusic(0.2);
 
     state = 'title';
-    titleStartPending = false;
+    ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'title', lastKey: _lastKey });
     goalReached = false;
     goalTimer = 0;
     respawnState = null;
@@ -993,6 +974,60 @@ export async function boot(options = {}) {
     }
     restartRun('playAgain');
   });
+
+  // ── Title-start logic ──────────────────────────────────────────────────────
+  //
+  // requestStart is called DIRECTLY from the keydown handler — no render-loop
+  // consumption, no titleStartPending flag.  The state transition is immediate.
+  //
+  function requestStart(targetLevelId) {
+    if (state !== 'title') return; // already loading or playing
+    if (targetLevelId !== levelId) {
+      // User selected a different level than the one currently loaded; navigate.
+      state = 'loading'; // prevent re-entry while setTimeout is pending
+      ui.showLoading(targetLevelId);
+      ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
+      const url = targetLevelId === 2
+        ? `${window.location.pathname}?level=2`
+        : window.location.pathname;
+      setTimeout(() => { window.location.href = url; }, 80);
+      return;
+    }
+    // Same level — transition immediately (world is already built).
+    audio.unlock();
+    state = 'gameplay';
+    input.consumeAll();
+    player.setWinAnimationActive(false);
+    audio.startMusic(0.5);
+    window.__DADA_DEBUG__.sceneKey = 'CribScene';
+    ui.hideTitle();
+    ui.showGameplayHud(coins.length);
+    ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
+    if (debugMode) {
+      debugIdleTimerMs = 1000;
+      player.beginSpawnProbe('initial');
+    }
+  }
+
+  // Single unconditional keydown handler on window — fires regardless of which
+  // DOM element has focus.  Updates the debug line on every key, calls
+  // requestStart for Space/Enter.
+  window.addEventListener('keydown', (ev) => {
+    _lastKey = `${ev.key}/${ev.code}`;
+    ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
+    if (
+      ev.code === 'Space' ||
+      ev.key === 'Enter' ||
+      ev.code === 'Enter' ||
+      ev.code === 'NumpadEnter'
+    ) {
+      ev.preventDefault();
+      requestStart(selectedLevelId);
+    }
+  }, { passive: false });
+
+  // Seed the debug line with initial state so it's visible before any keypress.
+  ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
 
   function startGoalCelebration(goalPos) {
     ui.hideObjective();
@@ -1376,23 +1411,9 @@ export async function boot(options = {}) {
       ui.showStatus(muted ? 'Muted' : 'Sound on', 820);
     }
 
-    if (state === 'title') {
-      // Wait for player input — titleStartPending is set by the window keydown handler
-      if (titleStartPending || input.consumeJump() || input.consumeEnter()) {
-        titleStartPending = false;
-        audio.unlock();
-        state = 'gameplay';
-        input.consumeAll();
-        player.setWinAnimationActive(false);
-        audio.startMusic(0.5);
-        window.__DADA_DEBUG__.sceneKey = 'CribScene';
-        ui.hideTitle();
-        ui.showGameplayHud(coins.length);
-        if (debugMode) {
-          debugIdleTimerMs = 1000; // suppress input for 1s so probe runs clean
-          player.beginSpawnProbe('initial');
-        }
-      }
+    if (state === 'title' || state === 'loading') {
+      // requestStart() handles transitions directly from keydown.
+      // Nothing to do here; render the scene so the title card remains visible.
     } else if (state === 'gameplay') {
       if (respawnState) {
         if (respawnState.phase === 'fadeOut') {
