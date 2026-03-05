@@ -899,6 +899,7 @@ export async function boot(options = {}) {
     // Hazard overlaps affect movement.
     let accelMultiplier = 1;
     let decelMultiplier = 1;
+    let turnResponsiveness = 1;
     let inSlipHazard = false;
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
@@ -908,8 +909,9 @@ export async function boot(options = {}) {
 
       if (inside && hazard.type === 'slip') {
         inSlipHazard = true;
-        accelMultiplier *= hazard.accelMultiplier ?? 0.78;
-        decelMultiplier *= hazard.decelMultiplier ?? 0.22;
+        accelMultiplier *= hazard.accelMultiplier ?? 0.70;
+        decelMultiplier *= hazard.decelMultiplier ?? 0.25;
+        turnResponsiveness = Math.min(turnResponsiveness, 0.58);
         slipRecentTimerMs = 900;
       }
     }
@@ -919,6 +921,8 @@ export async function boot(options = {}) {
     }
     if (inSlipHazard && !slipWasInside && slipToastCooldownMs <= 0) {
       ui.showSlipperyToast();
+      audio.playSplash();
+      juiceFx.spawnSlipRipple(pos);
       slipToastCooldownMs = 1000;
     }
     slipWasInside = inSlipHazard;
@@ -932,6 +936,7 @@ export async function boot(options = {}) {
       surfaceDecelMultiplier: decelMultiplier,
       jumpVelocityMultiplier: onesieJumpBoost,
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
+      turnResponsiveness,
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);

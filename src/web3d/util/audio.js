@@ -130,6 +130,15 @@ export class GameAudio {
     this._osc(120, 'triangle', t + 0.02, 0.18, 0.04, 70);
   }
 
+  playSplash() {
+    if (!this.enabled || !this._allow('splash', 180)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(230, 'triangle', t, 0.10, 0.028, 150);
+    this._osc(140, 'sine', t + 0.02, 0.12, 0.02, 95);
+  }
+
   playWin() {
     if (!this.enabled || !this._allow('win', 500)) return;
     this.unlock();

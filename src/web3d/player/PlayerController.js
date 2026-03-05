@@ -142,6 +142,7 @@ export class PlayerController {
     this.jumpVelocityMultiplier = 1;
     this.maxAirJumps = 0;
     this.airJumpsUsed = 0;
+    this.turnResponsiveness = 1;
 
     // Feedback state
     this.landSquashTimerMs = 0;
@@ -167,11 +168,13 @@ export class PlayerController {
     surfaceDecelMultiplier = 1,
     jumpVelocityMultiplier = 1,
     maxAirJumps = 0,
+    turnResponsiveness = 1,
   } = {}) {
     this.surfaceAccelMultiplier = surfaceAccelMultiplier;
     this.surfaceDecelMultiplier = surfaceDecelMultiplier;
     this.jumpVelocityMultiplier = jumpVelocityMultiplier;
     this.maxAirJumps = Math.max(0, maxAirJumps | 0);
+    this.turnResponsiveness = clamp(turnResponsiveness, 0.2, 1);
   }
 
   setPosition(x, y, z = 0) {
@@ -341,7 +344,16 @@ export class PlayerController {
       ? (moveX !== 0 ? GROUND_ACCEL * this.surfaceAccelMultiplier : GROUND_DECEL * this.surfaceDecelMultiplier)
       : (moveX !== 0 ? AIR_ACCEL * this.surfaceAccelMultiplier : AIR_DECEL * this.surfaceDecelMultiplier);
     const targetVx = moveX * MAX_SPEED;
-    const diff = targetVx - this.vx;
+    let diff = targetVx - this.vx;
+    if (
+      this.grounded
+      && moveX !== 0
+      && Math.abs(this.vx) > 0.2
+      && Math.sign(targetVx) !== Math.sign(this.vx)
+      && this.turnResponsiveness < 0.999
+    ) {
+      diff *= this.turnResponsiveness;
+    }
     const maxStep = accelVal * dt;
     this.vx += clamp(diff, -maxStep, maxStep);
 

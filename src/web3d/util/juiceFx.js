@@ -58,6 +58,11 @@ const SPARKLE_RING = [
   [-0.32, 0.36],
   [0.00, 0.52],
 ];
+const RIPPLE_OFFSETS = [
+  [0, 0],
+  [0.18, 0.05],
+  [-0.16, 0.03],
+];
 
 export class JuiceFx {
   constructor(scene, { enabled = true } = {}) {
@@ -182,6 +187,21 @@ export class JuiceFx {
         startScale: i === 0 ? 0.18 : 0.13,
         endScale: i === 0 ? 0.58 : 0.46,
         vy: 0.10 + i * 0.02,
+      });
+    }
+  }
+
+  spawnSlipRipple(pos) {
+    if (!this.enabled) return;
+    for (let i = 0; i < RIPPLE_OFFSETS.length; i++) {
+      const [ox, oz] = RIPPLE_OFFSETS[i];
+      this._spawn(this.dustMat, 'slipRipple', pos.x + ox, pos.y - 0.42, pos.z + oz, {
+        life: 0.34,
+        startScale: 0.16 + (i * 0.02),
+        endScale: 0.62 + (i * 0.08),
+        vx: ox * 0.28,
+        vy: 0.08,
+        vz: oz * 0.25,
       });
     }
   }
