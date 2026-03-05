@@ -1,18 +1,18 @@
 {
   "primaryPack": "kenney",
   "roles": {
-    "playerModel": ["kenney_baby", "quaternius_character"],
-    "goalModel": ["kenney_dad", "quaternius_character_gun"],
-    "checkpointModel": ["kenney_flag", "quaternius_goal_flag"],
-    "pickupModel": ["kenney_coin", "quaternius_coin"],
-    "signModel": ["kenney_flag", "quaternius_arrow"],
-    "toyBlockModel": ["kenney_crate", "quaternius_chest"],
-    "cribRailModel": ["kenney_fence", "quaternius_plant_large"],
-    "hangingModel": ["kenney_coin", "quaternius_coin"],
-    "bannerModel": ["kenney_flag", "quaternius_goal_flag"],
-    "treeModel": ["kenney_tree", "kenney_tree_pine", "quaternius_tree"],
-    "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass", "quaternius_plant_large"],
-    "cloudModel": ["kenney_rocks", "quaternius_cloud"]
+    "playerModel": ["kenney_baby"],
+    "goalModel": ["kenney_dad"],
+    "checkpointModel": ["kenney_flag"],
+    "pickupModel": ["kenney_coin"],
+    "signModel": ["kenney_flag"],
+    "toyBlockModel": ["kenney_crate", "kenney_chest"],
+    "cribRailModel": ["kenney_fence"],
+    "hangingModel": ["kenney_coin"],
+    "bannerModel": ["kenney_flag"],
+    "treeModel": ["kenney_tree", "kenney_tree_pine"],
+    "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass"],
+    "cloudModel": ["kenney_rocks"]
   },
   "models": [
     {

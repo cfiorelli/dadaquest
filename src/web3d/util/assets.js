@@ -189,7 +189,10 @@ async function loadContainer(scene, modelPath) {
   let promise = containerCache.get(modelPath);
   if (!promise) {
     const url = withBase(modelPath);
-    promise = BABYLON.SceneLoader.LoadAssetContainerAsync('', url, scene)
+    const slashIndex = url.lastIndexOf('/');
+    const rootUrl = slashIndex >= 0 ? url.slice(0, slashIndex + 1) : '';
+    const sceneFileName = slashIndex >= 0 ? url.slice(slashIndex + 1) : url;
+    promise = BABYLON.SceneLoader.LoadAssetContainerAsync(rootUrl, sceneFileName, scene, undefined, '.glb')
       .catch((error) => ({ __failed: true, error }));
     containerCache.set(modelPath, promise);
   }
@@ -231,7 +234,12 @@ export async function loadModelById(scene, modelId, options = {}) {
 
   const loadedContainer = await loadContainer(scene, model.path);
   if (!loadedContainer || loadedContainer.__failed) {
-    console.warn(`[assets] Failed to load ${model.id} from ${model.path}; using fallback visuals.`);
+    const errText = loadedContainer?.error
+      ? ` (${loadedContainer.error.message || String(loadedContainer.error)})`
+      : '';
+    console.warn(
+      `[assets] Failed to load ${model.id} from ${model.path}; using fallback visuals.${errText}`,
+    );
     return { loaded: false, reason: 'load_failed', meshes: [], roots: [] };
   }
 

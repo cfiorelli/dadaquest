@@ -21,6 +21,8 @@ const DEFAULT_FLAGS = {
   occlusionFade: true,
 };
 const GOAL_CELEBRATION_SEC = 0.48;
+const PLAYER_MODEL_SLOT_Y = -0.44;
+const GOAL_MODEL_SLOT_Y = -0.56;
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -127,6 +129,26 @@ function resolveAttachParent(anchor) {
   return anchor;
 }
 
+function collectNodeMeshes(node) {
+  if (!node) return [];
+  const meshes = [];
+  if (node instanceof BABYLON.Mesh) meshes.push(node);
+  if (node instanceof BABYLON.TransformNode) {
+    meshes.push(...node.getChildMeshes(false));
+  }
+  return meshes;
+}
+
+function hideMeshList(meshes) {
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    if (mesh.name === 'goalTrigger') continue;
+    mesh.isVisible = false;
+    mesh.visibility = 0;
+    mesh.setEnabled(false);
+  }
+}
+
 function getAnchorWorldPosition(anchor) {
   if (!anchor) return null;
   if (typeof anchor.getAbsolutePosition === 'function') {
@@ -136,6 +158,113 @@ function getAnchorWorldPosition(anchor) {
     return anchor.position.clone();
   }
   return null;
+}
+
+function applyRoleMetadata(meshes, roleName) {
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      role: roleName,
+    };
+  }
+}
+
+function combineBounds(meshes) {
+  let min = new BABYLON.Vector3(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
+  let max = new BABYLON.Vector3(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY);
+  let count = 0;
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    const bi = mesh.getBoundingInfo();
+    if (!bi) continue;
+    const bmin = bi.boundingBox.minimumWorld;
+    const bmax = bi.boundingBox.maximumWorld;
+    min = BABYLON.Vector3.Minimize(min, bmin);
+    max = BABYLON.Vector3.Maximize(max, bmax);
+    count += 1;
+  }
+  if (count === 0) {
+    return {
+      center: new BABYLON.Vector3(0, 0, 0),
+      size: new BABYLON.Vector3(0, 0, 0),
+      maxDim: 0,
+    };
+  }
+  const size = max.subtract(min);
+  return {
+    center: min.add(max).scale(0.5),
+    size,
+    maxDim: Math.max(size.x, size.y, size.z),
+  };
+}
+
+function sanitizeLoadedRoleModel({
+  role,
+  result,
+  attachParent,
+  debugMode,
+}) {
+  if (!result?.loaded) {
+    return {
+      loaded: false,
+      usingFallback: true,
+      reason: result?.reason || 'load_failed',
+      worldPos: attachParent?.getAbsolutePosition?.()?.asArray?.() || [0, 0, 0],
+      bboxSize: [0, 0, 0],
+    };
+  }
+
+  for (const root of result.roots || []) {
+    if (attachParent && root.parent !== attachParent) {
+      root.parent = attachParent;
+    }
+    root.setEnabled(true);
+    if (attachParent) {
+      root.position.set(0, 0, 0);
+      root.rotationQuaternion = null;
+      root.rotation.set(0, 0, 0);
+    }
+  }
+
+  const meshes = result.meshes || [];
+  applyRoleMetadata(meshes, role);
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.setEnabled(true);
+    mesh.isVisible = true;
+    mesh.visibility = 1;
+    if (mesh.material && Object.prototype.hasOwnProperty.call(mesh.material, 'alpha')) {
+      mesh.material.alpha = 1;
+    }
+  }
+
+  let bounds = combineBounds(meshes);
+  if (bounds.maxDim > 0 && (bounds.maxDim < 0.05 || bounds.maxDim > 50)) {
+    const targetSize = role === 'player' ? 0.95 : 1.15;
+    const correction = targetSize / bounds.maxDim;
+    for (const root of result.roots || []) {
+      root.scaling.scaleInPlace(correction);
+    }
+    bounds = combineBounds(meshes);
+  }
+
+  const visibleMeshCount = meshes.filter(
+    (mesh) => mesh.isEnabled() && mesh.isVisible !== false && (mesh.visibility ?? 1) > 0.02,
+  ).length;
+
+  if (visibleMeshCount === 0 && debugMode) {
+    console.error(`[actors] ${role} loaded but invisible after sanitize`);
+  }
+
+  const worldPos = attachParent?.getAbsolutePosition?.() || bounds.center;
+  return {
+    loaded: true,
+    usingFallback: visibleMeshCount === 0,
+    reason: visibleMeshCount === 0 ? 'loaded_invisible' : 'ok',
+    worldPos: [worldPos.x, worldPos.y, worldPos.z],
+    bboxSize: [bounds.size.x, bounds.size.y, bounds.size.z],
+  };
 }
 
 export async function boot(options = {}) {
@@ -216,12 +345,42 @@ export async function boot(options = {}) {
   const availableModels = await getAvailableModels();
   window.__DADA_DEBUG__.assetModels = availableModels;
 
+  const actorState = {
+    player: { loaded: false, usingFallback: true, reason: 'not_loaded', bboxSize: [0, 0, 0], worldPos: [0, 0, 0] },
+    goal: { loaded: false, usingFallback: true, reason: 'not_loaded', bboxSize: [0, 0, 0], worldPos: [0, 0, 0] },
+  };
+  window.__DADA_DEBUG__.actors = actorState;
+
   async function attachRoleModel(roleName, fallbackNode, options = {}) {
+    const fallbackMeshes = Array.isArray(options.fallbackMeshes)
+      ? options.fallbackMeshes
+      : collectNodeMeshes(fallbackNode);
     const result = await loadModelForRole(scene, roleName, options);
     if (result.loaded) {
       registerShadowCasters(world.shadowGen, result.meshes);
-      if (fallbackNode) hideProceduralVisuals(fallbackNode);
+      hideMeshList(fallbackMeshes);
+      if (options.actorRole) {
+        actorState[options.actorRole] = sanitizeLoadedRoleModel({
+          role: options.actorRole,
+          result,
+          attachParent: options.parent || null,
+          debugMode,
+        });
+      }
       return result;
+    }
+    if (options.actorRole) {
+      const p = options.parent?.getAbsolutePosition?.();
+      actorState[options.actorRole] = {
+        loaded: false,
+        usingFallback: true,
+        reason: result.reason || 'load_failed',
+        worldPos: p ? [p.x, p.y, p.z] : [0, 0, 0],
+        bboxSize: [0, 0, 0],
+      };
+      if (debugMode) {
+        console.error(`[actors] ${options.actorRole} load failed: ${result.reason || 'load_failed'}`);
+      }
     }
     return result;
   }
@@ -246,19 +405,35 @@ export async function boot(options = {}) {
   for (const m of player._meshes) {
     world.shadowGen.addShadowCaster(m);
   }
+  const playerFallbackMeshes = collectNodeMeshes(player.visual).filter((mesh) => mesh.name !== 'goalTrigger');
+  const goalFallbackMeshes = collectNodeMeshes(world.goalRoot).filter((mesh) => mesh.name !== 'goalTrigger');
+  applyRoleMetadata(playerFallbackMeshes, 'player');
+  applyRoleMetadata(goalFallbackMeshes, 'goal');
+
+  const playerVisualRoot = new BABYLON.TransformNode('playerVisualRoot', scene);
+  playerVisualRoot.parent = player.visual;
+  playerVisualRoot.position.set(0, PLAYER_MODEL_SLOT_Y, 0);
+
+  const goalVisualRoot = new BABYLON.TransformNode('goalVisualRoot', scene);
+  goalVisualRoot.parent = world.goalRoot;
+  goalVisualRoot.position.set(0, GOAL_MODEL_SLOT_Y, 0);
 
   // Replace procedural player toy with authored model (visuals only).
   await attachRoleModel('playerModel', player.visual, {
-    parent: player.visual,
+    parent: playerVisualRoot,
+    fallbackMeshes: playerFallbackMeshes,
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
+    actorRole: 'player',
   });
 
   // Replace DaDa mesh and key props with authored assets.
   await attachRoleModel('goalModel', world.goalRoot, {
-    parent: world.goalRoot,
+    parent: goalVisualRoot,
+    fallbackMeshes: goalFallbackMeshes,
     fallbackMaterial: 'plastic',
     rotation: new BABYLON.Vector3(0, Math.PI, 0),
+    actorRole: 'goal',
   });
 
   for (const signRoot of world.signs || []) {
@@ -401,8 +576,10 @@ export async function boot(options = {}) {
   }
 
   // Camera — fixed angle, smooth follow
-  const camera = new BABYLON.FreeCamera('cam', new BABYLON.Vector3(-18, 7, -14), scene);
-  camera.setTarget(new BABYLON.Vector3(-12, 2, 0));
+  const cameraStartPos = new BABYLON.Vector3(-18, 7, -14);
+  const cameraStartTarget = new BABYLON.Vector3(-12, 2, 0);
+  const camera = new BABYLON.FreeCamera('cam', cameraStartPos.clone(), scene);
+  camera.setTarget(cameraStartTarget.clone());
   camera.minZ = 0.5;
   camera.maxZ = 100;
   // Do NOT attach controls — camera is game-controlled, not user-controlled
@@ -427,15 +604,129 @@ export async function boot(options = {}) {
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
+  const checkpointEmissiveBase = new Map();
+  for (const checkpoint of checkpoints) {
+    if (!checkpoint.marker) continue;
+    for (const mesh of checkpoint.marker.getChildMeshes()) {
+      if (mesh.material && mesh.material.emissiveColor) {
+        checkpointEmissiveBase.set(mesh.uniqueId, mesh.material.emissiveColor.clone());
+      }
+    }
+  }
+  const actorInvisibleLogged = {
+    player: false,
+    goal: false,
+  };
   window.__DADA_DEBUG__.lastRespawnReason = '';
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
+  window.__DADA_DEBUG__.actors = actorState;
+
+  function updateActorDebug() {
+    const describe = (roleName, node) => {
+      const meshes = collectNodeMeshes(node).filter((mesh) => mesh.name !== 'goalTrigger');
+      const enabledMeshes = meshes.filter((mesh) => mesh.isEnabled());
+      const bounds = combineBounds(enabledMeshes.length ? enabledMeshes : meshes);
+      const visibleCount = meshes.filter(
+        (mesh) => mesh.isEnabled() && mesh.isVisible !== false && (mesh.visibility ?? 1) > 0.02,
+      ).length;
+      const pos = node?.getAbsolutePosition?.() || bounds.center;
+      const usingFallback = actorState[roleName].usingFallback;
+
+      if (visibleCount === 0 && debugMode && !actorInvisibleLogged[roleName]) {
+        const cause = actorState[roleName].loaded ? 'loaded_but_invisible' : 'load_failed_using_fallback';
+        console.error(`[actors] ${roleName} invisible (${cause})`);
+        actorInvisibleLogged[roleName] = true;
+      }
+      if (visibleCount > 0) {
+        actorInvisibleLogged[roleName] = false;
+      }
+
+      return {
+        loaded: actorState[roleName].loaded,
+        usingFallback,
+        reason: actorState[roleName].reason,
+        worldPos: [pos.x, pos.y, pos.z],
+        bboxSize: [bounds.size.x, bounds.size.y, bounds.size.z],
+        visibleMeshCount: visibleCount,
+      };
+    };
+
+    window.__DADA_DEBUG__.actors = {
+      player: describe('player', player.visual),
+      goal: describe('goal', world.goalRoot),
+    };
+  }
 
   function finishRun() {
     state = 'end';
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     ui.showEnd();
   }
+
+  function restartRun(reason = 'ui') {
+    if (debugMode) {
+      console.log(`[game] restart requested via ${reason}`);
+    }
+
+    ui.setFade(0);
+    ui.hideEnd();
+    ui.showTitle();
+    ui.showStatus('Ready!', 500);
+    input.consumeAll();
+    juiceFx.clear();
+
+    state = 'title';
+    goalReached = false;
+    goalTimer = 0;
+    respawnState = null;
+    activeCheckpointIndex = 0;
+    respawnPoint = { ...spawnPoint };
+    onesieBuffTimerMs = 0;
+    onesieJumpBoost = 1;
+    slipRecentTimerMs = 0;
+    debugIdleTimerMs = 0;
+    window.__DADA_DEBUG__.sceneKey = 'TitleScene';
+    window.__DADA_DEBUG__.checkpointIndex = 0;
+    window.__DADA_DEBUG__.lastRespawnReason = '';
+    window.__DADA_DEBUG__.onesieBuffMs = 0;
+
+    for (const checkpoint of checkpoints) {
+      if (!checkpoint.marker) continue;
+      for (const mesh of checkpoint.marker.getChildMeshes()) {
+        if (!mesh.material || !mesh.material.emissiveColor) continue;
+        const base = checkpointEmissiveBase.get(mesh.uniqueId);
+        if (base) {
+          mesh.material.emissiveColor = base.clone();
+        }
+      }
+    }
+
+    for (const pickup of pickups) {
+      pickup.collected = false;
+      if (pickup.node) pickup.node.setEnabled(true);
+    }
+
+    player.spawnAt(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
+    player.vx = 0;
+    player.vy = 0;
+    player.invulnTimerMs = 0;
+    player.setMovementModifiers();
+    player.visual.scaling.set(1, 1, 1);
+    player.visual.rotation.set(0, 0, 0);
+    updatePlayerShadow(player);
+
+    camera.position.copyFrom(cameraStartPos);
+    camera.setTarget(cameraStartTarget.clone());
+    updateActorDebug();
+  }
+
+  ui.setPlayAgainHandler(() => {
+    if (debugMode) {
+      console.log('UI: playAgain clicked');
+    }
+    restartRun('playAgain');
+  });
 
   function startGoalCelebration(goalPos) {
     if (!debugFlags.juice) {
@@ -598,6 +889,7 @@ export async function boot(options = {}) {
     const ray = new BABYLON.Ray(cameraPos, rayDir, rayLength);
 
     for (const mesh of foregroundMeshes) {
+      if (mesh?.metadata?.role === 'player' || mesh?.metadata?.role === 'goal') continue;
       const stateInfo = foregroundState.get(mesh.uniqueId);
       if (!stateInfo) continue;
 
@@ -656,6 +948,7 @@ export async function boot(options = {}) {
     player.vx = 0;
     player.vy = 0;
     updatePlayerShadow(player);
+    updateActorDebug();
   }
 
   // Main loop
@@ -664,6 +957,7 @@ export async function boot(options = {}) {
 
     if (shotMode) {
       updatePlayerShadow(player);
+      updateActorDebug();
       window.__DADA_DEBUG__.playerX = player.mesh.position.x;
       window.__DADA_DEBUG__.playerY = player.mesh.position.y;
 
@@ -793,10 +1087,15 @@ export async function boot(options = {}) {
       if (goalTimer <= 0) {
         finishRun();
       }
+    } else if (state === 'end') {
+      if (input.consumeJump() || input.consumeEnter()) {
+        restartRun('keyboard');
+      }
     }
 
     juiceFx.update(dt);
     updateForegroundOcclusion(dt);
+    updateActorDebug();
     window.__DADA_DEBUG__.playerX = player.mesh.position.x;
     window.__DADA_DEBUG__.playerY = player.mesh.position.y;
 
