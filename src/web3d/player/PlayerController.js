@@ -2,6 +2,7 @@ import * as BABYLON from '@babylonjs/core';
 import { clamp } from '../util/math.js';
 import { createBlobShadow } from '../materials.js';
 import { createBabyVisual } from './babyVisual.js';
+import { BabyAnimationController } from './babyAnim.js';
 import { isDebugMode } from '../../utils/modes.js';
 
 function recordJump(reason, input, grounded, pos) {
@@ -37,7 +38,6 @@ const PLAYER_HALF_W = 0.25;
 const PLAYER_HALF_H = 0.4;
 const SKIN_WIDTH = 0.005;     // separation buffer to prevent re-collision
 const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
-const LAND_SQUASH_MS = 95;
 const INVULN_BLINK_HZ = 20;
 
 export class PlayerController {
@@ -64,6 +64,10 @@ export class PlayerController {
     const babyVisual = createBabyVisual(scene);
     babyVisual.root.parent = this.visual;
     this.babyRig = babyVisual.rig;
+    this.babyAnim = new BabyAnimationController({
+      rig: this.babyRig,
+      enabled: this.animationsEnabled,
+    });
 
     // Store child meshes for shadow caster registration
     this._meshes = babyVisual.shadowMeshes;
@@ -100,7 +104,6 @@ export class PlayerController {
     this.accelBonusMultiplier = 1;
 
     // Feedback state
-    this.landSquashTimerMs = 0;
     this.invulnTimerMs = 0;
     this.eventQueue = [];
   }
@@ -148,6 +151,10 @@ export class PlayerController {
     this.lastJumpPressIdUsed = 0;
     this.outOfBoundsEmitted = false;
     this.airJumpsUsed = 0;
+    if (this.babyAnim) {
+      this.babyAnim.setWinActive(false);
+      this.babyAnim.resetPose();
+    }
   }
 
   /**
@@ -198,7 +205,9 @@ export class PlayerController {
   }
 
   triggerLandSquash() {
-    this.landSquashTimerMs = LAND_SQUASH_MS;
+    if (this.babyAnim) {
+      this.babyAnim.onLand();
+    }
   }
 
   applyHit({ direction = 1, knockback = 4.5, upward = 4.0, invulnMs = 800 } = {}) {
@@ -284,6 +293,9 @@ export class PlayerController {
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
       this.jumpBufferMs = 0; // consume buffer immediately
       this.grounded = false;
+      if (this.babyAnim) {
+        this.babyAnim.onJump();
+      }
       if (canAirJump) {
         this.airJumpsUsed += 1;
         this.emitEvent('doubleJump');
@@ -387,17 +399,11 @@ export class PlayerController {
       this.outOfBoundsEmitted = false;
     }
 
-    // Visual-only squash/stretch envelope.
-    if (this.landSquashTimerMs > 0) {
-      this.landSquashTimerMs = Math.max(0, this.landSquashTimerMs - dt * 1000);
-      const t = 1 - (this.landSquashTimerMs / LAND_SQUASH_MS);
-      const pulse = Math.sin(t * Math.PI);
-      const sx = 1 + 0.13 * pulse;
-      const sy = 1 - 0.16 * pulse;
-      const sz = 1 + 0.13 * pulse;
-      this.visual.scaling.set(sx, sy, sz);
-    } else {
-      this.visual.scaling.set(1, 1, 1);
+    if (this.babyAnim) {
+      this.babyAnim.update(dt, {
+        vx: this.vx,
+        grounded: this.grounded,
+      });
     }
 
     // Blink while invulnerable for clear feedback.
@@ -416,6 +422,21 @@ export class PlayerController {
 
   hasAirJumpAvailable() {
     return this.maxAirJumps > 0 && this.airJumpsUsed < this.maxAirJumps;
+  }
+
+  setWinAnimationActive(active) {
+    if (this.babyAnim) {
+      this.babyAnim.setWinActive(active);
+    }
+  }
+
+  updateVisualOnly(dt) {
+    if (this.babyAnim) {
+      this.babyAnim.update(dt, {
+        vx: this.vx,
+        grounded: this.grounded,
+      });
+    }
   }
 
   /**

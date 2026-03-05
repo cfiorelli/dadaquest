@@ -703,7 +703,6 @@ export async function boot(options = {}) {
   let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
-  let breathTimer = 0;     // player idle breath
   const checkpointEmissiveBase = new Map();
   for (const checkpoint of checkpoints) {
     if (!checkpoint.marker) continue;
@@ -785,6 +784,7 @@ export async function boot(options = {}) {
 
   function finishRun() {
     state = 'end';
+    player.setWinAnimationActive(false);
     audio.stopMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     ui.showEnd();
@@ -848,6 +848,7 @@ export async function boot(options = {}) {
     player.vx = 0;
     player.vy = 0;
     player.invulnTimerMs = 0;
+    player.setWinAnimationActive(false);
     player.setMovementModifiers();
     player.visual.scaling.set(1, 1, 1);
     player.visual.rotation.set(0, 0, 0);
@@ -872,6 +873,7 @@ export async function boot(options = {}) {
       return;
     }
     audio.playWin();
+    player.setWinAnimationActive(true);
     state = 'goal';
     goalTimer = GOAL_CELEBRATION_SEC;
     goalCamStartPos = camera.position.clone();
@@ -1230,6 +1232,7 @@ export async function boot(options = {}) {
         audio.unlock();
         state = 'gameplay';
         input.consumeAll();
+        player.setWinAnimationActive(false);
         audio.startMusic(0.5);
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
@@ -1336,6 +1339,7 @@ export async function boot(options = {}) {
       const ease = easeOutCubic(t);
       camera.position = BABYLON.Vector3.Lerp(goalCamStartPos, goalCamEndPos, ease);
       camera.setTarget(BABYLON.Vector3.Lerp(goalCamStartTarget, goalCamEndTarget, ease));
+      player.updateVisualOnly(dt);
       if (goalTimer <= 0) {
         finishRun();
       }
@@ -1355,13 +1359,6 @@ export async function boot(options = {}) {
           if (coin.node && !coin.collected) {
             coin.node.rotation.y += dt * 2.5;
           }
-        }
-        if (player.grounded && Math.abs(player.vx) < 0.5) {
-          breathTimer += dt;
-          playerVisualRoot.position.y = PLAYER_MODEL_SLOT_Y + Math.sin(breathTimer * 2.2) * 0.018;
-        } else {
-          breathTimer = 0;
-          playerVisualRoot.position.y = PLAYER_MODEL_SLOT_Y;
         }
       }
     }
