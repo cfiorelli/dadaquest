@@ -651,6 +651,17 @@ function configureFoliageCutout(node) {
   }
 }
 
+// ── Shared helper exports (used by buildWorld2) ───────────────────
+export {
+  createCardboardPlatform,
+  createCoin,
+  createCheckpointMarker,
+  createDaDa,
+  createOnesiePickup,
+  createCrumblePlatform,
+  setRenderingGroup,
+};
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {

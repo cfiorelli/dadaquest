@@ -74,6 +74,35 @@ const CSS = `
   font-family: monospace;
   font-weight: 700;
 }
+.dada-level-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.dada-level-btn {
+  padding: 7px 20px;
+  font-size: clamp(12px, 1.8vw, 15px);
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  background: rgba(90,68,46,0.10);
+  border: 1.5px solid rgba(120,88,56,0.35);
+  border-radius: 8px;
+  color: #5d4a36;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: auto;
+  transition: background 0.15s, transform 0.12s;
+}
+.dada-level-btn:hover {
+  background: rgba(90,68,46,0.20);
+  transform: scale(1.04);
+}
+.dada-level-btn.active {
+  background: linear-gradient(135deg, #ce5739, #ad3d28);
+  border-color: rgba(125,64,40,0.5);
+  color: #fff;
+}
 .dada-btn {
   margin-top: 24px;
   padding: 14px 32px;
@@ -361,22 +390,37 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.style.zIndex = '1000';
   uiRoot.style.pointerEvents = 'none';
 
+  // Detect current level from URL
+  const _currentLevel = new URLSearchParams(window.location.search).get('level') === '2' ? 2 : 1;
+
   // Title overlay
   const titleEl = document.createElement('div');
   titleEl.className = 'dada-overlay dada-title-bg';
   titleEl.innerHTML = `
     <div class="dada-card">
       <div class="dada-h1">DA DA QUEST</div>
-      <div class="dada-sub">A baby's epic journey</div>
+      <div class="dada-sub">${_currentLevel === 2 ? 'Level 2 \u2014 Condo Garden' : 'A baby\'s epic journey'}</div>
       <div class="dada-controls">
         <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
         <span>Space</span> Jump &nbsp;\u00b7&nbsp;
         <span>M</span> Mute
       </div>
+      <div class="dada-level-row">
+        <button class="dada-level-btn${_currentLevel === 1 ? ' active' : ''}" id="levelBtn1">Level 1</button>
+        <button class="dada-level-btn${_currentLevel === 2 ? ' active' : ''}" id="levelBtn2">Level 2</button>
+      </div>
       <div class="dada-hint">Press SPACE or ENTER to start</div>
     </div>
   `;
   uiRoot.appendChild(titleEl);
+
+  // Level select button handlers — navigate to appropriate URL
+  titleEl.querySelector('#levelBtn1')?.addEventListener('click', () => {
+    window.location.href = window.location.pathname;
+  });
+  titleEl.querySelector('#levelBtn2')?.addEventListener('click', () => {
+    window.location.href = `${window.location.pathname}?level=2`;
+  });
 
   // End overlay
   const endEl = document.createElement('div');
