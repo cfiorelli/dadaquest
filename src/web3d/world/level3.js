@@ -50,7 +50,7 @@ const BASE_LEVEL3 = {
   checkpoints: [
     { x: 8.8, y: 3.15, z: L, label: 'Porch Step' },
     { x: 36.8, y: 10.00, z: L, label: 'Dinner End' },
-    { x: 43.0, y: 5.75, z: L, label: 'Crossing' },
+    { x: 43.4, y: 5.75, z: L, label: 'Crossing' },
   ],
 
   ground: { x: 28.0, y: -0.75, z: L, w: 112, h: 1.5, d: 14 },
@@ -73,7 +73,7 @@ const BASE_LEVEL3 = {
     { name: 'crossingStart', x: 43.0, y: 4.95, w: 4.6, h: 0.80, d: 4.0 },
     { name: 'lane1',         x: 48.4, y: 4.95, w: 4.8, h: 0.60, d: 4.0 },
     { name: 'lane2',         x: 53.8, y: 4.95, w: 4.8, h: 0.60, d: 4.0 },
-    { name: 'safeIsland',    x: 59.2, y: 5.20, w: 4.0, h: 0.80, d: 4.0 },
+    { name: 'safeIsland',    x: 59.2, y: 5.20, w: 4.6, h: 0.80, d: 4.0 },
     { name: 'lane3',         x: 64.8, y: 5.20, w: 4.8, h: 0.60, d: 4.0 },
     { name: 'lane4',         x: 70.4, y: 5.20, w: 4.8, h: 0.60, d: 4.0 },
     { name: 'grandmaPorch',  x: 76.4, y: 6.35, w: 6.6, h: 0.80, d: 5.0 },
@@ -107,20 +107,20 @@ const BASE_LEVEL3 = {
   ],
 
   sprinklers: [
-    { name: 'sprinklerA', x: -13.2, y: 1.20, z: L, width: 1.2, height: 1.9, onMs: 1200, offMs: 1200, phaseMs: 0 },
-    { name: 'sprinklerB', x:  -7.0, y: 1.55, z: L, width: 1.1, height: 1.8, onMs: 1200, offMs: 1200, phaseMs: 600 },
+    { name: 'sprinklerA', x: -13.2, y: 1.20, z: L, width: 1.2, height: 1.9, onMs: 1100, offMs: 1350, phaseMs: 0 },
+    { name: 'sprinklerB', x:  -7.0, y: 1.55, z: L, width: 1.1, height: 1.8, onMs: 1100, offMs: 1350, phaseMs: 650 },
   ],
 
   steamVents: [
-    { name: 'steamA', x: 23.2, y: 5.20, z: L, width: 1.3, height: 1.8, onMs: 900, offMs: 900, phaseMs: 0 },
-    { name: 'steamB', x: 29.2, y: 6.45, z: L, width: 1.3, height: 1.9, onMs: 900, offMs: 900, phaseMs: 450 },
+    { name: 'steamA', x: 23.2, y: 5.20, z: L, width: 1.3, height: 1.8, onMs: 900, offMs: 1150, phaseMs: 0 },
+    { name: 'steamB', x: 29.2, y: 6.45, z: L, width: 1.3, height: 1.9, onMs: 900, offMs: 1150, phaseMs: 500 },
   ],
 
   dogLanes: [
-    { name: 'dogLane1', y: 5.35, minX: 46.0, maxX: 50.8, speed: 2.8, dogs: [{ startX: 46.1, dir: 1 }] },
-    { name: 'dogLane2', y: 5.35, minX: 51.5, maxX: 56.2, speed: -3.1, dogs: [{ startX: 55.8, dir: -1 }] },
-    { name: 'dogLane3', y: 5.55, minX: 62.6, maxX: 67.2, speed: 3.3, dogs: [{ startX: 62.9, dir: 1 }] },
-    { name: 'dogLane4', y: 5.55, minX: 68.0, maxX: 72.8, speed: -3.5, dogs: [{ startX: 72.4, dir: -1 }] },
+    { name: 'dogLane1', y: 5.35, minX: 46.0, maxX: 50.8, speed: 2.5, dogs: [{ startX: 46.1, dir: 1 }] },
+    { name: 'dogLane2', y: 5.35, minX: 51.5, maxX: 56.2, speed: -2.8, dogs: [{ startX: 55.8, dir: -1 }] },
+    { name: 'dogLane3', y: 5.55, minX: 62.6, maxX: 67.2, speed: 3.0, dogs: [{ startX: 62.9, dir: 1 }] },
+    { name: 'dogLane4', y: 5.55, minX: 68.0, maxX: 72.8, speed: -3.2, dogs: [{ startX: 72.4, dir: -1 }] },
   ],
 };
 

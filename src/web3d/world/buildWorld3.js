@@ -222,6 +222,39 @@ function createGrandmaBackdrop(scene, shadowGen) {
   gardenFence.material = makeCardboard(scene, 'gardenFence3Mat', 208, 191, 172, { roughness: 0.92 });
   gardenFence.receiveShadows = true;
   markDecorative(gardenFence);
+
+  const goalBanner = BABYLON.MeshBuilder.CreatePlane('grandmaGoalBanner', {
+    width: 4.4,
+    height: 1.0,
+  }, scene);
+  goalBanner.position.set(74.8, 9.2, 5.9);
+  const bannerMat = makePaper(scene, 'grandmaGoalBannerMat', 255, 239, 198, {
+    roughness: 0.98,
+    grainScale: 2.2,
+    noiseAmt: 10,
+  });
+  bannerMat.emissiveColor = new BABYLON.Color3(0.22, 0.12, 0.08);
+  goalBanner.material = bannerMat;
+  goalBanner.receiveShadows = true;
+  markDecorative(goalBanner);
+
+  const bannerPoleLeft = BABYLON.MeshBuilder.CreateBox('grandmaGoalPoleL', {
+    width: 0.12,
+    height: 1.5,
+    depth: 0.12,
+  }, scene);
+  bannerPoleLeft.position.set(72.7, 8.75, 6.0);
+  bannerPoleLeft.material = makeCardboard(scene, 'grandmaGoalPoleLMat', 156, 112, 88, { roughness: 0.88 });
+  markDecorative(bannerPoleLeft);
+
+  const bannerPoleRight = BABYLON.MeshBuilder.CreateBox('grandmaGoalPoleR', {
+    width: 0.12,
+    height: 1.5,
+    depth: 0.12,
+  }, scene);
+  bannerPoleRight.position.set(76.9, 8.75, 6.0);
+  bannerPoleRight.material = makeCardboard(scene, 'grandmaGoalPoleRMat', 156, 112, 88, { roughness: 0.88 });
+  markDecorative(bannerPoleRight);
 }
 
 export function buildWorld3(scene, options = {}) {
