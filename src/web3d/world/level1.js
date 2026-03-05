@@ -115,11 +115,7 @@ const BASE_LEVEL1 = {
       decelMultiplier: 0.25,
     },
   ],
-  signs: [
-    { x: -10.6, y: 2.05, z: 1.6, direction: 1 },
-    { x:   0.6, y: 4.6,  z: 1.7, direction: 1 },
-    { x:  20.8, y: 4.4,  z: 1.7, direction: 1 },
-  ],
+  signs: [], // removed: kenney_flag GLB on a pole read as "toilet plunger" by players
   crumbles: [
     {
       // Centered over the puddle: when it crumbles the player falls into the puddle zone.

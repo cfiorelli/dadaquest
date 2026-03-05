@@ -2,7 +2,7 @@
   "primaryPack": "kenney",
   "roles": {
     "playerModel": ["kenney_baby"],
-    "goalModel": ["kenney_dad"],
+    "goalModel": ["local_dad"],
     "checkpointModel": ["kenney_flag"],
     "pickupModel": [],
     "signModel": ["kenney_flag"],
@@ -163,8 +163,8 @@
     {
       "id": "local_dad",
       "path": "assets/models/characters/dad.glb",
-      "scale": 1,
-      "yOffset": 0
+      "scale": 0.9,
+      "yOffset": -0.5
     },
     {
       "id": "local_mom",

@@ -20,7 +20,7 @@ const PLINK_RESTS = [
   false, false, false, true,
   false, false, false, false,
 ];
-const PLINK_VOL = 0.06;   // quiet pluck through musicGain
+const PLINK_VOL = 0.22;   // pluck volume through musicGain
 const PLINK_MS = 1000;    // one plink per second
 
 export class GameAudio {
@@ -45,7 +45,7 @@ export class GameAudio {
     if (!Ctor) return;
     this.ctx = new Ctor();
     this.master = this.ctx.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.24;
+    this.master.gain.value = this.muted ? 0 : 0.75;
     this.master.connect(this.ctx.destination);
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
@@ -71,7 +71,7 @@ export class GameAudio {
     this.muted = !this.muted;
     this._ensureContext();
     if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(this.muted ? 0 : 0.24, this.ctx.currentTime, 0.01);
+      this.master.gain.setTargetAtTime(this.muted ? 0 : 0.75, this.ctx.currentTime, 0.01);
     }
     return this.muted;
   }
@@ -89,7 +89,7 @@ export class GameAudio {
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
-    this.musicGain.gain.linearRampToValueAtTime(0.55, t + Math.max(0.02, fadeSec));
+    this.musicGain.gain.linearRampToValueAtTime(0.85, t + Math.max(0.02, fadeSec));
     this._schedulePlink();
     this._scheduleBirdChirp();
   }
