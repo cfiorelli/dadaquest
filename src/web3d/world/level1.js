@@ -2,8 +2,10 @@ export const LEVEL1 = {
   extents: { minX: -20, maxX: 33 },
   spawn: { x: -15.2, y: 1.205, z: 0 },
   goal: { x: 30.2, y: 5.3, z: 0 },
+  // Beat 1 (Tutorial) ends at platVert1. Beat 2 (Challenge) starts at platBridge.
   checkpoints: [
-    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },
+    { x: -2.1, y: 3.1, z: 0, label: 'First' },   // end of Beat 1 — tutorial clear
+    { x: 12.8, y: 5.1, z: 0, label: 'Midway' },   // start of Beat 2 — before hazards
   ],
   ground: { x: 6.5, y: -0.75, z: 0, w: 58, h: 1.5, d: 14 },
   platforms: [
@@ -44,5 +46,31 @@ export const LEVEL1 = {
     { x: -10.6, y: 2.05, z: 1.6, direction: 1 },
     { x: 0.6, y: 4.6, z: 1.7, direction: 1 },
     { x: 20.8, y: 4.4, z: 1.7, direction: 1 },
+  ],
+  // Crumble platforms: shake after first step, fall after 0.6s, respawn after 2.5s.
+  crumbles: [
+    {
+      name: 'crumbleA',
+      x: 20.4, y: 3.1, z: 0,
+      w: 3.2, h: 0.65, d: 4.0,
+    },
+  ],
+  // 12 coins along the critical path.
+  // Beat 1 (tutorial): gentle arcs on first platforms.
+  // Beat 2 (challenge): near slip zone + optional risky coin above puddle.
+  // Beat 3 (victory): reward trail to DaDa.
+  coins: [
+    { x: -14.8, y: 1.65, z: 0 },
+    { x: -13.2, y: 1.95, z: 0 },
+    { x: -10.4, y: 2.55, z: 0 },
+    { x: -8.8,  y: 2.65, z: 0 },
+    { x: -2.6,  y: 3.65, z: 0 },
+    { x:  2.0,  y: 4.85, z: 0 },
+    { x:  7.6,  y: 5.55, z: 0 },
+    { x: 10.8,  y: 4.45, z: 0 },
+    { x: 16.8,  y: 3.65, z: 0 },
+    { x: 18.4,  y: 3.65, z: 0 },
+    { x: 24.2,  y: 4.80, z: 0 },
+    { x: 27.8,  y: 5.55, z: 0 },
   ],
 };

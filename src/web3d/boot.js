@@ -554,7 +554,22 @@ export async function boot(options = {}) {
     ...(world.checkpoints || []),
   ];
   const pickups = world.pickups || [];
+  const coins = world.coins || [];
   const hazards = world.hazards || [];
+  const crumbles = world.crumbles || [];
+  // Crumble state machine — each entry links to a player.colliders[] slot.
+  const crumbleStates = crumbles.map((cr) => {
+    const platformIndex = world.platforms.indexOf(cr.colliderMesh);
+    const collider = platformIndex >= 0 ? player.colliders[platformIndex] : null;
+    return {
+      cr,
+      collider,
+      savedMinY: collider ? collider.minY : 0,
+      savedMaxY: collider ? collider.maxY : 0,
+      state: 'idle',  // idle | shaking | falling
+      timer: 0,
+    };
+  });
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
   const audio = new GameAudio({ enabled: !!debugFlags.audio && !shotMode });
   audio.armOnFirstGesture();
@@ -589,6 +604,8 @@ export async function boot(options = {}) {
   if (import.meta.env.DEV) installRestStabilityTest(player);
 
   // Game state machine
+  const goalX = world.goalRoot.position.x;
+
   let state = 'title'; // title | gameplay | end
   let goalReached = false;
   let shotFrames = 0;
@@ -601,9 +618,13 @@ export async function boot(options = {}) {
   let activeCheckpointIndex = 0;
   let respawnPoint = { ...spawnPoint };
   let onesieBuffTimerMs = 0;
+  let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
+  let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
+  let goalWaveTimer = 0;   // ambient DaDa idle wave
+  let breathTimer = 0;     // player idle breath
   const checkpointEmissiveBase = new Map();
   for (const checkpoint of checkpoints) {
     if (!checkpoint.marker) continue;
@@ -672,6 +693,7 @@ export async function boot(options = {}) {
     ui.setFade(0);
     ui.hideEnd();
     ui.showTitle();
+    ui.resetGameplayHud();
     ui.showStatus('Ready!', 500);
     input.consumeAll();
     juiceFx.clear();
@@ -683,8 +705,10 @@ export async function boot(options = {}) {
     activeCheckpointIndex = 0;
     respawnPoint = { ...spawnPoint };
     onesieBuffTimerMs = 0;
+    onesieMaxDurationMs = 10000;
     onesieJumpBoost = 1;
     slipRecentTimerMs = 0;
+    coinsCollected = 0;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
     window.__DADA_DEBUG__.checkpointIndex = 0;
@@ -701,6 +725,13 @@ export async function boot(options = {}) {
         }
       }
     }
+
+    for (const coin of coins) {
+      coin.collected = false;
+      if (coin.node) coin.node.setEnabled(true);
+    }
+    coinsCollected = 0;
+    resetCrumbles();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -729,6 +760,7 @@ export async function boot(options = {}) {
   });
 
   function startGoalCelebration(goalPos) {
+    ui.hideObjective();
     if (!debugFlags.juice) {
       finishRun();
       return;
@@ -741,6 +773,8 @@ export async function boot(options = {}) {
     goalCamEndPos = new BABYLON.Vector3(goalPos.x - 3.0, goalPos.y + 2.0, -10.5);
     goalCamEndTarget = new BABYLON.Vector3(goalPos.x, goalPos.y + 0.8, 0);
     juiceFx.spawnGoalSparkles(goalPos);
+    juiceFx.spawnGoalSparkles({ x: goalPos.x - 0.9, y: goalPos.y + 0.4, z: goalPos.z });
+    juiceFx.spawnGoalSparkles({ x: goalPos.x + 0.9, y: goalPos.y + 0.4, z: goalPos.z });
     ui.showPopText('Da Da!', 780);
   }
 
@@ -831,6 +865,25 @@ export async function boot(options = {}) {
       }
     }
 
+    // Coin overlaps
+    for (const coin of coins) {
+      if (coin.collected) continue;
+      const dx = pos.x - coin.position.x;
+      const dy = pos.y - coin.position.y;
+      const r = coin.radius ?? 0.45;
+      if ((dx * dx + dy * dy) <= (r * r)) {
+        coin.collected = true;
+        if (coin.node) coin.node.setEnabled(false);
+        coinsCollected++;
+        audio.playCoin();
+        juiceFx.spawnCoinSparkle(coin.position);
+        ui.updateCoins(coinsCollected);
+        if (coinsCollected === coins.length) {
+          ui.showPopText('All stars!', 900);
+        }
+      }
+    }
+
     // Pickup overlaps
     for (const pickup of pickups) {
       if (pickup.collected) continue;
@@ -840,10 +893,12 @@ export async function boot(options = {}) {
       if ((dx * dx + dy * dy) <= (r * r)) {
         pickup.collected = true;
         if (pickup.node) pickup.node.setEnabled(false);
-        onesieBuffTimerMs = pickup.durationMs ?? 10000;
+        onesieMaxDurationMs = pickup.durationMs ?? 10000;
+        onesieBuffTimerMs = onesieMaxDurationMs;
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
         audio.playPickup();
-        ui.showStatus('Onesie boost + jump', 1500);
+        juiceFx.spawnPickupSparkle(pickup.position);
+        ui.showStatus('Onesie boost!', 1400);
       }
     }
 
@@ -874,6 +929,67 @@ export async function boot(options = {}) {
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
+  }
+
+  function resetCrumbles() {
+    for (const cs of crumbleStates) {
+      cs.state = 'idle';
+      cs.timer = 0;
+      cs.cr.root.position.x = cs.cr.x;
+      cs.cr.root.position.y = cs.cr.y;
+      cs.cr.root.setEnabled(true);
+      if (cs.collider) {
+        cs.collider.minY = cs.savedMinY;
+        cs.collider.maxY = cs.savedMaxY;
+      }
+    }
+  }
+
+  function updateCrumbles(dt) {
+    const pos = player.mesh.position;
+    const { halfW, halfH } = player.getCollisionHalfExtents();
+    const SHAKE_DUR = 0.58;
+    const FALL_DUR = 2.5;
+
+    for (const cs of crumbleStates) {
+      if (cs.state === 'idle') {
+        if (!player.grounded || !cs.collider) continue;
+        const playerBottom = pos.y - halfH;
+        const onTop = Math.abs(playerBottom - cs.collider.maxY) < 0.05
+          && (pos.x + halfW) > cs.collider.minX
+          && (pos.x - halfW) < cs.collider.maxX;
+        if (onTop) {
+          cs.state = 'shaking';
+          cs.timer = SHAKE_DUR;
+          audio.playCrumbleWarn();
+        }
+      } else if (cs.state === 'shaking') {
+        cs.timer = Math.max(0, cs.timer - dt);
+        // Visual shake — oscillate root X
+        cs.cr.root.position.x = cs.cr.x + Math.sin(cs.timer * 72) * 0.038;
+        if (cs.timer <= 0) {
+          cs.state = 'falling';
+          cs.timer = FALL_DUR;
+          audio.playCrumbleFall();
+          cs.cr.root.position.x = cs.cr.x;
+          cs.cr.root.setEnabled(false);
+          if (cs.collider) {
+            cs.collider.minY = -1000;
+            cs.collider.maxY = -999;
+          }
+        }
+      } else if (cs.state === 'falling') {
+        cs.timer = Math.max(0, cs.timer - dt);
+        if (cs.timer <= 0) {
+          cs.state = 'idle';
+          cs.cr.root.setEnabled(true);
+          if (cs.collider) {
+            cs.collider.minY = cs.savedMinY;
+            cs.collider.maxY = cs.savedMaxY;
+          }
+        }
+      }
+    }
   }
 
   function updateForegroundOcclusion(dt) {
@@ -993,6 +1109,7 @@ export async function boot(options = {}) {
         input.consumeAll();
         window.__DADA_DEBUG__.sceneKey = 'CribScene';
         ui.hideTitle();
+        ui.showGameplayHud(coins.length);
         if (debugMode) {
           debugIdleTimerMs = 1000; // suppress input for 1s so probe runs clean
           player.beginSpawnProbe('initial');
@@ -1026,6 +1143,7 @@ export async function boot(options = {}) {
         }
       } else {
         updateLevelInteractions(dt);
+        updateCrumbles(dt);
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);
@@ -1041,14 +1159,20 @@ export async function boot(options = {}) {
           if (ev.type === 'jump') {
             audio.playJump();
             juiceFx.spawnJumpDust(player.mesh.position);
+            ui.fadeControlHints();
           } else if (ev.type === 'land') {
             audio.playLand();
             juiceFx.spawnLandDust(player.mesh.position);
+            if (!shotMode) camera.position.y -= 0.18; // camera punch
           } else if (ev.type === 'outOfBounds') {
             const reason = slipRecentTimerMs > 0 ? 'slip_fall' : 'fell_off_level';
             triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
           }
         }
+
+        // HUD updates each frame
+        ui.updateObjectiveDir(player.mesh.position.x, goalX);
+        ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
       }
 
       // Update blob shadow position (follows player X, stays near ground)
@@ -1090,6 +1214,27 @@ export async function boot(options = {}) {
     } else if (state === 'end') {
       if (input.consumeJump() || input.consumeEnter()) {
         restartRun('keyboard');
+      }
+    }
+
+    // Ambient micro-animations — disabled in shot mode
+    if (!shotMode) {
+      goalWaveTimer += dt;
+      goalVisualRoot.position.y = GOAL_MODEL_SLOT_Y + Math.sin(goalWaveTimer * 1.4) * 0.06;
+
+      if (state === 'gameplay' && !respawnState) {
+        for (const coin of coins) {
+          if (coin.node && !coin.collected) {
+            coin.node.rotation.y += dt * 2.5;
+          }
+        }
+        if (player.grounded && Math.abs(player.vx) < 0.5) {
+          breathTimer += dt;
+          playerVisualRoot.position.y = PLAYER_MODEL_SLOT_Y + Math.sin(breathTimer * 2.2) * 0.018;
+        } else {
+          breathTimer = 0;
+          playerVisualRoot.position.y = PLAYER_MODEL_SLOT_Y;
+        }
       }
     }
 

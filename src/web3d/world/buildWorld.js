@@ -542,6 +542,119 @@ function createGoalBanner(scene, name, { x, y, z, shadowGen }) {
   return root;
 }
 
+function createCrumblePlatform(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  // Slightly lighter/more cracked look: lighter edge color, cracked-line overlay.
+  const edgeH = Math.min(0.10, h * 0.16);
+  const slabH = h - edgeH;
+
+  // Use a lighter version of the platform color to visually signal "different"
+  const slab = BABYLON.MeshBuilder.CreateBox(name + '_slab', {
+    width: w, height: slabH, depth: d,
+  }, scene);
+  slab.position.y = edgeH / 2;
+  slab.parent = root;
+  slab.material = makeCardboard(scene, name + '_slabMat', 208, 196, 168, {
+    grainScale: 1.6,
+    noiseAmt: 28,  // extra noise → visibly "weathered"
+    roughness: 0.88,
+  });
+  slab.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(slab);
+
+  const edge = BABYLON.MeshBuilder.CreateBox(name + '_edge', {
+    width: w + 0.06, height: edgeH, depth: d + 0.06,
+  }, scene);
+  edge.position.y = -(slabH / 2);
+  edge.parent = root;
+  edge.material = makeCardboard(scene, name + '_edgeMat', 160, 148, 118, { roughness: 0.92 });
+  edge.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(edge);
+
+  // Crack lines on top (3 diagonal planes to suggest fractures)
+  const crackMat = new BABYLON.StandardMaterial(name + '_crackMat', scene);
+  crackMat.diffuseColor = new BABYLON.Color3(0.28, 0.22, 0.16);
+  crackMat.specularColor = BABYLON.Color3.Black();
+  crackMat.disableLighting = true;
+  crackMat.emissiveColor = new BABYLON.Color3(0.14, 0.10, 0.07);
+  crackMat.alpha = 0.45;
+  crackMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  for (let ci = 0; ci < 3; ci++) {
+    const crack = BABYLON.MeshBuilder.CreateBox(name + `_crack${ci}`, {
+      width: w * (0.28 + ci * 0.12),
+      height: 0.008,
+      depth: 0.06,
+    }, scene);
+    crack.rotation.y = (ci * 0.62);
+    crack.position.y = (h * 0.5) + 0.005;
+    crack.parent = root;
+    crack.material = crackMat;
+  }
+
+  // Invisible collider mesh (separate from visual root — positions must match)
+  const colliderMesh = BABYLON.MeshBuilder.CreateBox(name + '_col', {
+    width: w, height: h, depth: d,
+  }, scene);
+  colliderMesh.position.set(x, y, z);
+  colliderMesh.visibility = 0;
+  colliderMesh.isPickable = false;
+
+  return { root, colliderMesh };
+}
+
+function createCoin(scene, name, { x, y, z }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  // Star-disc shape: slightly flattened sphere for a coin silhouette.
+  const disc = BABYLON.MeshBuilder.CreateSphere(name + '_disc', {
+    diameter: 0.32, segments: 10,
+  }, scene);
+  disc.scaling.z = 0.24;
+  disc.parent = root;
+  const discMat = new BABYLON.PBRMaterial(name + '_mat', scene);
+  discMat.albedoColor = new BABYLON.Color3(0.95, 0.78, 0.22);
+  discMat.roughness = 0.22;
+  discMat.metallic = 0.7;
+  discMat.environmentIntensity = 0.5;
+  disc.material = discMat;
+
+  // Star inner face
+  const star = BABYLON.MeshBuilder.CreatePlane(name + '_star', { size: 0.18 }, scene);
+  star.position.z = -0.06;
+  star.parent = root;
+  const starTex = new BABYLON.DynamicTexture(name + '_starTex', 32, scene, true);
+  const sCtx = starTex.getContext();
+  sCtx.fillStyle = 'rgba(255,242,150,0.0)';
+  sCtx.fillRect(0, 0, 32, 32);
+  sCtx.fillStyle = 'rgba(255,230,60,0.88)';
+  // 5-point star
+  const cx = 16, cy = 16, outerR = 14, innerR = 6;
+  sCtx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const angle = (i * Math.PI / 5) - Math.PI / 2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    if (i === 0) sCtx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    else sCtx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+  }
+  sCtx.closePath();
+  sCtx.fill();
+  starTex.update();
+  starTex.hasAlpha = true;
+  const starMat = new BABYLON.StandardMaterial(name + '_starMat', scene);
+  starMat.diffuseTexture = starTex;
+  starMat.opacityTexture = starTex;
+  starMat.useAlphaFromDiffuseTexture = true;
+  starMat.specularColor = BABYLON.Color3.Black();
+  starMat.disableLighting = true;
+  starMat.emissiveColor = new BABYLON.Color3(1.0, 0.85, 0.3);
+  star.material = starMat;
+
+  return root;
+}
+
 // ── Main world builder ───────────────────────────────────────────
 
 export function buildWorld(scene, options = {}) {
@@ -573,6 +686,12 @@ export function buildWorld(scene, options = {}) {
   rimLight.intensity = 0.30;
   rimLight.diffuse = new BABYLON.Color3(0.80, 0.92, 1.0);
   rimLight.range = 40;
+
+  // Goal hero light — warm accent near DaDa to make the destination pop.
+  const goalLight = new BABYLON.PointLight('goalLight', new BABYLON.Vector3(30.2, 9.0, -6.0), scene);
+  goalLight.intensity = 0.55;
+  goalLight.diffuse = new BABYLON.Color3(1.0, 0.82, 0.50);
+  goalLight.range = 18;
 
   const shadowGen = new BABYLON.ShadowGenerator(1024, keyLight);
   // Keep shadow filtering stable in swiftshader and local browsers.
@@ -616,12 +735,40 @@ export function buildWorld(scene, options = {}) {
     roughness: 0.98,
   });
 
-  const skyMat = makeFelt(scene, 'skyMat', ...P.backgroundSky, { roughness: 1.0 });
-  skyMat.alpha = 0.25;
-  skyMat.sheen.isEnabled = false;
+  // Sky gradient: warm horizon at bottom, cool blue at top — DynamicTexture for clean gradient.
+  const skyTex = new BABYLON.DynamicTexture('skyGradTex', { width: 4, height: 256 }, scene, true);
+  const sCtx = skyTex.getContext();
+  const skyGrad = sCtx.createLinearGradient(0, 0, 0, 256);
+  skyGrad.addColorStop(0.0, 'rgba(148,190,230,0.92)');  // cool upper blue
+  skyGrad.addColorStop(0.48, 'rgba(178,212,240,0.78)'); // mid sky
+  skyGrad.addColorStop(0.82, 'rgba(224,230,220,0.58)'); // hazy horizon
+  skyGrad.addColorStop(1.0, 'rgba(240,232,210,0.32)');  // warm ground haze
+  sCtx.fillStyle = skyGrad;
+  sCtx.fillRect(0, 0, 4, 256);
+  skyTex.update();
+  skyTex.hasAlpha = true;
+  const skyMat = new BABYLON.StandardMaterial('skyMat', scene);
+  skyMat.diffuseTexture = skyTex;
+  skyMat.opacityTexture = skyTex;
+  skyMat.useAlphaFromDiffuseTexture = true;
+  skyMat.specularColor = BABYLON.Color3.Black();
+  skyMat.disableLighting = true;
+  skyMat.emissiveColor = new BABYLON.Color3(0.82, 0.88, 0.95);
   const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 64, height: 20 }, scene);
   skyPlane.position.set(6, 9.5, 7.98);
   skyPlane.material = skyMat;
+
+  // Backdrop seam lines (simulate paper join strips — deterministic, no random)
+  const seamMat = makePaper(scene, 'seamMat', 190, 182, 168, { grainScale: 3.0, noiseAmt: 8, roughness: 0.99 });
+  seamMat.alpha = 0.28;
+  seamMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  for (let i = 0; i < 3; i++) {
+    const seamY = 2.4 + i * 6.2;
+    const seam = BABYLON.MeshBuilder.CreateBox(`seam_${i}`, { width: 67, height: 0.09, depth: 0.18 }, scene);
+    seam.position.set(6, seamY, 8.05);
+    seam.material = seamMat;
+    seam.isPickable = false;
+  }
 
   // === PARALLAX CUTOUT LAYERS (deterministic) ===
   const decorativeRand = seededRandom(5021);
@@ -798,6 +945,19 @@ export function buildWorld(scene, options = {}) {
     });
   }
 
+  // === COINS ===
+  const coins = [];
+  for (let i = 0; i < LEVEL1.coins.length; i++) {
+    const c = LEVEL1.coins[i];
+    const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: c.z });
+    coins.push({
+      position: new BABYLON.Vector3(c.x, c.y, c.z),
+      radius: 0.45,
+      node,
+      collected: false,
+    });
+  }
+
   // Toy blocks near spawn to make the first area feel inhabited.
   const toyBlocks = [];
   toyBlocks.push(createToyBlock(scene, 'toyBlockA', {
@@ -848,6 +1008,24 @@ export function buildWorld(scene, options = {}) {
         mesh: created.puddle,
       });
     }
+  }
+
+  // === CRUMBLE PLATFORMS ===
+  const crumbles = [];
+  for (let i = 0; i < (LEVEL1.crumbles || []).length; i++) {
+    const cr = LEVEL1.crumbles[i];
+    const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, cr.name, {
+      x: cr.x, y: cr.y, z: cr.z,
+      w: cr.w, h: cr.h, d: cr.d,
+      shadowGen,
+    });
+    allPlatforms.push(crCol);
+    crumbles.push({
+      root: crRoot,
+      colliderMesh: crCol,
+      x: cr.x, y: cr.y, z: cr.z,
+      w: cr.w, h: cr.h,
+    });
   }
 
   // === DECORATIONS ===
@@ -912,7 +1090,9 @@ export function buildWorld(scene, options = {}) {
     spawn: LEVEL1.spawn,
     checkpoints,
     pickups,
+    coins,
     hazards,
+    crumbles,
     level: LEVEL1,
     signs: signRoots,
     assetAnchors: {

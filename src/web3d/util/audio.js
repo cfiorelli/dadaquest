@@ -87,6 +87,31 @@ export class GameAudio {
     this._osc(170, 'triangle', t, 0.14, 0.07, 85);
   }
 
+  playCrumbleWarn() {
+    if (!this.enabled || !this._allow('crumbleWarn', 400)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(110, 'triangle', t, 0.22, 0.04, 68);
+    this._osc(88, 'square', t + 0.05, 0.16, 0.025, 55);
+  }
+
+  playCrumbleFall() {
+    if (!this.enabled || !this._allow('crumbleFall', 300)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(140, 'square', t, 0.15, 0.055, 55);
+  }
+
+  playCoin() {
+    if (!this.enabled || !this._allow('coin', 60)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(880, 'sine', t, 0.09, 0.055, 1200);
+  }
+
   playPickup() {
     if (!this.enabled || !this._allow('pickup', 180)) return;
     this.unlock();
