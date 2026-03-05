@@ -574,6 +574,12 @@ export function buildWorld(scene, options = {}) {
   rimLight.diffuse = new BABYLON.Color3(0.80, 0.92, 1.0);
   rimLight.range = 40;
 
+  // Goal hero light — warm accent near DaDa to make the destination pop.
+  const goalLight = new BABYLON.PointLight('goalLight', new BABYLON.Vector3(30.2, 9.0, -6.0), scene);
+  goalLight.intensity = 0.55;
+  goalLight.diffuse = new BABYLON.Color3(1.0, 0.82, 0.50);
+  goalLight.range = 18;
+
   const shadowGen = new BABYLON.ShadowGenerator(1024, keyLight);
   // Keep shadow filtering stable in swiftshader and local browsers.
   shadowGen.usePoissonSampling = true;
@@ -616,12 +622,40 @@ export function buildWorld(scene, options = {}) {
     roughness: 0.98,
   });
 
-  const skyMat = makeFelt(scene, 'skyMat', ...P.backgroundSky, { roughness: 1.0 });
-  skyMat.alpha = 0.25;
-  skyMat.sheen.isEnabled = false;
+  // Sky gradient: warm horizon at bottom, cool blue at top — DynamicTexture for clean gradient.
+  const skyTex = new BABYLON.DynamicTexture('skyGradTex', { width: 4, height: 256 }, scene, true);
+  const sCtx = skyTex.getContext();
+  const skyGrad = sCtx.createLinearGradient(0, 0, 0, 256);
+  skyGrad.addColorStop(0.0, 'rgba(148,190,230,0.92)');  // cool upper blue
+  skyGrad.addColorStop(0.48, 'rgba(178,212,240,0.78)'); // mid sky
+  skyGrad.addColorStop(0.82, 'rgba(224,230,220,0.58)'); // hazy horizon
+  skyGrad.addColorStop(1.0, 'rgba(240,232,210,0.32)');  // warm ground haze
+  sCtx.fillStyle = skyGrad;
+  sCtx.fillRect(0, 0, 4, 256);
+  skyTex.update();
+  skyTex.hasAlpha = true;
+  const skyMat = new BABYLON.StandardMaterial('skyMat', scene);
+  skyMat.diffuseTexture = skyTex;
+  skyMat.opacityTexture = skyTex;
+  skyMat.useAlphaFromDiffuseTexture = true;
+  skyMat.specularColor = BABYLON.Color3.Black();
+  skyMat.disableLighting = true;
+  skyMat.emissiveColor = new BABYLON.Color3(0.82, 0.88, 0.95);
   const skyPlane = BABYLON.MeshBuilder.CreatePlane('skyPlane', { width: 64, height: 20 }, scene);
   skyPlane.position.set(6, 9.5, 7.98);
   skyPlane.material = skyMat;
+
+  // Backdrop seam lines (simulate paper join strips — deterministic, no random)
+  const seamMat = makePaper(scene, 'seamMat', 190, 182, 168, { grainScale: 3.0, noiseAmt: 8, roughness: 0.99 });
+  seamMat.alpha = 0.28;
+  seamMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  for (let i = 0; i < 3; i++) {
+    const seamY = 2.4 + i * 6.2;
+    const seam = BABYLON.MeshBuilder.CreateBox(`seam_${i}`, { width: 67, height: 0.09, depth: 0.18 }, scene);
+    seam.position.set(6, seamY, 8.05);
+    seam.material = seamMat;
+    seam.isPickable = false;
+  }
 
   // === PARALLAX CUTOUT LAYERS (deterministic) ===
   const decorativeRand = seededRandom(5021);
