@@ -6,7 +6,7 @@ import {
   makeFelt,
   makePlastic,
 } from '../materials.js';
-import { LEVEL1 } from './level1.js';
+import { LEVEL1, LANE_Z } from './level1.js';
 import { makeCutoutPolygonMesh, makeCloudCutout, seededRandom } from './cutouts.js';
 
 // ── Platform prefab ──────────────────────────────────────────────
@@ -317,6 +317,17 @@ function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
   zipper.position.set(0, 0.03, -0.12);
   zipper.parent = root;
   zipper.material = makePlastic(scene, name + '_zipMat', ...P.accentYellow, { roughness: 0.22 });
+
+  // Floating burger badge above the onesie — makes it unmissable.
+  const badge = BABYLON.MeshBuilder.CreatePlane(name + '_badge', { width: 0.38, height: 0.38 }, scene);
+  badge.position.set(0, 0.54, 0);
+  badge.parent = root;
+  badge.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  const badgeMat = new BABYLON.StandardMaterial(name + '_badgeMat', scene);
+  badgeMat.diffuseTexture = new BABYLON.Texture('assets/ui/cheeseburger.svg', scene);
+  badgeMat.diffuseTexture.hasAlpha = true;
+  badgeMat.backFaceCulling = false;
+  badge.material = badgeMat;
 
   shadowGen.addShadowCaster(torso);
   shadowGen.addShadowCaster(shoulderL);
@@ -968,9 +979,10 @@ export function buildWorld(scene, options = {}) {
     const node = createOnesiePickup(scene, `pickup_${i}`, {
       x: pick.x,
       y: pick.y,
-      z: pick.z,
+      z: LANE_Z, // enforce lane
       shadowGen,
     });
+    node.position.z = LANE_Z; // extra safety after any child transformations
     setRenderingGroup(node, 3);
 
     pickups.push({
@@ -978,7 +990,7 @@ export function buildWorld(scene, options = {}) {
       radius: pick.radius,
       durationMs: pick.durationMs,
       jumpBoost: pick.jumpBoost,
-      position: new BABYLON.Vector3(pick.x, pick.y, pick.z),
+      position: new BABYLON.Vector3(pick.x, pick.y, LANE_Z),
       node,
       collected: false,
     });
@@ -988,10 +1000,11 @@ export function buildWorld(scene, options = {}) {
   const coins = [];
   for (let i = 0; i < LEVEL1.coins.length; i++) {
     const c = LEVEL1.coins[i];
-    const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: c.z });
+    const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: LANE_Z });
+    node.position.z = LANE_Z; // enforce lane
     setRenderingGroup(node, 3);
     coins.push({
-      position: new BABYLON.Vector3(c.x, c.y, c.z),
+      position: new BABYLON.Vector3(c.x, c.y, LANE_Z),
       radius: 0.45,
       node,
       collected: false,
@@ -1057,16 +1070,17 @@ export function buildWorld(scene, options = {}) {
   for (let i = 0; i < (LEVEL1.crumbles || []).length; i++) {
     const cr = LEVEL1.crumbles[i];
     const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, cr.name, {
-      x: cr.x, y: cr.y, z: cr.z,
+      x: cr.x, y: cr.y, z: LANE_Z,
       w: cr.w, h: cr.h, d: cr.d,
       shadowGen,
     });
+    crRoot.position.z = LANE_Z; // enforce lane
     allPlatforms.push(crCol);
     setRenderingGroup(crRoot, 2);
     crumbles.push({
       root: crRoot,
       colliderMesh: crCol,
-      x: cr.x, y: cr.y, z: cr.z,
+      x: cr.x, y: cr.y, z: LANE_Z,
       w: cr.w, h: cr.h,
     });
   }
