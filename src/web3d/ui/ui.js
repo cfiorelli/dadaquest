@@ -33,6 +33,7 @@ const CSS = `
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     inset 0 -1px 0 rgba(130, 102, 72, 0.22);
   color: #3a2c1f;
+  pointer-events: auto;
 }
 .dada-h1 {
   font-size: clamp(36px, 6vw, 64px);
@@ -86,6 +87,7 @@ const CSS = `
   transition: transform 0.15s, background 0.2s;
   letter-spacing: 0.04em;
   font-weight: 700;
+  pointer-events: auto;
 }
 .dada-btn:hover {
   background: linear-gradient(135deg, #db6948, #b64930);
@@ -143,7 +145,7 @@ const CSS = `
   height: 100%;
   background: #000;
   opacity: 0;
-  pointer-events: none;
+  pointer-events: none !important;
   transition: opacity 0.18s linear;
 }
 `;
@@ -153,6 +155,10 @@ export function createUI(uiRoot) {
   const style = document.createElement('style');
   style.textContent = CSS;
   document.head.appendChild(style);
+
+  // Keep UI above canvas and allow overlays/buttons to manage pointer events.
+  uiRoot.style.zIndex = '1000';
+  uiRoot.style.pointerEvents = 'none';
 
   // Title overlay
   const titleEl = document.createElement('div');
@@ -196,9 +202,36 @@ export function createUI(uiRoot) {
   const fadeEl = document.createElement('div');
   fadeEl.className = 'dada-fade';
   uiRoot.appendChild(fadeEl);
+  const canvasEl = document.getElementById('renderCanvas');
 
-  endEl.querySelector('#playAgainBtn').addEventListener('click', () => {
+  function setCanvasInputEnabled(enabled) {
+    if (!canvasEl) return;
+    canvasEl.style.pointerEvents = enabled ? 'auto' : 'none';
+  }
+  setCanvasInputEnabled(true);
+
+  let playAgainHandler = null;
+  const playAgainBtn = endEl.querySelector('#playAgainBtn');
+
+  function triggerPlayAgain() {
+    if (typeof playAgainHandler === 'function') {
+      playAgainHandler();
+      return;
+    }
     location.reload();
+  }
+
+  playAgainBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    triggerPlayAgain();
+  });
+
+  document.addEventListener('keydown', (ev) => {
+    if (endEl.classList.contains('hidden')) return;
+    if (ev.code !== 'Enter' && ev.code !== 'Space') return;
+    ev.preventDefault();
+    triggerPlayAgain();
   });
 
   let titleVisible = true;
@@ -220,9 +253,17 @@ export function createUI(uiRoot) {
     },
     showEnd() {
       endEl.classList.remove('hidden');
+      setCanvasInputEnabled(false);
+    },
+    hideEnd() {
+      endEl.classList.add('hidden');
+      setCanvasInputEnabled(true);
     },
     isEndVisible() {
       return !endEl.classList.contains('hidden');
+    },
+    setPlayAgainHandler(handler) {
+      playAgainHandler = handler;
     },
     showPopText(text, durationMs = 760) {
       if (popTimer) clearTimeout(popTimer);
