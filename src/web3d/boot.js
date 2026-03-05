@@ -900,6 +900,8 @@ export async function boot(options = {}) {
     let accelMultiplier = 1;
     let decelMultiplier = 1;
     let turnResponsiveness = 1;
+    let speedMultiplier = 1;
+    let accelBonusMultiplier = 1;
     let inSlipHazard = false;
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
@@ -926,6 +928,11 @@ export async function boot(options = {}) {
       slipToastCooldownMs = 1000;
     }
     slipWasInside = inSlipHazard;
+    const sprinting = input.isSprintHeld();
+    if (sprinting && !inSlipHazard) {
+      speedMultiplier = 1.15;
+      accelBonusMultiplier = 1.10;
+    }
 
     if (slipRecentTimerMs > 0) {
       slipRecentTimerMs = Math.max(0, slipRecentTimerMs - dt * 1000);
@@ -937,6 +944,8 @@ export async function boot(options = {}) {
       jumpVelocityMultiplier: onesieJumpBoost,
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
       turnResponsiveness,
+      speedMultiplier,
+      accelBonusMultiplier,
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
