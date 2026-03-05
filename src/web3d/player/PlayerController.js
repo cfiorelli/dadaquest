@@ -1,6 +1,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { clamp } from '../util/math.js';
-import { makePlastic, createBlobShadow, LEVEL1_PALETTE as P } from '../materials.js';
+import { createBlobShadow } from '../materials.js';
+import { createBabyVisual } from './babyVisual.js';
 import { isDebugMode } from '../../utils/modes.js';
 
 function recordJump(reason, input, grounded, pos) {
@@ -60,69 +61,12 @@ export class PlayerController {
     this.playerVisualRoot = this.visual;
     this.animationsEnabled = !!animationsEnabled;
 
-    // Body (capsule-like: sphere + cylinder)
-    const body = BABYLON.MeshBuilder.CreateCylinder('babyBody', {
-      height: 0.4, diameterTop: 0.38, diameterBottom: 0.42, tessellation: 14,
-    }, scene);
-    body.position.y = -0.05;
-    body.parent = this.visual;
-    body.material = makePlastic(scene, 'babyBodyMat', ...P.babyBody);
-
-    // Head (larger relative to body — toy proportions)
-    const head = BABYLON.MeshBuilder.CreateSphere('babyHead', {
-      diameter: 0.42, segments: 14,
-    }, scene);
-    head.position.y = 0.28;
-    head.parent = this.visual;
-    head.material = makePlastic(scene, 'babyHeadMat', ...P.babyBody);
-
-    // Diaper band
-    const diaper = BABYLON.MeshBuilder.CreateTorus('babyDiaper', {
-      diameter: 0.42, thickness: 0.12, tessellation: 14,
-    }, scene);
-    diaper.position.y = -0.18;
-    diaper.parent = this.visual;
-    diaper.material = makePlastic(scene, 'babyDiaperMat', ...P.babyDiaper, { roughness: 0.5 });
-
-    // Face (DynamicTexture)
-    const faceSize = 64;
-    const faceTex = new BABYLON.DynamicTexture('babyFaceTex', faceSize, scene, true);
-    const fCtx = faceTex.getContext();
-    fCtx.clearRect(0, 0, faceSize, faceSize);
-    // Eyes (big round baby eyes)
-    fCtx.fillStyle = '#333';
-    fCtx.beginPath();
-    fCtx.arc(20, 24, 5, 0, Math.PI * 2);
-    fCtx.arc(44, 24, 5, 0, Math.PI * 2);
-    fCtx.fill();
-    // Eye highlights
-    fCtx.fillStyle = '#fff';
-    fCtx.beginPath();
-    fCtx.arc(22, 22, 2, 0, Math.PI * 2);
-    fCtx.arc(46, 22, 2, 0, Math.PI * 2);
-    fCtx.fill();
-    // Small smile
-    fCtx.strokeStyle = '#555';
-    fCtx.lineWidth = 1.5;
-    fCtx.beginPath();
-    fCtx.arc(32, 34, 7, 0.15 * Math.PI, 0.85 * Math.PI);
-    fCtx.stroke();
-    faceTex.update();
-    faceTex.hasAlpha = true;
-
-    const facePlane = BABYLON.MeshBuilder.CreatePlane('babyFace', { size: 0.28 }, scene);
-    facePlane.position.set(0, 0.28, -0.22);
-    facePlane.parent = this.visual;
-    const faceMat = new BABYLON.StandardMaterial('babyFaceMat', scene);
-    faceMat.diffuseTexture = faceTex;
-    faceMat.opacityTexture = faceTex;
-    faceMat.specularColor = BABYLON.Color3.Black();
-    faceMat.useAlphaFromDiffuseTexture = true;
-    faceMat.emissiveColor = new BABYLON.Color3(0.12, 0.10, 0.08);
-    facePlane.material = faceMat;
+    const babyVisual = createBabyVisual(scene);
+    babyVisual.root.parent = this.visual;
+    this.babyRig = babyVisual.rig;
 
     // Store child meshes for shadow caster registration
-    this._meshes = [body, head, diaper];
+    this._meshes = babyVisual.shadowMeshes;
 
     // Blob shadow under the player
     this.blobShadow = createBlobShadow(scene, 'babyShadow', { diameter: 0.7, opacity: 0.3 });

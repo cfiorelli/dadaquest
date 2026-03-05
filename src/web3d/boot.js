@@ -43,6 +43,13 @@ function getShotToast() {
   return value === 'onesie' || value === 'slippery' ? value : '';
 }
 
+function shouldUseExternalPlayerModel() {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('playerModel') === '1') return true;
+  return window.__DADA_DEBUG__?.flags?.useExternalPlayerModel === true;
+}
+
 function createSeededRandom(seed = 1337) {
   let state = seed >>> 0;
   return () => {
@@ -313,10 +320,12 @@ export async function boot(options = {}) {
   }
   window.__DADA_DEBUG__.flags = mergedFlags;
   const debugFlags = window.__DADA_DEBUG__.flags;
+  const useExternalPlayerModel = shouldUseExternalPlayerModel();
   window.__DADA_DEBUG__.isShotMode = shotMode;
   window.__DADA_DEBUG__.shotReady = false;
   window.__DADA_DEBUG__.shotFrames = 0;
   window.__DADA_DEBUG__.playerAnimationsEnabled = animationsEnabled;
+  window.__DADA_DEBUG__.useExternalPlayerModel = useExternalPlayerModel;
 
   // Test mode fast-path: headless Chromium has no WebGL, so skip all rendering
   // and just advance the scene keys on timers for the smoke test.
@@ -457,15 +466,26 @@ export async function boot(options = {}) {
   goalVisualRoot.parent = world.goalRoot;
   goalVisualRoot.position.set(0, GOAL_MODEL_SLOT_Y, 0);
 
-  // Replace procedural player toy with authored model (visuals only).
-  await attachRoleModel('playerModel', player.visual, {
-    parent: playerVisualRoot,
-    fallbackMeshes: playerFallbackMeshes,
-    fallbackMaterial: 'plastic',
-    rotation: new BABYLON.Vector3(0, Math.PI, 0),
-    actorRole: 'player',
-    renderingGroupId: 3,
-  });
+  // Procedural baby is the default player visual. External model is opt-in.
+  if (useExternalPlayerModel) {
+    await attachRoleModel('playerModel', player.visual, {
+      parent: playerVisualRoot,
+      fallbackMeshes: playerFallbackMeshes,
+      fallbackMaterial: 'plastic',
+      rotation: new BABYLON.Vector3(0, Math.PI, 0),
+      actorRole: 'player',
+      renderingGroupId: 3,
+    });
+  } else {
+    const p = player.visual.getAbsolutePosition();
+    actorState.player = {
+      loaded: false,
+      usingFallback: true,
+      reason: 'procedural_baby_default',
+      worldPos: [p.x, p.y, p.z],
+      bboxSize: [0, 0, 0],
+    };
+  }
 
   // Replace DaDa mesh and key props with authored assets.
   await attachRoleModel('goalModel', world.goalRoot, {
