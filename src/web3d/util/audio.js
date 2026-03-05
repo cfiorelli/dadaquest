@@ -1,3 +1,13 @@
+// Am – F – C – G chord progression; 1.5 s per chord, looping forever.
+const PIANO_CHORDS = [
+  [220.00, 261.63, 329.63],  // Am: A3 C4 E4
+  [174.61, 220.00, 261.63],  // F:  F3 A3 C4
+  [261.63, 329.63, 392.00],  // C:  C4 E4 G4
+  [196.00, 246.94, 293.66],  // G:  G3 B3 D4
+];
+const PIANO_CHORD_DUR = 1.5;  // seconds per chord
+const PIANO_NOTE_VOL = 0.08;  // per-note amplitude through musicGain
+
 export class GameAudio {
   constructor({ enabled = true } = {}) {
     this.enabled = enabled;
@@ -5,10 +15,13 @@ export class GameAudio {
     this.ctx = null;
     this.master = null;
     this.musicGain = null;
-    this.musicElement = null;
-    this.musicSource = null;
     this.cooldowns = new Map();
     this._unlockBound = null;
+    this._pianoRunning = false;
+    this._pianoChordIndex = 0;
+    this._pianoNextTime = 0;
+    this._pianoScheduleId = null;
+    this._birdChirpId = null;
   }
 
   _ensureContext() {
@@ -22,22 +35,6 @@ export class GameAudio {
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
     this.musicGain.connect(this.master);
-  }
-
-  _ensureMusicElement() {
-    if (!this.enabled || this.musicElement) return;
-    this.musicElement = new Audio('assets/audio/music/level1.ogg');
-    this.musicElement.loop = true;
-    this.musicElement.preload = 'auto';
-    this.musicElement.crossOrigin = 'anonymous';
-  }
-
-  _ensureMusicSource() {
-    if (!this.ctx || !this.musicGain || this.musicSource) return;
-    this._ensureMusicElement();
-    if (!this.musicElement) return;
-    this.musicSource = this.ctx.createMediaElementSource(this.musicElement);
-    this.musicSource.connect(this.musicGain);
   }
 
   armOnFirstGesture() {
@@ -64,33 +61,88 @@ export class GameAudio {
     return this.muted;
   }
 
+  // --- Procedural piano loop ---
+
   startMusic(fadeSec = 0.5) {
     if (!this.enabled) return;
     this.unlock();
     if (!this.ctx || !this.musicGain) return;
-    this._ensureMusicSource();
-    if (!this.musicElement || !this.musicSource) return;
-    if (this.musicElement.paused) {
-      this.musicElement.play().catch(() => {});
-    }
+    if (this._pianoRunning) return;
+    this._pianoRunning = true;
+    this._pianoChordIndex = 0;
+    this._pianoNextTime = this.ctx.currentTime + 0.1;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0.55, t + Math.max(0.02, fadeSec));
+    this._schedulePianoChunk();
+    this._scheduleBirdChirp();
   }
 
   stopMusic(fadeSec = 0.5) {
-    if (!this.ctx || !this.musicGain || !this.musicElement) return;
+    this._pianoRunning = false;
+    clearTimeout(this._pianoScheduleId);
+    clearTimeout(this._birdChirpId);
+    this._pianoScheduleId = null;
+    this._birdChirpId = null;
+    if (!this.ctx || !this.musicGain) return;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
-    window.setTimeout(() => {
-      if (!this.musicElement) return;
-      this.musicElement.pause();
-      this.musicElement.currentTime = 0;
-    }, Math.ceil(Math.max(0.02, fadeSec) * 1000) + 40);
   }
+
+  _schedulePianoNote(freq, startTime, duration) {
+    if (!this.ctx || !this.musicGain) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.linearRampToValueAtTime(PIANO_NOTE_VOL, startTime + 0.06);
+    gain.gain.setValueAtTime(PIANO_NOTE_VOL, startTime + duration - 0.18);
+    gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+  }
+
+  _schedulePianoChunk() {
+    if (!this._pianoRunning || !this.ctx) return;
+    const LOOKAHEAD = 2.0; // seconds to schedule ahead
+    while (this._pianoNextTime < this.ctx.currentTime + LOOKAHEAD) {
+      const chord = PIANO_CHORDS[this._pianoChordIndex % PIANO_CHORDS.length];
+      for (const freq of chord) {
+        this._schedulePianoNote(freq, this._pianoNextTime, PIANO_CHORD_DUR - 0.05);
+      }
+      this._pianoNextTime += PIANO_CHORD_DUR;
+      this._pianoChordIndex++;
+    }
+    this._pianoScheduleId = window.setTimeout(() => this._schedulePianoChunk(), 500);
+  }
+
+  // --- Occasional bird chirps ---
+
+  _playBirdChirp() {
+    if (!this.enabled || !this.ctx || !this.master || this.muted) return;
+    const t = this.ctx.currentTime;
+    const base = 2800 + Math.random() * 1400;
+    const vol = 0.012 + Math.random() * 0.008;
+    this._osc(base, 'sine', t, 0.07, vol, base * 1.14);
+    this._osc(base * 1.2, 'sine', t + 0.08, 0.06, vol * 0.7, base * 1.32);
+  }
+
+  _scheduleBirdChirp() {
+    if (!this._pianoRunning) return;
+    const delayMs = 12000 + Math.random() * 13000; // 12–25 s between chirps
+    this._birdChirpId = window.setTimeout(() => {
+      this._playBirdChirp();
+      this._scheduleBirdChirp();
+    }, delayMs);
+  }
+
+  // --- Utilities ---
 
   _allow(key, cooldownMs) {
     const now = performance.now();
@@ -119,6 +171,8 @@ export class GameAudio {
     osc.start(start);
     osc.stop(start + duration + 0.02);
   }
+
+  // --- SFX ---
 
   playJump() {
     if (!this.enabled || !this._allow('jump', 80)) return;
