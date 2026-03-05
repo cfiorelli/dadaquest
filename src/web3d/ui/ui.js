@@ -390,8 +390,8 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.style.zIndex = '1000';
   uiRoot.style.pointerEvents = 'none';
 
-  // Detect current level from URL
-  const _currentLevel = new URLSearchParams(window.location.search).get('level') === '2' ? 2 : 1;
+  // Detect current level from URL (mutable — updated when user clicks level buttons)
+  let _selectedLevel = new URLSearchParams(window.location.search).get('level') === '2' ? 2 : 1;
 
   // Title overlay
   const titleEl = document.createElement('div');
@@ -399,28 +399,39 @@ export function createUI(uiRoot, options = {}) {
   titleEl.innerHTML = `
     <div class="dada-card">
       <div class="dada-h1">DA DA QUEST</div>
-      <div class="dada-sub">${_currentLevel === 2 ? 'Level 2 \u2014 Condo Garden' : 'A baby\'s epic journey'}</div>
+      <div class="dada-sub" id="titleSub">${_selectedLevel === 2 ? 'Level 2 \u2014 Condo Garden' : 'A baby\'s epic journey'}</div>
       <div class="dada-controls">
         <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
         <span>Space</span> Jump &nbsp;\u00b7&nbsp;
         <span>M</span> Mute
       </div>
       <div class="dada-level-row">
-        <button class="dada-level-btn${_currentLevel === 1 ? ' active' : ''}" id="levelBtn1">Level 1</button>
-        <button class="dada-level-btn${_currentLevel === 2 ? ' active' : ''}" id="levelBtn2">Level 2</button>
+        <button class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="levelBtn1" tabindex="-1">Level 1</button>
+        <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
       </div>
-      <div class="dada-hint">Press SPACE or ENTER to start</div>
+      <div class="dada-hint" id="titleHint">Press SPACE or ENTER to start</div>
     </div>
   `;
   uiRoot.appendChild(titleEl);
 
-  // Level select button handlers — navigate to appropriate URL
-  titleEl.querySelector('#levelBtn1')?.addEventListener('click', () => {
-    window.location.href = window.location.pathname;
-  });
-  titleEl.querySelector('#levelBtn2')?.addEventListener('click', () => {
-    window.location.href = `${window.location.pathname}?level=2`;
-  });
+  let levelSelectHandler = null;
+  const titleHintEl = titleEl.querySelector('#titleHint');
+  const btn1 = titleEl.querySelector('#levelBtn1');
+  const btn2 = titleEl.querySelector('#levelBtn2');
+
+  function selectLevel(id) {
+    _selectedLevel = id;
+    btn1.classList.toggle('active', id === 1);
+    btn2.classList.toggle('active', id === 2);
+    const url = id === 2 ? `${window.location.pathname}?level=2` : window.location.pathname;
+    history.replaceState(null, '', url);
+    if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
+  }
+
+  // tabindex="-1" prevents buttons from capturing keyboard focus;
+  // history.replaceState avoids page reload so Enter cannot loop back via click.
+  btn1?.addEventListener('click', (ev) => { ev.currentTarget.blur(); selectLevel(1); });
+  btn2?.addEventListener('click', (ev) => { ev.currentTarget.blur(); selectLevel(2); });
 
   // End overlay
   const endEl = document.createElement('div');
@@ -618,6 +629,19 @@ export function createUI(uiRoot, options = {}) {
     },
     setPlayAgainHandler(handler) {
       playAgainHandler = handler;
+    },
+    setLevelSelectHandler(cb) {
+      levelSelectHandler = cb;
+    },
+    showLoading(levelId) {
+      if (titleHintEl) titleHintEl.textContent = `Loading Level ${levelId}\u2026`;
+    },
+    showStartError(msg) {
+      if (titleHintEl) {
+        titleHintEl.style.color = '#c84f34';
+        titleHintEl.style.animation = 'none';
+        titleHintEl.textContent = `Error: ${msg}`;
+      }
     },
     showPopText(text, durationMs = 760) {
       if (popTimer) clearTimeout(popTimer);

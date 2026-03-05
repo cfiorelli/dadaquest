@@ -371,15 +371,28 @@ export async function boot(options = {}) {
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
 
+  // Track which level the player has selected (may differ from loaded levelId if they
+  // switched buttons without reloading). Initialized from URL to stay in sync with
+  // what the world builder actually loaded.
+  let selectedLevelId = levelId;
+  ui.setLevelSelectHandler((id) => { selectedLevelId = id; });
+
   // Build the diorama world (route by level)
-  const world = levelId === 2
-    ? buildWorld2(scene)
-    : shotMode
-      ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
-        random: createSeededRandom(7331),
-        animateGoal: false,
-      }))
-      : buildWorld(scene);
+  let world;
+  try {
+    world = levelId === 2
+      ? buildWorld2(scene)
+      : shotMode
+        ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
+          random: createSeededRandom(7331),
+          animateGoal: false,
+        }))
+        : buildWorld(scene);
+  } catch (buildErr) {
+    ui.showStartError(buildErr?.message || 'World build failed');
+    console.error('[boot] World build failed:', buildErr);
+    throw buildErr;
+  }
 
   await applyHdriEnvironment(scene, {
     intensity: shotMode ? 0.35 : 0.44,
@@ -721,6 +734,27 @@ export async function boot(options = {}) {
   const goalX = world.goalRoot.position.x;
 
   let state = 'title'; // title | gameplay | end
+  let titleStartPending = false;
+
+  // Window-level keydown handler — fires regardless of which element has focus.
+  // Prevents Enter/Space from being silently swallowed by a focused level button.
+  window.addEventListener('keydown', (ev) => {
+    if (state !== 'title') return;
+    if (ev.code !== 'Space' && ev.code !== 'Enter') return;
+    ev.preventDefault();
+    if (selectedLevelId !== levelId) {
+      // User switched to a different level via buttons; navigate to load it.
+      const url = selectedLevelId === 2
+        ? `${window.location.pathname}?level=2`
+        : window.location.pathname;
+      ui.showLoading(selectedLevelId);
+      setTimeout(() => { window.location.href = url; }, 80);
+    } else {
+      ui.showLoading(selectedLevelId);
+      titleStartPending = true;
+    }
+  });
+
   let goalReached = false;
   let shotFrames = 0;
   let goalTimer = 0;
@@ -896,6 +930,7 @@ export async function boot(options = {}) {
     audio.stopMusic(0.2);
 
     state = 'title';
+    titleStartPending = false;
     goalReached = false;
     goalTimer = 0;
     respawnState = null;
@@ -1342,8 +1377,9 @@ export async function boot(options = {}) {
     }
 
     if (state === 'title') {
-      // Wait for player input
-      if (input.consumeJump() || input.consumeEnter()) {
+      // Wait for player input — titleStartPending is set by the window keydown handler
+      if (titleStartPending || input.consumeJump() || input.consumeEnter()) {
+        titleStartPending = false;
         audio.unlock();
         state = 'gameplay';
         input.consumeAll();
