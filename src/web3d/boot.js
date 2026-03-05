@@ -958,7 +958,7 @@ export async function boot(options = {}) {
         juiceFx.spawnCoinSparkle(coin.position);
         ui.updateCoins(coinsCollected);
         if (coinsCollected === coins.length) {
-          ui.showPopText('All stars!', 900);
+          ui.showPopText('All pacifiers! 🍼', 900);
         }
       }
     }

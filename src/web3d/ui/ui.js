@@ -538,7 +538,7 @@ export function createUI(uiRoot, options = {}) {
     /** Show gameplay HUD elements (coin counter, objective, control hints). */
     showGameplayHud(total) {
       coinTotal = total;
-      coinsEl.textContent = `✦ 0 / ${total}`;
+      coinsEl.textContent = `🍼 0 / ${total}`;
       coinsEl.style.display = 'block';
       objectiveEl.style.display = 'block';
       // Show control hints; auto-fade after 5 s
@@ -559,7 +559,7 @@ export function createUI(uiRoot, options = {}) {
 
     /** Update coin counter; provide collected count. */
     updateCoins(collected) {
-      coinsEl.textContent = `✦ ${collected} / ${coinTotal}`;
+      coinsEl.textContent = `🍼 ${collected} / ${coinTotal}`;
       pulseCoin();
     },
 

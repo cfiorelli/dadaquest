@@ -616,52 +616,63 @@ function createCrumblePlatform(scene, name, { x, y, z = 0, w, h, d, shadowGen })
 }
 
 function createCoin(scene, name, { x, y, z }) {
+  // Baby pacifier collectible: shield + nipple + ring handle.
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
 
-  // Star-disc shape: slightly flattened sphere for a coin silhouette.
-  const disc = BABYLON.MeshBuilder.CreateSphere(name + '_disc', {
-    diameter: 0.32, segments: 10,
+  // Shield disc (mouth guard) — soft pink, faces -Z so it's visible from front.
+  const shield = BABYLON.MeshBuilder.CreateCylinder(name + '_shield', {
+    height: 0.04, diameter: 0.30, tessellation: 28,
   }, scene);
-  disc.scaling.z = 0.24;
-  disc.parent = root;
-  const discMat = new BABYLON.PBRMaterial(name + '_mat', scene);
-  discMat.albedoColor = new BABYLON.Color3(0.95, 0.78, 0.22);
-  discMat.roughness = 0.22;
-  discMat.metallic = 0.7;
-  discMat.environmentIntensity = 0.5;
-  disc.material = discMat;
+  shield.rotation.x = Math.PI / 2;
+  shield.parent = root;
+  const shieldMat = new BABYLON.PBRMaterial(name + '_shieldMat', scene);
+  shieldMat.albedoColor = new BABYLON.Color3(0.98, 0.68, 0.72); // baby pink
+  shieldMat.roughness = 0.55;
+  shieldMat.metallic = 0.0;
+  shieldMat.environmentIntensity = 0.3;
+  shield.material = shieldMat;
 
-  // Star inner face
-  const star = BABYLON.MeshBuilder.CreatePlane(name + '_star', { size: 0.18 }, scene);
-  star.position.z = -0.06;
-  star.parent = root;
-  const starTex = new BABYLON.DynamicTexture(name + '_starTex', 32, scene, true);
-  const sCtx = starTex.getContext();
-  sCtx.fillStyle = 'rgba(255,242,150,0.0)';
-  sCtx.fillRect(0, 0, 32, 32);
-  sCtx.fillStyle = 'rgba(255,230,60,0.88)';
-  // 5-point star
-  const cx = 16, cy = 16, outerR = 14, innerR = 6;
-  sCtx.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const angle = (i * Math.PI / 5) - Math.PI / 2;
-    const r = i % 2 === 0 ? outerR : innerR;
-    if (i === 0) sCtx.moveTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-    else sCtx.lineTo(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-  }
-  sCtx.closePath();
-  sCtx.fill();
-  starTex.update();
-  starTex.hasAlpha = true;
-  const starMat = new BABYLON.StandardMaterial(name + '_starMat', scene);
-  starMat.diffuseTexture = starTex;
-  starMat.opacityTexture = starTex;
-  starMat.useAlphaFromDiffuseTexture = true;
-  starMat.specularColor = BABYLON.Color3.Black();
-  starMat.disableLighting = true;
-  starMat.emissiveColor = new BABYLON.Color3(1.0, 0.85, 0.3);
-  star.material = starMat;
+  // Rim around the shield — slightly darker pink ring.
+  const rim = BABYLON.MeshBuilder.CreateTorus(name + '_rim', {
+    diameter: 0.30, thickness: 0.04, tessellation: 28,
+  }, scene);
+  rim.rotation.x = Math.PI / 2;
+  rim.parent = root;
+  const rimMat = new BABYLON.PBRMaterial(name + '_rimMat', scene);
+  rimMat.albedoColor = new BABYLON.Color3(0.92, 0.52, 0.60);
+  rimMat.roughness = 0.45;
+  rimMat.metallic = 0.0;
+  rimMat.environmentIntensity = 0.3;
+  rim.material = rimMat;
+
+  // Nipple — small cream-coloured elongated sphere protruding forward (-Z).
+  const nipple = BABYLON.MeshBuilder.CreateSphere(name + '_nipple', {
+    diameter: 0.11, segments: 8,
+  }, scene);
+  nipple.scaling.z = 1.7;
+  nipple.position.z = -0.11;
+  nipple.parent = root;
+  const nippleMat = new BABYLON.PBRMaterial(name + '_nippleMat', scene);
+  nippleMat.albedoColor = new BABYLON.Color3(0.98, 0.94, 0.84); // cream
+  nippleMat.roughness = 0.60;
+  nippleMat.metallic = 0.0;
+  nippleMat.environmentIntensity = 0.3;
+  nipple.material = nippleMat;
+
+  // Ring handle — small torus behind the shield.
+  const handle = BABYLON.MeshBuilder.CreateTorus(name + '_handle', {
+    diameter: 0.16, thickness: 0.04, tessellation: 20,
+  }, scene);
+  handle.rotation.x = Math.PI / 2;
+  handle.position.z = 0.06;
+  handle.parent = root;
+  const handleMat = new BABYLON.PBRMaterial(name + '_handleMat', scene);
+  handleMat.albedoColor = new BABYLON.Color3(0.55, 0.82, 0.94); // baby blue
+  handleMat.roughness = 0.45;
+  handleMat.metallic = 0.0;
+  handleMat.environmentIntensity = 0.3;
+  handle.material = handleMat;
 
   return root;
 }
