@@ -13,6 +13,7 @@ import {
   loadModelForRole,
 } from './util/assets.js';
 import { GameAudio } from './util/audio.js';
+import { isDebugMode, isShotMode } from '../utils/modes.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -27,16 +28,6 @@ const GOAL_MODEL_SLOT_Y = -0.56;
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
   return 1 - ((1 - v) ** 3);
-}
-
-function isDebugMode() {
-  if (typeof window === 'undefined') return false;
-  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
-}
-
-function isShotMode() {
-  if (typeof window === 'undefined') return false;
-  return new URLSearchParams(window.location.search).get('shot') === '1';
 }
 
 function getShotScene() {

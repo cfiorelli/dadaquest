@@ -1,11 +1,7 @@
 import * as BABYLON from '@babylonjs/core';
 import { clamp } from '../util/math.js';
 import { makePlastic, createBlobShadow, LEVEL1_PALETTE as P } from '../materials.js';
-
-function isDebugMode() {
-  if (typeof window === 'undefined') return false;
-  return import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
-}
+import { isDebugMode } from '../../utils/modes.js';
 
 function recordJump(reason, input, grounded, pos) {
   const debugMode = isDebugMode();
