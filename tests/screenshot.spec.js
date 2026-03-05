@@ -9,6 +9,7 @@ const SHOT_SCENES = [
 ];
 
 test('capture scene screenshots', async ({ page }) => {
+  test.setTimeout(60_000);
   await mkdir('docs/screenshots', { recursive: true });
   await page.setViewportSize({ width: 800, height: 500 });
 
