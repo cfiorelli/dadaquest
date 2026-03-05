@@ -556,9 +556,9 @@ export function buildWorld2(scene) {
     signs: [],
     level2,
     assetAnchors: {
-      cribRail: [],
+      cribRail: null,    // Level 2 has no crib rail; null avoids truthy-array trap in boot.js
       toyBlocks: [],
-      goalBanner: [],
+      goalBanner: null,  // Level 2 has no goal banner; null avoids truthy-array trap in boot.js
       backHills: [],
       midHedges: [],
       foregroundCutouts: [],

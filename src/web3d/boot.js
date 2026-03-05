@@ -407,6 +407,15 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.actors = actorState;
 
   async function attachRoleModel(roleName, fallbackNode, options = {}) {
+    // Guard: catch non-Babylon-Node parents before they reach Babylon internals.
+    const parentCandidate = options.parent;
+    if (parentCandidate != null && typeof parentCandidate.isEnabled !== 'function') {
+      throw new Error(
+        `[boot] attachRoleModel('${roleName}', level=${levelId}): invalid parent — not a Babylon Node. ` +
+        `type=${typeof parentCandidate}, isArray=${Array.isArray(parentCandidate)}`,
+      );
+    }
+
     const fallbackMeshes = Array.isArray(options.fallbackMeshes)
       ? options.fallbackMeshes
       : collectNodeMeshes(fallbackNode);
