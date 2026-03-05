@@ -4,7 +4,7 @@
     "playerModel": ["kenney_baby"],
     "goalModel": ["kenney_dad"],
     "checkpointModel": ["kenney_flag"],
-    "pickupModel": ["kenney_coin"],
+    "pickupModel": [],
     "signModel": ["kenney_flag"],
     "toyBlockModel": ["kenney_crate", "kenney_chest"],
     "cribRailModel": ["kenney_fence"],

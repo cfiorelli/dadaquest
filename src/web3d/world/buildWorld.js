@@ -287,7 +287,7 @@ function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
     width: 0.5, height: 0.48, depth: 0.22,
   }, scene);
   torso.parent = root;
-  torso.material = makeFelt(scene, name + '_torsoMat', 0.95, 0.94, 1.0, { roughness: 0.9 });
+  torso.material = makeFelt(scene, name + '_torsoMat', 0.22, 0.45, 0.90, { roughness: 0.9 });
 
   const shoulderL = BABYLON.MeshBuilder.CreateSphere(name + '_shL', { diameter: 0.18 }, scene);
   shoulderL.position.set(-0.18, 0.18, 0);
@@ -307,7 +307,7 @@ function createOnesiePickup(scene, name, { x, y, z, shadowGen }) {
   hood.rotation.x = Math.PI / 2;
   hood.position.set(0, 0.19, -0.02);
   hood.parent = root;
-  hood.material = makeFelt(scene, name + '_hoodMat', 0.88, 0.90, 0.98, { roughness: 0.96 });
+  hood.material = makeFelt(scene, name + '_hoodMat', 0.18, 0.40, 0.85, { roughness: 0.96 });
 
   const zipper = BABYLON.MeshBuilder.CreateBox(name + '_zip', {
     width: 0.06,
