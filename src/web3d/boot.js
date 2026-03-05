@@ -320,7 +320,7 @@ export async function boot(options = {}) {
   const input = new InputManager();
 
   // UI
-  const ui = createUI(uiRoot);
+  const ui = createUI(uiRoot, { disableToasts: shotMode });
 
   // Build the diorama world
   const world = shotMode
@@ -612,6 +612,8 @@ export async function boot(options = {}) {
   let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
   let slipRecentTimerMs = 0;
+  let slipWasInside = false;
+  let slipToastCooldownMs = 0;
   let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
@@ -889,6 +891,7 @@ export async function boot(options = {}) {
         onesieJumpBoost = pickup.jumpBoost ?? 1.2;
         audio.playPickup();
         juiceFx.spawnPickupSparkle(pickup.position);
+        ui.showOnesieBoostToast();
         ui.showStatus('Onesie boost!', 1400);
       }
     }
@@ -896,6 +899,7 @@ export async function boot(options = {}) {
     // Hazard overlaps affect movement.
     let accelMultiplier = 1;
     let decelMultiplier = 1;
+    let inSlipHazard = false;
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
         && pos.x <= hazard.maxX
@@ -903,11 +907,21 @@ export async function boot(options = {}) {
         && pos.y <= hazard.maxY;
 
       if (inside && hazard.type === 'slip') {
+        inSlipHazard = true;
         accelMultiplier *= hazard.accelMultiplier ?? 0.78;
         decelMultiplier *= hazard.decelMultiplier ?? 0.22;
         slipRecentTimerMs = 900;
       }
     }
+
+    if (slipToastCooldownMs > 0) {
+      slipToastCooldownMs = Math.max(0, slipToastCooldownMs - dt * 1000);
+    }
+    if (inSlipHazard && !slipWasInside && slipToastCooldownMs <= 0) {
+      ui.showSlipperyToast();
+      slipToastCooldownMs = 1000;
+    }
+    slipWasInside = inSlipHazard;
 
     if (slipRecentTimerMs > 0) {
       slipRecentTimerMs = Math.max(0, slipRecentTimerMs - dt * 1000);
