@@ -391,7 +391,8 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.style.pointerEvents = 'none';
 
   // Detect current level from URL (mutable — updated when user clicks level buttons)
-  let _selectedLevel = new URLSearchParams(window.location.search).get('level') === '2' ? 2 : 1;
+  const levelParam = new URLSearchParams(window.location.search).get('level');
+  let _selectedLevel = levelParam === '3' ? 3 : levelParam === '2' ? 2 : 1;
 
   // Title overlay
   const titleEl = document.createElement('div');
@@ -399,7 +400,13 @@ export function createUI(uiRoot, options = {}) {
   titleEl.innerHTML = `
     <div class="dada-card">
       <div class="dada-h1">DA DA QUEST</div>
-      <div class="dada-sub" id="titleSub">${_selectedLevel === 2 ? 'Level 2 \u2014 Condo Garden' : 'A baby\'s epic journey'}</div>
+      <div class="dada-sub" id="titleSub">${
+        _selectedLevel === 3
+          ? 'Level 3 \u2014 Grandma\'s House'
+          : _selectedLevel === 2
+            ? 'Level 2 \u2014 Condo Garden'
+            : 'A baby\'s epic journey'
+      }</div>
       <div class="dada-controls">
         <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
         <span>Space</span> Jump &nbsp;\u00b7&nbsp;
@@ -408,6 +415,7 @@ export function createUI(uiRoot, options = {}) {
       <div class="dada-level-row">
         <button class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="levelBtn1" tabindex="-1">Level 1</button>
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
+        <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
       </div>
       <div class="dada-hint" id="titleHint">Press SPACE or ENTER to start</div>
       <div id="titleDebug" style="font:10px/1.6 monospace;color:rgba(80,60,40,0.55);margin-top:8px;letter-spacing:0.03em;min-height:1.2em"></div>
@@ -416,16 +424,26 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.appendChild(titleEl);
 
   let levelSelectHandler = null;
+  const titleSubEl = titleEl.querySelector('#titleSub');
   const titleHintEl = titleEl.querySelector('#titleHint');
   const titleDebugEl = titleEl.querySelector('#titleDebug');
   const btn1 = titleEl.querySelector('#levelBtn1');
   const btn2 = titleEl.querySelector('#levelBtn2');
+  const btn3 = titleEl.querySelector('#levelBtn3');
 
   function selectLevel(id) {
     _selectedLevel = id;
     btn1.classList.toggle('active', id === 1);
     btn2.classList.toggle('active', id === 2);
-    const url = id === 2 ? `${window.location.pathname}?level=2` : window.location.pathname;
+    btn3.classList.toggle('active', id === 3);
+    if (titleSubEl) {
+      titleSubEl.textContent = id === 3
+        ? 'Level 3 — Grandma\'s House'
+        : id === 2
+          ? 'Level 2 — Condo Garden'
+          : 'A baby\'s epic journey';
+    }
+    const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
   }
@@ -435,6 +453,7 @@ export function createUI(uiRoot, options = {}) {
   // preventDefault+stopPropagation ensures no implicit form/button behavior on click.
   btn1?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(1); });
   btn2?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(2); });
+  btn3?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(3); });
 
   // End overlay
   const endEl = document.createElement('div');
