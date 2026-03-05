@@ -1008,8 +1008,8 @@ export async function boot(options = {}) {
     let accelBonusMultiplier = 1;
     const sprinting = input.isSprintHeld();
     if (sprinting) {
-      speedMultiplier = 1.15;      // TUNE: run = walk * this
-      accelBonusMultiplier = 1.10; // TUNE: sprint accel boost
+      speedMultiplier = 1.10;      // run = walk * 1.10 (was 1.15)
+      accelBonusMultiplier = 1.05; // sprint accel boost (was 1.10)
     }
 
     player.setMovementModifiers({

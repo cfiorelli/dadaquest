@@ -21,12 +21,12 @@ function recordJump(reason, input, grounded, pos) {
   console.log('[JUMP TRACE]', reason, record);
 }
 
-// Tuning constants — TUNE: walk speed = MAX_SPEED * speedMultiplier, run = MAX_SPEED * sprint
-const GROUND_ACCEL = 60; // TUNE: scale with MAX_SPEED
-const GROUND_DECEL = 80; // TUNE: scale with MAX_SPEED
+// Tuning constants — walk speed = MAX_SPEED, run = MAX_SPEED * sprint multiplier in boot.js
+const GROUND_ACCEL = 48; // 60 × 0.80 — scaled with MAX_SPEED
+const GROUND_DECEL = 64; // 80 × 0.80 — scaled with MAX_SPEED
 const AIR_ACCEL = 30;
 const AIR_DECEL = 10;
-const MAX_SPEED = 8; // TUNE: base walk speed (units/s)
+const MAX_SPEED = 6.4; // was 8; walk -20% per design
 const GRAVITY = 32;
 const JUMP_VEL = 14;
 const COYOTE_MS = 100;
