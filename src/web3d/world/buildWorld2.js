@@ -204,7 +204,8 @@ function createPianoVisual(scene, name, { x, y, z = 0, shadowGen }) {
 
 // ── Main Level 2 world builder ────────────────────────────────────
 
-export function buildWorld2(scene) {
+export function buildWorld2(scene, options = {}) {
+  const { animateGoal = true } = options;
   // Scene
   scene.clearColor = new BABYLON.Color4(0.88, 0.90, 0.94, 1.0);
   scene.ambientColor = new BABYLON.Color3(0.38, 0.36, 0.40);
@@ -284,7 +285,7 @@ export function buildWorld2(scene) {
 
   // === GOAL (DaDa) ===
   const goalDef = LEVEL2.goal;
-  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: true });
+  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
   setRenderingGroup(dada.root, 3);
 
   // === CHECKPOINTS ===

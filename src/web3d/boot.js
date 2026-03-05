@@ -222,6 +222,8 @@ function combineBounds(meshes) {
   if (count === 0) {
     return {
       center: new BABYLON.Vector3(0, 0, 0),
+      min: new BABYLON.Vector3(0, 0, 0),
+      max: new BABYLON.Vector3(0, 0, 0),
       size: new BABYLON.Vector3(0, 0, 0),
       maxDim: 0,
     };
@@ -229,8 +231,152 @@ function combineBounds(meshes) {
   const size = max.subtract(min);
   return {
     center: min.add(max).scale(0.5),
+    min,
+    max,
     size,
     maxDim: Math.max(size.x, size.y, size.z),
+  };
+}
+
+function collectRenderableMeshes(rootOrRoots) {
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots : [rootOrRoots];
+  const meshes = [];
+  for (const root of roots) {
+    if (!root) continue;
+    if (root instanceof BABYLON.Mesh && root.getTotalVertices() > 0) {
+      meshes.push(root);
+    }
+    if (root instanceof BABYLON.TransformNode) {
+      for (const mesh of root.getChildMeshes(false)) {
+        if (mesh instanceof BABYLON.Mesh && mesh.getTotalVertices() > 0) {
+          meshes.push(mesh);
+        }
+      }
+    }
+  }
+  return meshes;
+}
+
+function fitLoadedModel(rootOrRoots, {
+  targetMaxSize = 0,
+  targetHeight = 0,
+  groundY = null,
+  markDecorative = false,
+} = {}) {
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots.filter(Boolean) : [rootOrRoots].filter(Boolean);
+  if (!roots.length) {
+    return { bounds: combineBounds([]), scaleFactor: 1 };
+  }
+
+  const renderMeshes = collectRenderableMeshes(roots);
+  if (!renderMeshes.length) {
+    return { bounds: combineBounds([]), scaleFactor: 1 };
+  }
+
+  const refreshBounds = () => {
+    for (const root of roots) {
+      root.computeWorldMatrix?.(true);
+    }
+    for (const mesh of renderMeshes) {
+      mesh.computeWorldMatrix(true);
+      mesh.checkCollisions = false;
+      mesh.isPickable = false;
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        cameraBlocker: markDecorative ? false : mesh.metadata?.cameraBlocker,
+      };
+    }
+    return combineBounds(renderMeshes);
+  };
+
+  let bounds = refreshBounds();
+  let scaleFactor = 1;
+  const targetScaleByMax = targetMaxSize > 0 && bounds.maxDim > 0
+    ? targetMaxSize / bounds.maxDim
+    : 0;
+  const targetScaleByHeight = targetHeight > 0 && bounds.size.y > 0
+    ? targetHeight / bounds.size.y
+    : 0;
+  if (targetScaleByMax > 0 && targetScaleByHeight > 0) {
+    scaleFactor = Math.min(targetScaleByMax, targetScaleByHeight);
+  } else if (targetScaleByMax > 0) {
+    scaleFactor = targetScaleByMax;
+  } else if (targetScaleByHeight > 0) {
+    scaleFactor = targetScaleByHeight;
+  }
+
+  if (Number.isFinite(scaleFactor) && scaleFactor > 0 && Math.abs(scaleFactor - 1) > 0.001) {
+    for (const root of roots) {
+      root.scaling.scaleInPlace(scaleFactor);
+    }
+    bounds = refreshBounds();
+  } else {
+    scaleFactor = 1;
+  }
+
+  if (groundY !== null && Number.isFinite(groundY)) {
+    const lift = groundY - bounds.min.y;
+    if (Math.abs(lift) > 0.0001) {
+      for (const root of roots) {
+        root.position.y += lift;
+      }
+      bounds = refreshBounds();
+    }
+  }
+
+  return { bounds, scaleFactor };
+}
+
+function describeNodeChain(node) {
+  const chain = [];
+  let current = node;
+  while (current) {
+    chain.push(current.name || current.id || current.constructor?.name || 'Node');
+    current = current.parent || null;
+  }
+  return chain;
+}
+
+function isRenderableCameraObstacle(mesh, ignoredMeshes) {
+  if (!(mesh instanceof BABYLON.Mesh)) return false;
+  if (!mesh.isEnabled()) return false;
+  if (mesh.isVisible === false) return false;
+  if ((mesh.visibility ?? 1) <= 0.02) return false;
+  if (mesh.name === 'goalTrigger') return false;
+  if (ignoredMeshes.has(mesh)) return false;
+  if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') return false;
+  if (mesh.metadata?.cameraBlocker === false) return false;
+  const bounds = mesh.getBoundingInfo()?.boundingBox;
+  if (bounds) {
+    const maxExtent = Math.max(bounds.extendSizeWorld.x, bounds.extendSizeWorld.y, bounds.extendSizeWorld.z);
+    if (maxExtent < 0.35) return false;
+  }
+  return true;
+}
+
+function resolveCameraOcclusion(scene, focusPos, desiredPos, ignoredMeshes) {
+  const toCamera = desiredPos.subtract(focusPos);
+  const desiredDistance = toCamera.length();
+  if (desiredDistance <= 0.001) {
+    return { correctedPos: desiredPos, hit: null };
+  }
+
+  const rayDir = toCamera.scale(1 / desiredDistance);
+  const ray = new BABYLON.Ray(focusPos, rayDir, desiredDistance);
+  const pick = scene.pickWithRay(
+    ray,
+    (mesh) => isRenderableCameraObstacle(mesh, ignoredMeshes),
+    true,
+  );
+
+  if (!pick?.hit || !pick.pickedPoint) {
+    return { correctedPos: desiredPos, hit: null };
+  }
+
+  const safeDistance = Math.max(0.85, Math.min(desiredDistance, pick.distance - 0.3));
+  return {
+    correctedPos: focusPos.add(rayDir.scale(safeDistance)),
+    hit: pick,
   };
 }
 
@@ -657,21 +803,49 @@ export async function boot(options = {}) {
   if (world.level2) {
     const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
     const l2propDefs = [
-      { role: 'futureCribModel',         anchor: l2anchors.babyBed,      fallback: l2fallback?.babyBed },
-      { role: 'futurePianoModel',        anchor: l2anchors.piano,        fallback: l2fallback?.piano },
-      { role: 'futureBiancaModel',       anchor: l2anchors.bianca,       fallback: null },
-      { role: 'futureRockingHorseModel', anchor: l2anchors.rockingHorse, fallback: null },
+      {
+        role: 'futureCribModel',
+        anchor: l2anchors.babyBed,
+        fallback: l2fallback?.babyBed,
+        fit: { targetMaxSize: 6.2, groundOffset: 0.4 },
+      },
+      {
+        role: 'futurePianoModel',
+        anchor: l2anchors.piano,
+        fallback: l2fallback?.piano,
+        fit: { targetMaxSize: 7.4, groundOffset: 0.35 },
+      },
+      {
+        role: 'futureBiancaModel',
+        anchor: l2anchors.bianca,
+        fallback: null,
+        fit: { targetHeight: 2.2, targetMaxSize: 3.2, groundOffset: 0.0 },
+      },
+      {
+        role: 'futureRockingHorseModel',
+        anchor: l2anchors.rockingHorse,
+        fallback: null,
+        fit: { targetMaxSize: 4.4, groundOffset: 0.4 },
+      },
     ];
-    for (const { role, anchor, fallback } of l2propDefs) {
+    for (const { role, anchor, fallback, fit } of l2propDefs) {
       if (!anchor) continue;
-      const pos = anchor.getAbsolutePosition();
       const result = await attachRoleModel(role, anchor, {
-        position: pos,
+        parent: anchor,
         fallbackMaterial: 'plastic',
         renderingGroupId: 2,
       });
       if (result.loaded && fallback) {
         fallback.setEnabled(false);
+      }
+      if (result.loaded) {
+        const anchorPos = anchor.getAbsolutePosition();
+        fitLoadedModel(result.roots, {
+          targetMaxSize: fit?.targetMaxSize ?? 0,
+          targetHeight: fit?.targetHeight ?? 0,
+          groundY: anchorPos.y + (fit?.groundOffset ?? 0),
+          markDecorative: true,
+        });
       }
     }
   }
@@ -734,6 +908,11 @@ export async function boot(options = {}) {
   playerRimLight.diffuse = new BABYLON.Color3(0.92, 0.94, 1.0);
   playerRimLight.specular = new BABYLON.Color3(0.24, 0.26, 0.32);
   playerRimLight.range = 11;
+  const cameraIgnoredMeshes = new Set([player.blobShadow]);
+  const useCameraOcclusionGuard = levelId === 2;
+  let level2ProbeTimer = 0;
+  let level2LastProbeMeshId = null;
+  const level2ProbeRestoreTimers = new Map();
 
   // Dev-only debug HUD + rest stability test
   const debugHud = import.meta.env.DEV ? createDebugHud() : null;
@@ -895,6 +1074,61 @@ export async function boot(options = {}) {
       player.mesh.position.y + 1.12,
       -7.1,
     );
+  }
+
+  function updateLevel2CameraProbe(dt) {
+    if (!import.meta.env.DEV || levelId !== 2) return;
+    level2ProbeTimer += dt;
+    if (level2ProbeTimer < 1) return;
+    level2ProbeTimer = 0;
+
+    const playerHead = player.mesh.position.add(new BABYLON.Vector3(0, 0.9, 0));
+    const toPlayer = playerHead.subtract(camera.position);
+    const rayLength = toPlayer.length();
+    if (rayLength <= 0.001) return;
+
+    const rayDir = toPlayer.scale(1 / rayLength);
+    const ray = new BABYLON.Ray(camera.position, rayDir, rayLength);
+    const pick = scene.pickWithRay(
+      ray,
+      (mesh) => isRenderableCameraObstacle(mesh, cameraIgnoredMeshes),
+      true,
+    );
+
+    if (!pick?.hit || !pick.pickedMesh) {
+      level2LastProbeMeshId = null;
+      return;
+    }
+
+    const mesh = pick.pickedMesh;
+    if (mesh.uniqueId === level2LastProbeMeshId) return;
+    level2LastProbeMeshId = mesh.uniqueId;
+    const bounds = mesh.getBoundingInfo()?.boundingBox;
+    const pos = mesh.getAbsolutePosition();
+    console.log('[L2 camera probe] occluder', {
+      name: mesh.name,
+      id: mesh.id,
+      position: [pos.x, pos.y, pos.z],
+      min: bounds ? [bounds.minimumWorld.x, bounds.minimumWorld.y, bounds.minimumWorld.z] : null,
+      max: bounds ? [bounds.maximumWorld.x, bounds.maximumWorld.y, bounds.maximumWorld.z] : null,
+      extendSizeWorld: bounds ? [bounds.extendSizeWorld.x, bounds.extendSizeWorld.y, bounds.extendSizeWorld.z] : null,
+      parentChain: describeNodeChain(mesh),
+    });
+
+    const existing = level2ProbeRestoreTimers.get(mesh.uniqueId);
+    if (existing) {
+      clearTimeout(existing.timerId);
+      mesh.visibility = existing.originalVisibility;
+    }
+    const originalVisibility = mesh.visibility ?? 1;
+    mesh.visibility = 0.15;
+    const timerId = window.setTimeout(() => {
+      if (!mesh.isDisposed()) {
+        mesh.visibility = originalVisibility;
+      }
+      level2ProbeRestoreTimers.delete(mesh.uniqueId);
+    }, 2000);
+    level2ProbeRestoreTimers.set(mesh.uniqueId, { timerId, originalVisibility });
   }
 
   function finishRun() {
@@ -1506,13 +1740,21 @@ export async function boot(options = {}) {
         startGoalCelebration(world.goalRoot.getAbsolutePosition());
       }
 
-      // Smooth camera follow
+      updateLevel2CameraProbe(dt);
+
+      // Smooth camera follow with LOS correction for levels that have large set dressing.
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
-      camera.position.x = damp(camera.position.x, targetX - 8, 4, dt);
-      camera.position.y = damp(camera.position.y, py + 4, 4, dt);
-      camera.position.z = damp(camera.position.z, CAMERA_FOLLOW_Z, 4, dt);
+      const desiredCameraPos = new BABYLON.Vector3(targetX - 8, py + 4, CAMERA_FOLLOW_Z);
+      const playerHead = new BABYLON.Vector3(px, py + 0.9, 0);
+      const occlusion = useCameraOcclusionGuard
+        ? resolveCameraOcclusion(scene, playerHead, desiredCameraPos, cameraIgnoredMeshes)
+        : { correctedPos: desiredCameraPos, hit: null };
+      const cameraDamp = occlusion.hit ? 11 : 4;
+      camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
+      camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
+      camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
       camera.setTarget(new BABYLON.Vector3(
         damp(camera.getTarget().x, targetX, 4, dt),
         damp(camera.getTarget().y, py + 1.2, 4, dt),
