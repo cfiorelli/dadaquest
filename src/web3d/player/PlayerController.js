@@ -140,6 +140,8 @@ export class PlayerController {
     this.surfaceAccelMultiplier = 1;
     this.surfaceDecelMultiplier = 1;
     this.jumpVelocityMultiplier = 1;
+    this.maxAirJumps = 0;
+    this.airJumpsUsed = 0;
 
     // Feedback state
     this.landSquashTimerMs = 0;
@@ -164,10 +166,12 @@ export class PlayerController {
     surfaceAccelMultiplier = 1,
     surfaceDecelMultiplier = 1,
     jumpVelocityMultiplier = 1,
+    maxAirJumps = 0,
   } = {}) {
     this.surfaceAccelMultiplier = surfaceAccelMultiplier;
     this.surfaceDecelMultiplier = surfaceDecelMultiplier;
     this.jumpVelocityMultiplier = jumpVelocityMultiplier;
+    this.maxAirJumps = Math.max(0, maxAirJumps | 0);
   }
 
   setPosition(x, y, z = 0) {
@@ -181,6 +185,7 @@ export class PlayerController {
     this.ignoreJumpUntilRelease = true;
     this.lastJumpPressIdUsed = 0;
     this.outOfBoundsEmitted = false;
+    this.airJumpsUsed = 0;
   }
 
   /**
@@ -286,7 +291,6 @@ export class PlayerController {
 
     const canAcceptPress = !this.ignoreJumpUntilRelease;
     if (jumpPressedEdge && canAcceptPress) {
-      console.log('[JUMP-DEBUG] Setting jumpBufferMs:', { jumpPressedEdge, canAcceptPress, jumpHeld, jumpPressId });
       this.jumpBufferMs = JUMP_BUFFER_MS;
     } else {
       this.jumpBufferMs = Math.max(0, this.jumpBufferMs - dt * 1000);
@@ -295,10 +299,14 @@ export class PlayerController {
     // Jump (coyote + buffer)
     const canCoyote = this.timeSinceGround <= COYOTE_MS;
     const canBuffer = this.jumpBufferMs > 0;
-    if (canCoyote && canBuffer && !this.jumping) {
-      console.log('[JUMP-DEBUG] Executing jump:', { canCoyote, canBuffer, jumping: this.jumping, jumpBufferMs: this.jumpBufferMs, timeSinceGround: this.timeSinceGround });
-      let jumpReason = canBuffer ? 'buffer-consumed' : 'unknown';
-      
+    const canGroundJump = canBuffer && canCoyote && !this.jumping;
+    const canAirJump = canBuffer
+      && !this.grounded
+      && this.timeSinceGround > COYOTE_MS
+      && this.maxAirJumps > 0
+      && this.airJumpsUsed < this.maxAirJumps;
+    if (canGroundJump || canAirJump) {
+      const jumpReason = canAirJump ? 'air-jump' : 'buffer-consumed';
       recordJump(jumpReason, {
         jumpHeld,
         jumpEdge: jumpPressedEdge,
@@ -314,7 +322,12 @@ export class PlayerController {
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
       this.jumpBufferMs = 0; // consume buffer immediately
       this.grounded = false;
-      this.emitEvent('jump');
+      if (canAirJump) {
+        this.airJumpsUsed += 1;
+        this.emitEvent('doubleJump');
+      } else {
+        this.emitEvent('jump');
+      }
     }
 
     // Variable jump: cut upward velocity if released early
@@ -382,6 +395,7 @@ export class PlayerController {
 
     // Landing transition events + squash
     if (!this.wasGroundedLastFrame && this.grounded) {
+      this.airJumpsUsed = 0;
       this.triggerLandSquash();
       this.emitEvent('land');
     }
@@ -426,6 +440,10 @@ export class PlayerController {
 
   getPosition() {
     return this.mesh.position.clone();
+  }
+
+  hasAirJumpAvailable() {
+    return this.maxAirJumps > 0 && this.airJumpsUsed < this.maxAirJumps;
   }
 
   /**
@@ -497,6 +515,8 @@ export class PlayerController {
       coyoteMs: Math.max(0, COYOTE_MS - this.timeSinceGround).toFixed(0),
       bufferMs: this.jumpBufferMs.toFixed(0),
       jumping: this.jumping,
+      airJumpsUsed: this.airJumpsUsed,
+      airJumpsMax: this.maxAirJumps,
     };
   }
 }

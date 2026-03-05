@@ -931,6 +931,7 @@ export async function boot(options = {}) {
       surfaceAccelMultiplier: accelMultiplier,
       surfaceDecelMultiplier: decelMultiplier,
       jumpVelocityMultiplier: onesieJumpBoost,
+      maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
@@ -1165,6 +1166,9 @@ export async function boot(options = {}) {
             audio.playJump();
             juiceFx.spawnJumpDust(player.mesh.position);
             ui.fadeControlHints();
+          } else if (ev.type === 'doubleJump') {
+            audio.playJump();
+            juiceFx.spawnJumpDust(player.mesh.position);
           } else if (ev.type === 'land') {
             audio.playLand();
             juiceFx.spawnLandDust(player.mesh.position);
@@ -1178,6 +1182,7 @@ export async function boot(options = {}) {
         // HUD updates each frame
         ui.updateObjectiveDir(player.mesh.position.x, goalX);
         ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
+        ui.updateDoubleJumpCue(player.hasAirJumpAvailable() && onesieBuffTimerMs > 0);
       }
 
       // Update blob shadow position (follows player X, stays near ground)

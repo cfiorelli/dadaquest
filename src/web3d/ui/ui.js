@@ -198,6 +198,19 @@ const CSS = `
   font-size: 11px;
   opacity: 0.78;
   margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dada-buff-cue {
+  display: none;
+  font-size: 10px;
+  color: #fef7e7;
+  background: rgba(58, 92, 220, 0.65);
+  border: 1px solid rgba(224, 236, 255, 0.6);
+  border-radius: 999px;
+  padding: 1px 6px;
+  letter-spacing: 0.02em;
 }
 .dada-buff-track {
   height: 5px;
@@ -355,11 +368,12 @@ export function createUI(uiRoot, options = {}) {
   const buffEl = document.createElement('div');
   buffEl.className = 'dada-hud-pill dada-buff';
   buffEl.innerHTML = `
-    <div class="dada-buff-label">🧸 Onesie boost</div>
+    <div class="dada-buff-label">Onesie boost <span class="dada-buff-cue">x2 jump</span></div>
     <div class="dada-buff-track"><div class="dada-buff-fill" style="width:100%"></div></div>
   `;
   uiRoot.appendChild(buffEl);
   const buffFill = buffEl.querySelector('.dada-buff-fill');
+  const buffCue = buffEl.querySelector('.dada-buff-cue');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -580,11 +594,15 @@ export function createUI(uiRoot, options = {}) {
     updateBuff(remainingMs, totalMs) {
       if (remainingMs <= 0) {
         buffEl.style.display = 'none';
+        buffCue.style.display = 'none';
         return;
       }
       buffEl.style.display = 'block';
       const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
       buffFill.style.width = `${pct}%`;
+    },
+    updateDoubleJumpCue(available) {
+      buffCue.style.display = available ? 'inline-block' : 'none';
     },
 
     /** Reset all gameplay HUD to initial state for restart. */
