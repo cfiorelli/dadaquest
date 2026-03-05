@@ -491,15 +491,83 @@ export async function boot(options = {}) {
     };
   }
 
-  // Replace DaDa mesh and key props with authored assets.
-  await attachRoleModel('goalModel', world.goalRoot, {
-    parent: goalVisualRoot,
-    fallbackMeshes: goalFallbackMeshes,
-    fallbackMaterial: 'plastic',
-    rotation: new BABYLON.Vector3(0, Math.PI, 0),
-    actorRole: 'goal',
-    renderingGroupId: 3,
-  });
+  // Replace DaDa mesh with dad GLB. Uses a custom load path to avoid
+  // sanitizeLoadedRoleModel wiping the Y-rotation and reading stale
+  // bounding boxes before world matrices are computed.
+  await (async () => {
+    const dadResult = await loadModelForRole(scene, 'goalModel', {
+      parent: goalVisualRoot,
+      fallbackMaterial: 'plastic',
+    });
+
+    if (!dadResult.loaded) {
+      actorState.goal = {
+        loaded: false, usingFallback: true,
+        reason: dadResult.reason || 'load_failed',
+        worldPos: goalVisualRoot.getAbsolutePosition().asArray(),
+        bboxSize: [0, 0, 0],
+      };
+      return;
+    }
+
+    const { roots, meshes } = dadResult;
+
+    // Ensure model faces camera (-Z): clear any quaternion, set Euler Y = PI.
+    for (const root of roots) {
+      root.rotationQuaternion = null;
+      root.rotation.set(0, Math.PI, 0);
+    }
+
+    // Force world matrices so bounding box reflects the full parent chain.
+    for (const root of roots) {
+      root.computeWorldMatrix(true);
+      for (const m of root.getChildMeshes(false)) m.computeWorldMatrix(true);
+    }
+
+    // Compute world Y extents from geometry meshes only.
+    const geomMeshes = meshes.filter((m) => m instanceof BABYLON.Mesh && m.geometry);
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const m of geomMeshes) {
+      const bi = m.getBoundingInfo();
+      bi.update(m.getWorldMatrix());
+      if (bi.boundingBox.minimumWorld.y < minY) minY = bi.boundingBox.minimumWorld.y;
+      if (bi.boundingBox.maximumWorld.y > maxY) maxY = bi.boundingBox.maximumWorld.y;
+    }
+
+    // Autoscale to 2.0 game-unit height.
+    if (isFinite(minY) && isFinite(maxY) && maxY > minY) {
+      const scaleFactor = 2.0 / (maxY - minY);
+      for (const root of roots) root.scaling.scaleInPlace(scaleFactor);
+
+      // Recompute world matrices after scale, then find new feet position.
+      for (const root of roots) {
+        root.computeWorldMatrix(true);
+        for (const m of root.getChildMeshes(false)) m.computeWorldMatrix(true);
+      }
+      let newMinY = Infinity;
+      for (const m of geomMeshes) {
+        const bi = m.getBoundingInfo();
+        bi.update(m.getWorldMatrix());
+        if (bi.boundingBox.minimumWorld.y < newMinY) newMinY = bi.boundingBox.minimumWorld.y;
+      }
+      // Ground feet at goalVisualRoot world Y.
+      if (isFinite(newMinY)) {
+        const gvrY = goalVisualRoot.getAbsolutePosition().y;
+        for (const root of roots) root.position.y += gvrY - newMinY;
+      }
+    }
+
+    registerShadowCasters(world.shadowGen, meshes);
+    setMeshesRenderingGroup(meshes, 3);
+    hideMeshList(goalFallbackMeshes);
+
+    actorState.goal = {
+      loaded: true, usingFallback: false, reason: 'ok',
+      worldPos: goalVisualRoot.getAbsolutePosition().asArray(),
+      bboxSize: [0, isFinite(maxY - minY) ? maxY - minY : 0, 0],
+    };
+  })();
 
   for (const signRoot of world.signs || []) {
     await attachRoleModel('signModel', signRoot, {
