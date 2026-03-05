@@ -695,21 +695,28 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.onesieBuffMs = 0;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
-    const ph = hazards[0] || null;
-    window.__DADA_DEBUG__.levelAudit = {
-      onesiePos: pickups[0] ? [pickups[0].position.x, pickups[0].position.y] : 'missing',
-      puddleAabb: ph ? { minX: ph.minX, maxX: ph.maxX, minY: ph.minY, maxY: ph.maxY } : null,
-      coinPositions: coins.map((c) => [c.position.x, c.position.y]),
-      unreachableCoins: [],
+    const LANE_Z = 0;
+    window.__DADA_DEBUG__.laneAudit = () => {
+      const playerZ = player.mesh.position.z;
+      const items = [
+        ...coins.map((c, i) => ({ type: 'coin', id: `coin_${i}`, x: c.position.x, y: c.position.y, z: c.position.z })),
+        ...pickups.map((p, i) => ({ type: 'pickup', id: `pickup_${i}`, x: p.position.x, y: p.position.y, z: p.position.z })),
+        ...hazards.map((h, i) => ({ type: 'hazard', id: `hazard_${i}`, x: (h.minX + h.maxX) / 2, y: (h.minY + h.maxY) / 2, z: h.mesh?.position.z ?? 0 })),
+        ...crumbles.map((cr, i) => ({ type: 'crumble', id: `crumble_${i}`, x: cr.x, y: cr.y, z: cr.z ?? 0 })),
+        ...checkpoints.filter(cp => cp.index > 0).map((cp, i) => ({ type: 'checkpoint', id: `checkpoint_${i}`, x: cp.spawn.x, y: cp.spawn.y, z: cp.spawn.z ?? 0 })),
+      ];
+      const outOfLane = items.filter(item => Math.abs((item.z ?? 0) - LANE_Z) > 0.01);
+      return { laneZ: LANE_Z, playerZ, interactables: items, outOfLane };
     };
-    window.__DADA_DEBUG__.dumpLevelAudit = () => {
-      const a = window.__DADA_DEBUG__.levelAudit;
-      console.log('[level-audit] onesie:', a.onesiePos);
-      console.log('[level-audit] puddle AABB:', a.puddleAabb);
-      a.coinPositions.forEach((p, i) => {
-        const inPuddle = a.puddleAabb && p[0] >= a.puddleAabb.minX && p[0] <= a.puddleAabb.maxX;
-        console.log(`[level-audit] coin[${i}]: (${p[0]}, ${p[1]})${inPuddle ? ' WARNING inside puddle X' : ''}`);
-      });
+    window.__DADA_DEBUG__.dumpLaneAudit = () => {
+      const a = window.__DADA_DEBUG__.laneAudit();
+      console.log(`[lane-audit] playerZ=${a.playerZ.toFixed(3)} | outOfLane=${a.outOfLane.length}`);
+      if (a.outOfLane.length) {
+        a.outOfLane.forEach(item => console.warn(`[lane-audit] OUT-OF-LANE: ${item.type}(${item.id}) z=${item.z}`));
+      } else {
+        console.log('[lane-audit] All interactables on LANE_Z=0 ✓');
+      }
+      a.interactables.forEach(item => console.log(`[lane-audit]   ${item.type}[${item.id}] (${item.x.toFixed(2)},${item.y.toFixed(2)},${item.z?.toFixed(3) ?? 0})`));
     };
   }
 
