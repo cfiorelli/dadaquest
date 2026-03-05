@@ -22,6 +22,10 @@ export class InputManager {
       const code = e.code;
       this.held[code] = false;
     });
+    // Clear all held keys when the window loses focus so keys don't get stuck.
+    window.addEventListener('blur', () => {
+      this.held = {};
+    });
   }
 
   /** Returns -1, 0, or 1. */
