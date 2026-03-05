@@ -672,9 +672,7 @@ export async function boot(options = {}) {
   let onesieBuffTimerMs = 0;
   let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
-  let slipRecentTimerMs = 0;
-  let slipWasInside = false;
-  let slipToastCooldownMs = 0;
+  let puddleInvulnMs = 0;
   let coinsCollected = 0;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
@@ -781,7 +779,7 @@ export async function boot(options = {}) {
     onesieBuffTimerMs = 0;
     onesieMaxDurationMs = 10000;
     onesieJumpBoost = 1;
-    slipRecentTimerMs = 0;
+    puddleInvulnMs = 0;
     coinsCollected = 0;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
@@ -977,54 +975,39 @@ export async function boot(options = {}) {
       }
     }
 
-    // Hazard overlaps affect movement.
-    let accelMultiplier = 1;
-    let decelMultiplier = 1;
-    let turnResponsiveness = 1;
-    let speedMultiplier = 1;
-    let accelBonusMultiplier = 1;
-    let inSlipHazard = false;
+    // Puddle hazard: touching it resets player to spawn start.
+    if (puddleInvulnMs > 0) {
+      puddleInvulnMs = Math.max(0, puddleInvulnMs - dt * 1000);
+    }
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
         && pos.x <= hazard.maxX
         && pos.y >= hazard.minY
         && pos.y <= hazard.maxY;
 
-      if (inside && hazard.type === 'slip') {
-        inSlipHazard = true;
-        accelMultiplier *= hazard.accelMultiplier ?? 0.70;
-        decelMultiplier *= hazard.decelMultiplier ?? 0.25;
-        turnResponsiveness = Math.min(turnResponsiveness, 0.58);
-        slipRecentTimerMs = 900;
+      if (inside && hazard.type === 'slip' && puddleInvulnMs <= 0 && !respawnState) {
+        activeCheckpointIndex = 0;
+        respawnPoint = { ...spawnPoint };
+        respawnState = { phase: 'fadeOut', timer: 0.16, reason: 'puddle' };
+        window.__DADA_DEBUG__.lastRespawnReason = 'puddle';
+        audio.playSplash();
+        juiceFx.spawnSlipRipple(pos);
+        ui.showStatus('SPLASH!', 650);
+        puddleInvulnMs = 4000;
       }
     }
 
-    if (slipToastCooldownMs > 0) {
-      slipToastCooldownMs = Math.max(0, slipToastCooldownMs - dt * 1000);
-    }
-    if (inSlipHazard && !slipWasInside && slipToastCooldownMs <= 0) {
-      ui.showSlipperyToast();
-      audio.playSplash();
-      juiceFx.spawnSlipRipple(pos);
-      slipToastCooldownMs = 1000;
-    }
-    slipWasInside = inSlipHazard;
+    let speedMultiplier = 1;
+    let accelBonusMultiplier = 1;
     const sprinting = input.isSprintHeld();
-    if (sprinting && !inSlipHazard) {
+    if (sprinting) {
       speedMultiplier = 1.15;
       accelBonusMultiplier = 1.10;
     }
 
-    if (slipRecentTimerMs > 0) {
-      slipRecentTimerMs = Math.max(0, slipRecentTimerMs - dt * 1000);
-    }
-
     player.setMovementModifiers({
-      surfaceAccelMultiplier: accelMultiplier,
-      surfaceDecelMultiplier: decelMultiplier,
       jumpVelocityMultiplier: onesieJumpBoost,
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
-      turnResponsiveness,
       speedMultiplier,
       accelBonusMultiplier,
     });
@@ -1164,8 +1147,8 @@ export async function boot(options = {}) {
     }
     if (shotToast === 'onesie') {
       ui.showOnesieBoostToast();
-    } else if (shotToast === 'slippery') {
-      ui.showSlipperyToast();
+    } else if (shotToast === 'splash') {
+      ui.showStatus('SPLASH!', 2000);
     }
     player.vx = 0;
     player.vy = 0;
@@ -1275,7 +1258,7 @@ export async function boot(options = {}) {
             juiceFx.spawnLandDust(player.mesh.position);
             if (!shotMode) camera.position.y -= 0.18; // camera punch
           } else if (ev.type === 'outOfBounds') {
-            const reason = slipRecentTimerMs > 0 ? 'slip_fall' : 'fell_off_level';
+            const reason = 'fell_off_level';
             triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
           }
         }
