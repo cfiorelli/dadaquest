@@ -85,7 +85,7 @@ function createCardboardPlatform(scene, name, {
     noiseAmt: 7,
     roughness: 0.98,
   });
-  hiMat.alpha = 0.32;
+  hiMat.alpha = 0.44;
   hiMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   hiPlane.material = hiMat;
 
@@ -713,13 +713,13 @@ export function buildWorld(scene, options = {}) {
   scene.clearColor = new BABYLON.Color4(...P.clearColor);
   scene.ambientColor = new BABYLON.Color3(...P.ambientColor);
   scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-  scene.fogDensity = 0.010;
+  scene.fogDensity = 0.006;
   scene.fogColor = new BABYLON.Color3(...P.fogColor);
 
   // === LIGHTING (crafted 3-light rig) ===
   const keyLight = new BABYLON.DirectionalLight('keyLight', new BABYLON.Vector3(-0.56, -0.88, 0.22), scene);
   keyLight.position = new BABYLON.Vector3(22, 26, -12);
-  keyLight.intensity = 1.02;
+  keyLight.intensity = 1.12;
   keyLight.diffuse = new BABYLON.Color3(1.0, 0.92, 0.80);
   keyLight.specular = new BABYLON.Color3(0.55, 0.46, 0.34);
 
@@ -729,7 +729,7 @@ export function buildWorld(scene, options = {}) {
   fillLight.groundColor = new BABYLON.Color3(0.34, 0.32, 0.34);
 
   const rimLight = new BABYLON.PointLight('rimLight', new BABYLON.Vector3(-8.5, 8.8, -13.8), scene);
-  rimLight.intensity = 0.30;
+  rimLight.intensity = 0.44;
   rimLight.diffuse = new BABYLON.Color3(0.80, 0.92, 1.0);
   rimLight.range = 40;
 
@@ -785,10 +785,10 @@ export function buildWorld(scene, options = {}) {
   const skyTex = new BABYLON.DynamicTexture('skyGradTex', { width: 4, height: 256 }, scene, true);
   const sCtx = skyTex.getContext();
   const skyGrad = sCtx.createLinearGradient(0, 0, 0, 256);
-  skyGrad.addColorStop(0.0, 'rgba(148,190,230,0.92)');  // cool upper blue
-  skyGrad.addColorStop(0.48, 'rgba(178,212,240,0.78)'); // mid sky
-  skyGrad.addColorStop(0.82, 'rgba(224,230,220,0.58)'); // hazy horizon
-  skyGrad.addColorStop(1.0, 'rgba(240,232,210,0.32)');  // warm ground haze
+  skyGrad.addColorStop(0.0, 'rgba(110,168,220,0.96)');  // richer upper blue
+  skyGrad.addColorStop(0.45, 'rgba(158,202,238,0.82)'); // mid sky
+  skyGrad.addColorStop(0.78, 'rgba(216,228,218,0.62)'); // hazy horizon
+  skyGrad.addColorStop(1.0, 'rgba(246,234,208,0.38)');  // warm amber ground haze
   sCtx.fillStyle = skyGrad;
   sCtx.fillRect(0, 0, 4, 256);
   skyTex.update();
