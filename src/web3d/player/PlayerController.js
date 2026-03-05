@@ -135,8 +135,8 @@ export class PlayerController {
     this.jumpVelocityMultiplier = jumpVelocityMultiplier;
     this.maxAirJumps = Math.max(0, maxAirJumps | 0);
     this.turnResponsiveness = clamp(turnResponsiveness, 0.2, 1);
-    this.speedMultiplier = clamp(speedMultiplier, 0.6, 1.6);
-    this.accelBonusMultiplier = clamp(accelBonusMultiplier, 0.6, 1.6);
+    this.speedMultiplier = clamp(speedMultiplier, 0.6, 3.0); // 3.0 allows 1.75× sprint headroom
+    this.accelBonusMultiplier = clamp(accelBonusMultiplier, 0.6, 3.0);
   }
 
   setPosition(x, y, z = 0) {

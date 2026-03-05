@@ -1018,6 +1018,25 @@ export async function boot(options = {}) {
     }
   }
 
+  // Minimal run indicator — confirms Shift input is live every frame.
+  let _runIndicatorEl = null;
+  function getRunIndicator() {
+    if (!_runIndicatorEl) {
+      _runIndicatorEl = document.createElement('div');
+      _runIndicatorEl.style.cssText = [
+        'position:fixed', 'top:14px', 'right:16px',
+        'background:#d95c2a', 'color:#fff',
+        'font:bold 15px monospace', 'padding:4px 11px',
+        'border-radius:6px', 'opacity:0',
+        'transition:opacity 0.07s', 'z-index:1001',
+        'pointer-events:none', 'letter-spacing:0.06em',
+      ].join(';');
+      _runIndicatorEl.textContent = '\u25b6\u25b6 RUN';
+      document.body.appendChild(_runIndicatorEl);
+    }
+    return _runIndicatorEl;
+  }
+
   function updateLevelInteractions(dt) {
     const pos = player.mesh.position;
 
@@ -1107,6 +1126,7 @@ export async function boot(options = {}) {
       speedMultiplier = 1.75;      // run = walk * 1.75 — clearly noticeable
       accelBonusMultiplier = 1.40; // faster ramp-up while sprinting
     }
+    getRunIndicator().style.opacity = sprinting ? '1' : '0';
 
     player.setMovementModifiers({
       jumpVelocityMultiplier: onesieJumpBoost,

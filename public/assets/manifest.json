@@ -3,7 +3,7 @@
   "roles": {
     "playerModel": ["kenney_baby"],
     "goalModel": ["local_dad"],
-    "checkpointModel": ["kenney_flag"],
+    "checkpointModel": [],
     "pickupModel": [],
     "signModel": ["kenney_flag"],
     "toyBlockModel": ["kenney_crate", "kenney_chest"],
@@ -163,7 +163,7 @@
     {
       "id": "local_dad",
       "path": "assets/models/characters/dad.glb",
-      "scale": 0.9,
+      "scale": 0.01,
       "yOffset": 0.0
     },
     {
