@@ -1,5 +1,6 @@
 import * as BABYLON from '@babylonjs/core';
 import { buildWorld } from './world/buildWorld.js';
+import { buildWorld2 } from './world/buildWorld2.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
@@ -302,7 +303,7 @@ function sanitizeLoadedRoleModel({
 }
 
 export async function boot(options = {}) {
-  const { isTestMode = false } = options;
+  const { isTestMode = false, levelId = 1 } = options;
   const shotMode = isShotMode();
   const debugMode = isDebugMode();
   const animationsEnabled = !shotMode && !isTestMode;
@@ -370,13 +371,15 @@ export async function boot(options = {}) {
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
 
-  // Build the diorama world
-  const world = shotMode
-    ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
-      random: createSeededRandom(7331),
-      animateGoal: false,
-    }))
-    : buildWorld(scene);
+  // Build the diorama world (route by level)
+  const world = levelId === 2
+    ? buildWorld2(scene)
+    : shotMode
+      ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
+        random: createSeededRandom(7331),
+        animateGoal: false,
+      }))
+      : buildWorld(scene);
 
   await applyHdriEnvironment(scene, {
     intensity: shotMode ? 0.35 : 0.44,
@@ -491,83 +494,14 @@ export async function boot(options = {}) {
     };
   }
 
-  // Replace DaDa mesh with dad GLB. Uses a custom load path to avoid
-  // sanitizeLoadedRoleModel wiping the Y-rotation and reading stale
-  // bounding boxes before world matrices are computed.
-  await (async () => {
-    const dadResult = await loadModelForRole(scene, 'goalModel', {
-      parent: goalVisualRoot,
-      fallbackMaterial: 'plastic',
-    });
-
-    if (!dadResult.loaded) {
-      actorState.goal = {
-        loaded: false, usingFallback: true,
-        reason: dadResult.reason || 'load_failed',
-        worldPos: goalVisualRoot.getAbsolutePosition().asArray(),
-        bboxSize: [0, 0, 0],
-      };
-      return;
-    }
-
-    const { roots, meshes } = dadResult;
-
-    // Ensure model faces camera (-Z): clear any quaternion, set Euler Y = PI.
-    for (const root of roots) {
-      root.rotationQuaternion = null;
-      root.rotation.set(0, Math.PI, 0);
-    }
-
-    // Force world matrices so bounding box reflects the full parent chain.
-    for (const root of roots) {
-      root.computeWorldMatrix(true);
-      for (const m of root.getChildMeshes(false)) m.computeWorldMatrix(true);
-    }
-
-    // Compute world Y extents from geometry meshes only.
-    const geomMeshes = meshes.filter((m) => m instanceof BABYLON.Mesh && m.geometry);
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const m of geomMeshes) {
-      const bi = m.getBoundingInfo();
-      bi.update(m.getWorldMatrix());
-      if (bi.boundingBox.minimumWorld.y < minY) minY = bi.boundingBox.minimumWorld.y;
-      if (bi.boundingBox.maximumWorld.y > maxY) maxY = bi.boundingBox.maximumWorld.y;
-    }
-
-    // Autoscale to 2.0 game-unit height.
-    if (isFinite(minY) && isFinite(maxY) && maxY > minY) {
-      const scaleFactor = 2.0 / (maxY - minY);
-      for (const root of roots) root.scaling.scaleInPlace(scaleFactor);
-
-      // Recompute world matrices after scale, then find new feet position.
-      for (const root of roots) {
-        root.computeWorldMatrix(true);
-        for (const m of root.getChildMeshes(false)) m.computeWorldMatrix(true);
-      }
-      let newMinY = Infinity;
-      for (const m of geomMeshes) {
-        const bi = m.getBoundingInfo();
-        bi.update(m.getWorldMatrix());
-        if (bi.boundingBox.minimumWorld.y < newMinY) newMinY = bi.boundingBox.minimumWorld.y;
-      }
-      // Ground feet at goalVisualRoot world Y.
-      if (isFinite(newMinY)) {
-        const gvrY = goalVisualRoot.getAbsolutePosition().y;
-        for (const root of roots) root.position.y += gvrY - newMinY;
-      }
-    }
-
-    registerShadowCasters(world.shadowGen, meshes);
-    setMeshesRenderingGroup(meshes, 3);
-    hideMeshList(goalFallbackMeshes);
-
-    actorState.goal = {
-      loaded: true, usingFallback: false, reason: 'ok',
-      worldPos: goalVisualRoot.getAbsolutePosition().asArray(),
-      bboxSize: [0, isFinite(maxY - minY) ? maxY - minY : 0, 0],
-    };
-  })();
+  await attachRoleModel('goalModel', world.goalRoot, {
+    parent: goalVisualRoot,
+    fallbackMeshes: goalFallbackMeshes,
+    fallbackMaterial: 'plastic',
+    rotation: new BABYLON.Vector3(0, Math.PI, 0),
+    actorRole: 'goal',
+    renderingGroupId: 3,
+  });
 
   for (const signRoot of world.signs || []) {
     await attachRoleModel('signModel', signRoot, {
@@ -695,6 +629,29 @@ export async function boot(options = {}) {
       renderingGroupId: 1,
       alphaCutout: true,
     });
+  }
+
+  // Level 2 GLB props — hide procedural fallback visuals when GLB loads.
+  if (world.level2) {
+    const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
+    const l2propDefs = [
+      { role: 'futureCribModel',         anchor: l2anchors.babyBed,      fallback: l2fallback?.babyBed },
+      { role: 'futurePianoModel',        anchor: l2anchors.piano,        fallback: l2fallback?.piano },
+      { role: 'futureBiancaModel',       anchor: l2anchors.bianca,       fallback: null },
+      { role: 'futureRockingHorseModel', anchor: l2anchors.rockingHorse, fallback: null },
+    ];
+    for (const { role, anchor, fallback } of l2propDefs) {
+      if (!anchor) continue;
+      const pos = anchor.getAbsolutePosition();
+      const result = await attachRoleModel(role, anchor, {
+        position: pos,
+        fallbackMaterial: 'plastic',
+        renderingGroupId: 2,
+      });
+      if (result.loaded && fallback) {
+        fallback.setEnabled(false);
+      }
+    }
   }
 
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
@@ -972,6 +929,7 @@ export async function boot(options = {}) {
     }
     coinsCollected = 0;
     resetCrumbles();
+    if (world.level2) world.level2.reset();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -1428,6 +1386,9 @@ export async function boot(options = {}) {
       } else {
         updateLevelInteractions(dt);
         updateCrumbles(dt);
+        if (world.level2) {
+          world.level2.update(dt, { pos: player.mesh.position, triggerReset, player });
+        }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);

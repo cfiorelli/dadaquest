@@ -2,7 +2,7 @@
   "primaryPack": "kenney",
   "roles": {
     "playerModel": ["kenney_baby"],
-    "goalModel": ["local_dad"],
+    "goalModel": ["kenney_dad"],
     "checkpointModel": [],
     "pickupModel": [],
     "signModel": ["kenney_flag"],
