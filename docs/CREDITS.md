@@ -1,4 +1,4 @@
-# Asset Credits (CC0)
+# Asset Credits and Attribution
 
 - Kenney - Platformer Kit (CC0 1.0)
   - Source: https://kenney.nl/assets/platformer-kit

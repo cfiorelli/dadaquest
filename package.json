@@ -1,7 +1,7 @@
 {
   "name": "dada-quest",
   "version": "1.0.0",
-  "description": "Da Da Quest - A comedic 2D platformer",
+  "description": "DaDaQuest - crafted 3D diorama platformer with deterministic smoke and screenshot modes",
   "scripts": {
     "dev": "vite",
     "build": "npm run check:asset-manifest && vite build && npm run check:dist-nozip",

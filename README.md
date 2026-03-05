@@ -1,6 +1,6 @@
 # DaDaQuest
 
-Crafted 3D diorama platformer built with Babylon.js.
+Crafted 3D diorama platformer built with Babylon.js, with deterministic test/shot modes and a manifest-driven model pipeline.
 
 ## Live
 
@@ -19,6 +19,7 @@ Open the local URL printed by Vite (usually `http://127.0.0.1:5173`).
 
 - `A / D` or `Left / Right`: move
 - `Space`: jump
+- `Shift`: sprint
 - `Enter` or `Space` on title: start
 - `M`: mute/unmute
 
@@ -52,13 +53,26 @@ npx playwright test -g screenshot --project=chromium
   - Deterministic render path for screenshots.
   - Uses fixed frame capture and sets `window.__DADA_DEBUG__.shotReady = true`.
 
+## Debug Mode
+
+- `?debug=1` enables debug-only runtime helpers on `window.__DADA_DEBUG__` (lane/collectible audits, actor state, build SHA).
+
 ## Assets
 
-Asset pipeline scaffolding is in place:
-- `public/assets/glb/`
+Runtime-served assets:
+- `public/assets/models/characters/`
+- `public/assets/models/props/`
+- `public/assets/models/platforms/`
+- `public/assets/packs/kenney/`
+- `public/assets/packs/quaternius/`
 - `public/assets/audio/`
-- `public/assets/textures/`
+- `public/assets/hdr/`
+- `public/assets/ui/`
 
-Optional GLB loading is handled by `src/web3d/util/assets.js` via
-`public/assets/glb/manifest.json`. If no model is listed, the game cleanly falls
-back to primitive diorama meshes.
+Manifest source of truth:
+- `public/assets/manifest.json`
+- Role-driven loading: `src/web3d/util/assets.js`
+
+Local staging/source (not required by runtime):
+- `assets/`
+- `assets-src/`
