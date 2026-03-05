@@ -1013,6 +1013,19 @@ export function buildWorld(scene, options = {}) {
     const c = LEVEL1.coins[i];
     const node = createCoin(scene, `coin_${i}`, { x: c.x, y: c.y, z: LANE_Z });
     node.position.z = LANE_Z; // enforce lane
+    const collectibleId = `coin_${i}`;
+    node.metadata = {
+      ...(node.metadata || {}),
+      collectibleId,
+      collectibleType: 'coin',
+    };
+    for (const mesh of node.getChildMeshes(false)) {
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        collectibleId,
+        collectibleType: 'coin',
+      };
+    }
     setRenderingGroup(node, 3);
     coins.push({
       position: new BABYLON.Vector3(c.x, c.y, LANE_Z),

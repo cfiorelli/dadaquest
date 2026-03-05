@@ -679,12 +679,13 @@ export function createUI(uiRoot, options = {}) {
         title: 'ONESIE BOOST',
         iconSrc: 'assets/ui/cheeseburger.svg',
         bgColor: '#2B6DFF',
-        durationMs: 1200,
+        durationMs: 3200,
         enterMs: 120,
         exitMs: 180,
       });
     },
     showOnesieBoostCard() {
+      if (disableToasts) return;
       // Clear any in-flight card animation.
       if (boostCardTimer1) { clearTimeout(boostCardTimer1); boostCardTimer1 = null; }
       if (boostCardTimer2) { clearTimeout(boostCardTimer2); boostCardTimer2 = null; }
@@ -698,7 +699,7 @@ export function createUI(uiRoot, options = {}) {
         boostCardTimer2 = setTimeout(() => {
           boostCardEl.classList.remove('bc-out');
         }, 240);
-      }, 900);
+      }, 2900);
     },
     showSlipperyToast() {
       showToast({

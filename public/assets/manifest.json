@@ -8,7 +8,7 @@
     "signModel": ["kenney_flag"],
     "toyBlockModel": ["kenney_crate", "kenney_chest"],
     "cribRailModel": ["kenney_fence"],
-    "hangingModel": ["kenney_coin"],
+    "hangingModel": [],
     "bannerModel": ["kenney_flag"],
     "treeModel": ["kenney_tree", "kenney_tree_pine"],
     "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass"],

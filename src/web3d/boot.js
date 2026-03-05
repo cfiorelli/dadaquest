@@ -732,6 +732,54 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
     const LANE_Z = 0;
+    const collectibleIdSet = new Set(coins.map((_, i) => `coin_${i}`));
+    const collectibleNamePattern = /(coin|gold|token|collectible|pacifier)/i;
+
+    window.__DADA_DEBUG__.collectibleAudit = () => {
+      const suspectMeshes = scene.meshes.filter((mesh) => {
+        if (!(mesh instanceof BABYLON.Mesh)) return false;
+        if (!mesh.isEnabled()) return false;
+        if (mesh.isVisible === false) return false;
+        if ((mesh.visibility ?? 1) <= 0.02) return false;
+        return collectibleNamePattern.test(mesh.name || '');
+      });
+      const missingTrigger = suspectMeshes
+        .filter((mesh) => {
+          const collectibleId = mesh.metadata?.collectibleId;
+          return !collectibleId || !collectibleIdSet.has(collectibleId);
+        })
+        .map((mesh) => {
+          const p = mesh.getAbsolutePosition();
+          return {
+            name: mesh.name,
+            collectibleId: mesh.metadata?.collectibleId || null,
+            position: [p.x, p.y, p.z],
+          };
+        });
+
+      return {
+        expectedCollectibles: collectibleIdSet.size,
+        visibleCollectibleLikeMeshes: suspectMeshes.length,
+        missingTrigger,
+      };
+    };
+    window.__DADA_DEBUG__.dumpCollectibleAudit = () => {
+      const audit = window.__DADA_DEBUG__.collectibleAudit();
+      console.log(
+        `[collectible-audit] visible=${audit.visibleCollectibleLikeMeshes} missingTrigger=${audit.missingTrigger.length}`,
+      );
+      if (audit.missingTrigger.length) {
+        audit.missingTrigger.forEach((item) => {
+          console.warn(
+            `[collectible-audit] MISSING_TRIGGER ${item.name} id=${item.collectibleId} pos=(${item.position.map(v => v.toFixed(2)).join(',')})`,
+          );
+        });
+      } else {
+        console.log('[collectible-audit] all visible collectible-like meshes have trigger ids ✓');
+      }
+      return audit;
+    };
+
     window.__DADA_DEBUG__.laneAudit = () => {
       const playerZ = player.mesh.position.z;
       const items = [

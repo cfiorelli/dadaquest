@@ -1,5 +1,25 @@
-// C major melody: C4, E4, G4, E4 — one note per second.
-const PLINK_NOTES = [261.63, 329.63, 392.00, 329.63];
+// Gentle C-major melody loop (12 notes) at one note per second.
+const PLINK_NOTES = [
+  261.63, // C4
+  329.63, // E4
+  392.00, // G4
+  329.63, // E4
+  293.66, // D4
+  329.63, // E4
+  392.00, // G4
+  440.00, // A4
+  392.00, // G4
+  329.63, // E4
+  293.66, // D4
+  261.63, // C4
+];
+// Occasional rests to break strict metronome feel: 1 rest every 16 beats.
+const PLINK_RESTS = [
+  false, false, false, false,
+  false, false, false, false,
+  false, false, false, true,
+  false, false, false, false,
+];
 const PLINK_VOL = 0.06;   // quiet pluck through musicGain
 const PLINK_MS = 1000;    // one plink per second
 
@@ -14,6 +34,7 @@ export class GameAudio {
     this._unlockBound = null;
     this._pianoRunning = false;
     this._plinkIndex = 0;
+    this._beatIndex = 0;
     this._pianoScheduleId = null;
     this._birdChirpId = null;
   }
@@ -64,6 +85,7 @@ export class GameAudio {
     if (this._pianoRunning) return;
     this._pianoRunning = true;
     this._plinkIndex = 0;
+    this._beatIndex = 0;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
@@ -105,7 +127,13 @@ export class GameAudio {
 
   _schedulePlink() {
     if (!this._pianoRunning) return;
-    this._playPlinkNote();
+    const shouldRest = PLINK_RESTS[this._beatIndex % PLINK_RESTS.length];
+    if (!shouldRest) {
+      this._playPlinkNote();
+    } else {
+      this._plinkIndex++;
+    }
+    this._beatIndex++;
     this._pianoScheduleId = window.setTimeout(() => this._schedulePlink(), PLINK_MS);
   }
 
