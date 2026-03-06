@@ -1678,7 +1678,7 @@ export async function boot(options = {}) {
   function finishRun() {
     state = 'end';
     player.setWinAnimationActive(false);
-    audio.stopMusic(0.5);
+    audio.stopLevelMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     ui.showEnd();
   }
@@ -1695,7 +1695,7 @@ export async function boot(options = {}) {
     ui.showStatus('Ready!', 500);
     input.consumeAll();
     juiceFx.clear();
-    audio.stopMusic(0.2);
+    audio.stopLevelMusic(0.2);
 
     state = 'title';
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'title', lastKey: _lastKey });
@@ -1798,7 +1798,7 @@ export async function boot(options = {}) {
     state = 'gameplay';
     input.consumeAll();
     player.setWinAnimationActive(false);
-    audio.startMusic(0.5, levelId === 1 ? 'country' : 'piano');
+    audio.startLevelMusic(levelId, 0.5);
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
@@ -1836,6 +1836,7 @@ export async function boot(options = {}) {
       return;
     }
     audio.playWin();
+    audio.playCue(levelId, 'levelComplete');
     player.setWinAnimationActive(true);
     state = 'goal';
     goalTimer = GOAL_CELEBRATION_SEC;
@@ -1859,6 +1860,7 @@ export async function boot(options = {}) {
     });
     if (!applied) return;
     audio.playReset();
+    audio.playCue(levelId, 'collision');
     respawnState = { phase: 'fadeOut', timer: 0.16, reason };
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     ui.showStatus('Try again!', 650);
@@ -1904,6 +1906,7 @@ export async function boot(options = {}) {
     respawnPoint = { ...checkpoint.spawn };
     window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
     ui.showStatus(`${checkpoint.label} checkpoint`, 1200);
+    audio.playCue(levelId, 'checkpoint');
 
     if (checkpoint.marker) {
       for (const mesh of checkpoint.marker.getChildMeshes()) {
@@ -1913,6 +1916,11 @@ export async function boot(options = {}) {
       }
     }
   }
+
+  function triggerNearMissCue() {
+    audio.playCue(levelId, 'nearMiss');
+  }
+  window.__DADA_DEBUG__.playNearMissCue = triggerNearMissCue;
 
   // Minimal run indicator — confirms Shift input is live every frame.
   let _runIndicatorEl = null;

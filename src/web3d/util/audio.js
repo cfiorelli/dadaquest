@@ -1,118 +1,65 @@
-// Twangy G-major pentatonic loop (16 notes) for Level 1 banjo feel
-const BANJO_NOTES = [
-  392.00, // G4
-  329.63, // E4
-  293.66, // D4
-  246.94, // B3
-  196.00, // G3
-  220.00, // A3
-  246.94, // B3
-  293.66, // D4
-  329.63, // E4
-  392.00, // G4
-  440.00, // A4
-  493.88, // B4
-  392.00, // G4
-  293.66, // D4
-  246.94, // B3
-  196.00, // G3
-];
-const BANJO_RESTS = [
-  false, false, false, true,
-  false, false, false, false,
-  false, true,  false, false,
-  false, false, false, true,
-];
-const BANJO_VOL = 0.28;
-const BANJO_MS = 820;  // slightly snappier than piano
+import { LEVEL_MUSIC_SPECS } from './musicSpecs.js';
 
-// Gentle C-major melody loop (12 notes) at one note per second.
-const PLINK_NOTES = [
-  261.63, // C4
-  329.63, // E4
-  392.00, // G4
-  329.63, // E4
-  293.66, // D4
-  329.63, // E4
-  392.00, // G4
-  440.00, // A4
-  392.00, // G4
-  329.63, // E4
-  293.66, // D4
-  261.63, // C4
-];
-// Occasional rests to break strict metronome feel: 1 rest every 16 beats.
-const PLINK_RESTS = [
-  false, false, false, false,
-  false, false, false, false,
-  false, false, false, true,
-  false, false, false, false,
-];
-const PLINK_VOL = 0.22;   // pluck volume through musicGain
-const PLINK_MS = 1000;    // one plink per second
-const COUNTRY_BPM = 192;
-const COUNTRY_STEP_SEC = 60 / COUNTRY_BPM / 2; // eighth-note feel
-const COUNTRY_SCHEDULE_AHEAD_SEC = 0.45;
-const COUNTRY_SCHEDULER_MS = 120;
-const COUNTRY_PATTERNS = [
-  {
-    leadBars: [
-      [392.0, null, 440.0, 493.88, 587.33, null, 493.88, 440.0],
-      [392.0, null, 329.63, 293.66, 329.63, null, 392.0, 440.0],
-      [493.88, null, 587.33, 659.25, 587.33, null, 493.88, 440.0],
-      [392.0, null, 329.63, 293.66, 246.94, null, 293.66, 329.63],
-      [392.0, null, 440.0, 493.88, 587.33, null, 493.88, 440.0],
-      [392.0, null, 329.63, 293.66, 329.63, null, 392.0, 440.0],
-      [493.88, null, 587.33, 659.25, 587.33, 493.88, 440.0, 392.0],
-      [329.63, null, 293.66, 246.94, 220.0, null, 246.94, 293.66],
-    ],
-    bassBars: [
-      [98.0, 98.0], [98.0, 123.47], [146.83, 146.83], [123.47, 123.47],
-      [110.0, 110.0], [110.0, 123.47], [98.0, 98.0], [73.42, 98.0],
-    ],
-    kickBars: [[0, 4], [0, 4], [0, 3, 4], [0, 4], [0, 4], [0, 4], [0, 3, 4], [0, 4]],
-    snareBars: [[2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6]],
-    hatBars: [[1, 5], [1, 5], [1, 3, 5, 7], [1, 5], [1, 5], [1, 5], [1, 3, 5, 7], [1, 5]],
-  },
-  {
-    leadBars: [
-      [392.0, null, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88],
-      [440.0, null, 392.0, 329.63, 293.66, null, 329.63, 392.0],
-      [493.88, null, 523.25, 587.33, 659.25, null, 587.33, 523.25],
-      [440.0, null, 392.0, 329.63, 293.66, null, 246.94, 293.66],
-      [392.0, null, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88],
-      [523.25, null, 493.88, 440.0, 392.0, null, 329.63, 392.0],
-      [587.33, null, 659.25, 587.33, 523.25, null, 493.88, 440.0],
-      [392.0, null, 329.63, 293.66, 246.94, null, 220.0, 246.94],
-    ],
-    bassBars: [
-      [98.0, 110.0], [98.0, 123.47], [130.81, 146.83], [123.47, 130.81],
-      [110.0, 123.47], [110.0, 123.47], [98.0, 110.0], [82.41, 98.0],
-    ],
-    kickBars: [[0, 4], [0, 4], [0, 4, 7], [0, 4], [0, 4], [0, 4], [0, 4, 7], [0, 4]],
-    snareBars: [[2, 6], [2, 6], [2, 5, 6], [2, 6], [2, 6], [2, 6], [2, 5, 6], [2, 6]],
-    hatBars: [[1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5]],
-  },
-  {
-    leadBars: [
-      [392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 523.25, 493.88],
-      [440.0, null, 392.0, 329.63, 293.66, 329.63, 392.0, 440.0],
-      [493.88, 523.25, 587.33, 659.25, 698.46, 659.25, 587.33, 523.25],
-      [440.0, null, 392.0, 329.63, 293.66, 246.94, 220.0, 246.94],
-      [392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 523.25, 493.88],
-      [587.33, null, 523.25, 493.88, 440.0, 392.0, 329.63, 392.0],
-      [659.25, null, 587.33, 523.25, 493.88, 440.0, 392.0, 329.63],
-      [440.0, null, 392.0, 329.63, 293.66, 246.94, 220.0, 196.0],
-    ],
-    bassBars: [
-      [98.0, 98.0], [110.0, 110.0], [146.83, 146.83], [123.47, 98.0],
-      [110.0, 110.0], [123.47, 123.47], [98.0, 110.0], [73.42, 98.0],
-    ],
-    kickBars: [[0, 3, 4], [0, 4], [0, 3, 4], [0, 4], [0, 3, 4], [0, 4], [0, 3, 4], [0, 4]],
-    snareBars: [[2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6]],
-    hatBars: [[1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7]],
-  },
-];
+const MUSIC_SCHEDULE_AHEAD_SEC = 0.45;
+const MUSIC_SCHEDULER_MS = 120;
+const STEM_DEFAULTS = Object.freeze({
+  chord: 1,
+  lead: 1,
+  bass: 1,
+  counter: 1,
+  accent: 1,
+  percussion: 1,
+  vinyl: 1,
+});
+
+const NOTE_OFFSETS = Object.freeze({
+  C: 0,
+  D: 2,
+  E: 4,
+  F: 5,
+  G: 7,
+  A: 9,
+  B: 11,
+});
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function createSeededRandom(seed = 0x12345678) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function noteToFrequency(note) {
+  if (typeof note !== 'string') return 0;
+  const match = note.match(/^([A-G])([#b]?)(-?\d+)$/);
+  if (!match) return 0;
+  const [, name, accidental, octaveText] = match;
+  let semitone = NOTE_OFFSETS[name];
+  if (accidental === '#') semitone += 1;
+  if (accidental === 'b') semitone -= 1;
+  const octave = Number(octaveText);
+  const midi = ((octave + 1) * 12) + semitone;
+  return 440 * (2 ** ((midi - 69) / 12));
+}
+
+function getSpecBar(spec, barIndex) {
+  const barsPerSection = spec.sections[0]?.bars?.length || 8;
+  const totalBars = spec.sections.reduce((sum, section) => sum + section.bars.length, 0);
+  const wrappedBar = ((barIndex % totalBars) + totalBars) % totalBars;
+  const sectionIndex = Math.floor(wrappedBar / barsPerSection) % spec.sections.length;
+  const withinSectionBar = wrappedBar % barsPerSection;
+  return {
+    bar: spec.sections[sectionIndex].bars[withinSectionBar],
+    barIndex: wrappedBar,
+    sectionIndex,
+    withinSectionBar,
+  };
+}
 
 export class GameAudio {
   constructor({ enabled = true } = {}) {
@@ -124,16 +71,14 @@ export class GameAudio {
     this.sfxGain = null;
     this.cooldowns = new Map();
     this._unlockBound = null;
-    this._pianoRunning = false;
-    this._plinkIndex = 0;
-    this._beatIndex = 0;
-    this._pianoScheduleId = null;
-    this._birdChirpId = null;
-    this._countrySchedulerId = null;
-    this._countryNextNoteTime = 0;
-    this._countryStep = 0;
-    this._musicStyle = 'piano';
     this._noiseBuffer = null;
+    this._musicRunning = false;
+    this._musicLevelId = 0;
+    this._musicSpec = null;
+    this._musicStepIndex = 0;
+    this._musicNextStepTime = 0;
+    this._musicSchedulerId = null;
+    this._stemLevels = { ...STEM_DEFAULTS };
   }
 
   _ensureContext() {
@@ -144,12 +89,15 @@ export class GameAudio {
     this.master = this.ctx.createGain();
     this.master.gain.value = this.muted ? 0 : 0.75;
     this.master.connect(this.ctx.destination);
+
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
     this.musicGain.connect(this.master);
+
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = 1;
     this.sfxGain.connect(this.master);
+
     this._noiseBuffer = this._createNoiseBuffer();
   }
 
@@ -177,43 +125,45 @@ export class GameAudio {
     return this.muted;
   }
 
-  // --- Piano plink metronome ---
+  setStemLevel(role, value) {
+    if (!Object.prototype.hasOwnProperty.call(this._stemLevels, role)) return;
+    this._stemLevels[role] = clamp01(value);
+  }
 
-  startMusic(fadeSec = 0.5, style = 'piano') {
-    if (!this.enabled) return;
-    this.unlock();
-    if (!this.ctx || !this.musicGain) return;
-    if (this._pianoRunning) return;
-    this._pianoRunning = true;
-    this._musicStyle = style;
-    this._plinkIndex = 0;
-    this._beatIndex = 0;
-    this._countryStep = 0;
-    this._countryNextNoteTime = this.ctx.currentTime;
-    const t = this.ctx.currentTime;
-    this.musicGain.gain.cancelScheduledValues(t);
-    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
-    this.musicGain.gain.linearRampToValueAtTime(0.85, t + Math.max(0.02, fadeSec));
-    if (style === 'country') {
-      this._scheduleCountry();
-    } else if (style === 'banjo') {
-      this._scheduleBanjo();
-    } else {
-      this._schedulePlink();
-    }
-    if (style !== 'country') {
-      this._scheduleBirdChirp();
+  startLevelMusic(levelId, fadeSec = 0.5) {
+    if (!this.enabled) return false;
+    const spec = LEVEL_MUSIC_SPECS[levelId];
+    if (!spec) return false;
+
+    try {
+      this.unlock();
+      if (!this.ctx || !this.musicGain) return false;
+      if (this._musicRunning && this._musicLevelId === levelId) return true;
+
+      this.stopLevelMusic(0.05);
+      this._musicRunning = true;
+      this._musicLevelId = levelId;
+      this._musicSpec = spec;
+      this._musicStepIndex = 0;
+      this._musicNextStepTime = this.ctx.currentTime + 0.03;
+
+      const t = this.ctx.currentTime;
+      this.musicGain.gain.cancelScheduledValues(t);
+      this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+      this.musicGain.gain.linearRampToValueAtTime(this._getMusicTargetGain(levelId), t + Math.max(0.02, fadeSec));
+      this._scheduleLevelMusic();
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  stopMusic(fadeSec = 0.5) {
-    this._pianoRunning = false;
-    clearTimeout(this._pianoScheduleId);
-    clearTimeout(this._birdChirpId);
-    clearTimeout(this._countrySchedulerId);
-    this._pianoScheduleId = null;
-    this._birdChirpId = null;
-    this._countrySchedulerId = null;
+  stopLevelMusic(fadeSec = 0.5) {
+    this._musicRunning = false;
+    this._musicLevelId = 0;
+    this._musicSpec = null;
+    clearTimeout(this._musicSchedulerId);
+    this._musicSchedulerId = null;
     if (!this.ctx || !this.musicGain) return;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
@@ -221,208 +171,401 @@ export class GameAudio {
     this.musicGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
   }
 
-  _playPlinkNote() {
-    if (!this.ctx || !this.musicGain) return;
-    const freq = PLINK_NOTES[this._plinkIndex % PLINK_NOTES.length];
-    this._plinkIndex++;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.linearRampToValueAtTime(PLINK_VOL, t + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-    osc.connect(gain);
-    gain.connect(this.musicGain);
-    osc.start(t);
-    osc.stop(t + 0.26);
+  startMusic(fadeSec = 0.5, style = 'piano') {
+    const levelId = style === 'country' || style === 'banjo' ? 1 : 2;
+    return this.startLevelMusic(levelId, fadeSec);
   }
 
-  _schedulePlink() {
-    if (!this._pianoRunning) return;
-    const shouldRest = PLINK_RESTS[this._beatIndex % PLINK_RESTS.length];
-    if (!shouldRest) {
-      this._playPlinkNote();
-    } else {
-      this._plinkIndex++;
+  stopMusic(fadeSec = 0.5) {
+    this.stopLevelMusic(fadeSec);
+  }
+
+  playCue(levelId, cueName) {
+    if (!this.enabled) return false;
+    const spec = LEVEL_MUSIC_SPECS[levelId];
+    const events = spec?.cues?.[cueName];
+    if (!spec || !Array.isArray(events) || !events.length) return false;
+
+    try {
+      this.unlock();
+      if (!this.ctx) return false;
+      const beatSec = 60 / spec.tempo;
+      const startBase = this.ctx.currentTime + 0.02;
+      for (const event of events) {
+        const start = startBase + ((event.beat ?? 0) * beatSec);
+        if (event.drum) {
+          this._playMusicDrum(spec.levelId, event.drum, start, event.gain ?? 1);
+          continue;
+        }
+        if (Array.isArray(event.notes)) {
+          this._playRoleChord(spec.levelId, event.role || 'chord', event.notes, start, event.duration ?? (beatSec * 2), event.gain ?? 0.08);
+          continue;
+        }
+        if (event.note) {
+          this._playRoleNote(
+            spec.levelId,
+            event.role || 'lead',
+            noteToFrequency(event.note),
+            start,
+            event.duration ?? (beatSec * 0.75),
+            event.gain ?? 0.08,
+            event,
+          );
+        }
+      }
+      return true;
+    } catch {
+      return false;
     }
-    this._beatIndex++;
-    this._pianoScheduleId = window.setTimeout(() => this._schedulePlink(), PLINK_MS);
   }
 
-  // --- Banjo twang ---
-
-  _playBanjoNote() {
-    if (!this.ctx || !this.musicGain) return;
-    const freq = BANJO_NOTES[this._plinkIndex % BANJO_NOTES.length];
-    this._plinkIndex++;
-    const t = this.ctx.currentTime;
-    // Sawtooth pluck — fast attack, quick decay for banjo character
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.linearRampToValueAtTime(BANJO_VOL, t + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    osc.connect(gain);
-    gain.connect(this.musicGain);
-    osc.start(t);
-    osc.stop(t + 0.22);
-    // Slightly detuned triangle for twang warmth
-    const osc2 = this.ctx.createOscillator();
-    const gain2 = this.ctx.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.value = freq * 1.006;
-    gain2.gain.setValueAtTime(0.0001, t);
-    gain2.gain.linearRampToValueAtTime(BANJO_VOL * 0.4, t + 0.008);
-    gain2.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
-    osc2.connect(gain2);
-    gain2.connect(this.musicGain);
-    osc2.start(t);
-    osc2.stop(t + 0.18);
-  }
-
-  _scheduleBanjo() {
-    if (!this._pianoRunning) return;
-    const shouldRest = BANJO_RESTS[this._beatIndex % BANJO_RESTS.length];
-    if (!shouldRest) {
-      this._playBanjoNote();
-    } else {
-      this._plinkIndex++;
-    }
-    this._beatIndex++;
-    this._pianoScheduleId = window.setTimeout(() => this._scheduleBanjo(), BANJO_MS);
-  }
-
-  _scheduleCountry() {
-    if (!this._pianoRunning || !this.ctx || !this.musicGain) return;
+  _scheduleLevelMusic() {
+    if (!this._musicRunning || !this.ctx || !this.musicGain || !this._musicSpec) return;
+    const spec = this._musicSpec;
+    const stepSec = 60 / spec.tempo / 2;
     const now = this.ctx.currentTime;
-    if (!this._countryNextNoteTime || this._countryNextNoteTime < now) {
-      this._countryNextNoteTime = now + 0.02;
+    if (!this._musicNextStepTime || this._musicNextStepTime < now) {
+      this._musicNextStepTime = now + 0.02;
     }
-    while (this._countryNextNoteTime < now + COUNTRY_SCHEDULE_AHEAD_SEC) {
-      this._scheduleCountryStep(this._countryNextNoteTime, this._countryStep);
-      this._countryNextNoteTime += COUNTRY_STEP_SEC;
-      this._countryStep += 1;
+
+    while (this._musicNextStepTime < now + MUSIC_SCHEDULE_AHEAD_SEC) {
+      this._scheduleMusicStep(spec, this._musicNextStepTime, this._musicStepIndex);
+      this._musicNextStepTime += stepSec;
+      this._musicStepIndex += 1;
     }
-    this._countrySchedulerId = window.setTimeout(() => this._scheduleCountry(), COUNTRY_SCHEDULER_MS);
+
+    this._musicSchedulerId = window.setTimeout(() => this._scheduleLevelMusic(), MUSIC_SCHEDULER_MS);
   }
 
-  _scheduleCountryStep(time, stepIndex) {
-    const barIndex = Math.floor(stepIndex / 8);
-    const sectionIndex = Math.floor(barIndex / 8) % COUNTRY_PATTERNS.length;
-    const withinSectionBar = barIndex % 8;
+  _scheduleMusicStep(spec, start, stepIndex) {
     const stepInBar = stepIndex % 8;
-    const section = COUNTRY_PATTERNS[sectionIndex];
-    const leadFreq = section.leadBars[withinSectionBar][stepInBar];
-    const bassFreq = section.bassBars[withinSectionBar][stepInBar >= 4 ? 1 : 0];
+    const barIndex = Math.floor(stepIndex / 8);
+    const { bar } = getSpecBar(spec, barIndex);
+    const beatSec = 60 / spec.tempo;
 
-    if (leadFreq) {
-      this._playCountryLeadAt(leadFreq, time);
+    if (stepInBar === 0) {
+      this._playBarChord(spec, bar, start, beatSec);
+      if (spec.levelId === 2 && bar.vinyl) {
+        this._playVinylWash(start, beatSec * 4);
+      }
+    } else if (spec.levelId === 1 && stepInBar === 4) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 1.6, 0.032);
     }
-    if (stepInBar === 0 || stepInBar === 4) {
-      this._playCountryBassAt(bassFreq, time);
+
+    if (bar.lead[stepInBar]) {
+      this._playRoleNote(spec.levelId, 'lead', noteToFrequency(bar.lead[stepInBar]), start, this._roleDuration(spec, 'lead'), 0.078);
     }
-    if (section.kickBars[withinSectionBar].includes(stepInBar)) {
-      this._playCountryKickAt(time);
+    if (bar.counter[stepInBar]) {
+      this._playRoleNote(spec.levelId, 'counter', noteToFrequency(bar.counter[stepInBar]), start, this._roleDuration(spec, 'counter'), 0.055);
     }
-    if (section.snareBars[withinSectionBar].includes(stepInBar)) {
-      this._playCountrySnareAt(time);
+    if (bar.accent[stepInBar]) {
+      this._playRoleNote(spec.levelId, 'accent', noteToFrequency(bar.accent[stepInBar]), start, this._roleDuration(spec, 'accent'), 0.04);
     }
-    if (section.hatBars[withinSectionBar].includes(stepInBar)) {
-      this._playCountryHatAt(time);
+    if (bar.bass[stepInBar]) {
+      this._playRoleNote(spec.levelId, 'bass', noteToFrequency(bar.bass[stepInBar]), start, this._roleDuration(spec, 'bass'), 0.07);
+    }
+
+    if (bar.kick.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'kick', start, 1);
+    if (bar.snare.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'snare', start, 1);
+    if (bar.hat.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'hat', start, 1);
+    if (bar.rim.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'rim', start, 1);
+    if (bar.shaker.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'shaker', start, 1);
+  }
+
+  _getMusicTargetGain(levelId) {
+    if (levelId === 1) return 0.74;
+    if (levelId === 2) return 0.62;
+    if (levelId === 3) return 0.68;
+    return 0.7;
+  }
+
+  _roleDuration(spec, role) {
+    const beatSec = 60 / spec.tempo;
+    if (role === 'lead') return spec.levelId === 2 ? beatSec * 0.72 : beatSec * 0.78;
+    if (role === 'counter') return spec.levelId === 2 ? beatSec * 0.92 : beatSec * 0.88;
+    if (role === 'accent') return beatSec * 0.34;
+    if (role === 'bass') return beatSec * 0.95;
+    return beatSec * 0.9;
+  }
+
+  _stemGain(role) {
+    return this._stemLevels[role] ?? 1;
+  }
+
+  _playBarChord(spec, bar, start, beatSec) {
+    if (!Array.isArray(bar.chord) || !bar.chord.length) return;
+    if (spec.levelId === 1) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 2.2, 0.05);
+      return;
+    }
+    if (spec.levelId === 2) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.6, 0.046);
+      return;
+    }
+    this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.0, 0.05);
+  }
+
+  _playRoleChord(levelId, role, notes, start, duration, gain) {
+    if (!Array.isArray(notes) || !notes.length) return;
+    const freqs = notes.map(noteToFrequency).filter((freq) => freq > 0);
+    if (!freqs.length) return;
+    const scaledGain = gain * this._stemGain(role);
+    if (scaledGain <= 0.0001) return;
+
+    if (levelId === 1) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playToyChordTone(freqs[i], start + (i * 0.01), duration, scaledGain / (freqs.length + 0.4));
+      }
+      return;
+    }
+    if (levelId === 2) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playRhodesChordTone(freqs[i], start, duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    for (let i = 0; i < freqs.length; i++) {
+      this._playHomeChordTone(freqs[i], start + (i * 0.008), duration, scaledGain / freqs.length);
     }
   }
 
-  _playCountryLeadAt(freq, start) {
-    if (!this.ctx || !this.musicGain || this.muted) return;
+  _playRoleNote(levelId, role, freq, start, duration, gain, extras = {}) {
+    const scaledGain = gain * this._stemGain(role);
+    if (!freq || scaledGain <= 0.0001) return;
+
+    if (levelId === 1) {
+      if (role === 'lead') {
+        this._playToyLead(freq, start, duration, scaledGain);
+      } else if (role === 'counter') {
+        this._playWhistle(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'accent') {
+        this._playBanjoAccent(freq, start, duration, scaledGain);
+      } else if (role === 'bass') {
+        this._playRoundedBass(freq, start, duration, scaledGain, 240);
+      }
+      return;
+    }
+
+    if (levelId === 2) {
+      if (role === 'lead') {
+        this._playMutedBell(freq, start, duration, scaledGain);
+      } else if (role === 'counter') {
+        this._playMutedSynth(freq, start, duration, scaledGain);
+      } else if (role === 'bass') {
+        this._playRoundedBass(freq, start, duration, scaledGain * 0.9, 180);
+      } else if (role === 'accent') {
+        this._playMutedBell(freq, start, duration * 0.75, scaledGain * 0.75);
+      }
+      return;
+    }
+
+    if (role === 'lead') {
+      this._playHomeLead(freq, start, duration, scaledGain);
+    } else if (role === 'counter') {
+      this._playClarinet(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+    } else if (role === 'bass') {
+      this._playRoundedBass(freq, start, duration, scaledGain * 0.95, 220);
+    } else if (role === 'accent') {
+      this._playHomeLead(freq, start, duration * 0.7, scaledGain * 0.75);
+    }
+  }
+
+  _playOscVoice({
+    freq,
+    start,
+    duration,
+    peak,
+    type = 'sine',
+    destination = null,
+    attack = 0.01,
+    filterType = '',
+    filterFreq = 0,
+    q = 0.7,
+    detune = 0,
+    endFreq = null,
+  }) {
+    if (!this.ctx || this.muted) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.16, start + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
-    osc.connect(gain);
-    gain.connect(this.musicGain);
-    osc.start(start);
-    osc.stop(start + 0.18);
+    osc.type = type;
+    osc.frequency.setValueAtTime(Math.max(20, freq), start);
+    if (detune) osc.detune.setValueAtTime(detune, start);
+    if (endFreq) {
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), start + duration);
+    }
 
-    const slapOsc = this.ctx.createOscillator();
-    const slapGain = this.ctx.createGain();
-    slapOsc.type = 'square';
-    slapOsc.frequency.setValueAtTime(freq * 1.01, start + 0.12);
-    slapGain.gain.setValueAtTime(0.0001, start + 0.12);
-    slapGain.gain.linearRampToValueAtTime(0.04, start + 0.125);
-    slapGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
-    slapOsc.connect(slapGain);
-    slapGain.connect(this.musicGain);
-    slapOsc.start(start + 0.12);
-    slapOsc.stop(start + 0.24);
+    let tail = osc;
+    if (filterType) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(filterFreq, start);
+      filter.Q.setValueAtTime(q, start);
+      osc.connect(filter);
+      tail = filter;
+    }
+
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(peak, start + Math.min(attack, duration * 0.4));
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+    tail.connect(gain);
+    gain.connect(destination || this.musicGain || this.master);
+    osc.start(start);
+    osc.stop(start + duration + 0.02);
   }
 
-  _playCountryBassAt(freq, start) {
-    if (!this.ctx || !this.musicGain || this.muted) return;
-    const osc = this.ctx.createOscillator();
+  _playToyLead(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.12, duration), peak: gain * 0.85, type: 'triangle', attack: 0.006, filterType: 'lowpass', filterFreq: 2600 });
+    this._playOscVoice({ freq: freq * 2, start, duration: Math.max(0.08, duration * 0.58), peak: gain * 0.34, type: 'sine', attack: 0.004, filterType: 'highpass', filterFreq: 700 });
+  }
+
+  _playWhistle(freq, start, duration, gain, glideTo = 0) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.12, duration),
+      peak: gain * 0.92,
+      type: 'sine',
+      attack: 0.006,
+      filterType: 'bandpass',
+      filterFreq: 1900,
+      q: 0.9,
+      endFreq: glideTo || null,
+    });
+  }
+
+  _playBanjoAccent(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.1, duration * 0.55), peak: gain * 0.75, type: 'square', attack: 0.003, filterType: 'lowpass', filterFreq: 2200 });
+    this._playOscVoice({ freq: freq * 1.01, start, duration: Math.max(0.08, duration * 0.42), peak: gain * 0.28, type: 'triangle', attack: 0.004, filterType: 'highpass', filterFreq: 500 });
+  }
+
+  _playRoundedBass(freq, start, duration, gain, lowpassFreq) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.18, duration),
+      peak: gain,
+      type: 'sine',
+      attack: 0.012,
+      filterType: 'lowpass',
+      filterFreq: lowpassFreq,
+      q: 0.8,
+    });
+    this._playOscVoice({
+      freq: freq * 0.5,
+      start,
+      duration: Math.max(0.18, duration * 0.95),
+      peak: gain * 0.22,
+      type: 'triangle',
+      attack: 0.015,
+      filterType: 'lowpass',
+      filterFreq: lowpassFreq * 0.7,
+      q: 0.7,
+    });
+  }
+
+  _playToyChordTone(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration, peak: gain * 0.9, type: 'triangle', attack: 0.02, filterType: 'lowpass', filterFreq: 1700 });
+    this._playOscVoice({ freq: freq * 1.005, start: start + 0.01, duration: duration * 0.9, peak: gain * 0.24, type: 'square', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
+  }
+
+  _playRhodesChordTone(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration, peak: gain * 0.88, type: 'triangle', attack: 0.02, filterType: 'lowpass', filterFreq: 1300, q: 0.8 });
+    this._playOscVoice({ freq, start, duration: duration * 0.92, peak: gain * 0.34, type: 'sine', attack: 0.018, detune: 6, filterType: 'lowpass', filterFreq: 1500, q: 0.7 });
+  }
+
+  _playMutedBell(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.12, duration), peak: gain * 0.76, type: 'triangle', attack: 0.006, filterType: 'bandpass', filterFreq: 1600, q: 0.65 });
+    this._playOscVoice({ freq: freq * 2, start, duration: Math.max(0.08, duration * 0.55), peak: gain * 0.22, type: 'sine', attack: 0.004, filterType: 'highpass', filterFreq: 850, q: 0.7 });
+  }
+
+  _playMutedSynth(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.16, duration * 1.05), peak: gain * 0.8, type: 'triangle', attack: 0.012, filterType: 'lowpass', filterFreq: 980, q: 0.7 });
+    this._playOscVoice({ freq: freq * 0.5, start, duration: Math.max(0.14, duration), peak: gain * 0.16, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 540 });
+  }
+
+  _playHomeLead(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.12, duration), peak: gain * 0.78, type: 'triangle', attack: 0.005, filterType: 'bandpass', filterFreq: 2000, q: 0.7 });
+    this._playOscVoice({ freq: freq * 2, start, duration: Math.max(0.08, duration * 0.52), peak: gain * 0.3, type: 'sine', attack: 0.004, filterType: 'highpass', filterFreq: 1000 });
+  }
+
+  _playClarinet(freq, start, duration, gain, glideTo = 0) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.16, duration),
+      peak: gain * 0.82,
+      type: 'triangle',
+      attack: 0.012,
+      filterType: 'bandpass',
+      filterFreq: 1200,
+      q: 0.9,
+      endFreq: glideTo || null,
+    });
+  }
+
+  _playHomeChordTone(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration, peak: gain * 0.82, type: 'triangle', attack: 0.018, filterType: 'lowpass', filterFreq: 1500 });
+    this._playOscVoice({ freq: freq * 1.002, start: start + 0.006, duration: duration * 0.92, peak: gain * 0.22, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
+  }
+
+  _playVinylWash(start, duration) {
+    if (!this.ctx || !this._noiseBuffer || this.muted || this._stemLevels.vinyl <= 0.0001) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
     const filter = this.ctx.createBiquadFilter();
     const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, start);
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(220, start);
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1800, start);
+    filter.Q.setValueAtTime(0.35, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.12, start + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
-    osc.connect(filter);
+    gain.gain.linearRampToValueAtTime(0.003 * this._stemLevels.vinyl, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    src.connect(filter);
     filter.connect(gain);
     gain.connect(this.musicGain);
-    osc.start(start);
-    osc.stop(start + 0.28);
+    src.start(start);
+    src.stop(start + duration + 0.02);
   }
 
-  _playCountryKickAt(start) {
-    this._osc(96, 'sine', start, 0.16, 0.065, 48, this.musicGain);
+  _playMusicDrum(levelId, drum, start, gain = 1) {
+    const drumGain = (this._stemLevels.percussion ?? 1) * gain;
+    if (drumGain <= 0.0001) return;
+
+    if (levelId === 1) {
+      if (drum === 'kick') {
+        this._osc(108, 'sine', start, 0.16, 0.055 * drumGain, 52, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.042, 0.014 * drumGain, { type: 'bandpass', frequency: 2100, q: 0.8 }, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.03, 0.0105 * drumGain, { type: 'highpass', frequency: 3600, q: 0.55 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 2) {
+      if (drum === 'kick') {
+        this._osc(78, 'sine', start, 0.19, 0.05 * drumGain, 42, this.musicGain);
+        this._playNoiseBurst(start, 0.028, 0.006 * drumGain, { type: 'lowpass', frequency: 320, q: 0.5 }, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.085, 0.018 * drumGain, { type: 'bandpass', frequency: 1700, q: 0.7 }, this.musicGain);
+        this._osc(170, 'triangle', start, 0.08, 0.01 * drumGain, 120, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.03, 0.008 * drumGain, { type: 'highpass', frequency: 4200, q: 0.6 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.025, 0.007 * drumGain, { type: 'bandpass', frequency: 2400, q: 0.8 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (drum === 'kick') {
+      this._osc(92, 'sine', start, 0.15, 0.04 * drumGain, 54, this.musicGain);
+    } else if (drum === 'rim') {
+      this._playNoiseBurst(start, 0.036, 0.011 * drumGain, { type: 'bandpass', frequency: 2300, q: 0.85 }, this.musicGain);
+    } else if (drum === 'shaker') {
+      this._playNoiseBurst(start, 0.028, 0.009 * drumGain, { type: 'highpass', frequency: 3400, q: 0.55 }, this.musicGain);
+    }
   }
-
-  _playCountrySnareAt(start) {
-    this._playNoiseBurst(start, 0.075, 0.03, {
-      type: 'bandpass',
-      frequency: 1700,
-      q: 0.7,
-    }, this.musicGain);
-  }
-
-  _playCountryHatAt(start) {
-    this._playNoiseBurst(start, 0.04, 0.018, {
-      type: 'highpass',
-      frequency: 3200,
-      q: 0.6,
-    }, this.musicGain);
-  }
-
-  // --- Occasional bird chirps ---
-
-  _playBirdChirp() {
-    if (!this.enabled || !this.ctx || !this.master || this.muted) return;
-    const t = this.ctx.currentTime;
-    const base = 2800 + Math.random() * 1400;
-    const vol = 0.012 + Math.random() * 0.008;
-    this._osc(base, 'sine', t, 0.07, vol, base * 1.14);
-    this._osc(base * 1.2, 'sine', t + 0.08, 0.06, vol * 0.7, base * 1.32);
-  }
-
-  _scheduleBirdChirp() {
-    if (!this._pianoRunning) return;
-    const delayMs = 12000 + Math.random() * 13000; // 12–25 s between chirps
-    this._birdChirpId = window.setTimeout(() => {
-      this._playBirdChirp();
-      this._scheduleBirdChirp();
-    }, delayMs);
-  }
-
-  // --- Utilities ---
 
   _allow(key, cooldownMs) {
     const now = performance.now();
@@ -436,8 +579,9 @@ export class GameAudio {
     if (!this.ctx) return null;
     const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.25, this.ctx.sampleRate);
     const data = buffer.getChannelData(0);
+    const random = createSeededRandom(0x5eadbabe);
     for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2) - 1;
+      data[i] = (random() * 2) - 1;
     }
     return buffer;
   }
@@ -450,18 +594,19 @@ export class GameAudio {
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.linearRampToValueAtTime(volume, start + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    let tail = gain;
+
+    let tail = src;
     if (filterDef) {
       const filter = this.ctx.createBiquadFilter();
       filter.type = filterDef.type;
       filter.frequency.setValueAtTime(filterDef.frequency, start);
       filter.Q.setValueAtTime(filterDef.q ?? 1, start);
       src.connect(filter);
-      filter.connect(gain);
-    } else {
-      src.connect(gain);
+      tail = filter;
     }
-    tail.connect(destination || this.sfxGain || this.master);
+
+    tail.connect(gain);
+    gain.connect(destination || this.sfxGain || this.master);
     src.start(start);
     src.stop(start + duration + 0.02);
   }
@@ -485,8 +630,6 @@ export class GameAudio {
     osc.start(start);
     osc.stop(start + duration + 0.02);
   }
-
-  // --- SFX ---
 
   playJump() {
     if (!this.enabled || !this._allow('jump', 80)) return;
