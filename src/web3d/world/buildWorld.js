@@ -1751,6 +1751,11 @@ export function buildWorld(scene, options = {}) {
   const pzGoatAnchors = [
     new BABYLON.TransformNode('pz_goatAnchor0', scene),
     new BABYLON.TransformNode('pz_goatAnchor1', scene),
+    new BABYLON.TransformNode('pz_goatAnchor2', scene),
+    new BABYLON.TransformNode('pz_goatAnchor3', scene),
+    new BABYLON.TransformNode('pz_goatAnchor4', scene),
+    new BABYLON.TransformNode('pz_goatAnchor5', scene),
+    new BABYLON.TransformNode('pz_goatAnchor6', scene),
   ];
   placeLevel1DecorAnchor(pzGoatAnchors[0], {
     x: -13.8,
@@ -1762,13 +1767,58 @@ export function buildWorld(scene, options = {}) {
     maxZ: -0.62,
   });
   placeLevel1DecorAnchor(pzGoatAnchors[1], {
-    x: 11.0,
-    z: -1.18,
-    surfaceName: 'platBridge',
-    paddingX: 0.7,
-    paddingZ: 0.78,
-    minZ: -1.62,
+    x: -6.8,
+    z: -1.36,
+    surfaceName: 'floor',
+    paddingX: 1.1,
+    paddingZ: 0.88,
+    minZ: -1.86,
+    maxZ: -0.78,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[2], {
+    x: -1.8,
+    z: -1.12,
+    surfaceName: 'platVert1',
+    paddingX: 0.82,
+    paddingZ: 0.82,
+    minZ: -1.56,
     maxZ: -0.72,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[3], {
+    x: 8.9,
+    z: -1.28,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.86,
+    minZ: -1.84,
+    maxZ: -0.78,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[4], {
+    x: 14.2,
+    z: -1.34,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.86,
+    minZ: -1.86,
+    maxZ: -0.82,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[5], {
+    x: 18.8,
+    z: -1.56,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.9,
+    minZ: -1.96,
+    maxZ: -0.88,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[6], {
+    x: 29.4,
+    z: -1.42,
+    surfaceName: 'floor',
+    paddingX: 1.1,
+    paddingZ: 0.9,
+    minZ: -1.92,
+    maxZ: -0.86,
   });
 
   const pzChickenAnchors = [
@@ -1996,7 +2046,12 @@ export function buildWorld(scene, options = {}) {
       animalHomes: {
         goat: [
           { x: -13.8, y: startPenTopY, z: -1.22 },
-          { x: 11.0, y: bridgeSideTopY, z: -1.18 },
+          { x: -6.8, y: floorTopY, z: -1.36 },
+          { x: -1.8, y: getNearestLevel1SurfaceTopY(-1.8) + 0.02, z: -1.12 },
+          { x: 8.9, y: floorTopY, z: -1.28 },
+          { x: 14.2, y: floorTopY, z: -1.34 },
+          { x: 18.8, y: floorTopY, z: -1.56 },
+          { x: 29.4, y: floorTopY, z: -1.42 },
         ],
         chickens: [
           { x: -11.9, y: startPenTopY, z: -1.12 },
