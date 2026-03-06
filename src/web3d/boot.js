@@ -681,8 +681,17 @@ export async function boot(options = {}) {
   const availableModelSet = new Set(availableModels);
   window.__DADA_DEBUG__.assetModels = availableModels;
   const shouldLoadLevel2Decor = false;
-  const level1FloorTopY = levelId === 1 && world.level?.ground
-    ? world.level.ground.y + (world.level.ground.h * 0.5)
+  const level1FloorTopY = levelId === 1
+    ? (() => {
+      if (world.ground?.getBoundingInfo) {
+        world.ground.computeWorldMatrix?.(true);
+        return world.ground.getBoundingInfo().boundingBox.maximumWorld.y;
+      }
+      if (world.level?.ground) {
+        return world.level.ground.y + (world.level.ground.h * 0.5);
+      }
+      return null;
+    })()
     : null;
   if (levelId === 1) {
     if (!availableModelSet.has('local_baby_pig')) {
@@ -1499,6 +1508,7 @@ export async function boot(options = {}) {
   let prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
   let level1FloorPenaltyCooldownMs = 0;
   let level1AirborneFromAboveFloor = false;
+  let level1MaxAirborneBottomY = prevPlayerBottomY;
   let level1CoinLossAnim = null;
   let level1CoinFlyers = [];
   let level1AmbientTimerMs = 6200;
@@ -1701,6 +1711,7 @@ export async function boot(options = {}) {
     coinsCollected = 0;
     level1FloorPenaltyCooldownMs = 0;
     level1AirborneFromAboveFloor = false;
+    level1MaxAirborneBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
     level1CoinLossAnim = null;
     for (const flyer of level1CoinFlyers) flyer.node?.dispose?.();
     level1CoinFlyers = [];
@@ -1748,6 +1759,7 @@ export async function boot(options = {}) {
     player.visual.rotation.set(0, 0, 0);
     prevGrounded = player.grounded;
     prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
+    level1MaxAirborneBottomY = prevPlayerBottomY;
     updatePlayerShadow(player);
     updatePlayerReadabilityLight();
 
@@ -2279,16 +2291,20 @@ export async function boot(options = {}) {
         if (levelId === 1 && level1FloorTopY !== null) {
           const afterBottomY = player.mesh.position.y - halfH;
           if (prevGrounded && !player.grounded) {
-            level1AirborneFromAboveFloor = (prevPlayerBottomY - level1FloorTopY) > 0.9;
+            level1AirborneFromAboveFloor = (prevPlayerBottomY - level1FloorTopY) > 1.0;
+            level1MaxAirborneBottomY = Math.max(prevPlayerBottomY, afterBottomY);
+          } else if (!player.grounded) {
+            level1MaxAirborneBottomY = Math.max(level1MaxAirborneBottomY, afterBottomY);
           }
           const landedThisFrame = !prevGrounded && player.grounded;
-          const nearFloor = Math.abs(afterBottomY - level1FloorTopY) < 0.12;
-          const wasFalling = (prevPlayerBottomY - level1FloorTopY) > 0.9;
-          if (landedThisFrame && nearFloor && wasFalling && level1AirborneFromAboveFloor) {
+          const nearFloor = Math.abs(afterBottomY - level1FloorTopY) < 0.25;
+          const fellFromAbove = (level1MaxAirborneBottomY - level1FloorTopY) > 1.0;
+          if (landedThisFrame && nearFloor && fellFromAbove && level1AirborneFromAboveFloor) {
             triggerLevel1FloorPenalty();
           }
           if (landedThisFrame) {
             level1AirborneFromAboveFloor = false;
+            level1MaxAirborneBottomY = afterBottomY;
           }
           prevGrounded = player.grounded;
           prevPlayerBottomY = afterBottomY;
