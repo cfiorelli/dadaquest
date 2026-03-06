@@ -27,7 +27,15 @@
     "futureElephantPropModel": ["local_baby_elephant"],
     "futureGoatPropModel": ["local_baby_goat"],
     "futurePackPropModel": ["local_baby_pack"],
-    "futureBreadPropModel": ["local_rustic_bread"]
+    "futureBreadPropModel": ["local_rustic_bread"],
+    "futureTulipFlowerPropModel": ["local_tulip_flower"],
+    "futureYellowFlowerPropModel": ["local_yellow_flower", "local_yelow_flower"],
+    "futureCornPropModel": ["local_corn"],
+    "futureHuskyDogPropModel": ["local_husky_dog"],
+    "futurePlayfulDogPropModel": ["local_playful_dog"],
+    "futureTaterDogPropModel": ["local_tater_dog"],
+    "futureChickensPropModel": ["local_chickens"],
+    "futureTurkeyPropModel": ["local_thanksgiving_turkey"]
   },
   "models": [
     {
@@ -297,6 +305,12 @@
     {
       "id": "local_tulip_flower",
       "path": "assets/models/props/tulip_flower.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_yellow_flower",
+      "path": "assets/models/props/yelow_flower.glb",
       "scale": 1,
       "yOffset": 0
     },

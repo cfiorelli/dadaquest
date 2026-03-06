@@ -8,6 +8,7 @@ const manifestCache = {
 };
 
 const containerCache = new Map();
+const optionalWarnedKeys = new Set();
 
 function baseUrl() {
   return import.meta.env.BASE_URL || '/';
@@ -199,6 +200,14 @@ async function loadContainer(scene, modelPath) {
   return promise;
 }
 
+function warnOptionalModel(roleName, reason) {
+  if (!import.meta.env.DEV) return;
+  const key = `${roleName}:${reason}`;
+  if (optionalWarnedKeys.has(key)) return;
+  optionalWarnedKeys.add(key);
+  console.warn(`[assets] optional model '${roleName}' unavailable: ${reason}`);
+}
+
 export async function getAssetManifest() {
   return getManifest();
 }
@@ -224,6 +233,7 @@ export async function loadModelById(scene, modelId, options = {}) {
     scaling = null,
     rotation = null,
     fallbackMaterial = 'plastic',
+    silent = false,
   } = options;
 
   const manifest = await getManifest();
@@ -237,9 +247,11 @@ export async function loadModelById(scene, modelId, options = {}) {
     const errText = loadedContainer?.error
       ? ` (${loadedContainer.error.message || String(loadedContainer.error)})`
       : '';
-    console.warn(
-      `[assets] Failed to load ${model.id} from ${model.path}; using fallback visuals.${errText}`,
-    );
+    if (!silent) {
+      console.warn(
+        `[assets] Failed to load ${model.id} from ${model.path}; using fallback visuals.${errText}`,
+      );
+    }
     return { loaded: false, reason: 'load_failed', meshes: [], roots: [] };
   }
 
@@ -296,6 +308,25 @@ export async function loadModelForRole(scene, roleName, options = {}) {
     meshes: [],
     roots: [],
   };
+}
+
+export async function loadOptionalModel(scene, roleName, options = {}) {
+  const manifest = await getManifest();
+  const ids = manifest.roles[roleName] || [];
+  if (!ids.length) {
+    warnOptionalModel(roleName, 'role_not_mapped');
+    return null;
+  }
+
+  const result = await loadModelForRole(scene, roleName, {
+    ...options,
+    silent: true,
+  });
+  if (!result?.loaded) {
+    warnOptionalModel(roleName, result?.reason || 'load_failed');
+    return null;
+  }
+  return result;
 }
 
 export async function getAvailableModels() {
