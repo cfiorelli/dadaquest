@@ -8,6 +8,7 @@ import {
 } from '../materials.js';
 import { LEVEL1, LANE_Z } from './level1.js';
 import { makeCutoutPolygonMesh, makeCloudCutout, seededRandom } from './cutouts.js';
+import { createDad } from './characters.js';
 
 // ── Platform prefab ──────────────────────────────────────────────
 
@@ -955,10 +956,10 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   tagDecorNode(root);
 
   const postMat = makeCardboard(scene, 'pz_signPostMat', ...P.edgeDark, { roughness: 0.88 });
-  const boardWidth = 1.6;
-  const boardHeight = 0.82;
-  const boardDepth = 0.08;
-  for (const px of [-0.76, 0.76]) {
+  const boardWidth = 2.24;
+  const boardHeight = 1.07;
+  const boardDepth = 0.09;
+  for (const px of [-1.06, 1.06]) {
     const post = BABYLON.MeshBuilder.CreateBox(`pz_signPost${px}`, {
       width: 0.13, height: 2.55, depth: 0.13,
     }, scene);
@@ -987,10 +988,10 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   ctx.fillStyle = '#2a1308';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = 'bold 58px Georgia, serif';
-  ctx.fillText('WELCOME TO THE', texW / 2, texH * 0.34);
-  ctx.font = 'bold 82px Georgia, serif';
-  ctx.fillText('PETTING ZOO', texW / 2, texH * 0.71);
+  ctx.font = 'bold 76px Georgia, serif';
+  ctx.fillText('WELCOME TO THE', texW / 2, texH * 0.32);
+  ctx.font = 'bold 104px Georgia, serif';
+  ctx.fillText('PETTING ZOO', texW / 2, texH * 0.72);
   signTex.update();
 
   const boardMat = makeCardboard(scene, 'pz_welcomeBoardMat', 201, 152, 84, { roughness: 0.82 });
@@ -1013,8 +1014,8 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   tagDecorMesh(board);
 
   const textPlane = BABYLON.MeshBuilder.CreatePlane('pz_welcomeText', {
-    width: boardWidth * 0.9,
-    height: boardHeight * 0.82,
+    width: boardWidth * 0.92,
+    height: boardHeight * 0.86,
   }, scene);
   textPlane.position.set(0, 2.3, -(boardDepth * 0.5 + 0.03));
   textPlane.parent = root;
@@ -1499,7 +1500,15 @@ export function buildWorld(scene, options = {}) {
 
   // === GOAL (DaDa) ===
   const goalDef = LEVEL1.goal;
-  const dada = createHumanDad(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  const dada = createDad(scene, {
+    x: goalDef.x,
+    y: goalDef.y,
+    z: 0,
+    outfit: 'level1',
+    shadowGen,
+    animate: animateGoal,
+    goalVolume: { width: 3.0, height: 7.0, depth: 3.0, yOffset: -1.8 },
+  });
   setRenderingGroup(dada.root, 3);
 
   // Foreground crib rail creates a toy-diorama frame for the start area.
@@ -1995,20 +2004,29 @@ export function buildWorld(scene, options = {}) {
   setRenderingGroup(pzPanda2, 2);
 
   const cloudCutouts = [];
-  for (let i = 0; i < 5; i++) {
-    cloudCutouts.push(makeCloudCutout(scene, {
+  for (let i = 0; i < 10; i++) {
+    const cloud = makeCloudCutout(scene, {
       name: `cloudCutout_${i}`,
       seed: 4400 + i,
       width: 4.0 + random() * 1.2,
       height: 1.8 + random() * 0.5,
       thickness: 0.065,
-      x: -17 + i * 11.6 + random() * 0.6,
+      x: -22 + i * 7.9 + random() * 0.8,
       y: 9.8 + random() * 1.9,
       z: 6.88 + i * 0.03,
       color: [245, 245, 240],
       alpha: 0.86,
-    }));
-    cloudCutouts[cloudCutouts.length - 1].renderingGroupId = 0;
+    });
+    cloud.metadata = {
+      ...(cloud.metadata || {}),
+      cameraIgnore: true,
+      driftSpeed: 0.07 + ((i % 4) * 0.018),
+      driftMinX: -28,
+      driftMaxX: 58,
+      driftStartX: cloud.position.x,
+    };
+    cloud.renderingGroupId = 0;
+    cloudCutouts.push(cloud);
   }
 
   return {
