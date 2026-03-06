@@ -47,6 +47,16 @@ function wrapToPi(angle) {
   return wrapped;
 }
 
+function hashStringSeed(value) {
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 function getShotScene() {
   if (typeof window === 'undefined') return 'title';
   const value = new URLSearchParams(window.location.search).get('scene');
@@ -771,6 +781,84 @@ export async function boot(options = {}) {
   goalVisualRoot.parent = world.goalRoot;
   goalVisualRoot.position.set(0, GOAL_MODEL_SLOT_Y, 0);
   const level1AnimalDecor = [];
+  const level1SurfaceMap = new Map();
+  if (levelId === 1 && world.level) {
+    const ground = world.level.ground;
+    if (ground) {
+      const groundZ = ground.z ?? 0;
+      level1SurfaceMap.set('floor', {
+        name: 'floor',
+        topY: ground.y + (ground.h * 0.5),
+        minX: ground.x - (ground.w * 0.5),
+        maxX: ground.x + (ground.w * 0.5),
+        minZ: groundZ - (ground.d * 0.5),
+        maxZ: groundZ + (ground.d * 0.5),
+      });
+    }
+    for (const surface of world.level.platforms || []) {
+      const centerZ = surface.z ?? 0;
+      level1SurfaceMap.set(surface.name, {
+        name: surface.name,
+        topY: surface.y + (surface.h * 0.5),
+        minX: surface.x - (surface.w * 0.5),
+        maxX: surface.x + (surface.w * 0.5),
+        minZ: centerZ - (surface.d * 0.5),
+        maxZ: centerZ + (surface.d * 0.5),
+      });
+    }
+  }
+
+  function getLevel1DecorSurface(anchor) {
+    const meta = anchor?.metadata?.level1DecorSurface || {};
+    const key = meta.name || (meta.type === 'floor' ? 'floor' : '');
+    const base = (key && level1SurfaceMap.get(key)) || level1SurfaceMap.get('floor');
+    if (!base) {
+      const pos = getAnchorWorldPosition(anchor) || BABYLON.Vector3.Zero();
+      return {
+        name: key || 'fallback',
+        topY: pos.y - 0.02,
+        minX: pos.x - 1,
+        maxX: pos.x + 1,
+        minZ: pos.z - 1,
+        maxZ: pos.z + 1,
+        baseY: pos.y,
+      };
+    }
+    return {
+      name: key || base.name,
+      topY: Number.isFinite(meta.topY) ? meta.topY : base.topY,
+      minX: Number.isFinite(meta.minX) ? meta.minX : base.minX,
+      maxX: Number.isFinite(meta.maxX) ? meta.maxX : base.maxX,
+      minZ: Number.isFinite(meta.minZ) ? meta.minZ : base.minZ,
+      maxZ: Number.isFinite(meta.maxZ) ? meta.maxZ : base.maxZ,
+      baseY: Number.isFinite(meta.baseY) ? meta.baseY : base.topY + 0.02,
+    };
+  }
+
+  function clampLevel1DecorPoint(surface, x, z) {
+    return new BABYLON.Vector3(
+      clamp(x, surface.minX, surface.maxX),
+      surface.baseY,
+      clamp(z, surface.minZ, surface.maxZ),
+    );
+  }
+
+  function nextAnimalRandom(animal) {
+    animal.randState = (Math.imul(animal.randState, 1664525) + 1013904223) >>> 0;
+    return animal.randState / 0x100000000;
+  }
+
+  function retargetAnimalDecor(animal, immediate = false) {
+    const angle = nextAnimalRandom(animal) * Math.PI * 2;
+    const radius = animal.radius * (0.22 + (nextAnimalRandom(animal) * 0.78));
+    const target = clampLevel1DecorPoint(
+      animal.surface,
+      animal.home.x + (Math.cos(angle) * radius),
+      animal.home.z + (Math.sin(angle) * radius * 0.82),
+    );
+    animal.target.copyFrom(target);
+    animal.retargetMs = (immediate ? 900 : 2000) + (nextAnimalRandom(animal) * 2000);
+  }
 
   // Procedural baby is the default player visual. External model is opt-in.
   if (useExternalPlayerModel) {
@@ -994,7 +1082,7 @@ export async function boot(options = {}) {
 
   // Level 1 Petting Zoo — load animal GLBs onto pre-placed anchors
   if (levelId === 1) {
-    const registerAnimalDecor = (anchor, result, {
+    const registerAnimalDecor = (anchor, {
       kind,
       phase,
       speed,
@@ -1002,20 +1090,34 @@ export async function boot(options = {}) {
       bob,
       turnSpeed = 7.5,
     }) => {
-      const home = getAnchorWorldPosition(anchor) || anchor.position.clone();
+      const surface = getLevel1DecorSurface(anchor);
+      const anchorPos = getAnchorWorldPosition(anchor) || anchor.position.clone();
+      const home = clampLevel1DecorPoint(surface, anchorPos.x, anchorPos.z);
       anchor.rotationQuaternion = null;
-      level1AnimalDecor.push({
+      anchor.position.copyFrom(home);
+      const animal = {
         kind,
         root: anchor,
         home,
+        pos: home.clone(),
+        target: home.clone(),
+        vel: BABYLON.Vector3.Zero(),
+        surface,
         phase,
         speed,
         radius,
         bob,
         turnSpeed,
-        turn: 0,
+        time: 0,
         currentYaw: anchor.rotation.y,
-      });
+        randState: hashStringSeed(`${anchor.name}:${kind}`),
+        retargetMs: 0,
+        pitchAmplitude: kind === 'chicken' ? 0.04 : 0.026,
+        pitchFrequency: kind === 'chicken' ? 10.8 : 7.6,
+        bobFrequency: kind === 'chicken' ? 11.4 : 6.2,
+      };
+      retargetAnimalDecor(animal, true);
+      level1AnimalDecor.push(animal);
     };
 
     for (const anchor of anchors.pettingZooGoat || []) {
@@ -1025,20 +1127,20 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        const anchorPos = getAnchorWorldPosition(anchor);
+        const surface = getLevel1DecorSurface(anchor);
         fitLoadedModel(result.roots, {
           targetHeight: 1.7,
-          groundY: anchorPos ? anchorPos.y : 0,
+          groundY: surface.baseY,
           markDecorative: true,
         });
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
-        registerAnimalDecor(anchor, result, {
+        registerAnimalDecor(anchor, {
           kind: 'goat',
           phase: 0.7,
-          speed: 0.62,
+          speed: 0.58,
           radius: 0.6,
           bob: 0.028,
         });
@@ -1051,23 +1153,22 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        const anchorPos = getAnchorWorldPosition(anchor);
+        const surface = getLevel1DecorSurface(anchor);
         fitLoadedModel(result.roots, {
           targetHeight: anchor.name === 'pz_chicken3' || anchor.name === 'pz_chicken4' || anchor.name === 'pz_chicken5'
             ? 0.77
             : 0.7,
-          groundY: anchorPos ? anchorPos.y : 0,
+          groundY: surface.baseY,
           markDecorative: true,
         });
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
-        const home = anchorPos || anchor.position.clone();
-        registerAnimalDecor(anchor, result, {
+        registerAnimalDecor(anchor, {
           kind: 'chicken',
-          phase: home.x * 0.17,
-          speed: 0.95,
+          phase: anchor.position.x * 0.17,
+          speed: 0.82,
           radius: 0.4,
           bob: 0.022,
         });
@@ -1080,20 +1181,20 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        const anchorPos = getAnchorWorldPosition(anchor);
+        const surface = getLevel1DecorSurface(anchor);
         fitLoadedModel(result.roots, {
           targetHeight: anchor.name === 'pz_dinoAnchor1' ? 2.26 : 2.16,
-          groundY: anchorPos ? anchorPos.y : 0,
+          groundY: surface.baseY,
           markDecorative: true,
         });
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
-        registerAnimalDecor(anchor, result, {
+        registerAnimalDecor(anchor, {
           kind: 'dino',
           phase: 1.85,
-          speed: 0.56,
+          speed: 0.52,
           radius: 0.7,
           bob: 0.026,
         });
@@ -1107,20 +1208,20 @@ export async function boot(options = {}) {
           renderingGroupId: 2,
         });
         if (result.loaded) {
-          const anchorPos = getAnchorWorldPosition(anchor);
+          const surface = getLevel1DecorSurface(anchor);
           fitLoadedModel(result.roots, {
             targetHeight: 1.2,
-            groundY: anchorPos ? anchorPos.y : 0,
+            groundY: surface.baseY,
             markDecorative: true,
           });
           for (const root of result.roots || []) {
             root.rotation.y += Math.PI;
           }
           ensureVisibleMeshes(result.meshes);
-          registerAnimalDecor(anchor, result, {
+          registerAnimalDecor(anchor, {
             kind: 'pig',
             phase: 0.42,
-            speed: 0.68,
+            speed: 0.62,
             radius: 0.45,
             bob: 0.024,
             turnSpeed: 7.2,
@@ -1136,8 +1237,8 @@ export async function boot(options = {}) {
           renderingGroupId: 2,
         });
         if (result.loaded) {
-          const anchorPos = getAnchorWorldPosition(anchor);
-          const elephantGroundY = level1FloorTopY !== null ? level1FloorTopY + 0.02 : (anchorPos ? anchorPos.y : 0);
+          const surface = getLevel1DecorSurface(anchor);
+          const elephantGroundY = surface.baseY ?? (level1FloorTopY !== null ? level1FloorTopY + 0.02 : 0);
           fitLoadedModel(result.roots, {
             targetHeight: 1.9,
             groundY: elephantGroundY,
@@ -1147,10 +1248,10 @@ export async function boot(options = {}) {
             root.rotation.y += Math.PI;
           }
           ensureVisibleMeshes(result.meshes);
-          registerAnimalDecor(anchor, result, {
+          registerAnimalDecor(anchor, {
             kind: 'elephant',
             phase: 1.18,
-            speed: 0.48,
+            speed: 0.42,
             radius: 0.92,
             bob: 0.016,
             turnSpeed: 6.8,
@@ -1165,21 +1266,43 @@ export async function boot(options = {}) {
     for (const animal of level1AnimalDecor) {
       const root = animal.root;
       if (!root?.isEnabled?.()) continue;
-      animal.turn += dt;
-      const t = animal.turn;
-      const px = animal.home.x + Math.sin((t * animal.speed) + animal.phase) * animal.radius;
-      const pz = animal.home.z + Math.cos((t * animal.speed) + animal.phase) * animal.radius * 0.6;
-      const py = animal.home.y + Math.sin((t * animal.speed * 1.6) + animal.phase) * animal.bob;
-      const prevPos = root.position.clone();
-      root.position.set(px, py, pz);
-      const dx = px - prevPos.x;
-      const dz = pz - prevPos.z;
-      if (Math.abs(dx) > 0.0005 || Math.abs(dz) > 0.0005) {
-        const desiredYaw = Math.atan2(dx, dz);
+      animal.time += dt;
+      animal.retargetMs -= dt * 1000;
+      let toTarget = animal.target.subtract(animal.pos);
+      let dist = Math.sqrt((toTarget.x * toTarget.x) + (toTarget.z * toTarget.z));
+      if (animal.retargetMs <= 0 || dist < 0.15) {
+        retargetAnimalDecor(animal);
+        toTarget = animal.target.subtract(animal.pos);
+        dist = Math.sqrt((toTarget.x * toTarget.x) + (toTarget.z * toTarget.z));
+      }
+
+      let desiredVelX = 0;
+      let desiredVelZ = 0;
+      if (dist > 0.0001) {
+        desiredVelX = (toTarget.x / dist) * animal.speed;
+        desiredVelZ = (toTarget.z / dist) * animal.speed;
+      }
+      animal.vel.x = damp(animal.vel.x, desiredVelX, 7.5, dt);
+      animal.vel.z = damp(animal.vel.z, desiredVelZ, 7.5, dt);
+
+      const nextX = animal.pos.x + (animal.vel.x * dt);
+      const nextZ = animal.pos.z + (animal.vel.z * dt);
+      const clamped = clampLevel1DecorPoint(animal.surface, nextX, nextZ);
+      animal.pos.x = clamped.x;
+      animal.pos.z = clamped.z;
+
+      const planarSpeed = Math.sqrt((animal.vel.x * animal.vel.x) + (animal.vel.z * animal.vel.z));
+      if (planarSpeed > 0.02) {
+        const desiredYaw = Math.atan2(animal.vel.x, animal.vel.z);
         const delta = wrapToPi(desiredYaw - animal.currentYaw);
         animal.currentYaw += delta * Math.min(1, dt * animal.turnSpeed);
-        root.rotation.y = animal.currentYaw;
       }
+      const bob = Math.sin((animal.time * animal.bobFrequency) + animal.phase) * animal.bob;
+      const stepPitch = Math.sin((animal.time * animal.pitchFrequency) + animal.phase) * animal.pitchAmplitude;
+      root.position.set(animal.pos.x, animal.surface.baseY + bob, animal.pos.z);
+      root.rotationQuaternion = null;
+      root.rotation.y = animal.currentYaw;
+      root.rotation.x = stepPitch;
     }
   }
 

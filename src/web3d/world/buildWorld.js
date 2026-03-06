@@ -437,20 +437,23 @@ function createArrowSign(scene, name, { x, y, z, direction = 1, shadowGen }) {
 function createCheckpointMarker(scene, name, { x, y, z, shadowGen }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
+  root.metadata = { ...(root.metadata || {}), cameraIgnore: true };
 
   const post = BABYLON.MeshBuilder.CreateBox(name + '_post', {
-    width: 0.16, height: 1.5, depth: 0.16,
+    width: 0.16, height: 1.36, depth: 0.16,
   }, scene);
-  post.position.y = -0.35;
+  post.position.y = 0.68;
   post.parent = root;
   post.material = makeCardboard(scene, name + '_postMat', ...P.edgeDark);
+  tagDecorMesh(post);
 
   const flag = BABYLON.MeshBuilder.CreateBox(name + '_flag', {
-    width: 0.58, height: 0.32, depth: 0.06,
+    width: 0.64, height: 0.34, depth: 0.06,
   }, scene);
-  flag.position.set(0.35, 0.2, 0);
+  flag.position.set(0.40, 1.02, 0.02);
   flag.parent = root;
   flag.material = makePlastic(scene, name + '_flagMat', ...P.accentYellow, { roughness: 0.38 });
+  tagDecorMesh(flag);
 
   shadowGen.addShadowCaster(post);
   shadowGen.addShadowCaster(flag);
@@ -862,6 +865,87 @@ function getNearestLevel1SurfaceTopY(x) {
     }
   }
   return nearest.y + (nearest.h * 0.5);
+}
+
+function getLevel1SurfaceByName(name) {
+  if (!name || name === 'floor' || name === 'ground') return LEVEL1.ground;
+  return LEVEL1.platforms.find((surface) => surface.name === name) || LEVEL1.ground;
+}
+
+function getLevel1SurfaceBounds(surfaceRef, {
+  paddingX = 0,
+  paddingZ = 0,
+} = {}) {
+  const surface = typeof surfaceRef === 'string'
+    ? getLevel1SurfaceByName(surfaceRef)
+    : (surfaceRef || LEVEL1.ground);
+  const centerZ = surface.z ?? LANE_Z;
+  return {
+    surface,
+    topY: surface.y + (surface.h * 0.5),
+    minX: (surface.x - (surface.w * 0.5)) + paddingX,
+    maxX: (surface.x + (surface.w * 0.5)) - paddingX,
+    minZ: (centerZ - (surface.d * 0.5)) + paddingZ,
+    maxZ: (centerZ + (surface.d * 0.5)) - paddingZ,
+  };
+}
+
+function getNearestLevel1SurfaceBounds(x, options = {}) {
+  const surfaces = [...LEVEL1.platforms, LEVEL1.ground];
+  let nearest = surfaces[0];
+  let bestDx = Number.POSITIVE_INFINITY;
+  for (const surface of surfaces) {
+    const halfW = surface.w * 0.5;
+    const minX = surface.x - halfW;
+    const maxX = surface.x + halfW;
+    const clampedX = Math.max(minX, Math.min(maxX, x));
+    const dx = Math.abs(x - clampedX);
+    if (dx < bestDx) {
+      bestDx = dx;
+      nearest = surface;
+    }
+  }
+  return getLevel1SurfaceBounds(nearest, options);
+}
+
+function clampToLevel1SurfaceBounds(x, z, bounds) {
+  return {
+    x: Math.max(bounds.minX, Math.min(bounds.maxX, x)),
+    z: Math.max(bounds.minZ, Math.min(bounds.maxZ, z)),
+  };
+}
+
+function placeLevel1DecorAnchor(anchor, {
+  x,
+  z,
+  surfaceName = 'floor',
+  paddingX = 0.6,
+  paddingZ = 0.6,
+  minZ = null,
+  maxZ = null,
+}) {
+  const bounds = getLevel1SurfaceBounds(surfaceName, { paddingX, paddingZ });
+  if (Number.isFinite(minZ)) bounds.minZ = Math.max(bounds.minZ, minZ);
+  if (Number.isFinite(maxZ)) bounds.maxZ = Math.min(bounds.maxZ, maxZ);
+  const clamped = clampToLevel1SurfaceBounds(x, z, bounds);
+  anchor.position.set(clamped.x, bounds.topY + 0.02, clamped.z);
+  anchor.metadata = {
+    ...(anchor.metadata || {}),
+    cameraIgnore: true,
+    level1DecorSurface: {
+      type: surfaceName === 'floor' || surfaceName === 'ground' ? 'floor' : 'platform',
+      name: surfaceName === 'ground' ? 'floor' : surfaceName,
+      topY: bounds.topY,
+      minX: bounds.minX,
+      maxX: bounds.maxX,
+      minZ: bounds.minZ,
+      maxZ: bounds.maxZ,
+      baseY: bounds.topY + 0.02,
+      paddingX,
+      paddingZ,
+    },
+  };
+  return bounds;
 }
 
 /** Cardboard "Welcome to the Petting Zoo" sign on two posts. */
@@ -1446,10 +1530,15 @@ export function buildWorld(scene, options = {}) {
   const checkpoints = [];
   for (let i = 0; i < LEVEL1.checkpoints.length; i++) {
     const cp = LEVEL1.checkpoints[i];
+    const checkpointBounds = getNearestLevel1SurfaceBounds(cp.x, {
+      paddingX: 0.72,
+      paddingZ: 0.72,
+    });
+    const checkpointVisual = clampToLevel1SurfaceBounds(cp.x, 0.85, checkpointBounds);
     const marker = createCheckpointMarker(scene, `checkpoint_${i}`, {
-      x: cp.x,
-      y: cp.y,
-      z: 0.7,
+      x: checkpointVisual.x,
+      y: checkpointBounds.topY + 0.04,
+      z: checkpointVisual.z,
       shadowGen,
     });
     setRenderingGroup(marker, 3);
@@ -1663,8 +1752,24 @@ export function buildWorld(scene, options = {}) {
     new BABYLON.TransformNode('pz_goatAnchor0', scene),
     new BABYLON.TransformNode('pz_goatAnchor1', scene),
   ];
-  pzGoatAnchors[0].position.set(-13.8, startPenTopY, -1.22);
-  pzGoatAnchors[1].position.set(11.0, bridgeSideTopY, -1.18);
+  placeLevel1DecorAnchor(pzGoatAnchors[0], {
+    x: -13.8,
+    z: -1.22,
+    surfaceName: 'platStart',
+    paddingX: 0.85,
+    paddingZ: 0.78,
+    minZ: -1.72,
+    maxZ: -0.62,
+  });
+  placeLevel1DecorAnchor(pzGoatAnchors[1], {
+    x: 11.0,
+    z: -1.18,
+    surfaceName: 'platBridge',
+    paddingX: 0.7,
+    paddingZ: 0.78,
+    minZ: -1.62,
+    maxZ: -0.72,
+  });
 
   const pzChickenAnchors = [
     new BABYLON.TransformNode('pz_chicken0', scene),
@@ -1674,31 +1779,119 @@ export function buildWorld(scene, options = {}) {
     new BABYLON.TransformNode('pz_chicken4', scene),
     new BABYLON.TransformNode('pz_chicken5', scene),
   ];
-  pzChickenAnchors[0].position.set(-11.9, startPenTopY, -1.12);
-  pzChickenAnchors[1].position.set(-10.7, startPenTopY, -1.42);
-  pzChickenAnchors[2].position.set(-9.6, startPenTopY, -1.68);
-  pzChickenAnchors[3].position.set(12.2, bridgeSideTopY, -1.45);
-  pzChickenAnchors[4].position.set(26.7, floorTopY, -1.18);
-  pzChickenAnchors[5].position.set(28.1, floorTopY, -1.42);
+  placeLevel1DecorAnchor(pzChickenAnchors[0], {
+    x: -11.9,
+    z: -1.10,
+    surfaceName: 'platStart',
+    paddingX: 0.95,
+    paddingZ: 0.82,
+    minZ: -1.72,
+    maxZ: -0.70,
+  });
+  placeLevel1DecorAnchor(pzChickenAnchors[1], {
+    x: -10.7,
+    z: -1.34,
+    surfaceName: 'platStart',
+    paddingX: 0.95,
+    paddingZ: 0.82,
+    minZ: -1.72,
+    maxZ: -0.70,
+  });
+  placeLevel1DecorAnchor(pzChickenAnchors[2], {
+    x: -9.8,
+    z: -1.52,
+    surfaceName: 'platStart',
+    paddingX: 0.95,
+    paddingZ: 0.82,
+    minZ: -1.72,
+    maxZ: -0.70,
+  });
+  placeLevel1DecorAnchor(pzChickenAnchors[3], {
+    x: 12.0,
+    z: -1.28,
+    surfaceName: 'platBridge',
+    paddingX: 0.82,
+    paddingZ: 0.82,
+    minZ: -1.64,
+    maxZ: -0.74,
+  });
+  placeLevel1DecorAnchor(pzChickenAnchors[4], {
+    x: 26.7,
+    z: -1.18,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.82,
+    minZ: -1.86,
+    maxZ: -0.72,
+  });
+  placeLevel1DecorAnchor(pzChickenAnchors[5], {
+    x: 28.1,
+    z: -1.34,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.82,
+    minZ: -1.92,
+    maxZ: -0.82,
+  });
 
   const pzDinoAnchors = [
     new BABYLON.TransformNode('pz_dinoAnchor0', scene),
     new BABYLON.TransformNode('pz_dinoAnchor1', scene),
   ];
-  pzDinoAnchors[0].position.set(24.9, floorTopY, -1.22);
-  pzDinoAnchors[1].position.set(28.8, floorTopY, -1.05);
+  placeLevel1DecorAnchor(pzDinoAnchors[0], {
+    x: 24.9,
+    z: -1.22,
+    surfaceName: 'floor',
+    paddingX: 1.1,
+    paddingZ: 0.9,
+    minZ: -1.96,
+    maxZ: -0.74,
+  });
+  placeLevel1DecorAnchor(pzDinoAnchors[1], {
+    x: 28.8,
+    z: -1.05,
+    surfaceName: 'floor',
+    paddingX: 1.1,
+    paddingZ: 0.9,
+    minZ: -1.86,
+    maxZ: -0.72,
+  });
 
   const pzPigAnchors = [
     new BABYLON.TransformNode('pz_pigAnchor0', scene),
     new BABYLON.TransformNode('pz_pigAnchor1', scene),
   ];
-  pzPigAnchors[0].position.set(12.6, bridgeSideTopY, -1.1);
-  pzPigAnchors[1].position.set(26.0, floorTopY, -1.26);
+  placeLevel1DecorAnchor(pzPigAnchors[0], {
+    x: 12.6,
+    z: -1.08,
+    surfaceName: 'platBridge',
+    paddingX: 0.82,
+    paddingZ: 0.78,
+    minZ: -1.56,
+    maxZ: -0.68,
+  });
+  placeLevel1DecorAnchor(pzPigAnchors[1], {
+    x: 26.0,
+    z: -1.26,
+    surfaceName: 'floor',
+    paddingX: 1.0,
+    paddingZ: 0.86,
+    minZ: -1.88,
+    maxZ: -0.74,
+  });
 
   const pzElephantAnchors = [
     new BABYLON.TransformNode('pz_elephantAnchor0', scene),
   ];
-  pzElephantAnchors[0].position.set(22.8, floorTopY, -1.34);
+  placeLevel1DecorAnchor(pzElephantAnchors[0], {
+    x: 22.8,
+    z: -1.34,
+    surfaceName: 'floor',
+    paddingX: 1.2,
+    paddingZ: 0.95,
+    minZ: -2.02,
+    maxZ: -0.82,
+  });
 
   for (const anchor of [
     ...pzGoatAnchors,
@@ -1708,7 +1901,7 @@ export function buildWorld(scene, options = {}) {
     ...pzElephantAnchors,
   ]) {
     anchor.parent = pzRoot;
-    anchor.metadata = { cameraIgnore: true };
+    anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true };
   }
 
   const pzHayBales = [
