@@ -651,6 +651,232 @@ function configureFoliageCutout(node) {
   }
 }
 
+// ── Petting Zoo set-dressing helpers ─────────────────────────────
+
+function tagDecorMesh(mesh) {
+  mesh.isPickable = false;
+  mesh.checkCollisions = false;
+  mesh.metadata = { ...(mesh.metadata || {}), cameraIgnore: true };
+  return mesh;
+}
+
+function tagDecorNode(node) {
+  if (node instanceof BABYLON.Mesh) tagDecorMesh(node);
+  for (const child of node.getChildMeshes ? node.getChildMeshes(false) : []) {
+    tagDecorMesh(child);
+  }
+}
+
+/** Cardboard "Welcome to the Petting Zoo" sign on two posts. */
+function createWelcomeSign(scene, { x, y, z, shadowGen }) {
+  const root = new BABYLON.TransformNode('pz_welcomeSign', scene);
+  root.position.set(x, y, z);
+
+  const postMat = makeCardboard(scene, 'pz_signPostMat', ...P.edgeDark, { roughness: 0.88 });
+  for (const px of [-0.58, 0.58]) {
+    const post = BABYLON.MeshBuilder.CreateBox(`pz_signPost${px}`, {
+      width: 0.11, height: 2.5, depth: 0.11,
+    }, scene);
+    post.position.set(px, 1.25, 0);
+    post.parent = root;
+    post.material = postMat;
+    if (shadowGen) shadowGen.addShadowCaster(post);
+    tagDecorMesh(post);
+  }
+
+  // DynamicTexture sign board
+  const texW = 512; const texH = 256;
+  const signTex = new BABYLON.DynamicTexture('pz_welcomeTex', { width: texW, height: texH }, scene, true);
+  const ctx = signTex.getContext();
+  ctx.fillStyle = '#c8974a';
+  ctx.fillRect(0, 0, texW, texH);
+  ctx.strokeStyle = '#6b3e18';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(7, 7, texW - 14, texH - 14);
+  // grain lines
+  ctx.strokeStyle = 'rgba(90,54,18,0.14)';
+  ctx.lineWidth = 2;
+  for (let gy = 28; gy < texH; gy += 18) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(texW, gy + 4); ctx.stroke();
+  }
+  ctx.fillStyle = '#2a1308';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 52px Georgia, serif';
+  ctx.fillText('WELCOME TO THE', texW / 2, texH * 0.34);
+  ctx.font = 'bold 68px Georgia, serif';
+  ctx.fillText('PETTING ZOO', texW / 2, texH * 0.70);
+  signTex.update();
+
+  const signMat = new BABYLON.StandardMaterial('pz_welcomeSignMat', scene);
+  signMat.diffuseTexture = signTex;
+  signMat.emissiveTexture = signTex;
+  signMat.emissiveColor = new BABYLON.Color3(0.32, 0.22, 0.10);
+  signMat.specularColor = BABYLON.Color3.Black();
+
+  const board = BABYLON.MeshBuilder.CreateBox('pz_welcomeBoard', {
+    width: 1.28, height: 0.68, depth: 0.07,
+  }, scene);
+  board.position.set(0, 2.3, 0);
+  board.parent = root;
+  board.material = signMat;
+  if (shadowGen) shadowGen.addShadowCaster(board);
+  tagDecorMesh(board);
+
+  // Feet cross-pieces
+  const footMat = makeCardboard(scene, 'pz_signFootMat', ...P.edgeDark, { roughness: 0.92 });
+  for (const px of [-0.4, 0.4]) {
+    const foot = BABYLON.MeshBuilder.CreateBox(`pz_signFoot${px}`, {
+      width: 0.34, height: 0.07, depth: 0.24,
+    }, scene);
+    foot.position.set(px, 0.035, 0);
+    foot.parent = root;
+    foot.material = footMat;
+    tagDecorMesh(foot);
+  }
+
+  return root;
+}
+
+/** Cardboard cutout panda on a post stand. */
+function createPandaCutout(scene, { x, y, z }) {
+  const root = new BABYLON.TransformNode('pz_panda', scene);
+  root.position.set(x, y, z);
+
+  // Draw panda on DynamicTexture
+  const sz = 256;
+  const pandaTex = new BABYLON.DynamicTexture('pz_pandaTex', sz, scene, true);
+  const c = pandaTex.getContext();
+  c.clearRect(0, 0, sz, sz);
+
+  // White body blob
+  c.fillStyle = '#f0ede8';
+  c.beginPath(); c.ellipse(sz * 0.5, sz * 0.65, sz * 0.30, sz * 0.32, 0, 0, Math.PI * 2); c.fill();
+
+  // White face circle
+  c.fillStyle = '#f5f2ee';
+  c.beginPath(); c.arc(sz * 0.5, sz * 0.26, sz * 0.21, 0, Math.PI * 2); c.fill();
+
+  // Black ears
+  c.fillStyle = '#111';
+  for (const ex of [-0.20, 0.20]) {
+    c.beginPath(); c.arc(sz * (0.5 + ex), sz * 0.08, sz * 0.09, 0, Math.PI * 2); c.fill();
+  }
+  // White inner ears
+  c.fillStyle = '#ccc';
+  for (const ex of [-0.20, 0.20]) {
+    c.beginPath(); c.arc(sz * (0.5 + ex), sz * 0.08, sz * 0.052, 0, Math.PI * 2); c.fill();
+  }
+
+  // Eye patches
+  c.fillStyle = '#111';
+  for (const ex of [-0.088, 0.088]) {
+    c.beginPath(); c.ellipse(sz * (0.5 + ex), sz * 0.265, sz * 0.075, sz * 0.058, ex < 0 ? 0.35 : -0.35, 0, Math.PI * 2); c.fill();
+  }
+  // White eyes
+  c.fillStyle = '#f5f2ee';
+  for (const ex of [-0.088, 0.088]) {
+    c.beginPath(); c.arc(sz * (0.5 + ex), sz * 0.258, sz * 0.032, 0, Math.PI * 2); c.fill();
+  }
+  // Pupils
+  c.fillStyle = '#111';
+  for (const ex of [-0.088, 0.088]) {
+    c.beginPath(); c.arc(sz * (0.5 + ex), sz * 0.260, sz * 0.018, 0, Math.PI * 2); c.fill();
+  }
+
+  // Nose
+  c.fillStyle = '#333';
+  c.beginPath(); c.ellipse(sz * 0.5, sz * 0.305, sz * 0.030, sz * 0.020, 0, 0, Math.PI * 2); c.fill();
+
+  // Smile
+  c.strokeStyle = '#333'; c.lineWidth = 3.5;
+  c.beginPath(); c.arc(sz * 0.5, sz * 0.33, sz * 0.052, 0.12 * Math.PI, 0.88 * Math.PI); c.stroke();
+
+  // Black arm patches
+  c.fillStyle = '#111';
+  c.beginPath(); c.ellipse(sz * 0.21, sz * 0.60, sz * 0.09, sz * 0.13, -0.28, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(sz * 0.79, sz * 0.60, sz * 0.09, sz * 0.13, 0.28, 0, Math.PI * 2); c.fill();
+
+  // Legs
+  for (const lx of [0.37, 0.63]) {
+    c.beginPath(); c.ellipse(sz * lx, sz * 0.91, sz * 0.09, sz * 0.10, 0, 0, Math.PI * 2); c.fill();
+  }
+
+  pandaTex.update();
+  pandaTex.hasAlpha = true;
+
+  const pandaMat = new BABYLON.StandardMaterial('pz_pandaMat', scene);
+  pandaMat.diffuseTexture = pandaTex;
+  pandaMat.opacityTexture = pandaTex;
+  pandaMat.useAlphaFromDiffuseTexture = true;
+  pandaMat.emissiveColor = new BABYLON.Color3(0.22, 0.22, 0.22);
+  pandaMat.specularColor = BABYLON.Color3.Black();
+  pandaMat.backFaceCulling = false;
+
+  // Cardboard backing
+  const backing = BABYLON.MeshBuilder.CreateBox('pz_pandaBacking', {
+    width: 1.10, height: 1.35, depth: 0.05,
+  }, scene);
+  backing.position.set(0, 0.78, 0.03);
+  backing.parent = root;
+  backing.material = makeCardboard(scene, 'pz_pandaBackMat', 195, 168, 128, { roughness: 0.88 });
+  tagDecorMesh(backing);
+
+  // Panda face plane in front of backing
+  const pandaPlane = BABYLON.MeshBuilder.CreatePlane('pz_pandaPlane', { width: 1.05, height: 1.30 }, scene);
+  pandaPlane.position.set(0, 0.78, -0.01);
+  pandaPlane.parent = root;
+  pandaPlane.material = pandaMat;
+  tagDecorMesh(pandaPlane);
+
+  // Base feet
+  const bfMat = makeCardboard(scene, 'pz_pandaFeetMat', 175, 148, 108, { roughness: 0.92 });
+  for (const fx of [-0.28, 0.28]) {
+    const foot = BABYLON.MeshBuilder.CreateBox(`pz_pandaFoot${fx}`, {
+      width: 0.24, height: 0.06, depth: 0.26,
+    }, scene);
+    foot.position.set(fx, 0.03, 0.02);
+    foot.parent = root;
+    foot.material = bfMat;
+    tagDecorMesh(foot);
+  }
+
+  return root;
+}
+
+/** Simple wooden fence section: 2 posts + 2 horizontal rails. */
+function createFenceSection(scene, name, { x, y, z, rotY = 0, length = 2.0, shadowGen }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  root.rotation.y = rotY;
+
+  const postMat = makeCardboard(scene, name + '_pMat', 168, 140, 100, { roughness: 0.85 });
+  const railMat = makeCardboard(scene, name + '_rMat', 185, 158, 118, { roughness: 0.82 });
+
+  for (const side of [-0.5, 0.5]) {
+    const post = BABYLON.MeshBuilder.CreateBox(name + `_p${side}`, {
+      width: 0.09, height: 0.92, depth: 0.09,
+    }, scene);
+    post.position.set(side * length, 0.46, 0);
+    post.parent = root;
+    post.material = postMat;
+    if (shadowGen) shadowGen.addShadowCaster(post);
+    tagDecorMesh(post);
+  }
+
+  for (const ry of [0.24, 0.64]) {
+    const rail = BABYLON.MeshBuilder.CreateBox(name + `_r${ry}`, {
+      width: length * 2, height: 0.065, depth: 0.055,
+    }, scene);
+    rail.position.set(0, ry, 0);
+    rail.parent = root;
+    rail.material = railMat;
+    tagDecorMesh(rail);
+  }
+
+  return root;
+}
+
 // ── Shared helper exports (used by buildWorld2) ───────────────────
 export {
   createCardboardPlatform,
@@ -1099,6 +1325,51 @@ export function buildWorld(scene, options = {}) {
   });
   setRenderingGroup(goalBanner, 3);
 
+  // === PETTING ZOO SET DRESSING (Level 1 theme) ===
+  // All props at z ≥ 1.6 — behind the gameplay lane (z=0), never blocking player or camera.
+
+  // Welcome sign near spawn
+  const pzWelcomeSign = createWelcomeSign(scene, { x: -17.2, y: 0, z: 2.4, shadowGen });
+  setRenderingGroup(pzWelcomeSign, 2);
+
+  // Panda cutout exhibit (far-left pen)
+  const pzPanda = createPandaCutout(scene, { x: -21.0, y: 0, z: 2.6 });
+  setRenderingGroup(pzPanda, 2);
+
+  // Fence sections — entrance corral + animal pens
+  const pzFences = [
+    // Entrance corral (flanks welcome sign)
+    createFenceSection(scene, 'pz_f0', { x: -19.0, y: 0, z: 1.65, rotY: 0,          length: 1.8, shadowGen }),
+    createFenceSection(scene, 'pz_f1', { x: -15.0, y: 0, z: 1.65, rotY: 0,          length: 1.8, shadowGen }),
+    createFenceSection(scene, 'pz_f2', { x: -17.0, y: 0, z: 2.55, rotY: Math.PI / 2, length: 0.9, shadowGen }),
+    // Goat + chicken pen (mid-spawn area)
+    createFenceSection(scene, 'pz_f3', { x: -14.4, y: 0, z: 2.0,  rotY: 0,          length: 2.2, shadowGen }),
+    createFenceSection(scene, 'pz_f4', { x: -11.5, y: 0, z: 2.7,  rotY: Math.PI / 2, length: 1.0, shadowGen }),
+    // Panda pen (left side)
+    createFenceSection(scene, 'pz_f5', { x: -21.2, y: 0, z: 1.7,  rotY: 0,          length: 1.6, shadowGen }),
+    createFenceSection(scene, 'pz_f6', { x: -19.4, y: 0, z: 2.4,  rotY: Math.PI / 2, length: 0.7, shadowGen }),
+  ];
+  for (const f of pzFences) setRenderingGroup(f, 2);
+
+  // Animal anchors — boot.js loads GLBs, fits + grounds them via fitLoadedModel
+  const pzGoatAnchor = new BABYLON.TransformNode('pz_goatAnchor', scene);
+  pzGoatAnchor.position.set(-16.0, 0, 2.5);
+  pzGoatAnchor.metadata = { cameraIgnore: true };
+
+  const pzChickenAnchors = [
+    new BABYLON.TransformNode('pz_chicken0', scene),
+    new BABYLON.TransformNode('pz_chicken1', scene),
+    new BABYLON.TransformNode('pz_chicken2', scene),
+  ];
+  pzChickenAnchors[0].position.set(-12.8, 0, 2.5);
+  pzChickenAnchors[1].position.set(-11.6, 0, 3.0);
+  pzChickenAnchors[2].position.set(-13.6, 0, 3.1);
+  for (const a of pzChickenAnchors) a.metadata = { cameraIgnore: true };
+
+  const pzDinoAnchor = new BABYLON.TransformNode('pz_dinoAnchor', scene);
+  pzDinoAnchor.position.set(2.5, 0, 2.8);
+  pzDinoAnchor.metadata = { cameraIgnore: true };
+
   const cloudCutouts = [];
   for (let i = 0; i < 5; i++) {
     cloudCutouts.push(makeCloudCutout(scene, {
@@ -1141,6 +1412,9 @@ export function buildWorld(scene, options = {}) {
       foregroundCutouts,
       treeDecor,
       cloudCutouts,
+      pettingZooGoat: [pzGoatAnchor],
+      pettingZooChickens: pzChickenAnchors,
+      pettingZooDino: [pzDinoAnchor],
     },
   };
 }

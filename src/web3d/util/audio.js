@@ -1,3 +1,31 @@
+// Twangy G-major pentatonic loop (16 notes) for Level 1 banjo feel
+const BANJO_NOTES = [
+  392.00, // G4
+  329.63, // E4
+  293.66, // D4
+  246.94, // B3
+  196.00, // G3
+  220.00, // A3
+  246.94, // B3
+  293.66, // D4
+  329.63, // E4
+  392.00, // G4
+  440.00, // A4
+  493.88, // B4
+  392.00, // G4
+  293.66, // D4
+  246.94, // B3
+  196.00, // G3
+];
+const BANJO_RESTS = [
+  false, false, false, true,
+  false, false, false, false,
+  false, true,  false, false,
+  false, false, false, true,
+];
+const BANJO_VOL = 0.28;
+const BANJO_MS = 820;  // slightly snappier than piano
+
 // Gentle C-major melody loop (12 notes) at one note per second.
 const PLINK_NOTES = [
   261.63, // C4
@@ -37,6 +65,7 @@ export class GameAudio {
     this._beatIndex = 0;
     this._pianoScheduleId = null;
     this._birdChirpId = null;
+    this._musicStyle = 'piano';
   }
 
   _ensureContext() {
@@ -78,19 +107,24 @@ export class GameAudio {
 
   // --- Piano plink metronome ---
 
-  startMusic(fadeSec = 0.5) {
+  startMusic(fadeSec = 0.5, style = 'piano') {
     if (!this.enabled) return;
     this.unlock();
     if (!this.ctx || !this.musicGain) return;
     if (this._pianoRunning) return;
     this._pianoRunning = true;
+    this._musicStyle = style;
     this._plinkIndex = 0;
     this._beatIndex = 0;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0.85, t + Math.max(0.02, fadeSec));
-    this._schedulePlink();
+    if (style === 'banjo') {
+      this._scheduleBanjo();
+    } else {
+      this._schedulePlink();
+    }
     this._scheduleBirdChirp();
   }
 
@@ -135,6 +169,51 @@ export class GameAudio {
     }
     this._beatIndex++;
     this._pianoScheduleId = window.setTimeout(() => this._schedulePlink(), PLINK_MS);
+  }
+
+  // --- Banjo twang ---
+
+  _playBanjoNote() {
+    if (!this.ctx || !this.musicGain) return;
+    const freq = BANJO_NOTES[this._plinkIndex % BANJO_NOTES.length];
+    this._plinkIndex++;
+    const t = this.ctx.currentTime;
+    // Sawtooth pluck — fast attack, quick decay for banjo character
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(BANJO_VOL, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    osc.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(t);
+    osc.stop(t + 0.22);
+    // Slightly detuned triangle for twang warmth
+    const osc2 = this.ctx.createOscillator();
+    const gain2 = this.ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.value = freq * 1.006;
+    gain2.gain.setValueAtTime(0.0001, t);
+    gain2.gain.linearRampToValueAtTime(BANJO_VOL * 0.4, t + 0.008);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    osc2.connect(gain2);
+    gain2.connect(this.musicGain);
+    osc2.start(t);
+    osc2.stop(t + 0.18);
+  }
+
+  _scheduleBanjo() {
+    if (!this._pianoRunning) return;
+    const shouldRest = BANJO_RESTS[this._beatIndex % BANJO_RESTS.length];
+    if (!shouldRest) {
+      this._playBanjoNote();
+    } else {
+      this._plinkIndex++;
+    }
+    this._beatIndex++;
+    this._pianoScheduleId = window.setTimeout(() => this._scheduleBanjo(), BANJO_MS);
   }
 
   // --- Occasional bird chirps ---

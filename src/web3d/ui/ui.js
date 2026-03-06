@@ -405,7 +405,7 @@ export function createUI(uiRoot, options = {}) {
           ? 'Level 3 \u2014 Grandma\'s House'
           : _selectedLevel === 2
             ? 'Level 2 \u2014 Condo Garden'
-            : 'A baby\'s epic journey'
+            : 'Level 1 \u2014 Petting Zoo'
       }</div>
       <div class="dada-controls">
         <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
@@ -441,7 +441,7 @@ export function createUI(uiRoot, options = {}) {
         ? 'Level 3 — Grandma\'s House'
         : id === 2
           ? 'Level 2 — Condo Garden'
-          : 'A baby\'s epic journey';
+          : 'Level 1 — Petting Zoo';
     }
     const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);

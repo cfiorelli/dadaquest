@@ -942,6 +942,40 @@ export async function boot(options = {}) {
     }
   }
 
+  // Level 1 Petting Zoo — load animal GLBs onto pre-placed anchors
+  if (levelId === 1) {
+    for (const anchor of anchors.pettingZooGoat || []) {
+      const result = await attachRoleModel('futureGoatPropModel', anchor, {
+        parent: anchor,
+        fallbackMaterial: 'cardboard',
+        renderingGroupId: 2,
+      });
+      if (result.loaded) {
+        fitLoadedModel(result.roots, { targetHeight: 1.5, groundY: 0, markDecorative: true });
+      }
+    }
+    for (const anchor of anchors.pettingZooChickens || []) {
+      const result = await attachRoleModel('futureChickenPropModel', anchor, {
+        parent: anchor,
+        fallbackMaterial: 'cardboard',
+        renderingGroupId: 2,
+      });
+      if (result.loaded) {
+        fitLoadedModel(result.roots, { targetHeight: 0.55, groundY: 0, markDecorative: true });
+      }
+    }
+    for (const anchor of anchors.pettingZooDino || []) {
+      const result = await attachRoleModel('futureDinoPropModel', anchor, {
+        parent: anchor,
+        fallbackMaterial: 'cardboard',
+        renderingGroupId: 2,
+      });
+      if (result.loaded) {
+        fitLoadedModel(result.roots, { targetHeight: 1.8, groundY: 0, markDecorative: true });
+      }
+    }
+  }
+
   const spawnPoint = world.spawn || { x: -12, y: 3, z: 0 };
   // Deterministic settle: snap player onto platform surface before first frame
   player.spawnAt(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
@@ -1313,7 +1347,7 @@ export async function boot(options = {}) {
     state = 'gameplay';
     input.consumeAll();
     player.setWinAnimationActive(false);
-    audio.startMusic(0.5);
+    audio.startMusic(0.5, levelId === 1 ? 'banjo' : 'piano');
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
