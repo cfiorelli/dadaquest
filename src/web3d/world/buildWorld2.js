@@ -27,18 +27,49 @@ const P2 = {
 
 const LEVEL2_DECOR_Z = 1.35;
 
-function markDecorativeVisual(node) {
-  if (!node) return;
-  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
-  for (const mesh of meshes) {
-    if (!(mesh instanceof BABYLON.Mesh)) continue;
-    mesh.isPickable = false;
-    mesh.checkCollisions = false;
-    mesh.metadata = {
-      ...(mesh.metadata || {}),
-      cameraIgnore: true,
-      cameraBlocker: false,
+function collectLevel2Nodes(node) {
+  if (!node) return [];
+  const nodes = [node];
+  if (typeof node.getChildTransformNodes === 'function') {
+    nodes.push(...node.getChildTransformNodes(false));
+  }
+  if (typeof node.getChildMeshes === 'function') {
+    nodes.push(...node.getChildMeshes(false));
+  }
+  return nodes;
+}
+
+function prefixLevel2Gameplay(node) {
+  for (const entry of collectLevel2Nodes(node)) {
+    if (entry.name && !entry.name.startsWith('L2_')) {
+      entry.name = `L2_${entry.name}`;
+    }
+    if (entry.id && !entry.id.startsWith('L2_')) {
+      entry.id = `L2_${entry.id}`;
+    }
+    entry.metadata = {
+      ...(entry.metadata || {}),
+      level2Gameplay: true,
     };
+  }
+}
+
+function tagLevel2Decor(node) {
+  for (const entry of collectLevel2Nodes(node)) {
+    entry.metadata = {
+      ...(entry.metadata || {}),
+      level2Decor: true,
+    };
+    if (entry instanceof BABYLON.Mesh) {
+      entry.isPickable = false;
+      entry.checkCollisions = false;
+      entry.metadata = {
+        ...(entry.metadata || {}),
+        cameraIgnore: true,
+        cameraBlocker: false,
+        level2Decor: true,
+      };
+    }
   }
 }
 
@@ -262,40 +293,44 @@ export function buildWorld2(scene, options = {}) {
 
   // === GROUND ===
   const groundDef = LEVEL2.ground;
-  createCardboardPlatform(scene, 'ground2', {
+  const groundVisual = createCardboardPlatform(scene, 'L2_ground', {
     x: groundDef.x, y: groundDef.y, z: groundDef.z,
     w: groundDef.w, h: groundDef.h, d: groundDef.d,
     slabColor: P2.ground,
     edgeColor: P2.edgeDark,
     shadowGen,
   });
+  prefixLevel2Gameplay(groundVisual);
 
-  const groundCollider = BABYLON.MeshBuilder.CreateBox('groundCol2', {
+  const groundCollider = BABYLON.MeshBuilder.CreateBox('L2_groundCol', {
     width: groundDef.w, height: groundDef.h, depth: groundDef.d,
   }, scene);
   groundCollider.position.set(groundDef.x, groundDef.y, groundDef.z);
   groundCollider.visibility = 0;
   groundCollider.isPickable = false;
+  prefixLevel2Gameplay(groundCollider);
 
   // === PLATFORMS ===
   const allPlatforms = [groundCollider];
   const platformColliders = {};  // name → collider mesh
 
   for (const def of LEVEL2.platforms) {
-    createCardboardPlatform(scene, def.name, {
+    const platformVisual = createCardboardPlatform(scene, `L2_${def.name}`, {
       x: def.x, y: def.y, z: LANE_Z,
       w: def.w, h: def.h, d: def.d,
       slabColor: P2.platformCard,
       edgeColor: P2.edgeDark,
       shadowGen,
     });
+    prefixLevel2Gameplay(platformVisual);
 
-    const col = BABYLON.MeshBuilder.CreateBox(def.name + '_col', {
+    const col = BABYLON.MeshBuilder.CreateBox(`L2_${def.name}_col`, {
       width: def.w, height: def.h, depth: def.d,
     }, scene);
     col.position.set(def.x, def.y, LANE_Z);
     col.visibility = 0;
     col.isPickable = false;
+    prefixLevel2Gameplay(col);
     allPlatforms.push(col);
     platformColliders[def.name] = col;
   }
@@ -303,15 +338,18 @@ export function buildWorld2(scene, options = {}) {
   // === GOAL (DaDa) ===
   const goalDef = LEVEL2.goal;
   const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  prefixLevel2Gameplay(dada.root);
+  prefixLevel2Gameplay(dada.goal);
   setRenderingGroup(dada.root, 3);
 
   // === CHECKPOINTS ===
   const checkpoints = [];
   for (let i = 0; i < LEVEL2.checkpoints.length; i++) {
     const cp = LEVEL2.checkpoints[i];
-    const marker = createCheckpointMarker(scene, `cp2_${i}`, {
+    const marker = createCheckpointMarker(scene, `L2_cp2_${i}`, {
       x: cp.x, y: cp.y, z: 0.7, shadowGen,
     });
+    prefixLevel2Gameplay(marker);
     setRenderingGroup(marker, 3);
     checkpoints.push({
       index: i + 1,
@@ -326,10 +364,11 @@ export function buildWorld2(scene, options = {}) {
   const pickups = [];
   for (let i = 0; i < LEVEL2.pickups.length; i++) {
     const pick = LEVEL2.pickups[i];
-    const node = createOnesiePickup(scene, `pickup2_${i}`, {
+    const node = createOnesiePickup(scene, `L2_pickup2_${i}`, {
       x: pick.x, y: pick.y, z: LANE_Z, shadowGen,
     });
     node.position.z = LANE_Z;
+    prefixLevel2Gameplay(node);
     setRenderingGroup(node, 3);
     pickups.push({
       type: pick.type,
@@ -346,8 +385,9 @@ export function buildWorld2(scene, options = {}) {
   const coins = [];
   for (let i = 0; i < LEVEL2.coins.length; i++) {
     const c = LEVEL2.coins[i];
-    const node = createCoin(scene, `coin2_${i}`, { x: c.x, y: c.y, z: LANE_Z });
+    const node = createCoin(scene, `L2_coin2_${i}`, { x: c.x, y: c.y, z: LANE_Z });
     node.position.z = LANE_Z;
+    prefixLevel2Gameplay(node);
     setRenderingGroup(node, 3);
     coins.push({
       position: new BABYLON.Vector3(c.x, c.y, LANE_Z),
@@ -362,10 +402,11 @@ export function buildWorld2(scene, options = {}) {
   for (let i = 0; i < LEVEL2.hazards.length; i++) {
     const hz = LEVEL2.hazards[i];
     if (hz.type === 'slip') {
-      createHazardZone(scene, `hazard2_${i}`, {
+      const hazardMesh = createHazardZone(scene, `L2_hazard2_${i}`, {
         x: hz.x, y: hz.y, z: hz.z,
         width: hz.width, depth: hz.depth,
       });
+      prefixLevel2Gameplay(hazardMesh);
       hazards.push({
         type: hz.type,
         minX: hz.x - hz.width / 2,
@@ -382,12 +423,14 @@ export function buildWorld2(scene, options = {}) {
   const crumbles = [];
   for (let i = 0; i < (LEVEL2.crumbles || []).length; i++) {
     const cr = LEVEL2.crumbles[i];
-    const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, cr.name, {
+    const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, `L2_${cr.name}`, {
       x: cr.x, y: cr.y, z: LANE_Z,
       w: cr.w, h: cr.h, d: cr.d,
       shadowGen,
     });
     crRoot.position.z = LANE_Z;
+    prefixLevel2Gameplay(crRoot);
+    prefixLevel2Gameplay(crCol);
     allPlatforms.push(crCol);
     setRenderingGroup(crRoot, 2);
     crumbles.push({
@@ -406,7 +449,7 @@ export function buildWorld2(scene, options = {}) {
   const backdropMat = makeCardboard(scene, 'backdrop2Mat', 225, 220, 210, { roughness: 0.96 });
   backdrop.material = backdropMat;
   backdrop.receiveShadows = true;
-  markDecorativeVisual(backdrop);
+  tagLevel2Decor(backdrop);
 
   // === AMANDA PATROL ===
   const amandaDef = LEVEL2.amanda;
@@ -417,6 +460,7 @@ export function buildWorld2(scene, options = {}) {
     w: amandaDef.w, h: amandaDef.h, d: amandaDef.d,
     shadowGen,
   });
+  prefixLevel2Gameplay(amandaRoot);
   setRenderingGroup(amandaRoot, 3);
 
   // === ROCKING HORSE (MOVEABLE PLATFORM) ===
@@ -428,7 +472,7 @@ export function buildWorld2(scene, options = {}) {
     shadowGen,
   });
   setRenderingGroup(horseVisualRoot, 2);
-  markDecorativeVisual(horseVisualRoot);
+  tagLevel2Decor(horseVisualRoot);
 
   // horseCollider is the invisible platform box for platHorse
   const horseColliderMesh = platformColliders[horseDef.platformName];
@@ -440,6 +484,7 @@ export function buildWorld2(scene, options = {}) {
     LEVEL2.assetAnchors.babyBed.y,
     LEVEL2_DECOR_Z,
   );
+  tagLevel2Decor(babyBedAnchor);
   const babyBedVisual = createBedVisual(scene, 'babyBed', {
     x: LEVEL2.assetAnchors.babyBed.x,
     y: LEVEL2.assetAnchors.babyBed.y + 0.1,
@@ -447,7 +492,7 @@ export function buildWorld2(scene, options = {}) {
     shadowGen,
   });
   setRenderingGroup(babyBedVisual, 2);
-  markDecorativeVisual(babyBedVisual);
+  tagLevel2Decor(babyBedVisual);
 
   const pianoAnchor = new BABYLON.TransformNode('pianoAnchor', scene);
   pianoAnchor.position.set(
@@ -455,6 +500,7 @@ export function buildWorld2(scene, options = {}) {
     LEVEL2.assetAnchors.piano.y,
     LEVEL2_DECOR_Z,
   );
+  tagLevel2Decor(pianoAnchor);
   const pianoVisual = createPianoVisual(scene, 'piano', {
     x: LEVEL2.assetAnchors.piano.x,
     y: LEVEL2.assetAnchors.piano.y,
@@ -462,7 +508,7 @@ export function buildWorld2(scene, options = {}) {
     shadowGen,
   });
   setRenderingGroup(pianoVisual, 2);
-  markDecorativeVisual(pianoVisual);
+  tagLevel2Decor(pianoVisual);
 
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
@@ -470,9 +516,11 @@ export function buildWorld2(scene, options = {}) {
     LEVEL2.assetAnchors.bianca.y,
     LEVEL2_DECOR_Z,
   );
+  tagLevel2Decor(biancaAnchor);
 
   const rockingHorseAnchor = new BABYLON.TransformNode('rockingHorseAnchor', scene);
   rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
+  tagLevel2Decor(rockingHorseAnchor);
 
   // === LEVEL 2 RUNTIME LOGIC ===
   const PLAYER_HALF_W = 0.25;

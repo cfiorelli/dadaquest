@@ -339,6 +339,47 @@ function describeNodeChain(node) {
   return chain;
 }
 
+function disableLevel2DecorMeshes(scene, { debugMode = false } = {}) {
+  const disabledDecor = [];
+  const disabledGiant = [];
+
+  for (const mesh of scene.meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    if (mesh.metadata?.level2Decor === true) {
+      mesh.setEnabled(false);
+      disabledDecor.push(mesh.name || mesh.id || 'mesh');
+    }
+  }
+
+  for (const mesh of scene.meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    if (!mesh.isEnabled()) continue;
+    if ((mesh.name || '').startsWith('L2_')) continue;
+    if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') continue;
+    mesh.computeWorldMatrix(true);
+    const bi = mesh.getBoundingInfo?.();
+    const ext = bi?.boundingBox?.extendSizeWorld;
+    if (!ext) continue;
+    const maxExtent = Math.max(ext.x, ext.y, ext.z);
+    const volume = (ext.x * 2) * (ext.y * 2) * (ext.z * 2);
+    if (maxExtent > 40 || volume > 18000) {
+      mesh.setEnabled(false);
+      const info = {
+        name: mesh.name,
+        id: mesh.id,
+        maxExtent: Number(maxExtent.toFixed(3)),
+        volume: Number(volume.toFixed(3)),
+      };
+      disabledGiant.push(info);
+      if (debugMode && disabledGiant.length === 1) {
+        console.log('[L2 giant mesh disabled]', info);
+      }
+    }
+  }
+
+  return { disabledDecor, disabledGiant };
+}
+
 function isRenderableCameraObstacle(mesh, ignoredMeshes) {
   if (!(mesh instanceof BABYLON.Mesh)) return false;
   if (!mesh.isEnabled()) return false;
@@ -586,11 +627,16 @@ export async function boot(options = {}) {
     throw buildErr;
   }
 
+  if (levelId === 2) {
+    window.__DADA_DEBUG__.level2CullResult = disableLevel2DecorMeshes(scene, { debugMode });
+  }
+
   await applyHdriEnvironment(scene, {
     intensity: shotMode ? 0.35 : 0.44,
   });
   const availableModels = await getAvailableModels();
   window.__DADA_DEBUG__.assetModels = availableModels;
+  const shouldLoadLevel2Decor = false;
 
   const actorState = {
     player: { loaded: false, usingFallback: true, reason: 'not_loaded', bboxSize: [0, 0, 0], worldPos: [0, 0, 0] },
@@ -845,8 +891,8 @@ export async function boot(options = {}) {
     });
   }
 
-  // Level 2 GLB props — hide procedural fallback visuals when GLB loads.
-  if (world.level2) {
+  // Level 2 ships platforms-only for readability — skip decorative GLB props entirely.
+  if (world.level2 && shouldLoadLevel2Decor) {
     const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
     const l2propDefs = [
       {
@@ -941,8 +987,12 @@ export async function boot(options = {}) {
   }
 
   // Camera — fixed angle, smooth follow
-  const cameraStartPos = new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
-  const cameraStartTarget = new BABYLON.Vector3(-12, 2, 0);
+  const cameraStartPos = levelId === 2
+    ? new BABYLON.Vector3((spawnPoint.x || -12) - 10, (spawnPoint.y || 2) + 10, -18)
+    : new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
+  const cameraStartTarget = levelId === 2
+    ? new BABYLON.Vector3(spawnPoint.x || -12, (spawnPoint.y || 2) + 1.0, 0)
+    : new BABYLON.Vector3(-12, 2, 0);
   const camera = new BABYLON.FreeCamera('cam', cameraStartPos.clone(), scene);
   camera.setTarget(cameraStartTarget.clone());
   camera.minZ = 0.5;
@@ -1382,6 +1432,7 @@ export async function boot(options = {}) {
   // Minimal run indicator — confirms Shift input is live every frame.
   let _runIndicatorEl = null;
   function getRunIndicator() {
+    if (!import.meta.env.DEV) return null;
     if (!_runIndicatorEl) {
       _runIndicatorEl = document.createElement('div');
       _runIndicatorEl.style.cssText = [
@@ -1489,7 +1540,10 @@ export async function boot(options = {}) {
       speedMultiplier = 1.75;      // run = walk * 1.75 — clearly noticeable
       accelBonusMultiplier = 1.40; // faster ramp-up while sprinting
     }
-    getRunIndicator().style.opacity = sprinting ? '1' : '0';
+    const runIndicator = getRunIndicator();
+    if (runIndicator) {
+      runIndicator.style.opacity = sprinting ? '1' : '0';
+    }
 
     player.setMovementModifiers({
       jumpVelocityMultiplier: onesieJumpBoost,
@@ -1767,27 +1821,39 @@ export async function boot(options = {}) {
         startGoalCelebration(world.goalRoot.getAbsolutePosition());
       }
 
-      // Smooth camera follow with Level 2-specific LOS correction for decorative start props.
+      // Camera follow.
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
-      const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
-      const desiredCameraPos = new BABYLON.Vector3(targetX - 8, py + 4, CAMERA_FOLLOW_Z);
-      const headPos = new BABYLON.Vector3(px, py + 1.2, 0);
-      const occlusion = useLevel2CameraOcclusionGuard
-        ? resolveLevel2CameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
-        : useGenericCameraOcclusionGuard
-          ? resolveCameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
-          : { correctedPos: desiredCameraPos, hit: null };
-      updateLevel2CameraProbe(dt, occlusion.hit);
-      const cameraDamp = occlusion.hit ? 11 : 4;
-      camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
-      camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
-      camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
-      camera.setTarget(new BABYLON.Vector3(
-        damp(camera.getTarget().x, targetX, 4, dt),
-        damp(camera.getTarget().y, py + 1.2, 4, dt),
-        0,
-      ));
+      if (levelId === 2) {
+        const desiredCameraPos = new BABYLON.Vector3(px - 10, py + 10, -18);
+        camera.position.x = damp(camera.position.x, desiredCameraPos.x, 4.5, dt);
+        camera.position.y = damp(camera.position.y, desiredCameraPos.y, 4.5, dt);
+        camera.position.z = damp(camera.position.z, desiredCameraPos.z, 4.5, dt);
+        camera.setTarget(new BABYLON.Vector3(
+          damp(camera.getTarget().x, px, 4.5, dt),
+          damp(camera.getTarget().y, py + 1.0, 4.5, dt),
+          0,
+        ));
+      } else {
+        const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
+        const desiredCameraPos = new BABYLON.Vector3(targetX - 8, py + 4, CAMERA_FOLLOW_Z);
+        const headPos = new BABYLON.Vector3(px, py + 1.2, 0);
+        const occlusion = useLevel2CameraOcclusionGuard
+          ? resolveLevel2CameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
+          : useGenericCameraOcclusionGuard
+            ? resolveCameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
+            : { correctedPos: desiredCameraPos, hit: null };
+        updateLevel2CameraProbe(dt, occlusion.hit);
+        const cameraDamp = occlusion.hit ? 11 : 4;
+        camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
+        camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
+        camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
+        camera.setTarget(new BABYLON.Vector3(
+          damp(camera.getTarget().x, targetX, 4, dt),
+          damp(camera.getTarget().y, py + 1.2, 4, dt),
+          0,
+        ));
+      }
     } else if (state === 'goal') {
       goalTimer = Math.max(0, goalTimer - dt);
       const t = 1 - (goalTimer / GOAL_CELEBRATION_SEC);
