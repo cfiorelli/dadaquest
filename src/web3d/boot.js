@@ -40,6 +40,13 @@ function quadraticBezier(start, mid, end, t) {
     .add(end.scale(t * t));
 }
 
+function wrapToPi(angle) {
+  let wrapped = angle;
+  while (wrapped > Math.PI) wrapped -= Math.PI * 2;
+  while (wrapped < -Math.PI) wrapped += Math.PI * 2;
+  return wrapped;
+}
+
 function getShotScene() {
   if (typeof window === 'undefined') return 'title';
   const value = new URLSearchParams(window.location.search).get('scene');
@@ -990,8 +997,10 @@ export async function boot(options = {}) {
       speed,
       radius,
       bob,
+      turnSpeed = 7.5,
     }) => {
       const home = getAnchorWorldPosition(anchor) || anchor.position.clone();
+      anchor.rotationQuaternion = null;
       level1AnimalDecor.push({
         kind,
         root: anchor,
@@ -1000,8 +1009,9 @@ export async function boot(options = {}) {
         speed,
         radius,
         bob,
+        turnSpeed,
         turn: 0,
-        baseYaw: 0,
+        currentYaw: anchor.rotation.y,
       });
     };
 
@@ -1014,7 +1024,7 @@ export async function boot(options = {}) {
       if (result.loaded) {
         const anchorPos = getAnchorWorldPosition(anchor);
         fitLoadedModel(result.roots, {
-          targetHeight: 1.6,
+          targetHeight: 1.7,
           groundY: anchorPos ? anchorPos.y : 0,
           markDecorative: true,
         });
@@ -1040,7 +1050,9 @@ export async function boot(options = {}) {
       if (result.loaded) {
         const anchorPos = getAnchorWorldPosition(anchor);
         fitLoadedModel(result.roots, {
-          targetHeight: 0.7,
+          targetHeight: anchor.name === 'pz_chicken3' || anchor.name === 'pz_chicken4' || anchor.name === 'pz_chicken5'
+            ? 0.77
+            : 0.7,
           groundY: anchorPos ? anchorPos.y : 0,
           markDecorative: true,
         });
@@ -1067,7 +1079,7 @@ export async function boot(options = {}) {
       if (result.loaded) {
         const anchorPos = getAnchorWorldPosition(anchor);
         fitLoadedModel(result.roots, {
-          targetHeight: 2.16,
+          targetHeight: anchor.name === 'pz_dinoAnchor1' ? 2.26 : 2.16,
           groundY: anchorPos ? anchorPos.y : 0,
           markDecorative: true,
         });
@@ -1094,7 +1106,7 @@ export async function boot(options = {}) {
         if (result.loaded) {
           const anchorPos = getAnchorWorldPosition(anchor);
           fitLoadedModel(result.roots, {
-            targetHeight: 1.05,
+            targetHeight: 1.2,
             groundY: anchorPos ? anchorPos.y : 0,
             markDecorative: true,
           });
@@ -1108,6 +1120,7 @@ export async function boot(options = {}) {
             speed: 0.68,
             radius: 0.45,
             bob: 0.024,
+            turnSpeed: 7.2,
           });
         }
       }
@@ -1121,9 +1134,10 @@ export async function boot(options = {}) {
         });
         if (result.loaded) {
           const anchorPos = getAnchorWorldPosition(anchor);
+          const elephantGroundY = level1FloorTopY !== null ? level1FloorTopY + 0.02 : (anchorPos ? anchorPos.y : 0);
           fitLoadedModel(result.roots, {
             targetHeight: 1.9,
-            groundY: anchorPos ? anchorPos.y : 0,
+            groundY: elephantGroundY,
             markDecorative: true,
           });
           for (const root of result.roots || []) {
@@ -1134,8 +1148,9 @@ export async function boot(options = {}) {
             kind: 'elephant',
             phase: 1.18,
             speed: 0.48,
-            radius: 0.52,
-            bob: 0.02,
+            radius: 0.92,
+            bob: 0.016,
+            turnSpeed: 6.8,
           });
         }
       }
@@ -1157,8 +1172,10 @@ export async function boot(options = {}) {
       const dx = px - prevPos.x;
       const dz = pz - prevPos.z;
       if (Math.abs(dx) > 0.0005 || Math.abs(dz) > 0.0005) {
-        const targetYaw = Math.atan2(dx, dz) + animal.baseYaw;
-        root.rotation.y = damp(root.rotation.y, targetYaw, 5.5, dt);
+        const desiredYaw = Math.atan2(dx, dz);
+        const delta = wrapToPi(desiredYaw - animal.currentYaw);
+        animal.currentYaw += delta * Math.min(1, dt * animal.turnSpeed);
+        root.rotation.y = animal.currentYaw;
       }
     }
   }

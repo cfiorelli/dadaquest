@@ -54,15 +54,65 @@ const COUNTRY_BPM = 192;
 const COUNTRY_STEP_SEC = 60 / COUNTRY_BPM / 2; // eighth-note feel
 const COUNTRY_SCHEDULE_AHEAD_SEC = 0.45;
 const COUNTRY_SCHEDULER_MS = 120;
-const COUNTRY_LEAD = [
-  392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88, 440.0,
-  392.0, 329.63, 293.66, 329.63, 392.0, 440.0, 493.88, 440.0,
+const COUNTRY_PATTERNS = [
+  {
+    leadBars: [
+      [392.0, null, 440.0, 493.88, 587.33, null, 493.88, 440.0],
+      [392.0, null, 329.63, 293.66, 329.63, null, 392.0, 440.0],
+      [493.88, null, 587.33, 659.25, 587.33, null, 493.88, 440.0],
+      [392.0, null, 329.63, 293.66, 246.94, null, 293.66, 329.63],
+      [392.0, null, 440.0, 493.88, 587.33, null, 493.88, 440.0],
+      [392.0, null, 329.63, 293.66, 329.63, null, 392.0, 440.0],
+      [493.88, null, 587.33, 659.25, 587.33, 493.88, 440.0, 392.0],
+      [329.63, null, 293.66, 246.94, 220.0, null, 246.94, 293.66],
+    ],
+    bassBars: [
+      [98.0, 98.0], [98.0, 123.47], [146.83, 146.83], [123.47, 123.47],
+      [110.0, 110.0], [110.0, 123.47], [98.0, 98.0], [73.42, 98.0],
+    ],
+    kickBars: [[0, 4], [0, 4], [0, 3, 4], [0, 4], [0, 4], [0, 4], [0, 3, 4], [0, 4]],
+    snareBars: [[2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6]],
+    hatBars: [[1, 5], [1, 5], [1, 3, 5, 7], [1, 5], [1, 5], [1, 5], [1, 3, 5, 7], [1, 5]],
+  },
+  {
+    leadBars: [
+      [392.0, null, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88],
+      [440.0, null, 392.0, 329.63, 293.66, null, 329.63, 392.0],
+      [493.88, null, 523.25, 587.33, 659.25, null, 587.33, 523.25],
+      [440.0, null, 392.0, 329.63, 293.66, null, 246.94, 293.66],
+      [392.0, null, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88],
+      [523.25, null, 493.88, 440.0, 392.0, null, 329.63, 392.0],
+      [587.33, null, 659.25, 587.33, 523.25, null, 493.88, 440.0],
+      [392.0, null, 329.63, 293.66, 246.94, null, 220.0, 246.94],
+    ],
+    bassBars: [
+      [98.0, 110.0], [98.0, 123.47], [130.81, 146.83], [123.47, 130.81],
+      [110.0, 123.47], [110.0, 123.47], [98.0, 110.0], [82.41, 98.0],
+    ],
+    kickBars: [[0, 4], [0, 4], [0, 4, 7], [0, 4], [0, 4], [0, 4], [0, 4, 7], [0, 4]],
+    snareBars: [[2, 6], [2, 6], [2, 5, 6], [2, 6], [2, 6], [2, 6], [2, 5, 6], [2, 6]],
+    hatBars: [[1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5], [1, 3, 5, 7], [1, 5]],
+  },
+  {
+    leadBars: [
+      [392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 523.25, 493.88],
+      [440.0, null, 392.0, 329.63, 293.66, 329.63, 392.0, 440.0],
+      [493.88, 523.25, 587.33, 659.25, 698.46, 659.25, 587.33, 523.25],
+      [440.0, null, 392.0, 329.63, 293.66, 246.94, 220.0, 246.94],
+      [392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 523.25, 493.88],
+      [587.33, null, 523.25, 493.88, 440.0, 392.0, 329.63, 392.0],
+      [659.25, null, 587.33, 523.25, 493.88, 440.0, 392.0, 329.63],
+      [440.0, null, 392.0, 329.63, 293.66, 246.94, 220.0, 196.0],
+    ],
+    bassBars: [
+      [98.0, 98.0], [110.0, 110.0], [146.83, 146.83], [123.47, 98.0],
+      [110.0, 110.0], [123.47, 123.47], [98.0, 110.0], [73.42, 98.0],
+    ],
+    kickBars: [[0, 3, 4], [0, 4], [0, 3, 4], [0, 4], [0, 3, 4], [0, 4], [0, 3, 4], [0, 4]],
+    snareBars: [[2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6], [2, 6]],
+    hatBars: [[1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7], [1, 3, 5, 7]],
+  },
 ];
-const COUNTRY_BASS = [
-  98.0, 98.0, 146.83, 146.83, 110.0, 110.0, 98.0, 98.0,
-];
-const COUNTRY_SNARE_STEPS = new Set([2, 6]);
-const COUNTRY_KICK_STEPS = new Set([0, 4]);
 
 export class GameAudio {
   constructor({ enabled = true } = {}) {
@@ -261,23 +311,27 @@ export class GameAudio {
   }
 
   _scheduleCountryStep(time, stepIndex) {
-    const leadFreq = COUNTRY_LEAD[stepIndex % COUNTRY_LEAD.length];
-    const bassFreq = COUNTRY_BASS[Math.floor(stepIndex / 2) % COUNTRY_BASS.length];
+    const barIndex = Math.floor(stepIndex / 8);
+    const sectionIndex = Math.floor(barIndex / 8) % COUNTRY_PATTERNS.length;
+    const withinSectionBar = barIndex % 8;
     const stepInBar = stepIndex % 8;
+    const section = COUNTRY_PATTERNS[sectionIndex];
+    const leadFreq = section.leadBars[withinSectionBar][stepInBar];
+    const bassFreq = section.bassBars[withinSectionBar][stepInBar >= 4 ? 1 : 0];
 
-    if (stepIndex % 2 === 0 || stepInBar === 3 || stepInBar === 7) {
+    if (leadFreq) {
       this._playCountryLeadAt(leadFreq, time);
     }
     if (stepInBar === 0 || stepInBar === 4) {
       this._playCountryBassAt(bassFreq, time);
     }
-    if (COUNTRY_KICK_STEPS.has(stepInBar)) {
+    if (section.kickBars[withinSectionBar].includes(stepInBar)) {
       this._playCountryKickAt(time);
     }
-    if (COUNTRY_SNARE_STEPS.has(stepInBar)) {
+    if (section.snareBars[withinSectionBar].includes(stepInBar)) {
       this._playCountrySnareAt(time);
     }
-    if (stepInBar === 1 || stepInBar === 5) {
+    if (section.hatBars[withinSectionBar].includes(stepInBar)) {
       this._playCountryHatAt(time);
     }
   }

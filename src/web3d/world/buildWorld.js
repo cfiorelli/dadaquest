@@ -1633,7 +1633,9 @@ export function buildWorld(scene, options = {}) {
   tagDecorNode(pzRoot);
 
   const startPenTopY = getNearestLevel1SurfaceTopY(-16.0) + 0.02;
-  const dinoTopY = getNearestLevel1SurfaceTopY(0.6) + 0.02;
+  const bridgeSideTopY = getNearestLevel1SurfaceTopY(11.4) + 0.02;
+  const farRightTopY = getNearestLevel1SurfaceTopY(27.0) + 0.02;
+  const floorTopY = (LEVEL1.ground.y + (LEVEL1.ground.h * 0.5)) + 0.02;
 
   // Welcome sign near spawn
   const pzWelcomeSign = createWelcomeSign(scene, { x: -17.2, y: startPenTopY, z: 2.35, shadowGen });
@@ -1657,38 +1659,57 @@ export function buildWorld(scene, options = {}) {
   }
 
   // Animal anchors — boot.js loads GLBs, fits + grounds them via fitLoadedModel
-  const pzGoatAnchor = new BABYLON.TransformNode('pz_goatAnchor', scene);
-  pzGoatAnchor.position.set(-14.5, startPenTopY, 2.34);
-  pzGoatAnchor.parent = pzRoot;
-  pzGoatAnchor.metadata = { cameraIgnore: true };
+  const pzGoatAnchors = [
+    new BABYLON.TransformNode('pz_goatAnchor0', scene),
+    new BABYLON.TransformNode('pz_goatAnchor1', scene),
+  ];
+  pzGoatAnchors[0].position.set(-13.8, startPenTopY, -1.22);
+  pzGoatAnchors[1].position.set(11.0, bridgeSideTopY, -1.18);
 
   const pzChickenAnchors = [
     new BABYLON.TransformNode('pz_chicken0', scene),
     new BABYLON.TransformNode('pz_chicken1', scene),
     new BABYLON.TransformNode('pz_chicken2', scene),
+    new BABYLON.TransformNode('pz_chicken3', scene),
+    new BABYLON.TransformNode('pz_chicken4', scene),
+    new BABYLON.TransformNode('pz_chicken5', scene),
   ];
-  pzChickenAnchors[0].position.set(-11.3, startPenTopY, 2.28);
-  pzChickenAnchors[1].position.set(-10.1, startPenTopY, 2.62);
-  pzChickenAnchors[2].position.set(-12.25, startPenTopY, 2.92);
-  for (const a of pzChickenAnchors) {
-    a.parent = pzRoot;
-    a.metadata = { cameraIgnore: true };
+  pzChickenAnchors[0].position.set(-11.9, startPenTopY, -1.12);
+  pzChickenAnchors[1].position.set(-10.7, startPenTopY, -1.42);
+  pzChickenAnchors[2].position.set(-9.6, startPenTopY, -1.68);
+  pzChickenAnchors[3].position.set(12.2, bridgeSideTopY, -1.45);
+  pzChickenAnchors[4].position.set(26.7, floorTopY, -1.18);
+  pzChickenAnchors[5].position.set(28.1, floorTopY, -1.42);
+
+  const pzDinoAnchors = [
+    new BABYLON.TransformNode('pz_dinoAnchor0', scene),
+    new BABYLON.TransformNode('pz_dinoAnchor1', scene),
+  ];
+  pzDinoAnchors[0].position.set(24.9, floorTopY, -1.22);
+  pzDinoAnchors[1].position.set(28.8, floorTopY, -1.05);
+
+  const pzPigAnchors = [
+    new BABYLON.TransformNode('pz_pigAnchor0', scene),
+    new BABYLON.TransformNode('pz_pigAnchor1', scene),
+  ];
+  pzPigAnchors[0].position.set(12.6, bridgeSideTopY, -1.1);
+  pzPigAnchors[1].position.set(26.0, floorTopY, -1.26);
+
+  const pzElephantAnchors = [
+    new BABYLON.TransformNode('pz_elephantAnchor0', scene),
+  ];
+  pzElephantAnchors[0].position.set(22.8, floorTopY, -1.34);
+
+  for (const anchor of [
+    ...pzGoatAnchors,
+    ...pzChickenAnchors,
+    ...pzDinoAnchors,
+    ...pzPigAnchors,
+    ...pzElephantAnchors,
+  ]) {
+    anchor.parent = pzRoot;
+    anchor.metadata = { cameraIgnore: true };
   }
-
-  const pzDinoAnchor = new BABYLON.TransformNode('pz_dinoAnchor', scene);
-  pzDinoAnchor.position.set(0.6, dinoTopY, 2.26);
-  pzDinoAnchor.parent = pzRoot;
-  pzDinoAnchor.metadata = { cameraIgnore: true };
-
-  const pzPigAnchor = new BABYLON.TransformNode('pz_pigAnchor', scene);
-  pzPigAnchor.position.set(11.9, getNearestLevel1SurfaceTopY(11.9) + 0.02, 2.22);
-  pzPigAnchor.parent = pzRoot;
-  pzPigAnchor.metadata = { cameraIgnore: true };
-
-  const pzElephantAnchor = new BABYLON.TransformNode('pz_elephantAnchor', scene);
-  pzElephantAnchor.position.set(20.8, getNearestLevel1SurfaceTopY(20.8) + 0.02, 2.7);
-  pzElephantAnchor.parent = pzRoot;
-  pzElephantAnchor.metadata = { cameraIgnore: true };
 
   const pzHayBales = [
     createHayBale(scene, 'pz_hay0', { x: -15.0, y: startPenTopY, z: 3.35, scale: 1.0, shadowGen }),
@@ -1703,7 +1724,7 @@ export function buildWorld(scene, options = {}) {
   const pzMiniSigns = [
     createMiniSign(scene, 'pz_sign_goats', { x: -16.9, y: startPenTopY, z: 1.92, label: 'GOATS', shadowGen }),
     createMiniSign(scene, 'pz_sign_chickens', { x: -12.05, y: startPenTopY, z: 1.9, label: 'CHICKENS', shadowGen }),
-    createMiniSign(scene, 'pz_sign_dino', { x: -0.4, y: dinoTopY, z: 1.9, label: 'DINO', shadowGen }),
+    createMiniSign(scene, 'pz_sign_dino', { x: 24.6, y: floorTopY, z: -0.86, label: 'DINO', shadowGen }),
     createMiniSign(scene, 'pz_sign_rules', { x: 23.8, y: getNearestLevel1SurfaceTopY(23.8) + 0.02, z: 2.35, label: 'NO CLIMBING', shadowGen }),
   ];
   for (const sign of pzMiniSigns) {
@@ -1772,21 +1793,35 @@ export function buildWorld(scene, options = {}) {
       foregroundCutouts,
       treeDecor,
       cloudCutouts,
-      pettingZooGoat: [pzGoatAnchor],
+      pettingZooGoat: pzGoatAnchors,
       pettingZooChickens: pzChickenAnchors,
-      pettingZooDino: [pzDinoAnchor],
-      pettingZooPig: [pzPigAnchor],
-      pettingZooElephant: [pzElephantAnchor],
+      pettingZooDino: pzDinoAnchors,
+      pettingZooPig: pzPigAnchors,
+      pettingZooElephant: pzElephantAnchors,
     },
     level1Decor: {
       animalHomes: {
-        goat: [{ x: -14.5, y: startPenTopY, z: 2.34 }],
-        chickens: [
-          { x: -11.3, y: startPenTopY, z: 2.28 },
-          { x: -10.1, y: startPenTopY, z: 2.62 },
-          { x: -12.25, y: startPenTopY, z: 2.92 },
+        goat: [
+          { x: -13.8, y: startPenTopY, z: -1.22 },
+          { x: 11.0, y: bridgeSideTopY, z: -1.18 },
         ],
-        dino: [{ x: 0.6, y: dinoTopY, z: 2.26 }],
+        chickens: [
+          { x: -11.9, y: startPenTopY, z: -1.12 },
+          { x: -10.7, y: startPenTopY, z: -1.42 },
+          { x: -9.6, y: startPenTopY, z: -1.68 },
+          { x: 12.2, y: bridgeSideTopY, z: -1.45 },
+          { x: 26.7, y: floorTopY, z: -1.18 },
+          { x: 28.1, y: floorTopY, z: -1.42 },
+        ],
+        dino: [
+          { x: 24.9, y: floorTopY, z: -1.22 },
+          { x: 28.8, y: floorTopY, z: -1.05 },
+        ],
+        pig: [
+          { x: 12.6, y: bridgeSideTopY, z: -1.1 },
+          { x: 26.0, y: floorTopY, z: -1.26 },
+        ],
+        elephant: [{ x: 22.8, y: floorTopY, z: -1.34 }],
       },
     },
   };
