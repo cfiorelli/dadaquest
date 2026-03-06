@@ -13,6 +13,7 @@ import { JuiceFx } from './util/juiceFx.js';
 import {
   applyHdriEnvironment,
   getAvailableModels,
+  loadOptionalModel,
   loadModelForRole,
 } from './util/assets.js';
 import { GameAudio } from './util/audio.js';
@@ -388,7 +389,7 @@ function disableLevel2DecorMeshes(scene, { debugMode = false } = {}) {
 
   for (const mesh of scene.meshes) {
     if (!(mesh instanceof BABYLON.Mesh)) continue;
-    if (mesh.metadata?.level2Decor === true) {
+    if (mesh.metadata?.level2Cull === true) {
       mesh.setEnabled(false);
       disabledDecor.push(mesh.name || mesh.id || 'mesh');
     }
@@ -399,6 +400,7 @@ function disableLevel2DecorMeshes(scene, { debugMode = false } = {}) {
     if (!mesh.isEnabled()) continue;
     if ((mesh.name || '').startsWith('L2_')) continue;
     if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') continue;
+    if (mesh.metadata?.cameraIgnore === true) continue;
     mesh.computeWorldMatrix(true);
     const bi = mesh.getBoundingInfo?.();
     const ext = bi?.boundingBox?.extendSizeWorld;
@@ -680,7 +682,6 @@ export async function boot(options = {}) {
   const availableModels = await getAvailableModels();
   const availableModelSet = new Set(availableModels);
   window.__DADA_DEBUG__.assetModels = availableModels;
-  const shouldLoadLevel2Decor = false;
   const level1FloorTopY = levelId === 1
     ? (() => {
       if (world.ground?.getBoundingInfo) {
@@ -693,7 +694,7 @@ export async function boot(options = {}) {
       return null;
     })()
     : null;
-  if (levelId === 1) {
+  if (levelId === 1 && import.meta.env.DEV) {
     if (!availableModelSet.has('local_baby_pig')) {
       console.warn('[assets] missing local_baby_pig; skipping Level 1 pig decor');
     }
@@ -721,7 +722,14 @@ export async function boot(options = {}) {
     const fallbackMeshes = Array.isArray(options.fallbackMeshes)
       ? options.fallbackMeshes
       : collectNodeMeshes(fallbackNode);
-    const result = await loadModelForRole(scene, roleName, options);
+    const result = options.optional
+      ? ((await loadOptionalModel(scene, roleName, options)) || {
+        loaded: false,
+        reason: 'optional_missing',
+        meshes: [],
+        roots: [],
+      })
+      : await loadModelForRole(scene, roleName, options);
     if (result.loaded) {
       registerShadowCasters(world.shadowGen, result.meshes);
       if (typeof options.renderingGroupId === 'number') {
@@ -755,6 +763,13 @@ export async function boot(options = {}) {
       }
     }
     return result;
+  }
+
+  function attachOptionalRoleModel(roleName, fallbackNode, options = {}) {
+    return attachRoleModel(roleName, fallbackNode, {
+      ...options,
+      optional: true,
+    });
   }
 
   function pushForegroundMeshes(meshes) {
@@ -880,25 +895,14 @@ export async function boot(options = {}) {
     };
   }
 
-  if (levelId !== 1) {
-    await attachRoleModel('goalModel', world.goalRoot, {
-      parent: goalVisualRoot,
-      fallbackMeshes: goalFallbackMeshes,
-      fallbackMaterial: 'plastic',
-      rotation: new BABYLON.Vector3(0, Math.PI, 0),
-      actorRole: 'goal',
-      renderingGroupId: 3,
-    });
-  } else {
-    const p = world.goalRoot.getAbsolutePosition();
-    actorState.goal = {
-      loaded: false,
-      usingFallback: true,
-      reason: 'procedural_human_dad_level1',
-      worldPos: [p.x, p.y, p.z],
-      bboxSize: [0, 0, 0],
-    };
-  }
+  const goalPos = world.goalRoot.getAbsolutePosition();
+  actorState.goal = {
+    loaded: false,
+    usingFallback: true,
+    reason: `procedural_human_dad_level${levelId}`,
+    worldPos: [goalPos.x, goalPos.y, goalPos.z],
+    bboxSize: [0, 0, 0],
+  };
 
   for (const signRoot of world.signs || []) {
     await attachRoleModel('signModel', signRoot, {
@@ -1028,8 +1032,7 @@ export async function boot(options = {}) {
     });
   }
 
-  // Level 2 ships platforms-only for readability — skip decorative GLB props entirely.
-  if (world.level2 && shouldLoadLevel2Decor) {
+  if (world.level2) {
     const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
     const l2propDefs = [
       {
@@ -1042,32 +1045,57 @@ export async function boot(options = {}) {
         role: 'futurePianoModel',
         anchor: l2anchors.piano,
         fallback: l2fallback?.piano,
-        fit: { targetMaxSize: 7.4, groundOffset: 0.35 },
+        fit: { targetMaxSize: 7.0, groundOffset: 0.35 },
       },
       {
         role: 'futureBiancaModel',
         anchor: l2anchors.bianca,
         fallback: null,
-        fit: { targetHeight: 2.2, targetMaxSize: 3.2, groundOffset: 0.0 },
+        fit: { targetHeight: 2.2, targetMaxSize: 3.0, groundOffset: 0.0 },
       },
       {
         role: 'futureRockingHorseModel',
         anchor: l2anchors.rockingHorse,
         fallback: null,
-        fit: { targetMaxSize: 4.4, groundOffset: 0.4 },
+        fit: { targetMaxSize: 4.2, groundOffset: 0.35 },
+      },
+      {
+        role: 'futureHighchairModel',
+        anchor: l2anchors.highchair,
+        fallback: l2fallback?.highchair,
+        fit: { targetHeight: 1.65, targetMaxSize: 2.2, groundOffset: 0.0 },
+      },
+      {
+        role: 'futureBikeModel',
+        anchor: l2anchors.bike,
+        fallback: l2fallback?.bike,
+        fit: { targetMaxSize: 2.2, groundOffset: 0.0 },
+      },
+      {
+        role: 'futurePackPropModel',
+        anchor: l2anchors.pack,
+        fallback: l2fallback?.pack,
+        fit: { targetHeight: 1.1, targetMaxSize: 1.6, groundOffset: 0.0 },
+      },
+      {
+        role: 'futureGoatPropModel',
+        anchor: l2anchors.goat,
+        fallback: null,
+        fit: { targetHeight: 1.45, targetMaxSize: 2.0, groundOffset: 0.0 },
       },
     ];
     for (const { role, anchor, fallback, fit } of l2propDefs) {
       if (!anchor) continue;
-      const result = await attachRoleModel(role, anchor, {
+      const result = await attachOptionalRoleModel(role, anchor, {
         parent: anchor,
+        fallbackMeshes: fallback ? collectNodeMeshes(fallback) : collectNodeMeshes(anchor),
         fallbackMaterial: 'plastic',
         renderingGroupId: 2,
       });
-      if (result.loaded && fallback) {
+      if (result?.loaded && fallback) {
         fallback.setEnabled(false);
       }
-      if (result.loaded) {
+      if (result?.loaded) {
         const anchorPos = anchor.getAbsolutePosition();
         fitLoadedModel(result.roots, {
           targetMaxSize: fit?.targetMaxSize ?? 0,
@@ -1291,6 +1319,54 @@ export async function boot(options = {}) {
     }
   }
 
+  if (levelId === 3) {
+    const level3OptionalDefs = [
+      { role: 'futureTulipFlowerPropModel', anchors: anchors.futureTulipFlowerPropModel || [], fit: { targetHeight: 0.8 } },
+      { role: 'futureYellowFlowerPropModel', anchors: anchors.futureYellowFlowerPropModel || [], fit: { targetHeight: 0.8 } },
+      { role: 'futureCornPropModel', anchors: anchors.futureCornPropModel || [], fit: { targetHeight: 1.55 } },
+      { role: 'futureHuskyDogPropModel', anchors: anchors.futureHuskyDogPropModel || [], fit: { targetHeight: 1.2, targetMaxSize: 1.8 } },
+      { role: 'futurePlayfulDogPropModel', anchors: anchors.futurePlayfulDogPropModel || [], fit: { targetHeight: 1.15, targetMaxSize: 1.7 } },
+      { role: 'futureTaterDogPropModel', anchors: anchors.futureTaterDogPropModel || [], fit: { targetHeight: 1.15, targetMaxSize: 1.7 } },
+      { role: 'futureChickensPropModel', anchors: anchors.futureChickensPropModel || [], fit: { targetHeight: 0.78, targetMaxSize: 1.0 } },
+      { role: 'futureGoatPropModel', anchors: anchors.futureGoatPropModel || [], fit: { targetHeight: 1.42, targetMaxSize: 1.9 } },
+      { role: 'futureTurkeyPropModel', anchors: anchors.futureTurkeyPropModel || [], fit: { targetHeight: 1.18, targetMaxSize: 1.6 } },
+    ];
+    for (const { role, anchors: roleAnchors, fit } of level3OptionalDefs) {
+      for (const anchor of roleAnchors) {
+        const result = await attachOptionalRoleModel(role, anchor, {
+          parent: anchor,
+          fallbackMeshes: collectNodeMeshes(anchor),
+          fallbackMaterial: 'plastic',
+          renderingGroupId: 3,
+        });
+        if (!result?.loaded) continue;
+        const anchorPos = anchor.getAbsolutePosition();
+        fitLoadedModel(result.roots, {
+          targetMaxSize: fit?.targetMaxSize ?? 0,
+          targetHeight: fit?.targetHeight ?? 0,
+          groundY: anchorPos.y,
+          markDecorative: true,
+        });
+      }
+    }
+  }
+
+  const cloudCutouts = levelId === 1 ? (anchors.cloudCutouts || []) : [];
+
+  function updateLevel1Clouds(dt) {
+    if (levelId !== 1 || shotMode || !cloudCutouts.length) return;
+    for (const cloud of cloudCutouts) {
+      if (!cloud?.position) continue;
+      const speed = cloud.metadata?.driftSpeed ?? 0.08;
+      const minX = cloud.metadata?.driftMinX ?? -28;
+      const maxX = cloud.metadata?.driftMaxX ?? 58;
+      cloud.position.x += dt * speed;
+      if (cloud.position.x > maxX) {
+        cloud.position.x = minX;
+      }
+    }
+  }
+
   function updateLevel1AnimalDecor(dt) {
     if (levelId !== 1 || shotMode || !level1AnimalDecor.length) return;
     for (const animal of level1AnimalDecor) {
@@ -1485,6 +1561,8 @@ export async function boot(options = {}) {
 
   // Game state machine
   const goalX = world.goalRoot.position.x;
+  const goalGuardMinX = Number.isFinite(world.goalGuardMinX) ? world.goalGuardMinX : null;
+  let warnedEarlyGoal = false;
 
   let state = 'title'; // title | gameplay | loading | end
   let _lastKey = '—';
@@ -2336,8 +2414,15 @@ export async function boot(options = {}) {
         && pPos.y >= goalBounds.minimumWorld.y
         && pPos.y <= goalBounds.maximumWorld.y;
       if (goalInside && !goalReached) {
-        goalReached = true;
-        startGoalCelebration(world.goalRoot.getAbsolutePosition());
+        if (goalGuardMinX !== null && pPos.x < goalGuardMinX) {
+          if (import.meta.env.DEV && !warnedEarlyGoal) {
+            warnedEarlyGoal = true;
+            console.error(`[goal] blocked early win on level ${levelId} at x=${pPos.x.toFixed(2)} (< ${goalGuardMinX.toFixed(2)})`);
+          }
+        } else {
+          goalReached = true;
+          startGoalCelebration(world.goalRoot.getAbsolutePosition());
+        }
       }
 
       // Camera follow.
@@ -2390,6 +2475,7 @@ export async function boot(options = {}) {
     }
 
     updateLevel1AnimalDecor(dt);
+    updateLevel1Clouds(dt);
     updateLevel1Ambient(dt);
     updateCoinLossDisplay(dt);
     updateCoinFlybacks(dt);

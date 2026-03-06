@@ -10,11 +10,11 @@ import {
   createCardboardPlatform,
   createCoin,
   createCheckpointMarker,
-  createDaDa,
   createOnesiePickup,
   createCrumblePlatform,
   setRenderingGroup,
 } from './buildWorld.js';
+import { createDad, createMom, createSimpleChair } from './characters.js';
 
 const LANE_Z = LANE_Z2;
 
@@ -71,6 +71,216 @@ function tagLevel2Decor(node) {
       };
     }
   }
+}
+
+function createRoomPanel(scene, name, {
+  x,
+  y,
+  z = 6.8,
+  width,
+  height,
+  color = [228, 220, 208],
+  trim = [170, 150, 128],
+  windowCount = 0,
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const wall = BABYLON.MeshBuilder.CreateBox(`${name}_wall`, {
+    width,
+    height,
+    depth: 0.22,
+  }, scene);
+  wall.parent = root;
+  wall.material = makeCardboard(scene, `${name}_wallMat`, ...color, { roughness: 0.96 });
+  wall.receiveShadows = true;
+
+  const crown = BABYLON.MeshBuilder.CreateBox(`${name}_crown`, {
+    width: width + 0.18,
+    height: 0.24,
+    depth: 0.28,
+  }, scene);
+  crown.parent = root;
+  crown.position.y = (height * 0.5) - 0.12;
+  crown.material = makeCardboard(scene, `${name}_crownMat`, ...trim, { roughness: 0.9 });
+
+  const baseTrim = BABYLON.MeshBuilder.CreateBox(`${name}_baseTrim`, {
+    width: width + 0.12,
+    height: 0.18,
+    depth: 0.26,
+  }, scene);
+  baseTrim.parent = root;
+  baseTrim.position.y = -(height * 0.5) + 0.09;
+  baseTrim.material = crown.material;
+
+  for (let i = 0; i < windowCount; i++) {
+    const offset = ((i - ((windowCount - 1) * 0.5)) * Math.max(1.8, width / (windowCount + 1)));
+    const frame = BABYLON.MeshBuilder.CreateBox(`${name}_window_${i}`, {
+      width: 1.25,
+      height: 1.6,
+      depth: 0.08,
+    }, scene);
+    frame.parent = root;
+    frame.position.set(offset, 0.4, -0.11);
+    frame.material = makeCardboard(scene, `${name}_windowMat_${i}`, 182, 198, 212, { roughness: 0.75 });
+
+    const muntinV = BABYLON.MeshBuilder.CreateBox(`${name}_muntinV_${i}`, {
+      width: 0.08,
+      height: 1.5,
+      depth: 0.10,
+    }, scene);
+    muntinV.parent = frame;
+    muntinV.material = makeCardboard(scene, `${name}_muntinVMat_${i}`, ...trim, { roughness: 0.88 });
+
+    const muntinH = BABYLON.MeshBuilder.CreateBox(`${name}_muntinH_${i}`, {
+      width: 1.1,
+      height: 0.08,
+      depth: 0.10,
+    }, scene);
+    muntinH.parent = frame;
+    muntinH.material = muntinV.material;
+  }
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createHighchairPlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const seatMat = makePlastic(scene, `${name}_seatMat`, 0.95, 0.89, 0.72, { roughness: 0.52 });
+  const frameMat = makeCardboard(scene, `${name}_frameMat`, 170, 138, 98, { roughness: 0.88 });
+
+  const seat = BABYLON.MeshBuilder.CreateBox(`${name}_seat`, {
+    width: 0.9,
+    height: 0.14,
+    depth: 0.76,
+  }, scene);
+  seat.parent = root;
+  seat.position.y = 0.82;
+  seat.material = seatMat;
+
+  const back = BABYLON.MeshBuilder.CreateBox(`${name}_back`, {
+    width: 0.9,
+    height: 0.92,
+    depth: 0.12,
+  }, scene);
+  back.parent = root;
+  back.position.set(0, 1.24, -0.28);
+  back.material = seatMat;
+
+  const tray = BABYLON.MeshBuilder.CreateBox(`${name}_tray`, {
+    width: 1.04,
+    height: 0.10,
+    depth: 0.46,
+  }, scene);
+  tray.parent = root;
+  tray.position.set(0, 0.96, 0.28);
+  tray.material = makePlastic(scene, `${name}_trayMat`, 0.86, 0.78, 0.64, { roughness: 0.42 });
+
+  for (const lx of [-0.3, 0.3]) {
+    for (const lz of [-0.22, 0.22]) {
+      const leg = BABYLON.MeshBuilder.CreateBox(`${name}_leg_${lx}_${lz}`, {
+        width: 0.08,
+        height: 0.92,
+        depth: 0.08,
+      }, scene);
+      leg.parent = root;
+      leg.position.set(lx, 0.35, lz);
+      leg.material = frameMat;
+    }
+  }
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createBikePlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  const frameMat = makePlastic(scene, `${name}_frameMat`, 0.82, 0.33, 0.22, { roughness: 0.42 });
+  const tireMat = makeCardboard(scene, `${name}_tireMat`, 58, 52, 48, { roughness: 0.92 });
+
+  for (const side of [-0.42, 0.42]) {
+    const wheel = BABYLON.MeshBuilder.CreateTorus(`${name}_wheel${side}`, {
+      diameter: 0.6,
+      thickness: 0.08,
+      tessellation: 18,
+    }, scene);
+    wheel.parent = root;
+    wheel.position.set(side, 0.3, 0);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.material = tireMat;
+  }
+
+  const frame = BABYLON.MeshBuilder.CreateCylinder(`${name}_frame`, {
+    height: 1.0,
+    diameter: 0.08,
+    tessellation: 10,
+  }, scene);
+  frame.parent = root;
+  frame.position.set(0, 0.5, 0);
+  frame.rotation.z = Math.PI / 2.8;
+  frame.material = frameMat;
+
+  const bar = BABYLON.MeshBuilder.CreateCylinder(`${name}_bar`, {
+    height: 0.8,
+    diameter: 0.08,
+    tessellation: 10,
+  }, scene);
+  bar.parent = root;
+  bar.position.set(0.15, 0.72, 0);
+  bar.rotation.z = -Math.PI / 3;
+  bar.material = frameMat;
+
+  const seat = BABYLON.MeshBuilder.CreateBox(`${name}_seat`, {
+    width: 0.28,
+    height: 0.08,
+    depth: 0.18,
+  }, scene);
+  seat.parent = root;
+  seat.position.set(-0.05, 0.82, 0);
+  seat.material = makeCardboard(scene, `${name}_seatMat`, 76, 58, 48, { roughness: 0.9 });
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createPackPlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
+    width: 0.74,
+    height: 0.92,
+    depth: 0.46,
+  }, scene);
+  body.parent = root;
+  body.position.y = 0.46;
+  body.material = makePlastic(scene, `${name}_bodyMat`, 0.47, 0.65, 0.42, { roughness: 0.68 });
+
+  for (const side of [-0.2, 0.2]) {
+    const strap = BABYLON.MeshBuilder.CreateCylinder(`${name}_strap${side}`, {
+      height: 0.92,
+      diameter: 0.06,
+      tessellation: 8,
+    }, scene);
+    strap.parent = root;
+    strap.position.set(side, 0.52, -0.16);
+    strap.material = makeCardboard(scene, `${name}_strapMat${side}`, 124, 92, 70, { roughness: 0.92 });
+  }
+
+  const flap = BABYLON.MeshBuilder.CreateBox(`${name}_flap`, {
+    width: 0.72,
+    height: 0.18,
+    depth: 0.18,
+  }, scene);
+  flap.parent = root;
+  flap.position.set(0, 0.86, -0.13);
+  flap.material = makePlastic(scene, `${name}_flapMat`, 0.36, 0.54, 0.32, { roughness: 0.72 });
+
+  tagLevel2Decor(root);
+  return root;
 }
 
 // ── Slip / hazard zone ────────────────────────────────────────────
@@ -337,7 +547,15 @@ export function buildWorld2(scene, options = {}) {
 
   // === GOAL (DaDa) ===
   const goalDef = LEVEL2.goal;
-  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  const dada = createDad(scene, {
+    x: goalDef.x,
+    y: goalDef.y,
+    z: LANE_Z,
+    outfit: 'level2',
+    shadowGen,
+    animate: animateGoal,
+    goalVolume: { width: 2.8, height: 4.8, depth: 2.8, yOffset: 1.55 },
+  });
   prefixLevel2Gameplay(dada.root);
   prefixLevel2Gameplay(dada.goal);
   setRenderingGroup(dada.root, 3);
@@ -441,15 +659,31 @@ export function buildWorld2(scene, options = {}) {
     });
   }
 
-  // === DECORATIVE BACKDROP ===
+  // === DECORATIVE BACKDROP / ROOM ZONES ===
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop2', {
     width: 70, height: 22, depth: 0.5,
   }, scene);
-  backdrop.position.set(9, 9, 10.4);
+  backdrop.position.set(9, 9, 10.6);
   const backdropMat = makeCardboard(scene, 'backdrop2Mat', 225, 220, 210, { roughness: 0.96 });
   backdrop.material = backdropMat;
   backdrop.receiveShadows = true;
   tagLevel2Decor(backdrop);
+
+  const roomPanels = [
+    createRoomPanel(scene, 'l2_bedroomPanel', {
+      x: -11.0, y: 4.8, z: 6.9, width: 16, height: 10.5, color: [220, 214, 226], trim: [165, 152, 170], windowCount: 1,
+    }),
+    createRoomPanel(scene, 'l2_kitchenPanel', {
+      x: 8.4, y: 4.5, z: 6.8, width: 12.5, height: 9.6, color: [217, 226, 214], trim: [165, 176, 154], windowCount: 1,
+    }),
+    createRoomPanel(scene, 'l2_stairsPanel', {
+      x: 23.2, y: 6.4, z: 6.7, width: 10.8, height: 10.2, color: [224, 217, 206], trim: [171, 156, 138], windowCount: 0,
+    }),
+    createRoomPanel(scene, 'l2_loftPanel', {
+      x: 36.8, y: 8.0, z: 6.5, width: 12.4, height: 9.4, color: [214, 228, 214], trim: [156, 170, 144], windowCount: 2,
+    }),
+  ];
+  roomPanels.forEach((panel) => setRenderingGroup(panel, 1));
 
   // === AMANDA PATROL ===
   const amandaDef = LEVEL2.amanda;
@@ -510,6 +744,28 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(pianoVisual, 2);
   tagLevel2Decor(pianoVisual);
 
+  const momChair = createSimpleChair(scene, {
+    x: LEVEL2.assetAnchors.piano.x - 1.3,
+    y: LEVEL2.platforms.find((p) => p.name === 'platPiano').y + 0.35,
+    z: LEVEL2_DECOR_Z + 0.02,
+    shadowGen,
+    seatColor: '#cfb190',
+    legColor: '#7e5b3d',
+  });
+  setRenderingGroup(momChair, 2);
+  tagLevel2Decor(momChair);
+
+  const momAtPiano = createMom(scene, {
+    x: LEVEL2.assetAnchors.piano.x - 1.34,
+    y: LEVEL2.platforms.find((p) => p.name === 'platPiano').y + 0.36,
+    z: LEVEL2_DECOR_Z - 0.02,
+    pose: 'sitting',
+    shadowGen,
+  });
+  momAtPiano.root.rotation.y = 0.38;
+  setRenderingGroup(momAtPiano.root, 3);
+  tagLevel2Decor(momAtPiano.root);
+
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
     LEVEL2.assetAnchors.bianca.x,
@@ -517,6 +773,49 @@ export function buildWorld2(scene, options = {}) {
     LEVEL2_DECOR_Z,
   );
   tagLevel2Decor(biancaAnchor);
+
+  const highchairAnchor = new BABYLON.TransformNode('highchairAnchor', scene);
+  highchairAnchor.position.set(6.2, LEVEL2.platforms.find((p) => p.name === 'platKitchen').y + 0.4, LEVEL2_DECOR_Z - 0.05);
+  tagLevel2Decor(highchairAnchor);
+  const highchairPlaceholder = createHighchairPlaceholder(scene, 'highchairFallback', {
+    x: highchairAnchor.position.x,
+    y: highchairAnchor.position.y,
+    z: highchairAnchor.position.z,
+  });
+  highchairPlaceholder.parent = highchairAnchor;
+  highchairPlaceholder.position.set(0, 0, 0);
+  setRenderingGroup(highchairPlaceholder, 2);
+  tagLevel2Decor(highchairPlaceholder);
+
+  const bikeAnchor = new BABYLON.TransformNode('bikeAnchor', scene);
+  bikeAnchor.position.set(20.8, LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.4, LEVEL2_DECOR_Z - 0.06);
+  tagLevel2Decor(bikeAnchor);
+  const bikePlaceholder = createBikePlaceholder(scene, 'bikeFallback', {
+    x: bikeAnchor.position.x,
+    y: bikeAnchor.position.y,
+    z: bikeAnchor.position.z,
+  });
+  bikePlaceholder.parent = bikeAnchor;
+  bikePlaceholder.position.set(0, 0, 0);
+  setRenderingGroup(bikePlaceholder, 2);
+  tagLevel2Decor(bikePlaceholder);
+
+  const packAnchor = new BABYLON.TransformNode('packAnchor', scene);
+  packAnchor.position.set(34.6, LEVEL2.platforms.find((p) => p.name === 'platLoft').y + 0.4, LEVEL2_DECOR_Z + 0.08);
+  tagLevel2Decor(packAnchor);
+  const packPlaceholder = createPackPlaceholder(scene, 'packFallback', {
+    x: packAnchor.position.x,
+    y: packAnchor.position.y,
+    z: packAnchor.position.z,
+  });
+  packPlaceholder.parent = packAnchor;
+  packPlaceholder.position.set(0, 0, 0);
+  setRenderingGroup(packPlaceholder, 2);
+  tagLevel2Decor(packPlaceholder);
+
+  const loftGoatAnchor = new BABYLON.TransformNode('loftGoatAnchor', scene);
+  loftGoatAnchor.position.set(36.0, LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.4, LEVEL2_DECOR_Z - 0.14);
+  tagLevel2Decor(loftGoatAnchor);
 
   const rockingHorseAnchor = new BABYLON.TransformNode('rockingHorseAnchor', scene);
   rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
@@ -600,11 +899,18 @@ export function buildWorld2(scene, options = {}) {
       piano: pianoAnchor,
       bianca: biancaAnchor,
       rockingHorse: rockingHorseAnchor,
+      highchair: highchairAnchor,
+      bike: bikeAnchor,
+      pack: packAnchor,
+      goat: loftGoatAnchor,
     },
     // Expose fallback visuals so boot.js can hide them when GLBs load
     fallbackVisuals: {
       babyBed: babyBedVisual,
       piano: pianoVisual,
+      highchair: highchairPlaceholder,
+      bike: bikePlaceholder,
+      pack: packPlaceholder,
     },
   };
 
@@ -623,6 +929,7 @@ export function buildWorld2(scene, options = {}) {
     hazards,
     crumbles,
     level: LEVEL2,
+    goalGuardMinX: goalDef.x - 4.5,
     signs: [],
     level2,
     assetAnchors: {
@@ -639,6 +946,10 @@ export function buildWorld2(scene, options = {}) {
       futurePianoModel: [pianoAnchor],
       futureBiancaModel: [biancaAnchor],
       futureRockingHorseModel: [rockingHorseAnchor],
+      futureHighchairModel: [highchairAnchor],
+      futureBikeModel: [bikeAnchor],
+      futurePackPropModel: [packAnchor],
+      futureGoatPropModel: [loftGoatAnchor],
     },
   };
 }

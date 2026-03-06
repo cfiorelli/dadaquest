@@ -5,14 +5,15 @@ import {
   makePaper,
 } from '../materials.js';
 import { LEVEL3, LANE_Z3 } from './level3.js';
+import { AnimalWanderController } from './animalWander.js';
 import {
   createCardboardPlatform,
   createCoin,
   createCheckpointMarker,
-  createDaDa,
   createOnesiePickup,
   setRenderingGroup,
 } from './buildWorld.js';
+import { createDad } from './characters.js';
 
 const LANE_Z = LANE_Z3;
 
@@ -37,6 +38,10 @@ function makeInvisibleCollider(scene, name, def) {
 
 function markDecorative(node) {
   if (!node) return;
+  node.metadata = {
+    ...(node.metadata || {}),
+    cameraIgnore: true,
+  };
   const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
   for (const mesh of meshes) {
     if (!(mesh instanceof BABYLON.Mesh)) continue;
@@ -44,12 +49,13 @@ function markDecorative(node) {
     mesh.checkCollisions = false;
     mesh.metadata = {
       ...(mesh.metadata || {}),
+      cameraIgnore: true,
       cameraBlocker: false,
     };
   }
 }
 
-function createTimedHazardVisual(scene, name, {
+function createSteamHazardVisual(scene, name, {
   x,
   y,
   z = 0,
@@ -107,6 +113,69 @@ function createTimedHazardVisual(scene, name, {
 
   markDecorative(root);
   return { root, column };
+}
+
+function createSprinklerVisual(scene, name, {
+  x,
+  y,
+  z = 0,
+  width,
+  height,
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const hose = BABYLON.MeshBuilder.CreateCylinder(`${name}_hose`, {
+    height: 1.3,
+    diameter: 0.08,
+    tessellation: 10,
+  }, scene);
+  hose.parent = root;
+  hose.position.set(-0.34, -0.24, 0);
+  hose.rotation.z = -0.76;
+  hose.material = makePlastic(scene, `${name}_hoseMat`, 0.27, 0.58, 0.18, { roughness: 0.56 });
+
+  const stand = BABYLON.MeshBuilder.CreateCylinder(`${name}_stand`, {
+    height: 0.48,
+    diameter: 0.16,
+    tessellation: 12,
+  }, scene);
+  stand.parent = root;
+  stand.position.y = -(height * 0.5) + 0.24;
+  stand.material = makeCardboard(scene, `${name}_standMat`, 116, 108, 96, { roughness: 0.92 });
+
+  const head = BABYLON.MeshBuilder.CreateCylinder(`${name}_head`, {
+    height: 0.28,
+    diameter: 0.2,
+    tessellation: 12,
+  }, scene);
+  head.parent = root;
+  head.position.set(0, height * 0.5 - 0.14, 0);
+  head.rotation.z = Math.PI / 2;
+  head.material = makePlastic(scene, `${name}_headMat`, 0.62, 0.68, 0.72, { roughness: 0.46 });
+
+  const streamMat = new BABYLON.StandardMaterial(`${name}_streamMat`, scene);
+  streamMat.diffuseColor = new BABYLON.Color3(0.56, 0.80, 0.98);
+  streamMat.emissiveColor = new BABYLON.Color3(0.16, 0.34, 0.46);
+  streamMat.specularColor = BABYLON.Color3.Black();
+  streamMat.alpha = 0.28;
+  streamMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+
+  const streams = [];
+  for (const offset of [-0.3, 0, 0.3]) {
+    const stream = BABYLON.MeshBuilder.CreatePlane(`${name}_stream${offset}`, {
+      width: Math.max(0.22, width * 0.45),
+      height,
+    }, scene);
+    stream.parent = root;
+    stream.position.set(offset, 0, 0);
+    stream.rotation.z = offset * 0.18;
+    stream.material = streamMat;
+    streams.push(stream);
+  }
+
+  markDecorative(root);
+  return { root, streams };
 }
 
 function createDogVisual(scene, name, { x, y, z = 0, color = [0.66, 0.50, 0.30] }) {
@@ -177,6 +246,133 @@ function createDogVisual(scene, name, { x, y, z = 0, color = [0.66, 0.50, 0.30] 
   return root;
 }
 
+function createHayBale(scene, name, { x, y, z = 0, scale = 1 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  root.scaling.setAll(scale);
+
+  const bale = BABYLON.MeshBuilder.CreateBox(`${name}_bale`, {
+    width: 1.2,
+    height: 0.72,
+    depth: 0.82,
+  }, scene);
+  bale.parent = root;
+  bale.position.y = 0.36;
+  bale.material = makeCardboard(scene, `${name}_mat`, 214, 186, 102, { roughness: 0.9 });
+
+  const bandMat = makeCardboard(scene, `${name}_bandMat`, 156, 118, 62, { roughness: 0.92 });
+  for (const px of [-0.24, 0.24]) {
+    const band = BABYLON.MeshBuilder.CreateBox(`${name}_band${px}`, {
+      width: 0.08,
+      height: 0.76,
+      depth: 0.86,
+    }, scene);
+    band.parent = root;
+    band.position.set(px, 0.36, 0);
+    band.material = bandMat;
+  }
+
+  markDecorative(root);
+  return root;
+}
+
+function createPlantPlaceholder(scene, name, { x, y, z = 0, kind = 'flower' }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const stem = BABYLON.MeshBuilder.CreateCylinder(`${name}_stem`, {
+    height: kind === 'corn' ? 1.4 : 0.8,
+    diameter: kind === 'corn' ? 0.10 : 0.06,
+    tessellation: 8,
+  }, scene);
+  stem.parent = root;
+  stem.position.y = (kind === 'corn' ? 0.7 : 0.4);
+  stem.material = makePlastic(scene, `${name}_stemMat`, 0.35, 0.58, 0.20, { roughness: 0.7 });
+
+  if (kind === 'corn') {
+    const husk = BABYLON.MeshBuilder.CreateBox(`${name}_husk`, {
+      width: 0.22,
+      height: 0.8,
+      depth: 0.18,
+    }, scene);
+    husk.parent = root;
+    husk.position.y = 0.88;
+    husk.material = makeCardboard(scene, `${name}_huskMat`, 194, 176, 84, { roughness: 0.84 });
+  } else {
+    for (let i = 0; i < 4; i++) {
+      const petal = BABYLON.MeshBuilder.CreateSphere(`${name}_petal${i}`, {
+        diameter: 0.18,
+        segments: 8,
+      }, scene);
+      petal.parent = root;
+      const ang = (i / 4) * Math.PI * 2;
+      petal.position.set(Math.cos(ang) * 0.12, 0.78, Math.sin(ang) * 0.08);
+      petal.material = makePaper(
+        scene,
+        `${name}_petalMat${i}`,
+        kind === 'yellow' ? 246 : 232,
+        kind === 'yellow' ? 214 : 120,
+        kind === 'yellow' ? 84 : 166,
+        { roughness: 0.96, noiseAmt: 8 },
+      );
+    }
+  }
+
+  markDecorative(root);
+  return root;
+}
+
+function createCritterPlaceholder(scene, name, { x, y, z = 0, kind = 'chicken' }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  let bodyColor = [0.76, 0.56, 0.34];
+  let accentColor = [0.96, 0.88, 0.76];
+  let scale = 1;
+  if (kind === 'chicken') {
+    bodyColor = [0.94, 0.88, 0.74];
+    accentColor = [0.86, 0.28, 0.18];
+    scale = 0.72;
+  } else if (kind === 'goat') {
+    bodyColor = [0.82, 0.78, 0.72];
+    accentColor = [0.40, 0.28, 0.22];
+    scale = 1.0;
+  } else if (kind === 'turkey') {
+    bodyColor = [0.46, 0.30, 0.20];
+    accentColor = [0.86, 0.24, 0.16];
+    scale = 1.1;
+  }
+  root.scaling.setAll(scale);
+
+  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
+    width: kind === 'chicken' ? 0.7 : 1.0,
+    height: kind === 'chicken' ? 0.56 : 0.72,
+    depth: kind === 'chicken' ? 0.52 : 0.62,
+  }, scene);
+  body.parent = root;
+  body.position.y = kind === 'chicken' ? 0.32 : 0.42;
+  body.material = makePlastic(scene, `${name}_bodyMat`, ...bodyColor, { roughness: 0.62 });
+
+  const head = BABYLON.MeshBuilder.CreateSphere(`${name}_head`, {
+    diameter: kind === 'chicken' ? 0.28 : 0.34,
+    segments: 10,
+  }, scene);
+  head.parent = root;
+  head.position.set(kind === 'chicken' ? 0.28 : 0.44, kind === 'chicken' ? 0.58 : 0.74, 0);
+  head.material = body.material;
+
+  const crest = BABYLON.MeshBuilder.CreateBox(`${name}_crest`, {
+    width: 0.12,
+    height: 0.12,
+    depth: 0.08,
+  }, scene);
+  crest.parent = root;
+  crest.position.set(head.position.x + 0.04, head.position.y + 0.14, 0);
+  crest.material = makePlastic(scene, `${name}_crestMat`, ...accentColor, { roughness: 0.5 });
+
+  markDecorative(root);
+  return root;
+}
+
 function createGrandmaBackdrop(scene, shadowGen) {
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop3', {
     width: 110,
@@ -191,15 +387,15 @@ function createGrandmaBackdrop(scene, shadowGen) {
   });
   backdrop.receiveShadows = true;
 
-  const house = BABYLON.MeshBuilder.CreateBox('grandmaHouseSilhouette', {
-    width: 12,
-    height: 8,
+  const barn = BABYLON.MeshBuilder.CreateBox('grandmaBarnSilhouette', {
+    width: 13,
+    height: 7.8,
     depth: 0.8,
   }, scene);
-  house.position.set(75, 5.0, 6.8);
-  house.material = makeCardboard(scene, 'grandmaHouseMat', 188, 144, 110, { roughness: 0.9 });
-  house.receiveShadows = true;
-  shadowGen.addShadowCaster(house);
+  barn.position.set(75, 5.0, 6.8);
+  barn.material = makeCardboard(scene, 'grandmaBarnMat', 176, 116, 88, { roughness: 0.9 });
+  barn.receiveShadows = true;
+  shadowGen.addShadowCaster(barn);
 
   const roof = BABYLON.MeshBuilder.CreateCylinder('grandmaRoof', {
     diameterTop: 0,
@@ -212,6 +408,15 @@ function createGrandmaBackdrop(scene, shadowGen) {
   roof.material = makeCardboard(scene, 'grandmaRoofMat', 162, 86, 64, { roughness: 0.88 });
   roof.receiveShadows = true;
   shadowGen.addShadowCaster(roof);
+
+  const silo = BABYLON.MeshBuilder.CreateCylinder('grandmaSilo', {
+    diameter: 2.4,
+    height: 8.2,
+    tessellation: 18,
+  }, scene);
+  silo.position.set(67.8, 4.2, 7.0);
+  silo.material = makeCardboard(scene, 'grandmaSiloMat', 196, 188, 176, { roughness: 0.94 });
+  markDecorative(silo);
 
   const gardenFence = BABYLON.MeshBuilder.CreateBox('gardenFence3', {
     width: 22,
@@ -255,6 +460,30 @@ function createGrandmaBackdrop(scene, shadowGen) {
   bannerPoleRight.position.set(76.9, 8.75, 6.0);
   bannerPoleRight.material = makeCardboard(scene, 'grandmaGoalPoleRMat', 156, 112, 88, { roughness: 0.88 });
   markDecorative(bannerPoleRight);
+
+  for (let i = 0; i < 4; i++) {
+    const tree = BABYLON.MeshBuilder.CreateCylinder(`farmTree_${i}`, {
+      diameterTop: 0.2,
+      diameterBottom: 0.34,
+      height: 3.2,
+      tessellation: 8,
+    }, scene);
+    tree.position.set(-8 + (i * 24), 2.1, 7.6 + (i * 0.08));
+    tree.material = makeCardboard(scene, `farmTreeTrunkMat_${i}`, 110, 82, 58, { roughness: 0.92 });
+    markDecorative(tree);
+
+    const canopy = BABYLON.MeshBuilder.CreateSphere(`farmTreeCanopy_${i}`, {
+      diameter: 2.4,
+      segments: 10,
+    }, scene);
+    canopy.position.set(tree.position.x, 4.2, tree.position.z - 0.06);
+    canopy.material = makePaper(scene, `farmTreeCanopyMat_${i}`, 142, 174, 112, {
+      roughness: 0.98,
+      grainScale: 2.4,
+      noiseAmt: 10,
+    });
+    markDecorative(canopy);
+  }
 }
 
 export function buildWorld3(scene, options = {}) {
@@ -330,7 +559,15 @@ export function buildWorld3(scene, options = {}) {
   createGrandmaBackdrop(scene, shadowGen);
 
   const goalDef = LEVEL3.goal;
-  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  const dada = createDad(scene, {
+    x: goalDef.x,
+    y: goalDef.y,
+    z: LANE_Z,
+    outfit: 'level3',
+    shadowGen,
+    animate: animateGoal,
+    goalVolume: { width: 2.8, height: 4.8, depth: 2.8, yOffset: 1.55 },
+  });
   setRenderingGroup(dada.root, 3);
 
   const checkpoints = [];
@@ -390,13 +627,12 @@ export function buildWorld3(scene, options = {}) {
 
   const timedHazards = [];
   for (const sprinkler of LEVEL3.sprinklers) {
-    const visual = createTimedHazardVisual(scene, sprinkler.name, {
+    const visual = createSprinklerVisual(scene, sprinkler.name, {
       x: sprinkler.x,
       y: sprinkler.y,
       z: LANE_Z,
       width: sprinkler.width,
       height: sprinkler.height,
-      color: [0.34, 0.63, 0.92],
     });
     setRenderingGroup(visual.root, 3);
     timedHazards.push({
@@ -404,7 +640,8 @@ export function buildWorld3(scene, options = {}) {
       reason: 'sprinkler',
       statusText: 'Sprinkled!',
       root: visual.root,
-      mesh: visual.column,
+      mesh: visual.streams[1],
+      streamMeshes: visual.streams,
       active: false,
       handledByLevelRuntime: true,
       minX: sprinkler.x - sprinkler.width * 0.5,
@@ -414,7 +651,7 @@ export function buildWorld3(scene, options = {}) {
     });
   }
   for (const vent of LEVEL3.steamVents) {
-    const visual = createTimedHazardVisual(scene, vent.name, {
+    const visual = createSteamHazardVisual(scene, vent.name, {
       x: vent.x,
       y: vent.y,
       z: LANE_Z,
@@ -469,6 +706,151 @@ export function buildWorld3(scene, options = {}) {
   }
 
   const hazards = [...timedHazards, ...dogHazards];
+  const floorTopY = groundDef.y + (groundDef.h * 0.5) + 0.02;
+  const porchTopY = LEVEL3.platforms.find((p) => p.name === 'grandmaPorch').y + 0.42;
+  const decorControllers = [];
+
+  function makeDecorAnimalAnchor(name, { x, y, z, kind, controller }) {
+    const anchor = new BABYLON.TransformNode(name, scene);
+    anchor.position.set(x, y, z);
+    anchor.rotationQuaternion = null;
+    const placeholder = kind === 'dog'
+      ? createDogVisual(scene, `${name}_placeholder`, { x: 0, y: 0, z: 0 })
+      : createCritterPlaceholder(scene, `${name}_placeholder`, { x: 0, y: 0, z: 0, kind });
+    placeholder.parent = anchor;
+    placeholder.position.set(0, 0, 0);
+    markDecorative(anchor);
+    setRenderingGroup(anchor, 3);
+    if (controller) {
+      decorControllers.push(new AnimalWanderController({
+        root: anchor,
+        home: new BABYLON.Vector3(x, y, z),
+        surface: {
+          type: 'floor',
+          topY: y - 0.02,
+          minX: controller.minX,
+          maxX: controller.maxX,
+          minZ: controller.minZ,
+          maxZ: controller.maxZ,
+          baseY: y,
+        },
+        speed: controller.speed,
+        turnSpeed: controller.turnSpeed,
+        radius: controller.radius,
+        phase: controller.phase,
+        bobAmp: controller.bobAmp,
+        stepFreq: controller.stepFreq,
+        pitchAmp: controller.pitchAmp,
+        rollAmp: controller.rollAmp,
+        accel: controller.accel,
+        minWalkSpeed: controller.minWalkSpeed,
+        seed: name,
+      }));
+    }
+    return anchor;
+  }
+
+  const flowerAnchors = [
+    new BABYLON.TransformNode('l3_tulipAnchor0', scene),
+    new BABYLON.TransformNode('l3_yellowFlowerAnchor0', scene),
+    new BABYLON.TransformNode('l3_cornAnchor0', scene),
+    new BABYLON.TransformNode('l3_cornAnchor1', scene),
+  ];
+  flowerAnchors[0].position.set(-13.8, floorTopY, 1.5);
+  flowerAnchors[1].position.set(-7.4, floorTopY, 1.4);
+  flowerAnchors[2].position.set(-12.1, floorTopY, 1.9);
+  flowerAnchors[3].position.set(-6.3, floorTopY, 1.95);
+  flowerAnchors.forEach((anchor) => {
+    anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true };
+  });
+  const tulipFallback = createPlantPlaceholder(scene, 'l3_tulipFallback', {
+    x: flowerAnchors[0].position.x,
+    y: flowerAnchors[0].position.y,
+    z: flowerAnchors[0].position.z,
+    kind: 'flower',
+  });
+  tulipFallback.parent = flowerAnchors[0];
+  tulipFallback.position.set(0, 0, 0);
+  const yellowFallback = createPlantPlaceholder(scene, 'l3_yellowFallback', {
+    x: flowerAnchors[1].position.x,
+    y: flowerAnchors[1].position.y,
+    z: flowerAnchors[1].position.z,
+    kind: 'yellow',
+  });
+  yellowFallback.parent = flowerAnchors[1];
+  yellowFallback.position.set(0, 0, 0);
+  const cornFallback0 = createPlantPlaceholder(scene, 'l3_cornFallback0', {
+    x: flowerAnchors[2].position.x,
+    y: flowerAnchors[2].position.y,
+    z: flowerAnchors[2].position.z,
+    kind: 'corn',
+  });
+  cornFallback0.parent = flowerAnchors[2];
+  cornFallback0.position.set(0, 0, 0);
+  const cornFallback1 = createPlantPlaceholder(scene, 'l3_cornFallback1', {
+    x: flowerAnchors[3].position.x,
+    y: flowerAnchors[3].position.y,
+    z: flowerAnchors[3].position.z,
+    kind: 'corn',
+  });
+  cornFallback1.parent = flowerAnchors[3];
+  cornFallback1.position.set(0, 0, 0);
+
+  const decorDogAnchors = [
+    makeDecorAnimalAnchor('l3_huskyAnchor', {
+      x: -10.6, y: floorTopY, z: -1.26, kind: 'dog', controller: {
+        minX: -14.4, maxX: -6.2, minZ: -1.9, maxZ: -0.7, speed: 0.54, turnSpeed: 6.0, radius: 1.2, phase: 0.2, bobAmp: 0.02, stepFreq: 6.2, pitchAmp: 0.02, rollAmp: 0.024, accel: 6.5, minWalkSpeed: 0.02,
+      },
+    }),
+    makeDecorAnimalAnchor('l3_playfulAnchor', {
+      x: 24.8, y: floorTopY, z: -1.18, kind: 'dog', controller: {
+        minX: 20.0, maxX: 29.2, minZ: -1.8, maxZ: -0.7, speed: 0.58, turnSpeed: 6.3, radius: 1.26, phase: 0.7, bobAmp: 0.02, stepFreq: 6.8, pitchAmp: 0.022, rollAmp: 0.026, accel: 6.8, minWalkSpeed: 0.02,
+      },
+    }),
+    makeDecorAnimalAnchor('l3_taterAnchor', {
+      x: 63.8, y: floorTopY, z: -1.22, kind: 'dog', controller: {
+        minX: 60.4, maxX: 69.8, minZ: -1.8, maxZ: -0.7, speed: 0.52, turnSpeed: 5.8, radius: 1.18, phase: 1.4, bobAmp: 0.02, stepFreq: 6.0, pitchAmp: 0.018, rollAmp: 0.022, accel: 6.0, minWalkSpeed: 0.02,
+      },
+    }),
+  ];
+
+  const endAnimalAnchors = [
+    makeDecorAnimalAnchor('l3_endChickensAnchor', {
+      x: 72.4, y: porchTopY, z: -1.14, kind: 'chicken', controller: {
+        minX: 70.1, maxX: 75.8, minZ: -1.8, maxZ: -0.5, speed: 0.72, turnSpeed: 7.2, radius: 0.72, phase: 0.3, bobAmp: 0.028, stepFreq: 11.0, pitchAmp: 0.03, rollAmp: 0.018, accel: 8.2, minWalkSpeed: 0.025,
+      },
+    }),
+    makeDecorAnimalAnchor('l3_endGoatAnchor', {
+      x: 74.5, y: porchTopY, z: -1.32, kind: 'goat', controller: {
+        minX: 72.0, maxX: 78.8, minZ: -1.9, maxZ: -0.6, speed: 0.5, turnSpeed: 6.0, radius: 0.92, phase: 1.2, bobAmp: 0.024, stepFreq: 6.4, pitchAmp: 0.018, rollAmp: 0.024, accel: 6.4, minWalkSpeed: 0.02,
+      },
+    }),
+    makeDecorAnimalAnchor('l3_endTurkeyAnchor', {
+      x: 76.8, y: porchTopY, z: -1.18, kind: 'turkey', controller: {
+        minX: 74.4, maxX: 79.6, minZ: -1.8, maxZ: -0.6, speed: 0.46, turnSpeed: 5.4, radius: 0.82, phase: 2.0, bobAmp: 0.02, stepFreq: 5.2, pitchAmp: 0.016, rollAmp: 0.024, accel: 5.8, minWalkSpeed: 0.02,
+      },
+    }),
+  ];
+
+  const hayDecor = [
+    createHayBale(scene, 'l3_hay0', { x: -15.2, y: floorTopY, z: 2.2, scale: 0.9 }),
+    createHayBale(scene, 'l3_hay1', { x: 17.4, y: LEVEL3.platforms.find((p) => p.name === 'tableEntry').y + 0.42, z: 2.1, scale: 0.78 }),
+    createHayBale(scene, 'l3_hay2', { x: 69.2, y: floorTopY, z: 2.3, scale: 1.0 }),
+  ];
+  hayDecor.forEach((item) => setRenderingGroup(item, 2));
+
+  const fenceDecor = [];
+  for (let i = 0; i < 5; i++) {
+    const fence = BABYLON.MeshBuilder.CreateBox(`l3_fence_${i}`, {
+      width: 4.4,
+      height: 1.2,
+      depth: 0.12,
+    }, scene);
+    fence.position.set(-14 + (i * 20), floorTopY + 0.62, 2.9 + (i * 0.05));
+    fence.material = makeCardboard(scene, `l3_fenceMat_${i}`, 206, 190, 164, { roughness: 0.94 });
+    markDecorative(fence);
+    fenceDecor.push(fence);
+  }
 
   let runtimeMs = 0;
 
@@ -477,8 +859,15 @@ export function buildWorld3(scene, options = {}) {
     const cycleTime = (runtimeMs + hazard.phaseMs) % cycleMs;
     hazard.active = cycleTime < hazard.onMs;
     hazard.root.setEnabled(true);
-    hazard.mesh.visibility = hazard.active ? 0.88 : 0.16;
-    hazard.mesh.isVisible = true;
+    if (hazard.streamMeshes?.length) {
+      for (const stream of hazard.streamMeshes) {
+        stream.visibility = hazard.active ? 0.74 : 0.10;
+        stream.isVisible = true;
+      }
+    } else {
+      hazard.mesh.visibility = hazard.active ? 0.88 : 0.16;
+      hazard.mesh.isVisible = true;
+    }
   }
 
   function updateDogHazard(dog, dt) {
@@ -526,6 +915,10 @@ export function buildWorld3(scene, options = {}) {
           triggerReset('dog', pos.x < dog.root.position.x ? -1 : 1);
         }
       }
+
+      for (const controller of decorControllers) {
+        controller.update(dt);
+      }
     },
     reset() {
       runtimeMs = 0;
@@ -541,6 +934,9 @@ export function buildWorld3(scene, options = {}) {
         dog.maxX = dog.startX + dog.width * 0.5;
         dog.minY = dog.lane.y - dog.height * 0.5;
         dog.maxY = dog.lane.y + dog.height * 0.5;
+      }
+      for (const controller of decorControllers) {
+        controller.reset();
       }
     },
   };
@@ -564,6 +960,7 @@ export function buildWorld3(scene, options = {}) {
     level: LEVEL3,
     signs: [],
     level3,
+    goalGuardMinX: goalDef.x - 4.5,
     assetAnchors: {
       cribRail: null,
       toyBlocks: [],
@@ -573,6 +970,15 @@ export function buildWorld3(scene, options = {}) {
       foregroundCutouts: [],
       treeDecor: [],
       cloudCutouts: [],
+      futureTulipFlowerPropModel: [flowerAnchors[0]],
+      futureYellowFlowerPropModel: [flowerAnchors[1]],
+      futureCornPropModel: [flowerAnchors[2], flowerAnchors[3]],
+      futureHuskyDogPropModel: [decorDogAnchors[0]],
+      futurePlayfulDogPropModel: [decorDogAnchors[1]],
+      futureTaterDogPropModel: [decorDogAnchors[2]],
+      futureChickensPropModel: [endAnimalAnchors[0]],
+      futureGoatPropModel: [endAnimalAnchors[1]],
+      futureTurkeyPropModel: [endAnimalAnchors[2]],
     },
   };
 }
