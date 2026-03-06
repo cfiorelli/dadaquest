@@ -77,6 +77,36 @@ const CSS = `
   font-family: monospace;
   font-weight: 700;
 }
+.dada-loading-wrap {
+  margin-top: 16px;
+  display: none;
+}
+.dada-loading-wrap.visible {
+  display: block;
+}
+.dada-loading-text {
+  font-size: clamp(12px, 1.8vw, 15px);
+  color: #4f3c2c;
+  margin-bottom: 8px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.dada-loading-bar {
+  width: min(320px, 72vw);
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(90, 68, 46, 0.14);
+  border: 1px solid rgba(120, 88, 56, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.24);
+}
+.dada-loading-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #d86848, #e7b957);
+  transition: width 0.12s ease;
+}
 .dada-level-row {
   display: flex;
   gap: 10px;
@@ -428,6 +458,10 @@ export function createUI(uiRoot, options = {}) {
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
         <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
       </div>
+      <div class="dada-loading-wrap" id="titleLoadingWrap">
+        <div class="dada-loading-text" id="titleLoadingText">Loading Level 1… 0%</div>
+        <div class="dada-loading-bar"><div class="dada-loading-fill" id="titleLoadingFill"></div></div>
+      </div>
       <div class="dada-hint" id="titleHint">Press SPACE or ENTER to start</div>
       <div id="titleDebug" style="font:10px/1.6 monospace;color:rgba(80,60,40,0.55);margin-top:8px;letter-spacing:0.03em;min-height:1.2em"></div>
     </div>
@@ -438,22 +472,37 @@ export function createUI(uiRoot, options = {}) {
   const titleSubEl = titleEl.querySelector('#titleSub');
   const titleHintEl = titleEl.querySelector('#titleHint');
   const titleDebugEl = titleEl.querySelector('#titleDebug');
+  const titleLoadingWrapEl = titleEl.querySelector('#titleLoadingWrap');
+  const titleLoadingTextEl = titleEl.querySelector('#titleLoadingText');
+  const titleLoadingFillEl = titleEl.querySelector('#titleLoadingFill');
   const btn1 = titleEl.querySelector('#levelBtn1');
   const btn2 = titleEl.querySelector('#levelBtn2');
   const btn3 = titleEl.querySelector('#levelBtn3');
+  let titleErrorVisible = false;
+
+  function getLevelSubtitle(id) {
+    return id === 3
+      ? 'Level 3 — Grandma\'s House'
+      : id === 2
+        ? 'Level 2 — Condo Garden'
+        : 'Level 1 — Petting Zoo';
+  }
+
+  function resetTitleCopy() {
+    if (titleSubEl) titleSubEl.textContent = getLevelSubtitle(_selectedLevel);
+    if (titleHintEl && !titleErrorVisible) {
+      titleHintEl.style.color = '';
+      titleHintEl.style.animation = '';
+      titleHintEl.textContent = 'Press SPACE or ENTER to start';
+    }
+  }
 
   function selectLevel(id) {
     _selectedLevel = id;
     btn1.classList.toggle('active', id === 1);
     btn2.classList.toggle('active', id === 2);
     btn3.classList.toggle('active', id === 3);
-    if (titleSubEl) {
-      titleSubEl.textContent = id === 3
-        ? 'Level 3 — Grandma\'s House'
-        : id === 2
-          ? 'Level 2 — Condo Garden'
-          : 'Level 1 — Petting Zoo';
-    }
+    resetTitleCopy();
     const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
@@ -672,14 +721,32 @@ export function createUI(uiRoot, options = {}) {
       levelSelectHandler = cb;
     },
     showLoading(levelId) {
-      if (titleHintEl) titleHintEl.textContent = `Loading Level ${levelId}\u2026`;
+      const percent = arguments.length > 1 ? arguments[1] : 0;
+      titleErrorVisible = false;
+      if (titleSubEl) titleSubEl.textContent = `Loading Level ${levelId}… ${percent}%`;
+      if (titleLoadingTextEl) titleLoadingTextEl.textContent = `Loading Level ${levelId}… ${percent}%`;
+      if (titleLoadingFillEl) titleLoadingFillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+      if (titleLoadingWrapEl) titleLoadingWrapEl.classList.add('visible');
+      if (titleHintEl) {
+        titleHintEl.style.color = '#245532';
+        titleHintEl.style.animation = 'none';
+        titleHintEl.textContent = percent >= 100 ? 'Starting…' : 'Preparing diorama…';
+      }
+    },
+    clearLoading() {
+      if (titleLoadingFillEl) titleLoadingFillEl.style.width = '0%';
+      if (titleLoadingWrapEl) titleLoadingWrapEl.classList.remove('visible');
+      resetTitleCopy();
     },
     showStartError(msg) {
+      titleErrorVisible = true;
+      if (titleLoadingWrapEl) titleLoadingWrapEl.classList.remove('visible');
       if (titleHintEl) {
         titleHintEl.style.color = '#c84f34';
         titleHintEl.style.animation = 'none';
         titleHintEl.textContent = `Error: ${msg}`;
       }
+      if (titleSubEl) titleSubEl.textContent = getLevelSubtitle(_selectedLevel);
     },
     updateTitleDebug({ selectedLevel, currentLevel, titleState, lastKey } = {}) {
       if (!titleDebugEl) return;

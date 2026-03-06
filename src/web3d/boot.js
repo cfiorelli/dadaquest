@@ -29,6 +29,7 @@ const GOAL_CELEBRATION_SEC = 0.48;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
+const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -67,6 +68,37 @@ function shouldUseExternalPlayerModel() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('playerModel') === '1') return true;
   return window.__DADA_DEBUG__?.flags?.useExternalPlayerModel === true;
+}
+
+function readLoadingIntent() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(LOADING_INTENT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Number.isFinite(parsed.levelId) || !Number.isFinite(parsed.startedAt)) return null;
+    if ((Date.now() - parsed.startedAt) > 15000) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeLoadingIntent(levelId) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(LOADING_INTENT_KEY, JSON.stringify({
+      levelId,
+      startedAt: Date.now(),
+    }));
+  } catch {}
+}
+
+function clearLoadingIntent() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(LOADING_INTENT_KEY);
+  } catch {}
 }
 
 function createSeededRandom(seed = 1337) {
@@ -408,6 +440,73 @@ function ensureDecorGrounding(rootOrRoots, groundY, label, debugMode) {
   }
 }
 
+function clampDecorMaxExtent(rootOrRoots, maxAllowedExtent) {
+  if (!Number.isFinite(maxAllowedExtent) || maxAllowedExtent <= 0) return null;
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots.filter(Boolean) : [rootOrRoots].filter(Boolean);
+  const meshes = collectRenderableMeshes(roots);
+  if (!meshes.length) return null;
+  for (const mesh of meshes) mesh.computeWorldMatrix(true);
+  let bounds = combineBounds(meshes);
+  if (bounds.maxDim <= maxAllowedExtent) {
+    return { maxDim: bounds.maxDim, scaled: false };
+  }
+  const scaleFactor = maxAllowedExtent / bounds.maxDim;
+  for (const root of roots) {
+    root.scaling.scaleInPlace(scaleFactor);
+  }
+  for (const mesh of meshes) mesh.computeWorldMatrix(true);
+  bounds = combineBounds(meshes);
+  return { maxDim: bounds.maxDim, scaled: true, scaleFactor };
+}
+
+function recenterLoadedModelXZ(rootOrRoots, targetX, targetZ) {
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots.filter(Boolean) : [rootOrRoots].filter(Boolean);
+  const meshes = collectRenderableMeshes(roots);
+  if (!meshes.length || !Number.isFinite(targetX) || !Number.isFinite(targetZ)) return null;
+  for (const root of roots) {
+    root.computeWorldMatrix?.(true);
+  }
+  for (const mesh of meshes) {
+    mesh.computeWorldMatrix(true);
+  }
+  let bounds = combineBounds(meshes);
+  const dx = targetX - bounds.center.x;
+  const dz = targetZ - bounds.center.z;
+  if (Math.abs(dx) < 0.0001 && Math.abs(dz) < 0.0001) {
+    return { dx: 0, dz: 0, bounds };
+  }
+  for (const root of roots) {
+    root.position.x += dx;
+    root.position.z += dz;
+  }
+  for (const root of roots) {
+    root.computeWorldMatrix?.(true);
+  }
+  for (const mesh of meshes) {
+    mesh.computeWorldMatrix(true);
+  }
+  bounds = combineBounds(meshes);
+  return { dx, dz, bounds };
+}
+
+function setNodesEnabled(rootOrRoots, enabled) {
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots.filter(Boolean) : [rootOrRoots].filter(Boolean);
+  for (const root of roots) {
+    root.setEnabled?.(enabled);
+  }
+}
+
+function setMeshesEnabled(meshes, enabled) {
+  if (!Array.isArray(meshes)) return;
+  for (const mesh of meshes) {
+    mesh?.setEnabled?.(enabled);
+    if (mesh) {
+      mesh.isVisible = enabled;
+      mesh.visibility = enabled ? 1 : 0;
+    }
+  }
+}
+
 function describeNodeChain(node) {
   const chain = [];
   let current = node;
@@ -721,6 +820,44 @@ export async function boot(options = {}) {
 
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
+  const loadingIntent = !shotMode ? readLoadingIntent() : null;
+  const autoStartAfterLoad = !!loadingIntent && loadingIntent.levelId === levelId;
+  let bootLoadingRaf = 0;
+  let bootLoadingDone = false;
+  let bootLoadingPercent = 0;
+
+  const setBootLoadingPercent = (percent) => {
+    if (!autoStartAfterLoad) return;
+    bootLoadingPercent = Math.max(bootLoadingPercent, Math.min(100, Math.round(percent)));
+    ui.showLoading(levelId, bootLoadingPercent);
+  };
+
+  const startBootLoading = () => {
+    if (!autoStartAfterLoad) return;
+    const startedAt = performance.now();
+    setBootLoadingPercent(0);
+    const tick = (now) => {
+      if (bootLoadingDone) return;
+      const elapsed = Math.max(0, now - startedAt);
+      const t = Math.min(1, elapsed / 1200);
+      setBootLoadingPercent(85 * easeOutCubic(t));
+      bootLoadingRaf = window.requestAnimationFrame(tick);
+    };
+    bootLoadingRaf = window.requestAnimationFrame(tick);
+  };
+
+  const finishBootLoading = () => {
+    if (!autoStartAfterLoad) return;
+    bootLoadingDone = true;
+    if (bootLoadingRaf) {
+      window.cancelAnimationFrame(bootLoadingRaf);
+      bootLoadingRaf = 0;
+    }
+    setBootLoadingPercent(100);
+    clearLoadingIntent();
+  };
+
+  startBootLoading();
 
   // Track which level the player has selected (may differ from loaded levelId if they
   // switched buttons without reloading). Initialized from URL to stay in sync with
@@ -742,6 +879,7 @@ export async function boot(options = {}) {
           }))
           : buildWorld(scene);
   } catch (buildErr) {
+    clearLoadingIntent();
     ui.showStartError(buildErr?.message || 'World build failed');
     reportDevError(buildErr);
     console.error('[boot] World build failed:', buildErr);
@@ -1181,12 +1319,6 @@ export async function boot(options = {}) {
         fit: { targetMaxSize: 2.2, groundOffset: 0.0 },
       },
       {
-        role: 'futurePackPropModel',
-        anchor: l2anchors.pack,
-        fallback: l2fallback?.pack,
-        fit: { targetHeight: 1.1, targetMaxSize: 1.6, groundOffset: 0.0 },
-      },
-      {
         role: 'futureGoatPropModel',
         anchor: l2anchors.goat,
         fallback: null,
@@ -1226,6 +1358,21 @@ export async function boot(options = {}) {
           groundY: anchorPos.y + (fit?.groundOffset ?? 0),
           markDecorative: true,
         });
+        if (fit?.recenter) {
+          recenterLoadedModelXZ(result.roots, anchorPos.x, anchorPos.z);
+        }
+        if (fit?.hardMaxExtent) {
+          clampDecorMaxExtent(result.roots, fit.hardMaxExtent);
+        }
+        const normalizedBounds = combineBounds(collectRenderableMeshes(result.roots));
+        const stillOversized = normalizedBounds.maxDim > Math.max(6, fit?.hardMaxExtent ?? 0);
+        const badlyOffset = Math.abs(normalizedBounds.center.z - anchorPos.z) > 3.5;
+        if (role === 'futurePackPropModel' && (stillOversized || badlyOffset)) {
+          setNodesEnabled(result.roots, false);
+          setMeshesEnabled(result.meshes, false);
+          if (fallback) fallback.setEnabled(true);
+          continue;
+        }
         const cullResult = disableLevel2DecorMeshes(scene, { debugMode });
         window.__DADA_DEBUG__.level2CullResult = cullResult;
         if (fallback) {
@@ -1999,6 +2146,7 @@ export async function boot(options = {}) {
     ui.setFade(0);
     ui.hideEnd();
     ui.showTitle();
+    ui.clearLoading();
     ui.resetGameplayHud();
     ui.showStatus('Ready!', 500);
     input.consumeAll();
@@ -2096,21 +2244,10 @@ export async function boot(options = {}) {
   // requestStart is called DIRECTLY from the keydown handler — no render-loop
   // consumption, no titleStartPending flag.  The state transition is immediate.
   //
-  function requestStart(targetLevelId) {
-    if (state !== 'title') return; // already loading or playing
-    if (targetLevelId !== levelId) {
-      // User selected a different level than the one currently loaded; navigate.
-      state = 'loading'; // prevent re-entry while setTimeout is pending
-      ui.showLoading(targetLevelId);
-      ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
-      const url = targetLevelId === 1
-        ? window.location.pathname
-        : `${window.location.pathname}?level=${targetLevelId}`;
-      setTimeout(() => { window.location.href = url; }, 80);
-      return;
+  function beginGameplay({ unlockAudio = true } = {}) {
+    if (unlockAudio) {
+      audio.unlock();
     }
-    // Same level — transition immediately (world is already built).
-    audio.unlock();
     state = 'gameplay';
     input.consumeAll();
     player.setWinAnimationActive(false);
@@ -2118,11 +2255,47 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
-    ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
+    ui.updateTitleDebug({ selectedLevel: levelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
     if (debugMode) {
       debugIdleTimerMs = 1000;
       player.beginSpawnProbe('initial');
     }
+  }
+
+  function startLoadedLevelWithProgress(targetLevelId, { unlockAudio = true } = {}) {
+    state = 'loading';
+    const startTime = performance.now();
+    const tick = (now) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / 360);
+      const percent = Math.round(100 * easeOutCubic(t));
+      ui.showLoading(targetLevelId, percent);
+      ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
+      if (t >= 1) {
+        beginGameplay({ unlockAudio });
+        return;
+      }
+      window.requestAnimationFrame(tick);
+    };
+    ui.showLoading(targetLevelId, 0);
+    window.requestAnimationFrame(tick);
+  }
+
+  function requestStart(targetLevelId) {
+    if (state !== 'title') return; // already loading or playing
+    if (targetLevelId !== levelId) {
+      // User selected a different level than the one currently loaded; navigate.
+      state = 'loading'; // prevent re-entry while setTimeout is pending
+      ui.showLoading(targetLevelId, 0);
+      ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
+      writeLoadingIntent(targetLevelId);
+      const url = targetLevelId === 1
+        ? window.location.pathname
+        : `${window.location.pathname}?level=${targetLevelId}`;
+      setTimeout(() => { window.location.href = url; }, 80);
+      return;
+    }
+    startLoadedLevelWithProgress(targetLevelId, { unlockAudio: true });
   }
 
   if (debugMode) {
@@ -2186,6 +2359,17 @@ export async function boot(options = {}) {
 
   // Seed the debug line with initial state so it's visible before any keypress.
   ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
+  if (autoStartAfterLoad) {
+    finishBootLoading();
+    setTimeout(() => {
+      if (state === 'title') {
+        startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+      }
+    }, 70);
+  } else {
+    clearLoadingIntent();
+    ui.clearLoading();
+  }
 
   function startGoalCelebration(goalPos) {
     ui.hideObjective();

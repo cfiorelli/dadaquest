@@ -959,31 +959,44 @@ function createBillboardCloud(scene, name, {
   root.position.set(x, y, z);
   root.scaling.setAll(scale);
   root.metadata = { ...(root.metadata || {}), cameraIgnore: true };
+  const shadowMat = makePaper(scene, `${name}_shadowMat`, 192, 206, 224, {
+    roughness: 0.98,
+    grainScale: 2.8,
+    noiseAmt: 6,
+  });
+  shadowMat.emissiveColor = new BABYLON.Color3(0.68, 0.76, 0.86);
+  const cloudMat = makePaper(scene, `${name}_mat`, 250, 250, 248, {
+    roughness: 0.98,
+    grainScale: 2.6,
+    noiseAmt: 5,
+  });
+  cloudMat.emissiveColor = new BABYLON.Color3(0.94, 0.96, 1.0);
 
-  const cloudMat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
-  cloudMat.diffuseColor = new BABYLON.Color3(0.97, 0.98, 1.0);
-  cloudMat.emissiveColor = new BABYLON.Color3(0.88, 0.92, 0.98);
-  cloudMat.specularColor = BABYLON.Color3.Black();
-  cloudMat.alpha = 0.96;
-  cloudMat.disableLighting = true;
-  cloudMat.backFaceCulling = false;
-  cloudMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-
-  const puffs = [
-    { x: -0.72, y: 0.02, w: 1.02, h: 0.66 },
-    { x: -0.08, y: 0.18, w: 1.30, h: 0.82 },
-    { x: 0.68, y: 0.03, w: 0.98, h: 0.62 },
-    { x: 0.20, y: -0.16, w: 1.12, h: 0.68 },
+  const puffDefs = [
+    { x: -2.1, y: 0.08, z: -0.08, d: 2.1 },
+    { x: -0.8, y: 0.56, z: 0.02, d: 2.7 },
+    { x: 0.9, y: 0.34, z: 0.06, d: 2.9 },
+    { x: 2.35, y: 0.02, z: -0.02, d: 2.25 },
+    { x: 0.1, y: -0.18, z: 0.10, d: 2.45 },
   ];
-  for (let i = 0; i < puffs.length; i++) {
-    const puff = puffs[i];
-    const mesh = BABYLON.MeshBuilder.CreatePlane(`${name}_puff${i}`, {
-      width: puff.w,
-      height: puff.h,
+  for (const [index, puff] of puffDefs.entries()) {
+    const shadow = BABYLON.MeshBuilder.CreateSphere(`${name}_shadow_${index}`, {
+      diameter: puff.d * 1.02,
+      segments: 12,
+    }, scene);
+    shadow.parent = root;
+    shadow.position.set(puff.x + 0.12, puff.y - 0.16, puff.z + 0.18);
+    shadow.scaling.y = 0.56;
+    shadow.material = shadowMat;
+    tagDecorMesh(shadow);
+
+    const mesh = BABYLON.MeshBuilder.CreateSphere(`${name}_puff_${index}`, {
+      diameter: puff.d,
+      segments: 12,
     }, scene);
     mesh.parent = root;
-    mesh.position.set(puff.x, puff.y, 0);
-    mesh.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    mesh.position.set(puff.x, puff.y, puff.z);
+    mesh.scaling.y = 0.60;
     mesh.material = cloudMat;
     tagDecorMesh(mesh);
   }
@@ -2060,27 +2073,27 @@ export function buildWorld(scene, options = {}) {
   setRenderingGroup(pzPanda2, 2);
 
   const cloudCutouts = [];
-  const cloudSkyMinY = Math.max(12, floorTopY + 8);
-  const cloudSkyMaxY = cloudSkyMinY + 4;
-  const cloudSkyMinZ = -24;
-  const cloudSkyMaxZ = -18;
-  const cloudSpanX = (LEVEL1.extents.maxX - LEVEL1.extents.minX) + 16;
+  const cloudSkyMinY = 7.4;
+  const cloudSkyMaxY = 9.6;
+  const cloudSkyMinZ = -4.8;
+  const cloudSkyMaxZ = -3.1;
+  const cloudSpanX = 60;
   for (let i = 0; i < 12; i++) {
     const xT = i / 11;
     const y = cloudSkyMinY + (random() * (cloudSkyMaxY - cloudSkyMinY));
     const z = cloudSkyMinZ + (random() * (cloudSkyMaxZ - cloudSkyMinZ));
     const cloud = createBillboardCloud(scene, `cloudCutout_${i}`, {
-      x: (LEVEL1.extents.minX - 8) + (cloudSpanX * xT) + ((random() - 0.5) * 1.6),
+      x: -25 + (cloudSpanX * xT) + ((random() - 0.5) * 2.2),
       y,
       z,
-      scale: 1.6 + random() * 0.72,
+      scale: 0.84 + random() * 0.34,
     });
     cloud.metadata = {
       ...(cloud.metadata || {}),
       cameraIgnore: true,
-      driftSpeed: 0.08 + ((i % 4) * 0.018),
-      driftMinX: LEVEL1.extents.minX - 12,
-      driftMaxX: LEVEL1.extents.maxX + 12,
+      driftSpeed: 0.15 + ((i % 3) * 0.015),
+      driftMinX: -29,
+      driftMaxX: 39,
       driftStartX: cloud.position.x,
       driftBaseY: y,
       driftMinY: cloudSkyMinY,

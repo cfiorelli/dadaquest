@@ -461,7 +461,7 @@ function createGrandmaBackdrop(scene, shadowGen) {
   bannerPoleRight.material = makeCardboard(scene, 'grandmaGoalPoleRMat', 156, 112, 88, { roughness: 0.88 });
   markDecorative(bannerPoleRight);
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     const tree = BABYLON.MeshBuilder.CreateCylinder(`farmTree_${i}`, {
       diameterTop: 0.2,
       diameterBottom: 0.34,
@@ -483,6 +483,17 @@ function createGrandmaBackdrop(scene, shadowGen) {
       noiseAmt: 10,
     });
     markDecorative(canopy);
+  }
+
+  for (const [index, x] of [-12, 14, 42, 70].entries()) {
+    const fence = BABYLON.MeshBuilder.CreateBox(`grandmaBackdropFence_${index}`, {
+      width: 18,
+      height: 1.8,
+      depth: 0.18,
+    }, scene);
+    fence.position.set(x, 1.2, 6.2 + (index * 0.12));
+    fence.material = makeCardboard(scene, `grandmaBackdropFenceMat_${index}`, 198, 184, 160, { roughness: 0.94 });
+    markDecorative(fence);
   }
 }
 
@@ -750,51 +761,63 @@ export function buildWorld3(scene, options = {}) {
     return anchor;
   }
 
-  const flowerAnchors = [
+  const tulipAnchors = [
     new BABYLON.TransformNode('l3_tulipAnchor0', scene),
+    new BABYLON.TransformNode('l3_tulipAnchor1', scene),
+  ];
+  const yellowFlowerAnchors = [
     new BABYLON.TransformNode('l3_yellowFlowerAnchor0', scene),
+    new BABYLON.TransformNode('l3_yellowFlowerAnchor1', scene),
+  ];
+  const cornAnchors = [
     new BABYLON.TransformNode('l3_cornAnchor0', scene),
     new BABYLON.TransformNode('l3_cornAnchor1', scene),
+    new BABYLON.TransformNode('l3_cornAnchor2', scene),
+    new BABYLON.TransformNode('l3_cornAnchor3', scene),
   ];
-  flowerAnchors[0].position.set(-13.8, floorTopY, 1.5);
-  flowerAnchors[1].position.set(-7.4, floorTopY, 1.4);
-  flowerAnchors[2].position.set(-12.1, floorTopY, 1.9);
-  flowerAnchors[3].position.set(-6.3, floorTopY, 1.95);
-  flowerAnchors.forEach((anchor) => {
+  tulipAnchors[0].position.set(-13.8, floorTopY, 1.5);
+  tulipAnchors[1].position.set(47.8, floorTopY, 1.5);
+  yellowFlowerAnchors[0].position.set(-7.4, floorTopY, 1.4);
+  yellowFlowerAnchors[1].position.set(58.6, floorTopY, 1.4);
+  cornAnchors[0].position.set(-12.1, floorTopY, 1.9);
+  cornAnchors[1].position.set(-6.3, floorTopY, 1.95);
+  cornAnchors[2].position.set(16.6, floorTopY, 1.88);
+  cornAnchors[3].position.set(66.2, floorTopY, 1.96);
+
+  for (const anchor of [...tulipAnchors, ...yellowFlowerAnchors, ...cornAnchors]) {
     anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true };
+  }
+
+  tulipAnchors.forEach((anchor, index) => {
+    const fallback = createPlantPlaceholder(scene, `l3_tulipFallback${index}`, {
+      x: anchor.position.x,
+      y: anchor.position.y,
+      z: anchor.position.z,
+      kind: 'flower',
+    });
+    fallback.parent = anchor;
+    fallback.position.set(0, 0, 0);
   });
-  const tulipFallback = createPlantPlaceholder(scene, 'l3_tulipFallback', {
-    x: flowerAnchors[0].position.x,
-    y: flowerAnchors[0].position.y,
-    z: flowerAnchors[0].position.z,
-    kind: 'flower',
+  yellowFlowerAnchors.forEach((anchor, index) => {
+    const fallback = createPlantPlaceholder(scene, `l3_yellowFallback${index}`, {
+      x: anchor.position.x,
+      y: anchor.position.y,
+      z: anchor.position.z,
+      kind: 'yellow',
+    });
+    fallback.parent = anchor;
+    fallback.position.set(0, 0, 0);
   });
-  tulipFallback.parent = flowerAnchors[0];
-  tulipFallback.position.set(0, 0, 0);
-  const yellowFallback = createPlantPlaceholder(scene, 'l3_yellowFallback', {
-    x: flowerAnchors[1].position.x,
-    y: flowerAnchors[1].position.y,
-    z: flowerAnchors[1].position.z,
-    kind: 'yellow',
+  cornAnchors.forEach((anchor, index) => {
+    const fallback = createPlantPlaceholder(scene, `l3_cornFallback${index}`, {
+      x: anchor.position.x,
+      y: anchor.position.y,
+      z: anchor.position.z,
+      kind: 'corn',
+    });
+    fallback.parent = anchor;
+    fallback.position.set(0, 0, 0);
   });
-  yellowFallback.parent = flowerAnchors[1];
-  yellowFallback.position.set(0, 0, 0);
-  const cornFallback0 = createPlantPlaceholder(scene, 'l3_cornFallback0', {
-    x: flowerAnchors[2].position.x,
-    y: flowerAnchors[2].position.y,
-    z: flowerAnchors[2].position.z,
-    kind: 'corn',
-  });
-  cornFallback0.parent = flowerAnchors[2];
-  cornFallback0.position.set(0, 0, 0);
-  const cornFallback1 = createPlantPlaceholder(scene, 'l3_cornFallback1', {
-    x: flowerAnchors[3].position.x,
-    y: flowerAnchors[3].position.y,
-    z: flowerAnchors[3].position.z,
-    kind: 'corn',
-  });
-  cornFallback1.parent = flowerAnchors[3];
-  cornFallback1.position.set(0, 0, 0);
 
   const decorDogAnchors = [
     makeDecorAnimalAnchor('l3_huskyAnchor', {
@@ -836,17 +859,19 @@ export function buildWorld3(scene, options = {}) {
     createHayBale(scene, 'l3_hay0', { x: -15.2, y: floorTopY, z: 2.2, scale: 0.9 }),
     createHayBale(scene, 'l3_hay1', { x: 17.4, y: LEVEL3.platforms.find((p) => p.name === 'tableEntry').y + 0.42, z: 2.1, scale: 0.78 }),
     createHayBale(scene, 'l3_hay2', { x: 69.2, y: floorTopY, z: 2.3, scale: 1.0 }),
+    createHayBale(scene, 'l3_hay3', { x: 47.4, y: floorTopY, z: 2.18, scale: 0.86 }),
+    createHayBale(scene, 'l3_hay4', { x: 61.8, y: floorTopY, z: 2.32, scale: 0.94 }),
   ];
   hayDecor.forEach((item) => setRenderingGroup(item, 2));
 
   const fenceDecor = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const fence = BABYLON.MeshBuilder.CreateBox(`l3_fence_${i}`, {
       width: 4.4,
       height: 1.2,
       depth: 0.12,
     }, scene);
-    fence.position.set(-14 + (i * 20), floorTopY + 0.62, 2.9 + (i * 0.05));
+    fence.position.set(-14 + (i * 15.2), floorTopY + 0.62, 2.9 + (i * 0.05));
     fence.material = makeCardboard(scene, `l3_fenceMat_${i}`, 206, 190, 164, { roughness: 0.94 });
     markDecorative(fence);
     fenceDecor.push(fence);
@@ -970,9 +995,9 @@ export function buildWorld3(scene, options = {}) {
       foregroundCutouts: [],
       treeDecor: [],
       cloudCutouts: [],
-      futureTulipFlowerPropModel: [flowerAnchors[0]],
-      futureYellowFlowerPropModel: [flowerAnchors[1]],
-      futureCornPropModel: [flowerAnchors[2], flowerAnchors[3]],
+      futureTulipFlowerPropModel: tulipAnchors,
+      futureYellowFlowerPropModel: yellowFlowerAnchors,
+      futureCornPropModel: cornAnchors,
       futureHuskyDogPropModel: [decorDogAnchors[0]],
       futurePlayfulDogPropModel: [decorDogAnchors[1]],
       futureTaterDogPropModel: [decorDogAnchors[2]],

@@ -167,6 +167,311 @@ function createRoomPanel(scene, name, {
   return root;
 }
 
+function createCondoWallSegment(scene, name, {
+  x,
+  y,
+  z = 9.8,
+  width,
+  height,
+  color = [232, 224, 214],
+  trim = [170, 148, 122],
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const wall = BABYLON.MeshBuilder.CreateBox(`${name}_wall`, {
+    width,
+    height,
+    depth: 0.18,
+  }, scene);
+  wall.parent = root;
+  wall.material = makeCardboard(scene, `${name}_wallMat`, ...color, { roughness: 0.96 });
+
+  const base = BABYLON.MeshBuilder.CreateBox(`${name}_base`, {
+    width: width + 0.08,
+    height: 0.16,
+    depth: 0.22,
+  }, scene);
+  base.parent = root;
+  base.position.y = -(height * 0.5) + 0.08;
+  base.material = makeCardboard(scene, `${name}_baseMat`, ...trim, { roughness: 0.92 });
+
+  const trimLine = BABYLON.MeshBuilder.CreateBox(`${name}_trim`, {
+    width: width + 0.12,
+    height: 0.12,
+    depth: 0.2,
+  }, scene);
+  trimLine.parent = root;
+  trimLine.position.y = (height * 0.5) - 0.12;
+  trimLine.material = base.material;
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createWindowDisplay(scene, name, {
+  x,
+  y,
+  z = 9.62,
+  width = 2.2,
+  height = 1.8,
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const tex = new BABYLON.DynamicTexture(`${name}_tex`, { width: 320, height: 240 }, scene, true);
+  const ctx = tex.getContext();
+  const grad = ctx.createLinearGradient(0, 0, 0, 240);
+  grad.addColorStop(0, '#7fb0e8');
+  grad.addColorStop(0.58, '#bfd6f2');
+  grad.addColorStop(1, '#f4d8b2');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 320, 240);
+  ctx.fillStyle = 'rgba(255,255,255,0.46)';
+  ctx.fillRect(24, 24, 272, 18);
+  ctx.fillStyle = 'rgba(104,120,148,0.32)';
+  ctx.fillRect(18, 168, 284, 36);
+  ctx.fillRect(52, 146, 18, 58);
+  ctx.fillRect(88, 126, 20, 78);
+  ctx.fillRect(136, 138, 18, 66);
+  tex.update();
+
+  const paneMat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+  paneMat.diffuseTexture = tex;
+  paneMat.emissiveTexture = tex;
+  paneMat.specularColor = BABYLON.Color3.Black();
+
+  const pane = BABYLON.MeshBuilder.CreatePlane(`${name}_pane`, {
+    width,
+    height,
+  }, scene);
+  pane.parent = root;
+  pane.material = paneMat;
+
+  const frameMat = makeCardboard(scene, `${name}_frameMat`, 188, 170, 150, { roughness: 0.9 });
+  const frameParts = [
+    { name: 'top', w: width + 0.18, h: 0.12, x: 0, y: height * 0.5 },
+    { name: 'bottom', w: width + 0.18, h: 0.12, x: 0, y: -height * 0.5 },
+    { name: 'left', w: 0.12, h: height + 0.18, x: -(width * 0.5), y: 0 },
+    { name: 'right', w: 0.12, h: height + 0.18, x: width * 0.5, y: 0 },
+    { name: 'midV', w: 0.08, h: height - 0.18, x: 0, y: 0 },
+    { name: 'midH', w: width - 0.18, h: 0.08, x: 0, y: 0 },
+  ];
+  for (const part of frameParts) {
+    const mesh = BABYLON.MeshBuilder.CreateBox(`${name}_${part.name}`, {
+      width: part.w,
+      height: part.h,
+      depth: 0.08,
+    }, scene);
+    mesh.parent = root;
+    mesh.position.set(part.x, part.y, -0.05);
+    mesh.material = frameMat;
+  }
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createWallArt(scene, name, {
+  x,
+  y,
+  z = 9.56,
+  width = 1.5,
+  height = 1.1,
+  palette = ['#c86848', '#f3d07d', '#7390c8'],
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  const tex = new BABYLON.DynamicTexture(`${name}_tex`, { width: 256, height: 196 }, scene, true);
+  const ctx = tex.getContext();
+  ctx.fillStyle = '#f4efe6';
+  ctx.fillRect(0, 0, 256, 196);
+  ctx.fillStyle = palette[0];
+  ctx.fillRect(22, 26, 84, 58);
+  ctx.fillStyle = palette[1];
+  ctx.beginPath();
+  ctx.arc(182, 70, 34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = palette[2];
+  ctx.lineWidth = 14;
+  ctx.beginPath();
+  ctx.moveTo(34, 148);
+  ctx.lineTo(210, 118);
+  ctx.stroke();
+  tex.update();
+
+  const art = BABYLON.MeshBuilder.CreatePlane(`${name}_art`, { width, height }, scene);
+  art.parent = root;
+  const artMat = new BABYLON.StandardMaterial(`${name}_artMat`, scene);
+  artMat.diffuseTexture = tex;
+  artMat.emissiveTexture = tex;
+  artMat.specularColor = BABYLON.Color3.Black();
+  art.material = artMat;
+
+  const frame = BABYLON.MeshBuilder.CreateBox(`${name}_frame`, {
+    width: width + 0.14,
+    height: height + 0.14,
+    depth: 0.08,
+  }, scene);
+  frame.parent = root;
+  frame.position.z = -0.04;
+  frame.material = makeCardboard(scene, `${name}_frameMat`, 126, 102, 80, { roughness: 0.92 });
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createStairsDirectionSign(scene, name, {
+  x,
+  y,
+  z = -1.12,
+  text = 'UPSTAIRS CONDO →',
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  const boardTex = new BABYLON.DynamicTexture(`${name}_tex`, { width: 512, height: 196 }, scene, true);
+  const ctx = boardTex.getContext();
+  ctx.fillStyle = '#ead4a6';
+  ctx.fillRect(0, 0, 512, 196);
+  ctx.strokeStyle = '#6d4b2f';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, 496, 180);
+  ctx.fillStyle = '#50341f';
+  ctx.font = 'bold 58px Avenir Next, Trebuchet MS, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 98);
+  boardTex.update();
+
+  const board = BABYLON.MeshBuilder.CreatePlane(`${name}_board`, {
+    width: 3.6,
+    height: 1.38,
+  }, scene);
+  board.parent = root;
+  const boardMat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+  boardMat.diffuseTexture = boardTex;
+  boardMat.emissiveTexture = boardTex;
+  boardMat.specularColor = BABYLON.Color3.Black();
+  board.material = boardMat;
+
+  for (const px of [-1.42, 1.42]) {
+    const post = BABYLON.MeshBuilder.CreateBox(`${name}_post${px}`, {
+      width: 0.12,
+      height: 1.6,
+      depth: 0.12,
+    }, scene);
+    post.parent = root;
+    post.position.set(px, -0.68, -0.03);
+    post.material = makeCardboard(scene, `${name}_postMat${px}`, 118, 92, 68, { roughness: 0.9 });
+  }
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createWateringDecor(scene, name, { x, y, z = 2.2 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const hose = BABYLON.MeshBuilder.CreateCylinder(`${name}_hose`, {
+    height: 1.7,
+    diameter: 0.08,
+    tessellation: 10,
+  }, scene);
+  hose.parent = root;
+  hose.position.set(-0.42, 0.48, -0.18);
+  hose.rotation.z = -0.9;
+  hose.material = makePlastic(scene, `${name}_hoseMat`, 0.24, 0.56, 0.22, { roughness: 0.58 });
+
+  const nozzle = BABYLON.MeshBuilder.CreateCylinder(`${name}_nozzle`, {
+    height: 0.28,
+    diameter: 0.18,
+    tessellation: 12,
+  }, scene);
+  nozzle.parent = root;
+  nozzle.position.set(0.14, 1.22, -0.04);
+  nozzle.rotation.z = Math.PI / 2;
+  nozzle.material = makePlastic(scene, `${name}_nozzleMat`, 0.64, 0.70, 0.76, { roughness: 0.4 });
+
+  const streamMat = new BABYLON.StandardMaterial(`${name}_streamMat`, scene);
+  streamMat.diffuseColor = new BABYLON.Color3(0.56, 0.82, 0.98);
+  streamMat.emissiveColor = new BABYLON.Color3(0.14, 0.30, 0.42);
+  streamMat.specularColor = BABYLON.Color3.Black();
+  streamMat.alpha = 0.32;
+  streamMat.backFaceCulling = false;
+  streamMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  for (const [index, offset] of [-0.22, 0, 0.22].entries()) {
+    const stream = BABYLON.MeshBuilder.CreatePlane(`${name}_stream${index}`, {
+      width: 0.34,
+      height: 1.9,
+    }, scene);
+    stream.parent = root;
+    stream.position.set(0.72 + (offset * 0.18), 0.34, offset);
+    stream.rotation.z = -0.94 + (offset * 0.08);
+    stream.material = streamMat;
+  }
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createCornPatchPlaceholder(scene, name, {
+  x,
+  y,
+  z = 2.55,
+  rows = 2,
+  cols = 3,
+  spacingX = 0.76,
+  spacingZ = 0.72,
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  const anchors = [];
+  const halfCols = (cols - 1) * 0.5;
+  const halfRows = (rows - 1) * 0.5;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const anchor = new BABYLON.TransformNode(`${name}_anchor_${row}_${col}`, scene);
+      anchor.parent = root;
+      anchor.position.set(
+        (col - halfCols) * spacingX,
+        0,
+        (row - halfRows) * spacingZ,
+      );
+      const stalk = BABYLON.MeshBuilder.CreateCylinder(`${name}_stalk_${row}_${col}`, {
+        height: 1.12,
+        diameter: 0.09,
+        tessellation: 8,
+      }, scene);
+      stalk.parent = anchor;
+      stalk.position.y = 0.56;
+      stalk.material = makePlastic(scene, `${name}_stalkMat_${row}_${col}`, 0.34, 0.64, 0.24, { roughness: 0.7 });
+      for (const side of [-1, 1]) {
+        const leaf = BABYLON.MeshBuilder.CreatePlane(`${name}_leaf_${row}_${col}_${side}`, {
+          width: 0.54,
+          height: 0.20,
+        }, scene);
+        leaf.parent = anchor;
+        leaf.position.set(side * 0.14, 0.54, 0.04 * side);
+        leaf.rotation.z = side * 0.42;
+        leaf.material = stalk.material;
+      }
+      const husk = BABYLON.MeshBuilder.CreateBox(`${name}_husk_${row}_${col}`, {
+        width: 0.14,
+        height: 0.34,
+        depth: 0.12,
+      }, scene);
+      husk.parent = anchor;
+      husk.position.set(0, 0.78, 0);
+      husk.material = makePlastic(scene, `${name}_huskMat_${row}_${col}`, 0.93, 0.78, 0.26, { roughness: 0.52 });
+      tagLevel2Decor(anchor);
+      anchors.push(anchor);
+    }
+  }
+  tagLevel2Decor(root);
+  return { root, anchors };
+}
+
 function createHighchairPlaceholder(scene, name, { x, y, z = 0 }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
@@ -709,6 +1014,88 @@ export function buildWorld2(scene, options = {}) {
   ];
   roomPanels.forEach((panel) => setRenderingGroup(panel, 1));
 
+  const condoWalls = [
+    createCondoWallSegment(scene, 'l2_condoWall_bedroom', {
+      x: -11.2, y: 4.9, z: 8.9, width: 14.2, height: 10.0, color: [236, 226, 214], trim: [178, 156, 132],
+    }),
+    createCondoWallSegment(scene, 'l2_condoWall_kitchen', {
+      x: 7.6, y: 4.6, z: 8.8, width: 11.6, height: 9.2, color: [231, 228, 214], trim: [172, 164, 146],
+    }),
+    createCondoWallSegment(scene, 'l2_condoWall_stairs', {
+      x: 23.4, y: 6.0, z: 8.8, width: 9.6, height: 10.6, color: [233, 224, 214], trim: [176, 154, 134],
+    }),
+    createCondoWallSegment(scene, 'l2_condoWall_loft', {
+      x: 36.1, y: 7.8, z: 8.7, width: 10.8, height: 8.8, color: [228, 232, 221], trim: [164, 168, 144],
+    }),
+  ];
+  condoWalls.forEach((node) => setRenderingGroup(node, 1));
+
+  const condoWindows = [
+    createWindowDisplay(scene, 'l2_window_bedroom0', { x: -14.2, y: 5.9, z: 8.62, width: 2.6, height: 2.0 }),
+    createWindowDisplay(scene, 'l2_window_bedroom1', { x: -8.0, y: 5.8, z: 8.62, width: 2.3, height: 1.9 }),
+    createWindowDisplay(scene, 'l2_window_kitchen0', { x: 6.4, y: 5.6, z: 8.56, width: 2.2, height: 1.8 }),
+    createWindowDisplay(scene, 'l2_window_loft0', { x: 34.3, y: 8.5, z: 8.52, width: 2.0, height: 1.7 }),
+    createWindowDisplay(scene, 'l2_window_loft1', { x: 38.4, y: 8.45, z: 8.52, width: 2.0, height: 1.7 }),
+  ];
+  condoWindows.forEach((node) => setRenderingGroup(node, 1));
+
+  const wallArt = [
+    createWallArt(scene, 'l2_art_bedroom', {
+      x: -17.2, y: 5.2, z: 8.52, width: 1.7, height: 1.2, palette: ['#d17d62', '#f1d7a5', '#7892c7'],
+    }),
+    createWallArt(scene, 'l2_art_kitchen', {
+      x: 10.1, y: 5.0, z: 8.48, width: 1.5, height: 1.1, palette: ['#db8856', '#f0d078', '#83a776'],
+    }),
+    createWallArt(scene, 'l2_art_stairs', {
+      x: 20.6, y: 6.9, z: 8.50, width: 1.35, height: 1.0, palette: ['#6e8ec3', '#f5d88a', '#d88767'],
+    }),
+    createWallArt(scene, 'l2_art_loft', {
+      x: 40.0, y: 8.0, z: 8.46, width: 1.7, height: 1.2, palette: ['#7a9c5f', '#f0d090', '#d6765a'],
+    }),
+  ];
+  wallArt.forEach((node) => setRenderingGroup(node, 1));
+
+  const condoTrim = new BABYLON.TransformNode('l2_condoTrim', scene);
+  condoTrim.position.set(0, 0, 0);
+  tagLevel2Decor(condoTrim);
+  for (const [index, def] of [
+    { x: 9.0, y: 8.55, z: 8.32, width: 39.5, height: 0.18, depth: 0.12 },
+    { x: 30.6, y: 7.2, z: 8.26, width: 12.0, height: 0.16, depth: 0.12 },
+    { x: 30.6, y: 7.72, z: 8.16, width: 12.0, height: 0.12, depth: 0.10 },
+  ].entries()) {
+    const rail = BABYLON.MeshBuilder.CreateBox(`l2_condoTrim_${index}`, def, scene);
+    rail.parent = condoTrim;
+    rail.position.set(def.x, def.y, def.z);
+    rail.material = makeCardboard(scene, `l2_condoTrimMat_${index}`, 176, 154, 132, { roughness: 0.92 });
+  }
+  setRenderingGroup(condoTrim, 1);
+
+  const stairsSign = createStairsDirectionSign(scene, 'l2_upstairsSign', {
+    x: 21.2,
+    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 1.86,
+    z: -1.16,
+  });
+  setRenderingGroup(stairsSign, 3);
+
+  const wateringDecor = createWateringDecor(scene, 'l2_loftWatering', {
+    x: 33.7,
+    y: LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.42,
+    z: 2.12,
+  });
+  setRenderingGroup(wateringDecor, 2);
+
+  const cornPatch = createCornPatchPlaceholder(scene, 'l2_loftCornPatch', {
+    x: 34.3,
+    y: LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.42,
+    z: 1.58,
+    rows: 2,
+    cols: 3,
+    spacingX: 0.82,
+    spacingZ: 0.74,
+  });
+  cornPatch.root.scaling.setAll(1.18);
+  setRenderingGroup(cornPatch.root, 2);
+
   // === AMANDA PATROL ===
   const amandaDef = LEVEL2.amanda;
   let amandaX = amandaDef.minX;
@@ -927,6 +1314,7 @@ export function buildWorld2(scene, options = {}) {
       bike: bikeAnchor,
       pack: packAnchor,
       goat: loftGoatAnchor,
+      cornPatch: cornPatch.anchors,
     },
     // Expose fallback visuals so boot.js can hide them when GLBs load
     fallbackVisuals: {
@@ -974,6 +1362,7 @@ export function buildWorld2(scene, options = {}) {
       futureBikeModel: [bikeAnchor],
       futurePackPropModel: [packAnchor],
       futureGoatPropModel: [loftGoatAnchor],
+      futureCornPropModel: cornPatch.anchors,
     },
   };
 }
