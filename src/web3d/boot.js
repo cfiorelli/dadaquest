@@ -664,6 +664,9 @@ export async function boot(options = {}) {
   const availableModelSet = new Set(availableModels);
   window.__DADA_DEBUG__.assetModels = availableModels;
   const shouldLoadLevel2Decor = false;
+  const level1FloorTopY = levelId === 1 && world.level?.ground
+    ? world.level.ground.y + (world.level.ground.h * 0.5)
+    : null;
   if (levelId === 1) {
     if (!availableModelSet.has('local_baby_pig')) {
       console.warn('[assets] missing local_baby_pig; skipping Level 1 pig decor');
@@ -1395,9 +1398,6 @@ export async function boot(options = {}) {
   let level1AmbientBirdDelayMs = -1;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
-  const level1FloorTopY = levelId === 1 && world.level?.ground
-    ? world.level.ground.y + (world.level.ground.h * 0.5)
-    : null;
   const checkpointEmissiveBase = new Map();
   for (const checkpoint of checkpoints) {
     if (!checkpoint.marker) continue;
