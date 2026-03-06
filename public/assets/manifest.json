@@ -23,6 +23,8 @@
     "futureRockingHorseModel": ["local_rocking_horse"],
     "futureChickenPropModel": ["local_baby_chicken"],
     "futureDinoPropModel": ["local_baby_dino"],
+    "futurePigPropModel": ["local_baby_pig"],
+    "futureElephantPropModel": ["local_baby_elephant"],
     "futureGoatPropModel": ["local_baby_goat"],
     "futurePackPropModel": ["local_baby_pack"],
     "futureBreadPropModel": ["local_rustic_bread"]
@@ -227,6 +229,18 @@
       "yOffset": 0
     },
     {
+      "id": "local_baby_pig",
+      "path": "assets/models/props/baby_pig.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_baby_elephant",
+      "path": "assets/models/props/baby_elephant.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
       "id": "local_baby_pack",
       "path": "assets/models/props/baby_pack.glb",
       "scale": 1,
@@ -235,6 +249,60 @@
     {
       "id": "local_rustic_bread",
       "path": "assets/models/props/rustic_bread.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_bianca_dog",
+      "path": "assets/models/props/bianca_dog.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_chickens",
+      "path": "assets/models/props/chickens.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_corn",
+      "path": "assets/models/props/corn.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_husky_dog",
+      "path": "assets/models/props/husky_dog.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_playful_dog",
+      "path": "assets/models/props/playful_dog.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_tater_dog",
+      "path": "assets/models/props/tater_dog.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_thanksgiving_turkey",
+      "path": "assets/models/props/thanksgiving_turkey.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_tulip_flower",
+      "path": "assets/models/props/tulip_flower.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_yelow_flower",
+      "path": "assets/models/props/yelow_flower.glb",
       "scale": 1,
       "yOffset": 0
     }
