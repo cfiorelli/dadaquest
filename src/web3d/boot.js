@@ -159,6 +159,18 @@ function hideMeshList(meshes) {
   }
 }
 
+function ensureVisibleMeshes(meshes) {
+  for (const mesh of meshes || []) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.setEnabled(true);
+    mesh.isVisible = true;
+    mesh.visibility = 1;
+    if (mesh.material && Object.prototype.hasOwnProperty.call(mesh.material, 'alpha')) {
+      mesh.material.alpha = 1;
+    }
+  }
+}
+
 function getAnchorWorldPosition(anchor) {
   if (!anchor) return null;
   if (typeof anchor.getAbsolutePosition === 'function') {
@@ -951,7 +963,13 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        fitLoadedModel(result.roots, { targetHeight: 1.5, groundY: 0, markDecorative: true });
+        const anchorPos = getAnchorWorldPosition(anchor);
+        fitLoadedModel(result.roots, {
+          targetHeight: 1.6,
+          groundY: anchorPos ? anchorPos.y : 0,
+          markDecorative: true,
+        });
+        ensureVisibleMeshes(result.meshes);
       }
     }
     for (const anchor of anchors.pettingZooChickens || []) {
@@ -961,7 +979,13 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        fitLoadedModel(result.roots, { targetHeight: 0.55, groundY: 0, markDecorative: true });
+        const anchorPos = getAnchorWorldPosition(anchor);
+        fitLoadedModel(result.roots, {
+          targetHeight: 0.7,
+          groundY: anchorPos ? anchorPos.y : 0,
+          markDecorative: true,
+        });
+        ensureVisibleMeshes(result.meshes);
       }
     }
     for (const anchor of anchors.pettingZooDino || []) {
@@ -971,7 +995,16 @@ export async function boot(options = {}) {
         renderingGroupId: 2,
       });
       if (result.loaded) {
-        fitLoadedModel(result.roots, { targetHeight: 1.8, groundY: 0, markDecorative: true });
+        const anchorPos = getAnchorWorldPosition(anchor);
+        fitLoadedModel(result.roots, {
+          targetHeight: 2.16,
+          groundY: anchorPos ? anchorPos.y : 0,
+          markDecorative: true,
+        });
+        for (const root of result.roots || []) {
+          root.rotation.y += Math.PI;
+        }
+        ensureVisibleMeshes(result.meshes);
       }
     }
   }
