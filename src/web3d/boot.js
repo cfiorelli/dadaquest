@@ -435,14 +435,13 @@ function disableLevel2DecorMeshes(scene, { debugMode = false } = {}) {
     if (!mesh.isEnabled()) continue;
     if ((mesh.name || '').startsWith('L2_')) continue;
     if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') continue;
-    if (mesh.metadata?.cameraIgnore === true) continue;
     mesh.computeWorldMatrix(true);
     const bi = mesh.getBoundingInfo?.();
     const ext = bi?.boundingBox?.extendSizeWorld;
     if (!ext) continue;
     const maxExtent = Math.max(ext.x, ext.y, ext.z);
     const volume = (ext.x * 2) * (ext.y * 2) * (ext.z * 2);
-    if (maxExtent > 40 || volume > 18000) {
+    if (maxExtent > 30 || volume > 9000) {
       mesh.setEnabled(false);
       const info = {
         name: mesh.name,
@@ -759,20 +758,29 @@ export async function boot(options = {}) {
   const availableModels = await getAvailableModels();
   const availableModelSet = new Set(availableModels);
   window.__DADA_DEBUG__.assetModels = availableModels;
-  const level1FloorTopY = levelId === 1
-    ? (() => {
-      const floorSurface = buildSurfaceBoundsFromVisual('floor', world.groundVisual, world.level?.ground
-        ? {
-          topY: world.level.ground.y + (world.level.ground.h * 0.5),
-          minX: world.level.ground.x - (world.level.ground.w * 0.5),
-          maxX: world.level.ground.x + (world.level.ground.w * 0.5),
-          minZ: (world.level.ground.z ?? 0) - (world.level.ground.d * 0.5),
-          maxZ: (world.level.ground.z ?? 0) + (world.level.ground.d * 0.5),
-        }
-        : null);
-      return floorSurface?.topY ?? null;
-    })()
+  const floorSurfaceFallback = world.level?.ground
+    ? {
+      topY: world.level.ground.y + (world.level.ground.h * 0.5),
+      minX: world.level.ground.x - (world.level.ground.w * 0.5),
+      maxX: world.level.ground.x + (world.level.ground.w * 0.5),
+      minZ: (world.level.ground.z ?? 0) - (world.level.ground.d * 0.5),
+      maxZ: (world.level.ground.z ?? 0) + (world.level.ground.d * 0.5),
+    }
     : null;
+  const currentFloorTopY = (() => {
+    if (world.ground instanceof BABYLON.Mesh) {
+      world.ground.computeWorldMatrix(true);
+      const groundBounds = world.ground.getBoundingInfo?.()?.boundingBox;
+      if (groundBounds) {
+        return groundBounds.maximumWorld.y;
+      }
+    }
+    return buildSurfaceBoundsFromVisual(
+      'floor',
+      world.groundVisual || world.ground,
+      floorSurfaceFallback,
+    )?.topY ?? null;
+  })();
   if (levelId === 1 && import.meta.env.DEV) {
     if (!availableModelSet.has('local_baby_pig')) {
       console.warn('[assets] missing local_baby_pig; skipping Level 1 pig decor');
@@ -1193,10 +1201,24 @@ export async function boot(options = {}) {
         fallbackMaterial: 'plastic',
         renderingGroupId: 2,
       });
-      if (result?.loaded && fallback) {
-        fallback.setEnabled(false);
-      }
       if (result?.loaded) {
+        for (const mesh of result.meshes || []) {
+          if (mesh.name && !mesh.name.startsWith('L2_') && !mesh.name.startsWith('L2_DECOR_')) {
+            mesh.name = `L2_DECOR_${mesh.name}`;
+          }
+          if (mesh.id && !mesh.id.startsWith('L2_') && !mesh.id.startsWith('L2_DECOR_')) {
+            mesh.id = `L2_DECOR_${mesh.id}`;
+          }
+          mesh.metadata = {
+            ...(mesh.metadata || {}),
+            decor: true,
+            level2Decor: true,
+            cameraIgnore: true,
+            cameraBlocker: false,
+          };
+          mesh.isPickable = false;
+          mesh.checkCollisions = false;
+        }
         const anchorPos = anchor.getAbsolutePosition();
         fitLoadedModel(anchor, {
           targetMaxSize: fit?.targetMaxSize ?? 0,
@@ -1204,6 +1226,12 @@ export async function boot(options = {}) {
           groundY: anchorPos.y + (fit?.groundOffset ?? 0),
           markDecorative: true,
         });
+        const cullResult = disableLevel2DecorMeshes(scene, { debugMode });
+        window.__DADA_DEBUG__.level2CullResult = cullResult;
+        if (fallback) {
+          const hasVisibleLoadedMesh = (result.meshes || []).some((mesh) => mesh?.isEnabled?.() && (mesh.visibility ?? 1) > 0.02);
+          fallback.setEnabled(!hasVisibleLoadedMesh);
+        }
       }
     }
   }
@@ -1408,7 +1436,7 @@ export async function boot(options = {}) {
         });
         if (result.loaded) {
           const surface = getLevel1DecorSurface(anchor);
-          const elephantGroundY = surface.baseY ?? (level1FloorTopY !== null ? level1FloorTopY + 0.02 : 0);
+          const elephantGroundY = surface.baseY ?? (currentFloorTopY !== null ? currentFloorTopY + 0.02 : 0);
           fitLoadedModel(result.roots, {
             targetHeight: 1.9,
             groundY: elephantGroundY,
@@ -1480,15 +1508,27 @@ export async function boot(options = {}) {
 
   function updateLevel1Clouds(dt) {
     if (levelId !== 1 || shotMode || !cloudCutouts.length) return;
+    const floorClampY = Number.isFinite(currentFloorTopY) ? currentFloorTopY : 0;
     for (const cloud of cloudCutouts) {
       if (!cloud?.position) continue;
       const speed = cloud.metadata?.driftSpeed ?? 0.08;
       const minX = cloud.metadata?.driftMinX ?? -28;
       const maxX = cloud.metadata?.driftMaxX ?? 58;
+      const minY = Math.max(
+        floorClampY + 8,
+        Number.isFinite(cloud.metadata?.driftMinY) ? cloud.metadata.driftMinY : floorClampY + 8,
+      );
+      const maxY = Math.max(minY + 0.5, cloud.metadata?.driftMaxY ?? (minY + 4));
+      const minZ = cloud.metadata?.driftMinZ ?? -30;
+      const maxZ = cloud.metadata?.driftMaxZ ?? -22;
       cloud.position.x += dt * speed;
       if (cloud.position.x > maxX) {
         cloud.position.x = minX;
       }
+      if (cloud.position.y < floorClampY + 8 || cloud.position.y < minY || cloud.position.y > maxY) {
+        cloud.position.y = clamp(cloud.metadata?.driftBaseY ?? minY, minY, maxY);
+      }
+      cloud.position.z = clamp(cloud.metadata?.driftBaseZ ?? cloud.position.z, minZ, maxZ);
     }
   }
 
@@ -1586,8 +1626,8 @@ export async function boot(options = {}) {
     }
   }
 
-  function triggerLevel1FloorPenalty() {
-    if (levelId !== 1 || level1FloorPenaltyCooldownMs > 0) return;
+  function triggerFloorPenalty() {
+    if (level1FloorPenaltyCooldownMs > 0) return;
     const collectedCoins = coins.filter((coin) => coin.collected);
     if (collectedCoins.length === 0) return;
     level1FloorPenaltyCooldownMs = 1500;
@@ -1601,6 +1641,9 @@ export async function boot(options = {}) {
     }
     const startCount = coinsCollected;
     coinsCollected = 0;
+    window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+    window.__DADA_DEBUG__.lastFloorPenaltyLevel = levelId;
+    window.__DADA_DEBUG__.floorPenaltyCount = (window.__DADA_DEBUG__.floorPenaltyCount || 0) + 1;
     level1CoinLossAnim = {
       startCount,
       elapsedMs: 0,
@@ -1769,6 +1812,8 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.lastRespawnReason = '';
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
+  window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+  window.__DADA_DEBUG__.floorTopY = currentFloorTopY;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
     const LANE_Z = 0;
@@ -1972,6 +2017,7 @@ export async function boot(options = {}) {
     onesieJumpBoost = 1;
     puddleInvulnMs = 0;
     coinsCollected = 0;
+    window.__DADA_DEBUG__.coinsCollected = coinsCollected;
     level1FloorPenaltyCooldownMs = 0;
     level1AirborneFromAboveFloor = false;
     level1MaxAirborneBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
@@ -2009,6 +2055,7 @@ export async function boot(options = {}) {
     }
     coinsCollected = 0;
     ui.setCoins(0);
+    window.__DADA_DEBUG__.coinsCollected = coinsCollected;
     resetCrumbles();
     if (world.level2) world.level2.reset();
     if (world.level3) world.level3.reset();
@@ -2104,6 +2151,20 @@ export async function boot(options = {}) {
       updatePlayerShadow(player);
       return true;
     };
+    window.__DADA_DEBUG__.teleportPlayer = (x, y, z = 0) => {
+      player.spawnAt(x, y, z);
+      player.vx = 0;
+      player.vy = 0;
+      updatePlayerShadow(player);
+      return { x, y, z };
+    };
+    window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
+      index,
+      collected: coin.collected,
+      x: coin.position.x,
+      y: coin.position.y,
+      z: coin.position.z,
+    }));
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -2284,6 +2345,7 @@ export async function boot(options = {}) {
         coin.collected = true;
         if (coin.node) coin.node.setEnabled(false);
         coinsCollected++;
+        window.__DADA_DEBUG__.coinsCollected = coinsCollected;
         audio.playCoin();
         juiceFx.spawnCoinSparkle(coin.position);
         ui.updateCoins(coinsCollected);
@@ -2607,19 +2669,22 @@ export async function boot(options = {}) {
           }
         }
 
-        if (levelId === 1 && level1FloorTopY !== null) {
+        if (currentFloorTopY !== null) {
           const afterBottomY = player.mesh.position.y - halfH;
           if (prevGrounded && !player.grounded) {
-            level1AirborneFromAboveFloor = (prevPlayerBottomY - level1FloorTopY) > 1.0;
             level1MaxAirborneBottomY = Math.max(prevPlayerBottomY, afterBottomY);
-          } else if (!player.grounded) {
-            level1MaxAirborneBottomY = Math.max(level1MaxAirborneBottomY, afterBottomY);
+          }
+          if (!player.grounded) {
+            if ((prevPlayerBottomY - currentFloorTopY) > 1.0 || (afterBottomY - currentFloorTopY) > 1.0) {
+              level1AirborneFromAboveFloor = true;
+            }
+            level1MaxAirborneBottomY = Math.max(level1MaxAirborneBottomY, prevPlayerBottomY, afterBottomY);
           }
           const landedThisFrame = !prevGrounded && player.grounded;
-          const nearFloor = Math.abs(afterBottomY - level1FloorTopY) < 0.25;
-          const fellFromAbove = (level1MaxAirborneBottomY - level1FloorTopY) > 1.0;
+          const nearFloor = Math.abs(afterBottomY - currentFloorTopY) < 0.25;
+          const fellFromAbove = (level1MaxAirborneBottomY - currentFloorTopY) > 1.0;
           if (landedThisFrame && nearFloor && fellFromAbove && level1AirborneFromAboveFloor) {
-            triggerLevel1FloorPenalty();
+            triggerFloorPenalty();
           }
           if (landedThisFrame) {
             level1AirborneFromAboveFloor = false;

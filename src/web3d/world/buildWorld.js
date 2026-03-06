@@ -2060,21 +2060,34 @@ export function buildWorld(scene, options = {}) {
   setRenderingGroup(pzPanda2, 2);
 
   const cloudCutouts = [];
+  const cloudSkyMinY = Math.max(12, floorTopY + 8);
+  const cloudSkyMaxY = cloudSkyMinY + 4;
+  const cloudSkyMinZ = -24;
+  const cloudSkyMaxZ = -18;
+  const cloudSpanX = (LEVEL1.extents.maxX - LEVEL1.extents.minX) + 16;
   for (let i = 0; i < 12; i++) {
+    const xT = i / 11;
+    const y = cloudSkyMinY + (random() * (cloudSkyMaxY - cloudSkyMinY));
+    const z = cloudSkyMinZ + (random() * (cloudSkyMaxZ - cloudSkyMinZ));
     const cloud = createBillboardCloud(scene, `cloudCutout_${i}`, {
-      x: -22 + i * 6.1 + random() * 0.8,
-      y: 4.9 + random() * 1.2,
-      z: -6.4 - ((i % 3) * 0.9),
+      x: (LEVEL1.extents.minX - 8) + (cloudSpanX * xT) + ((random() - 0.5) * 1.6),
+      y,
+      z,
       scale: 1.6 + random() * 0.72,
     });
     cloud.metadata = {
       ...(cloud.metadata || {}),
       cameraIgnore: true,
       driftSpeed: 0.08 + ((i % 4) * 0.018),
-      driftMinX: -30,
-      driftMaxX: 58,
+      driftMinX: LEVEL1.extents.minX - 12,
+      driftMaxX: LEVEL1.extents.maxX + 12,
       driftStartX: cloud.position.x,
-      driftBaseY: cloud.position.y,
+      driftBaseY: y,
+      driftMinY: cloudSkyMinY,
+      driftMaxY: cloudSkyMaxY,
+      driftBaseZ: z,
+      driftMinZ: cloudSkyMinZ,
+      driftMaxZ: cloudSkyMaxZ,
       driftPhase: i * 0.58,
     };
     setRenderingGroup(cloud, 0);

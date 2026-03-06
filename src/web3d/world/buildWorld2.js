@@ -56,6 +56,12 @@ function prefixLevel2Gameplay(node) {
 
 function tagLevel2Decor(node) {
   for (const entry of collectLevel2Nodes(node)) {
+    if (entry.name && !entry.name.startsWith('L2_') && !entry.name.startsWith('L2_DECOR_')) {
+      entry.name = `L2_DECOR_${entry.name}`;
+    }
+    if (entry.id && !entry.id.startsWith('L2_') && !entry.id.startsWith('L2_DECOR_')) {
+      entry.id = `L2_DECOR_${entry.id}`;
+    }
     entry.metadata = {
       ...(entry.metadata || {}),
       decor: true,
