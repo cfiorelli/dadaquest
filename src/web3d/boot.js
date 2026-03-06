@@ -744,6 +744,7 @@ export async function boot(options = {}) {
   const goalVisualRoot = new BABYLON.TransformNode('goalVisualRoot', scene);
   goalVisualRoot.parent = world.goalRoot;
   goalVisualRoot.position.set(0, GOAL_MODEL_SLOT_Y, 0);
+  const level1AnimalDecor = [];
 
   // Procedural baby is the default player visual. External model is opt-in.
   if (useExternalPlayerModel) {
@@ -766,14 +767,25 @@ export async function boot(options = {}) {
     };
   }
 
-  await attachRoleModel('goalModel', world.goalRoot, {
-    parent: goalVisualRoot,
-    fallbackMeshes: goalFallbackMeshes,
-    fallbackMaterial: 'plastic',
-    rotation: new BABYLON.Vector3(0, Math.PI, 0),
-    actorRole: 'goal',
-    renderingGroupId: 3,
-  });
+  if (levelId !== 1) {
+    await attachRoleModel('goalModel', world.goalRoot, {
+      parent: goalVisualRoot,
+      fallbackMeshes: goalFallbackMeshes,
+      fallbackMaterial: 'plastic',
+      rotation: new BABYLON.Vector3(0, Math.PI, 0),
+      actorRole: 'goal',
+      renderingGroupId: 3,
+    });
+  } else {
+    const p = world.goalRoot.getAbsolutePosition();
+    actorState.goal = {
+      loaded: false,
+      usingFallback: true,
+      reason: 'procedural_human_dad_level1',
+      worldPos: [p.x, p.y, p.z],
+      bboxSize: [0, 0, 0],
+    };
+  }
 
   for (const signRoot of world.signs || []) {
     await attachRoleModel('signModel', signRoot, {
@@ -969,7 +981,22 @@ export async function boot(options = {}) {
           groundY: anchorPos ? anchorPos.y : 0,
           markDecorative: true,
         });
+        for (const root of result.roots || []) {
+          root.rotation.y += Math.PI;
+        }
         ensureVisibleMeshes(result.meshes);
+        const home = anchorPos || anchor.position.clone();
+        level1AnimalDecor.push({
+          kind: 'goat',
+          root: anchor,
+          home,
+          phase: 0.7,
+          speed: 0.62,
+          radius: 0.6,
+          bob: 0.028,
+          turn: 0,
+          baseYaw: 0,
+        });
       }
     }
     for (const anchor of anchors.pettingZooChickens || []) {
@@ -985,7 +1012,22 @@ export async function boot(options = {}) {
           groundY: anchorPos ? anchorPos.y : 0,
           markDecorative: true,
         });
+        for (const root of result.roots || []) {
+          root.rotation.y += Math.PI;
+        }
         ensureVisibleMeshes(result.meshes);
+        const home = anchorPos || anchor.position.clone();
+        level1AnimalDecor.push({
+          kind: 'chicken',
+          root: anchor,
+          home,
+          phase: home.x * 0.17,
+          speed: 0.95,
+          radius: 0.4,
+          bob: 0.022,
+          turn: 0,
+          baseYaw: 0,
+        });
       }
     }
     for (const anchor of anchors.pettingZooDino || []) {
@@ -1005,6 +1047,39 @@ export async function boot(options = {}) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
+        const home = anchorPos || anchor.position.clone();
+        level1AnimalDecor.push({
+          kind: 'dino',
+          root: anchor,
+          home,
+          phase: 1.85,
+          speed: 0.56,
+          radius: 0.7,
+          bob: 0.026,
+          turn: 0,
+          baseYaw: 0,
+        });
+      }
+    }
+  }
+
+  function updateLevel1AnimalDecor(dt) {
+    if (levelId !== 1 || shotMode || !level1AnimalDecor.length) return;
+    for (const animal of level1AnimalDecor) {
+      const root = animal.root;
+      if (!root?.isEnabled?.()) continue;
+      animal.turn += dt;
+      const t = animal.turn;
+      const px = animal.home.x + Math.sin((t * animal.speed) + animal.phase) * animal.radius;
+      const pz = animal.home.z + Math.cos((t * animal.speed) + animal.phase) * animal.radius * 0.6;
+      const py = animal.home.y + Math.sin((t * animal.speed * 1.6) + animal.phase) * animal.bob;
+      const prevPos = root.position.clone();
+      root.position.set(px, py, pz);
+      const dx = px - prevPos.x;
+      const dz = pz - prevPos.z;
+      if (Math.abs(dx) > 0.0005 || Math.abs(dz) > 0.0005) {
+        const targetYaw = Math.atan2(dx, dz) + animal.baseYaw;
+        root.rotation.y = damp(root.rotation.y, targetYaw, 5.5, dt);
       }
     }
   }
@@ -1936,6 +2011,8 @@ export async function boot(options = {}) {
         restartRun('keyboard');
       }
     }
+
+    updateLevel1AnimalDecor(dt);
 
     // Ambient micro-animations — disabled in shot mode
     if (!shotMode) {

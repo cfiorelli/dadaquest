@@ -138,6 +138,21 @@ function createPropContactShadow(scene, name, {
   return mesh;
 }
 
+function applyDecorFlags(node) {
+  if (!node) return;
+  node.metadata = { ...(node.metadata || {}), cameraIgnore: true };
+  if (node instanceof BABYLON.Mesh) {
+    node.isPickable = false;
+    node.checkCollisions = false;
+    return;
+  }
+  for (const mesh of node.getChildMeshes?.(false) || []) {
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.metadata = { ...(mesh.metadata || {}), cameraIgnore: true };
+  }
+}
+
 // ── Toy character builders ───────────────────────────────────────
 
 function createDaDa(scene, x, baseY, shadowGen, { animate = true } = {}) {
@@ -220,6 +235,169 @@ function createDaDa(scene, x, baseY, shadowGen, { animate = true } = {}) {
   }
 
   return { root, goal };
+}
+
+function createHumanDad(scene, x, baseY, shadowGen, { animate = true } = {}) {
+  const root = new BABYLON.TransformNode('humanDad', scene);
+  root.position.set(x, baseY, 0);
+  const visualRoot = new BABYLON.TransformNode('humanDadVisual', scene);
+  visualRoot.parent = root;
+
+  const shirtMat = new BABYLON.StandardMaterial('humanDadShirtMat', scene);
+  shirtMat.diffuseColor = new BABYLON.Color3(0.25, 0.42, 0.74);
+  shirtMat.specularColor = BABYLON.Color3.Black();
+  const skinMat = new BABYLON.StandardMaterial('humanDadSkinMat', scene);
+  skinMat.diffuseColor = new BABYLON.Color3(0.92, 0.79, 0.68);
+  skinMat.specularColor = BABYLON.Color3.Black();
+  const jeansMat = new BABYLON.StandardMaterial('humanDadJeansMat', scene);
+  jeansMat.diffuseColor = new BABYLON.Color3(0.18, 0.24, 0.44);
+  jeansMat.specularColor = BABYLON.Color3.Black();
+  const darkMat = new BABYLON.StandardMaterial('humanDadDarkMat', scene);
+  darkMat.diffuseColor = new BABYLON.Color3(0.18, 0.14, 0.12);
+  darkMat.specularColor = BABYLON.Color3.Black();
+
+  const torso = BABYLON.MeshBuilder.CreateCapsule('humanDadTorso', {
+    height: 1.55,
+    radius: 0.32,
+    tessellation: 12,
+  }, scene);
+  torso.position.y = 1.5;
+  torso.parent = visualRoot;
+  torso.material = shirtMat;
+  shadowGen.addShadowCaster(torso);
+
+  const neck = BABYLON.MeshBuilder.CreateCylinder('humanDadNeck', {
+    height: 0.16,
+    diameter: 0.18,
+  }, scene);
+  neck.position.y = 2.33;
+  neck.parent = visualRoot;
+  neck.material = skinMat;
+  shadowGen.addShadowCaster(neck);
+
+  const head = BABYLON.MeshBuilder.CreateSphere('humanDadHead', {
+    diameter: 0.66,
+    segments: 16,
+  }, scene);
+  head.position.y = 2.72;
+  head.parent = visualRoot;
+  head.material = skinMat;
+  shadowGen.addShadowCaster(head);
+
+  const hair = BABYLON.MeshBuilder.CreateBox('humanDadHair', {
+    width: 0.62,
+    height: 0.22,
+    depth: 0.56,
+  }, scene);
+  hair.position.set(0, 2.98, -0.02);
+  hair.parent = visualRoot;
+  hair.material = darkMat;
+  shadowGen.addShadowCaster(hair);
+
+  const beard = BABYLON.MeshBuilder.CreateBox('humanDadBeard', {
+    width: 0.34,
+    height: 0.18,
+    depth: 0.08,
+  }, scene);
+  beard.position.set(0, 2.55, -0.31);
+  beard.parent = visualRoot;
+  beard.material = darkMat;
+  shadowGen.addShadowCaster(beard);
+
+  for (const side of [-1, 1]) {
+    const arm = BABYLON.MeshBuilder.CreateCylinder(`humanDadArm${side}`, {
+      height: 1.08,
+      diameter: 0.16,
+      tessellation: 10,
+    }, scene);
+    arm.position.set(side * 0.52, 1.63, 0);
+    arm.rotation.z = side * 0.14;
+    arm.parent = visualRoot;
+    arm.material = shirtMat;
+    shadowGen.addShadowCaster(arm);
+
+    const hand = BABYLON.MeshBuilder.CreateSphere(`humanDadHand${side}`, {
+      diameter: 0.18,
+      segments: 10,
+    }, scene);
+    hand.position.set(side * 0.59, 1.08, 0);
+    hand.parent = visualRoot;
+    hand.material = skinMat;
+    shadowGen.addShadowCaster(hand);
+
+    const leg = BABYLON.MeshBuilder.CreateCylinder(`humanDadLeg${side}`, {
+      height: 1.24,
+      diameter: 0.2,
+      tessellation: 10,
+    }, scene);
+    leg.position.set(side * 0.18, 0.62, 0);
+    leg.parent = visualRoot;
+    leg.material = jeansMat;
+    shadowGen.addShadowCaster(leg);
+
+    const shoe = BABYLON.MeshBuilder.CreateBox(`humanDadShoe${side}`, {
+      width: 0.26,
+      height: 0.1,
+      depth: 0.46,
+    }, scene);
+    shoe.position.set(side * 0.18, 0.03, -0.04);
+    shoe.parent = visualRoot;
+    shoe.material = darkMat;
+    shadowGen.addShadowCaster(shoe);
+  }
+
+  const faceTex = new BABYLON.DynamicTexture('humanDadFaceTex', { width: 128, height: 128 }, scene, true);
+  const ctx = faceTex.getContext();
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.fillStyle = '#1d1a18';
+  ctx.beginPath();
+  ctx.arc(42, 48, 7, 0, Math.PI * 2);
+  ctx.arc(86, 48, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1d1a18';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(64, 70, 20, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.stroke();
+  faceTex.update();
+  faceTex.hasAlpha = true;
+
+  const face = BABYLON.MeshBuilder.CreatePlane('humanDadFace', {
+    width: 0.34,
+    height: 0.34,
+  }, scene);
+  face.position.set(0, 2.73, -0.34);
+  face.parent = visualRoot;
+  const faceMat = new BABYLON.StandardMaterial('humanDadFaceMat', scene);
+  faceMat.diffuseTexture = faceTex;
+  faceMat.opacityTexture = faceTex;
+  faceMat.useAlphaFromDiffuseTexture = true;
+  faceMat.specularColor = BABYLON.Color3.Black();
+  faceMat.emissiveColor = new BABYLON.Color3(0.14, 0.12, 0.1);
+  face.material = faceMat;
+
+  root.scaling.setAll(1.18);
+  applyDecorFlags(root);
+
+  const goal = BABYLON.MeshBuilder.CreateBox('goalTrigger', {
+    width: 3.0, height: 7.0, depth: 3.0,
+  }, scene);
+  goal.position.y = -1.8;
+  goal.parent = root;
+  goal.visibility = 0;
+  goal.isPickable = false;
+  goal.checkCollisions = false;
+  goal.metadata = { ...(goal.metadata || {}), cameraIgnore: true };
+
+  if (animate) {
+    scene.registerBeforeRender(() => {
+      const t = performance.now() * 0.001;
+      visualRoot.rotation.z = Math.sin(t * 1.2) * 0.03;
+      visualRoot.rotation.y = Math.sin(t * 0.75) * 0.035;
+    });
+  }
+
+  return { root, goal, height: 3.22 };
 }
 
 function createArrowSign(scene, name, { x, y, z, direction = 1, shadowGen }) {
@@ -1237,7 +1415,7 @@ export function buildWorld(scene, options = {}) {
 
   // === GOAL (DaDa) ===
   const goalDef = LEVEL1.goal;
-  const dada = createDaDa(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
+  const dada = createHumanDad(scene, goalDef.x, goalDef.y, shadowGen, { animate: animateGoal });
   setRenderingGroup(dada.root, 3);
 
   // Foreground crib rail creates a toy-diorama frame for the start area.
@@ -1455,6 +1633,7 @@ export function buildWorld(scene, options = {}) {
   tagDecorNode(pzRoot);
 
   const startPenTopY = getNearestLevel1SurfaceTopY(-16.0) + 0.02;
+  const dinoTopY = getNearestLevel1SurfaceTopY(0.6) + 0.02;
 
   // Welcome sign near spawn
   const pzWelcomeSign = createWelcomeSign(scene, { x: -17.2, y: startPenTopY, z: 2.35, shadowGen });
@@ -1468,16 +1647,9 @@ export function buildWorld(scene, options = {}) {
 
   // Fence sections — entrance corral + animal pens
   const pzFences = [
-    // Entrance corral (flanks welcome sign)
-    createFenceSection(scene, 'pz_f0', { x: -19.0, y: startPenTopY, z: 1.72, rotY: 0,          length: 1.8, shadowGen }),
-    createFenceSection(scene, 'pz_f1', { x: -15.0, y: startPenTopY, z: 1.72, rotY: 0,          length: 1.8, shadowGen }),
-    createFenceSection(scene, 'pz_f2', { x: -17.0, y: startPenTopY, z: 2.7,  rotY: Math.PI / 2, length: 0.92, shadowGen }),
-    // Goat + chicken pen (mid-spawn area)
-    createFenceSection(scene, 'pz_f3', { x: -14.4, y: startPenTopY, z: 2.06, rotY: 0,          length: 2.2, shadowGen }),
-    createFenceSection(scene, 'pz_f4', { x: -11.5, y: startPenTopY, z: 2.78, rotY: Math.PI / 2, length: 1.0, shadowGen }),
-    // Panda pen (left side)
-    createFenceSection(scene, 'pz_f5', { x: -21.2, y: startPenTopY, z: 1.76, rotY: 0,          length: 1.6, shadowGen }),
-    createFenceSection(scene, 'pz_f6', { x: -19.4, y: startPenTopY, z: 2.48, rotY: Math.PI / 2, length: 0.74, shadowGen }),
+    createFenceSection(scene, 'pz_f0', { x: -19.2, y: startPenTopY, z: 2.42, rotY: 0,          length: 1.2, shadowGen }),
+    createFenceSection(scene, 'pz_f1', { x: -16.6, y: startPenTopY, z: 3.08, rotY: 0,          length: 1.0, shadowGen }),
+    createFenceSection(scene, 'pz_f2', { x: -12.4, y: startPenTopY, z: 3.18, rotY: 0,          length: 1.1, shadowGen }),
   ];
   for (const f of pzFences) {
     f.parent = pzRoot;
@@ -1486,7 +1658,7 @@ export function buildWorld(scene, options = {}) {
 
   // Animal anchors — boot.js loads GLBs, fits + grounds them via fitLoadedModel
   const pzGoatAnchor = new BABYLON.TransformNode('pz_goatAnchor', scene);
-  pzGoatAnchor.position.set(-16.0, startPenTopY, 2.48);
+  pzGoatAnchor.position.set(-14.5, startPenTopY, 2.34);
   pzGoatAnchor.parent = pzRoot;
   pzGoatAnchor.metadata = { cameraIgnore: true };
 
@@ -1495,16 +1667,16 @@ export function buildWorld(scene, options = {}) {
     new BABYLON.TransformNode('pz_chicken1', scene),
     new BABYLON.TransformNode('pz_chicken2', scene),
   ];
-  pzChickenAnchors[0].position.set(-12.9, startPenTopY, 2.42);
-  pzChickenAnchors[1].position.set(-11.7, startPenTopY, 2.92);
-  pzChickenAnchors[2].position.set(-13.5, startPenTopY, 3.0);
+  pzChickenAnchors[0].position.set(-11.3, startPenTopY, 2.28);
+  pzChickenAnchors[1].position.set(-10.1, startPenTopY, 2.62);
+  pzChickenAnchors[2].position.set(-12.25, startPenTopY, 2.92);
   for (const a of pzChickenAnchors) {
     a.parent = pzRoot;
     a.metadata = { cameraIgnore: true };
   }
 
   const pzDinoAnchor = new BABYLON.TransformNode('pz_dinoAnchor', scene);
-  pzDinoAnchor.position.set(2.5, getNearestLevel1SurfaceTopY(2.5) + 0.02, 2.8);
+  pzDinoAnchor.position.set(0.6, dinoTopY, 2.26);
   pzDinoAnchor.parent = pzRoot;
   pzDinoAnchor.metadata = { cameraIgnore: true };
 
@@ -1521,7 +1693,7 @@ export function buildWorld(scene, options = {}) {
   const pzMiniSigns = [
     createMiniSign(scene, 'pz_sign_goats', { x: -16.9, y: startPenTopY, z: 1.92, label: 'GOATS', shadowGen }),
     createMiniSign(scene, 'pz_sign_chickens', { x: -12.05, y: startPenTopY, z: 1.9, label: 'CHICKENS', shadowGen }),
-    createMiniSign(scene, 'pz_sign_dino', { x: 1.3, y: getNearestLevel1SurfaceTopY(1.3) + 0.02, z: 2.2, label: 'DINO', shadowGen }),
+    createMiniSign(scene, 'pz_sign_dino', { x: -0.4, y: dinoTopY, z: 1.9, label: 'DINO', shadowGen }),
     createMiniSign(scene, 'pz_sign_rules', { x: 23.8, y: getNearestLevel1SurfaceTopY(23.8) + 0.02, z: 2.35, label: 'NO CLIMBING', shadowGen }),
   ];
   for (const sign of pzMiniSigns) {
@@ -1532,7 +1704,7 @@ export function buildWorld(scene, options = {}) {
   const laterPenTopY = getNearestLevel1SurfaceTopY(23.1) + 0.02;
   const pzLaterFences = [
     createFenceSection(scene, 'pz_f7', { x: 22.6, y: laterPenTopY, z: 2.66, rotY: 0, length: 1.2, shadowGen }),
-    createFenceSection(scene, 'pz_f8', { x: 25.2, y: laterPenTopY, z: 2.74, rotY: Math.PI / 2, length: 0.72, shadowGen }),
+    createFenceSection(scene, 'pz_f8', { x: 26.2, y: laterPenTopY, z: 2.96, rotY: 0, length: 1.0, shadowGen }),
   ];
   for (const f of pzLaterFences) {
     f.parent = pzRoot;
@@ -1593,6 +1765,17 @@ export function buildWorld(scene, options = {}) {
       pettingZooGoat: [pzGoatAnchor],
       pettingZooChickens: pzChickenAnchors,
       pettingZooDino: [pzDinoAnchor],
+    },
+    level1Decor: {
+      animalHomes: {
+        goat: [{ x: -14.5, y: startPenTopY, z: 2.34 }],
+        chickens: [
+          { x: -11.3, y: startPenTopY, z: 2.28 },
+          { x: -10.1, y: startPenTopY, z: 2.62 },
+          { x: -12.25, y: startPenTopY, z: 2.92 },
+        ],
+        dino: [{ x: 0.6, y: dinoTopY, z: 2.26 }],
+      },
     },
   };
 }
