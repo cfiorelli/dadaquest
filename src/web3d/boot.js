@@ -267,6 +267,39 @@ function combineBounds(meshes) {
   };
 }
 
+function buildSurfaceBoundsFromVisual(name, node, fallback = null) {
+  const meshes = collectRenderableMeshes(node);
+  if (meshes.length) {
+    const bounds = combineBounds(meshes);
+    return {
+      name,
+      topY: bounds.max.y,
+      minX: bounds.min.x,
+      maxX: bounds.max.x,
+      minZ: bounds.min.z,
+      maxZ: bounds.max.z,
+      baseY: bounds.max.y + 0.02,
+    };
+  }
+  if (fallback) {
+    return {
+      name,
+      topY: fallback.topY,
+      minX: fallback.minX,
+      maxX: fallback.maxX,
+      minZ: fallback.minZ,
+      maxZ: fallback.maxZ,
+      baseY: fallback.topY + 0.02,
+    };
+  }
+  return null;
+}
+
+function reportDevError(errorLike) {
+  if (!import.meta.env.DEV) return;
+  window.__DADA_DEV_ERROR__?.(errorLike);
+}
+
 function collectRenderableMeshes(rootOrRoots) {
   const roots = Array.isArray(rootOrRoots) ? rootOrRoots : [rootOrRoots];
   const meshes = [];
@@ -312,8 +345,10 @@ function fitLoadedModel(rootOrRoots, {
       mesh.isPickable = false;
       mesh.metadata = {
         ...(mesh.metadata || {}),
+        decor: markDecorative ? true : mesh.metadata?.decor,
         cameraIgnore: markDecorative ? true : mesh.metadata?.cameraIgnore,
         cameraBlocker: markDecorative ? false : mesh.metadata?.cameraBlocker,
+        level2Decor: markDecorative ? true : mesh.metadata?.level2Decor,
       };
     }
     return combineBounds(renderMeshes);
@@ -510,6 +545,47 @@ function resolveLevel2CameraOcclusion(scene, headPos, desiredPos, ignoredMeshes)
   };
 }
 
+function isLevel2GameplayMesh(mesh) {
+  if (!(mesh instanceof BABYLON.Mesh)) return false;
+  if (mesh.metadata?.level2Gameplay === true) return true;
+  return (mesh.name || '').startsWith('L2_');
+}
+
+function collectLevel2OccludingMeshes(scene, headPos, cameraPos, ignoredMeshes) {
+  const toCamera = cameraPos.subtract(headPos);
+  const rayLen = toCamera.length();
+  if (rayLen <= 0.001) return [];
+
+  const rayDir = toCamera.scale(1 / rayLen);
+  const ray = new BABYLON.Ray(headPos, rayDir, rayLen);
+  const hits = [];
+
+  for (const mesh of scene.meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    if (!mesh.isEnabled()) continue;
+    if (mesh.isVisible === false) continue;
+    if ((mesh.visibility ?? 1) <= 0.02) continue;
+    if (ignoredMeshes.has(mesh)) continue;
+    if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') continue;
+    if (mesh.name === 'goalTrigger') continue;
+    if (mesh.getTotalVertices?.() <= 0) continue;
+
+    mesh.computeWorldMatrix(true);
+    const hit = ray.intersectsMesh(mesh, true);
+    if (!hit?.hit || !Number.isFinite(hit.distance)) continue;
+    if (hit.distance <= 0.0001 || hit.distance >= rayLen) continue;
+
+    hits.push({
+      mesh,
+      distance: hit.distance,
+      pickedPoint: hit.pickedPoint || null,
+    });
+  }
+
+  hits.sort((a, b) => a.distance - b.distance);
+  return hits.slice(0, 8);
+}
+
 function sanitizeLoadedRoleModel({
   role,
   result,
@@ -668,6 +744,7 @@ export async function boot(options = {}) {
           : buildWorld(scene);
   } catch (buildErr) {
     ui.showStartError(buildErr?.message || 'World build failed');
+    reportDevError(buildErr);
     console.error('[boot] World build failed:', buildErr);
     throw buildErr;
   }
@@ -684,14 +761,16 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.assetModels = availableModels;
   const level1FloorTopY = levelId === 1
     ? (() => {
-      if (world.ground?.getBoundingInfo) {
-        world.ground.computeWorldMatrix?.(true);
-        return world.ground.getBoundingInfo().boundingBox.maximumWorld.y;
-      }
-      if (world.level?.ground) {
-        return world.level.ground.y + (world.level.ground.h * 0.5);
-      }
-      return null;
+      const floorSurface = buildSurfaceBoundsFromVisual('floor', world.groundVisual, world.level?.ground
+        ? {
+          topY: world.level.ground.y + (world.level.ground.h * 0.5),
+          minX: world.level.ground.x - (world.level.ground.w * 0.5),
+          maxX: world.level.ground.x + (world.level.ground.w * 0.5),
+          minZ: (world.level.ground.z ?? 0) - (world.level.ground.d * 0.5),
+          maxZ: (world.level.ground.z ?? 0) + (world.level.ground.d * 0.5),
+        }
+        : null);
+      return floorSurface?.topY ?? null;
     })()
     : null;
   if (levelId === 1 && import.meta.env.DEV) {
@@ -814,28 +893,36 @@ export async function boot(options = {}) {
   const level1AnimalDecor = [];
   const level1SurfaceMap = new Map();
   if (levelId === 1 && world.level) {
-    const ground = world.level.ground;
-    if (ground) {
-      const groundZ = ground.z ?? 0;
-      level1SurfaceMap.set('floor', {
-        name: 'floor',
-        topY: ground.y + (ground.h * 0.5),
-        minX: ground.x - (ground.w * 0.5),
-        maxX: ground.x + (ground.w * 0.5),
-        minZ: groundZ - (ground.d * 0.5),
-        maxZ: groundZ + (ground.d * 0.5),
-      });
+    const floorFallback = world.level.ground
+      ? {
+        topY: world.level.ground.y + (world.level.ground.h * 0.5),
+        minX: world.level.ground.x - (world.level.ground.w * 0.5),
+        maxX: world.level.ground.x + (world.level.ground.w * 0.5),
+        minZ: (world.level.ground.z ?? 0) - (world.level.ground.d * 0.5),
+        maxZ: (world.level.ground.z ?? 0) + (world.level.ground.d * 0.5),
+      }
+      : null;
+    const floorSurface = buildSurfaceBoundsFromVisual('floor', world.surfaceVisuals?.floor || world.groundVisual, floorFallback);
+    if (floorSurface) {
+      level1SurfaceMap.set('floor', floorSurface);
     }
+
     for (const surface of world.level.platforms || []) {
-      const centerZ = surface.z ?? 0;
-      level1SurfaceMap.set(surface.name, {
-        name: surface.name,
+      const fallback = {
         topY: surface.y + (surface.h * 0.5),
         minX: surface.x - (surface.w * 0.5),
         maxX: surface.x + (surface.w * 0.5),
-        minZ: centerZ - (surface.d * 0.5),
-        maxZ: centerZ + (surface.d * 0.5),
-      });
+        minZ: (surface.z ?? 0) - (surface.d * 0.5),
+        maxZ: (surface.z ?? 0) + (surface.d * 0.5),
+      };
+      const resolved = buildSurfaceBoundsFromVisual(
+        surface.name,
+        world.surfaceVisuals?.[surface.name],
+        fallback,
+      );
+      if (resolved) {
+        level1SurfaceMap.set(surface.name, resolved);
+      }
     }
   }
 
@@ -843,6 +930,9 @@ export async function boot(options = {}) {
     const meta = anchor?.metadata?.level1DecorSurface || {};
     const key = meta.name || (meta.type === 'floor' ? 'floor' : '');
     const base = (key && level1SurfaceMap.get(key)) || level1SurfaceMap.get('floor');
+    const groundedOffsetY = Number.isFinite(anchor?.metadata?.level1GroundOffsetY)
+      ? anchor.metadata.level1GroundOffsetY
+      : 0;
     if (!base) {
       const pos = getAnchorWorldPosition(anchor) || BABYLON.Vector3.Zero();
       return {
@@ -852,7 +942,7 @@ export async function boot(options = {}) {
         maxX: pos.x + 1,
         minZ: pos.z - 1,
         maxZ: pos.z + 1,
-        baseY: pos.y,
+        baseY: pos.y + groundedOffsetY,
       };
     }
     return {
@@ -862,8 +952,31 @@ export async function boot(options = {}) {
       maxX: Number.isFinite(meta.maxX) ? meta.maxX : base.maxX,
       minZ: Number.isFinite(meta.minZ) ? meta.minZ : base.minZ,
       maxZ: Number.isFinite(meta.maxZ) ? meta.maxZ : base.maxZ,
-      baseY: Number.isFinite(meta.baseY) ? meta.baseY : base.topY + 0.02,
+      baseY: (Number.isFinite(meta.baseY) ? meta.baseY : base.topY + 0.02) + groundedOffsetY,
     };
+  }
+
+  function computeAnchorGroundOffsetY(anchor) {
+    const meshes = collectRenderableMeshes(anchor);
+    if (!meshes.length) return 0;
+    const bounds = combineBounds(meshes);
+    const anchorPos = anchor.getAbsolutePosition?.() || anchor.position || BABYLON.Vector3.Zero();
+    const localMinY = bounds.min.y - anchorPos.y;
+    return localMinY < 0 ? -localMinY : 0;
+  }
+
+  function applyLevel1DecorGroundOffset(anchor, surface, meshes) {
+    if (!anchor || !surface || !Array.isArray(meshes) || !meshes.length) return;
+    for (const mesh of meshes) mesh.computeWorldMatrix(true);
+    const bounds = combineBounds(meshes);
+    const groundedOffsetY = Math.max(0, surface.baseY - bounds.min.y);
+    anchor.metadata = {
+      ...(anchor.metadata || {}),
+      level1GroundOffsetY: groundedOffsetY,
+    };
+    if (groundedOffsetY > 0.0001) {
+      anchor.position.y += groundedOffsetY;
+    }
   }
 
   function clampLevel1DecorPoint(surface, x, z) {
@@ -1036,12 +1149,6 @@ export async function boot(options = {}) {
     const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
     const l2propDefs = [
       {
-        role: 'futureCribModel',
-        anchor: l2anchors.babyBed,
-        fallback: l2fallback?.babyBed,
-        fit: { targetMaxSize: 6.2, groundOffset: 0.4 },
-      },
-      {
         role: 'futurePianoModel',
         anchor: l2anchors.piano,
         fallback: l2fallback?.piano,
@@ -1052,12 +1159,6 @@ export async function boot(options = {}) {
         anchor: l2anchors.bianca,
         fallback: null,
         fit: { targetHeight: 2.2, targetMaxSize: 3.0, groundOffset: 0.0 },
-      },
-      {
-        role: 'futureRockingHorseModel',
-        anchor: l2anchors.rockingHorse,
-        fallback: null,
-        fit: { targetMaxSize: 4.2, groundOffset: 0.35 },
       },
       {
         role: 'futureHighchairModel',
@@ -1097,7 +1198,7 @@ export async function boot(options = {}) {
       }
       if (result?.loaded) {
         const anchorPos = anchor.getAbsolutePosition();
-        fitLoadedModel(result.roots, {
+        fitLoadedModel(anchor, {
           targetMaxSize: fit?.targetMaxSize ?? 0,
           targetHeight: fit?.targetHeight ?? 0,
           groundY: anchorPos.y + (fit?.groundOffset ?? 0),
@@ -1122,6 +1223,11 @@ export async function boot(options = {}) {
       rollAmp = 0.03,
       accel = 7.5,
       minWalkSpeed = 0.02,
+      retargetMinSec = 1.5,
+      retargetMaxSec = 3.5,
+      pauseMinSec = 0.4,
+      pauseMaxSec = 1.1,
+      arrivalThreshold = 0.22,
     }) => {
       const surface = getLevel1DecorSurface(anchor);
       const anchorPos = getAnchorWorldPosition(anchor) || anchor.position.clone();
@@ -1141,6 +1247,11 @@ export async function boot(options = {}) {
         rollAmp,
         accel,
         minWalkSpeed,
+        retargetMinSec,
+        retargetMaxSec,
+        pauseMinSec,
+        pauseMaxSec,
+        arrivalThreshold,
         seed: `${anchor.name}:${kind}:${zone || 'zone'}`,
       });
       level1AnimalDecor.push({ kind, zone, root: anchor, controller, surface });
@@ -1163,6 +1274,11 @@ export async function boot(options = {}) {
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
+        anchor.metadata = {
+          ...(anchor.metadata || {}),
+          level1GroundOffsetY: 0.53,
+        };
+        anchor.position.y = surface.baseY + 0.53;
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'goat',
@@ -1197,6 +1313,7 @@ export async function boot(options = {}) {
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
+        applyLevel1DecorGroundOffset(anchor, surface, result.meshes);
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'chicken',
@@ -1230,6 +1347,7 @@ export async function boot(options = {}) {
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
+        applyLevel1DecorGroundOffset(anchor, surface, result.meshes);
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'dino',
@@ -1263,6 +1381,7 @@ export async function boot(options = {}) {
           for (const root of result.roots || []) {
             root.rotation.y += Math.PI;
           }
+          applyLevel1DecorGroundOffset(anchor, surface, result.meshes);
           ensureVisibleMeshes(result.meshes);
           registerAnimalDecor(anchor, {
             kind: 'pig',
@@ -1299,6 +1418,7 @@ export async function boot(options = {}) {
           for (const root of result.roots || []) {
             root.rotation.y += Math.PI;
           }
+          applyLevel1DecorGroundOffset(anchor, surface, result.meshes);
           ensureVisibleMeshes(result.meshes);
           registerAnimalDecor(anchor, {
             kind: 'elephant',
@@ -1311,8 +1431,13 @@ export async function boot(options = {}) {
             stepFreq: 4.2,
             pitchAmp: 0.012,
             rollAmp: 0.038,
-            accel: 5.2,
+            accel: 3.8,
             minWalkSpeed: 0.03,
+            retargetMinSec: 3.0,
+            retargetMaxSec: 5.0,
+            pauseMinSec: 0.8,
+            pauseMaxSec: 1.6,
+            arrivalThreshold: 0.34,
           });
         }
       }
@@ -1372,6 +1497,28 @@ export async function boot(options = {}) {
     for (const animal of level1AnimalDecor) {
       if (!animal.root?.isEnabled?.()) continue;
       animal.controller.update(dt);
+      const meshes = collectRenderableMeshes(animal.root);
+      if (!meshes.length) continue;
+      animal.root.computeWorldMatrix?.(true);
+      for (const mesh of meshes) mesh.computeWorldMatrix(true);
+      const bounds = combineBounds(meshes);
+      const desiredGroundY = animal.surface.topY + 0.02;
+      if (!animal.groundCalibrated) {
+        const calibrationLift = desiredGroundY - bounds.min.y;
+        if (Math.abs(calibrationLift) > 0.05) {
+          animal.surface.baseY += calibrationLift;
+          animal.controller.surface.baseY += calibrationLift;
+          animal.controller.home.y += calibrationLift;
+          animal.controller.pos.y += calibrationLift;
+          animal.root.position.y += calibrationLift;
+        }
+        animal.groundCalibrated = true;
+      }
+      if (bounds.min.y < desiredGroundY) {
+        animal.root.position.y += desiredGroundY - bounds.min.y;
+        animal.root.computeWorldMatrix?.(true);
+        for (const mesh of meshes) mesh.computeWorldMatrix(true);
+      }
     }
   }
 
@@ -1525,13 +1672,26 @@ export async function boot(options = {}) {
       clearMs: 0,
     });
   }
+  const level2OcclusionState = new Map();
+  if (levelId === 2) {
+    for (const mesh of scene.meshes) {
+      if (!(mesh instanceof BABYLON.Mesh)) continue;
+      if (!mesh.metadata?.decor) continue;
+      level2OcclusionState.set(mesh.uniqueId, {
+        mesh,
+        baseVisibility: typeof mesh.visibility === 'number' ? mesh.visibility : 1,
+        current: typeof mesh.visibility === 'number' ? mesh.visibility : 1,
+        target: typeof mesh.visibility === 'number' ? mesh.visibility : 1,
+      });
+    }
+  }
 
   // Camera — fixed angle, smooth follow
   const cameraStartPos = levelId === 2
-    ? new BABYLON.Vector3((spawnPoint.x || -12) - 10, (spawnPoint.y || 2) + 10, -18)
+    ? new BABYLON.Vector3((spawnPoint.x || -12) - 10.0, (spawnPoint.y || 2) + 10.0, -18.0)
     : new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
   const cameraStartTarget = levelId === 2
-    ? new BABYLON.Vector3(spawnPoint.x || -12, (spawnPoint.y || 2) + 1.0, 0)
+    ? new BABYLON.Vector3((spawnPoint.x || -12), (spawnPoint.y || 2) + 1.0, 0)
     : new BABYLON.Vector3(-12, 2, 0);
   const camera = new BABYLON.FreeCamera('cam', cameraStartPos.clone(), scene);
   camera.setTarget(cameraStartTarget.clone());
@@ -1728,29 +1888,54 @@ export async function boot(options = {}) {
     );
   }
 
-  function updateLevel2CameraProbe(dt, occlusionHit) {
+  function updateLevel2OccluderFade(dt, headPos) {
+    if (levelId !== 2 || !debugFlags.occlusionFade) return [];
+    const hits = collectLevel2OccludingMeshes(scene, headPos, camera.position, cameraIgnoredMeshes);
+    const activeIds = new Set();
+
+    for (const hit of hits) {
+      const mesh = hit.mesh;
+      activeIds.add(mesh.uniqueId);
+      const stateInfo = level2OcclusionState.get(mesh.uniqueId);
+      if (!stateInfo) continue;
+      stateInfo.target = isLevel2GameplayMesh(mesh) ? stateInfo.baseVisibility : Math.min(stateInfo.baseVisibility, 0.12);
+    }
+
+    for (const stateInfo of level2OcclusionState.values()) {
+      if (!activeIds.has(stateInfo.mesh.uniqueId)) {
+        stateInfo.target = stateInfo.baseVisibility;
+      }
+      stateInfo.current = damp(stateInfo.current, stateInfo.target, 12, dt);
+      stateInfo.mesh.visibility = stateInfo.current;
+    }
+
+    return hits;
+  }
+
+  function updateLevel2CameraProbe(dt, occlusionHits) {
     if (!import.meta.env.DEV || levelId !== 2) return;
     level2ProbeTimer += dt;
     if (level2ProbeTimer < 1) return;
     level2ProbeTimer = 0;
 
-    if (!occlusionHit?.mesh) {
+    if (!occlusionHits?.length) {
       return;
     }
-    const mesh = occlusionHit.mesh;
+    const mesh = occlusionHits[0].mesh;
     if (mesh.uniqueId === level2LoggedOccluderId) return;
     level2LoggedOccluderId = mesh.uniqueId;
-    const bounds = mesh.getBoundingInfo()?.boundingBox;
-    const pos = mesh.getAbsolutePosition();
-    console.log('[L2 camera probe] occluder', {
-      name: mesh.name,
-      id: mesh.id,
-      position: [pos.x, pos.y, pos.z],
-      min: bounds ? [bounds.minimumWorld.x, bounds.minimumWorld.y, bounds.minimumWorld.z] : null,
-      max: bounds ? [bounds.maximumWorld.x, bounds.maximumWorld.y, bounds.maximumWorld.z] : null,
-      extendSizeWorld: bounds ? [bounds.extendSizeWorld.x, bounds.extendSizeWorld.y, bounds.extendSizeWorld.z] : null,
-      parentChain: describeNodeChain(mesh),
-    });
+    console.log('[L2 camera probe] occluders', occlusionHits.slice(0, 3).map(({ mesh: hitMesh, distance }) => {
+      const bounds = hitMesh.getBoundingInfo()?.boundingBox;
+      const pos = hitMesh.getAbsolutePosition();
+      return {
+        name: hitMesh.name,
+        id: hitMesh.id,
+        distance: Number(distance.toFixed(3)),
+        position: [pos.x, pos.y, pos.z],
+        extendSizeWorld: bounds ? [bounds.extendSizeWorld.x, bounds.extendSizeWorld.y, bounds.extendSizeWorld.z] : null,
+        parentChain: describeNodeChain(hitMesh),
+      };
+    }));
   }
 
   function finishRun() {
@@ -1810,6 +1995,12 @@ export async function boot(options = {}) {
           mesh.material.emissiveColor = base.clone();
         }
       }
+    }
+
+    for (const stateInfo of level2OcclusionState.values()) {
+      stateInfo.target = stateInfo.baseVisibility;
+      stateInfo.current = stateInfo.baseVisibility;
+      stateInfo.mesh.visibility = stateInfo.baseVisibility;
     }
 
     for (const coin of coins) {
@@ -1885,6 +2076,34 @@ export async function boot(options = {}) {
       debugIdleTimerMs = 1000;
       player.beginSpawnProbe('initial');
     }
+  }
+
+  if (debugMode) {
+    window.__DADA_DEBUG__.startLevel = (targetLevelId = levelId) => {
+      if (targetLevelId === levelId) {
+        selectedLevelId = levelId;
+      }
+      requestStart(targetLevelId);
+      return window.__DADA_DEBUG__.sceneKey;
+    };
+    window.__DADA_DEBUG__.restartRun = () => {
+      restartRun('debug');
+      return window.__DADA_DEBUG__.sceneKey;
+    };
+    window.__DADA_DEBUG__.teleportToGoal = () => {
+      if (state === 'title') {
+        selectedLevelId = levelId;
+        requestStart(levelId);
+      }
+      const goalBounds = world.goal.getBoundingInfo()?.boundingBox;
+      if (!goalBounds) return false;
+      const center = goalBounds.centerWorld;
+      player.spawnAt(center.x, center.y, center.z);
+      player.vx = 0;
+      player.vy = 0;
+      updatePlayerShadow(player);
+      return true;
+    };
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -2022,6 +2241,7 @@ export async function boot(options = {}) {
 
   function updateLevelInteractions(dt) {
     const pos = player.mesh.position;
+    const checkpointPulse = 0.16 + (Math.sin(performance.now() * 0.004) * 0.08);
 
     if (onesieBuffTimerMs > 0) {
       onesieBuffTimerMs = Math.max(0, onesieBuffTimerMs - dt * 1000);
@@ -2033,6 +2253,18 @@ export async function boot(options = {}) {
 
     // Checkpoint overlaps
     for (const checkpoint of checkpoints) {
+      if (checkpoint.marker) {
+        for (const mesh of checkpoint.marker.getChildMeshes()) {
+          if (!mesh.material || !mesh.material.emissiveColor) continue;
+          const base = checkpointEmissiveBase.get(mesh.uniqueId);
+          if (!base) continue;
+          if (checkpoint.index <= activeCheckpointIndex) {
+            mesh.material.emissiveColor = base.clone();
+          } else {
+            mesh.material.emissiveColor = base.add(new BABYLON.Color3(checkpointPulse, checkpointPulse * 0.7, checkpointPulse * 0.18));
+          }
+        }
+      }
       if (checkpoint.index <= activeCheckpointIndex) continue;
       const dx = pos.x - checkpoint.spawn.x;
       const dy = pos.y - checkpoint.spawn.y;
@@ -2270,38 +2502,39 @@ export async function boot(options = {}) {
 
   // Main loop
   engine.runRenderLoop(() => {
-    const dt = engine.getDeltaTime() / 1000;
+    try {
+      const dt = engine.getDeltaTime() / 1000;
 
-    if (shotMode) {
-      updatePlayerShadow(player);
-      updatePlayerReadabilityLight();
-      updateActorDebug();
-      window.__DADA_DEBUG__.playerX = player.mesh.position.x;
-      window.__DADA_DEBUG__.playerY = player.mesh.position.y;
+      if (shotMode) {
+        updatePlayerShadow(player);
+        updatePlayerReadabilityLight();
+        updateActorDebug();
+        window.__DADA_DEBUG__.playerX = player.mesh.position.x;
+        window.__DADA_DEBUG__.playerY = player.mesh.position.y;
 
-      if (debugHud) {
-        const fps = engine.getFps();
-        const pDebug = player.getDebugState();
-        debugHud.update(fps, pDebug, state, player.lastCollisionHits);
+        if (debugHud) {
+          const fps = engine.getFps();
+          const pDebug = player.getDebugState();
+          debugHud.update(fps, pDebug, state, player.lastCollisionHits);
+        }
+
+        scene.render();
+        if (shotFrames < SHOT_FRAMES_TARGET) {
+          shotFrames += 1;
+          window.__DADA_DEBUG__.shotFrames = shotFrames;
+        }
+        if (shotFrames >= SHOT_FRAMES_TARGET) {
+          window.__DADA_DEBUG__.shotReady = true;
+        }
+        return;
       }
 
-      scene.render();
-      if (shotFrames < SHOT_FRAMES_TARGET) {
-        shotFrames += 1;
-        window.__DADA_DEBUG__.shotFrames = shotFrames;
+      if (input.consumeMuteToggle()) {
+        const muted = audio.toggleMute();
+        debugFlags.audio = !muted;
+        window.__DADA_DEBUG__.flags.audio = !muted;
+        ui.showStatus(muted ? 'Muted' : 'Sound on', 820);
       }
-      if (shotFrames >= SHOT_FRAMES_TARGET) {
-        window.__DADA_DEBUG__.shotReady = true;
-      }
-      return;
-    }
-
-    if (input.consumeMuteToggle()) {
-      const muted = audio.toggleMute();
-      debugFlags.audio = !muted;
-      window.__DADA_DEBUG__.flags.audio = !muted;
-      ui.showStatus(muted ? 'Muted' : 'Sound on', 820);
-    }
 
     if (state === 'title' || state === 'loading') {
       // requestStart() handles transitions directly from keydown.
@@ -2429,7 +2662,7 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (levelId === 2) {
-        const desiredCameraPos = new BABYLON.Vector3(px - 10, py + 10, -18);
+        const desiredCameraPos = new BABYLON.Vector3(px - 10.0, py + 10.0, -18.0);
         camera.position.x = damp(camera.position.x, desiredCameraPos.x, 4.5, dt);
         camera.position.y = damp(camera.position.y, desiredCameraPos.y, 4.5, dt);
         camera.position.z = damp(camera.position.z, desiredCameraPos.z, 4.5, dt);
@@ -2438,6 +2671,9 @@ export async function boot(options = {}) {
           damp(camera.getTarget().y, py + 1.0, 4.5, dt),
           0,
         ));
+        const level2HeadPos = new BABYLON.Vector3(px, py + 1.2, 0);
+        const occlusionHits = updateLevel2OccluderFade(dt, level2HeadPos);
+        updateLevel2CameraProbe(dt, occlusionHits);
       } else {
         const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
         const desiredCameraPos = new BABYLON.Vector3(targetX - 8, py + 4, CAMERA_FOLLOW_Z);
@@ -2447,7 +2683,6 @@ export async function boot(options = {}) {
           : useGenericCameraOcclusionGuard
             ? resolveCameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
             : { correctedPos: desiredCameraPos, hit: null };
-        updateLevel2CameraProbe(dt, occlusion.hit);
         const cameraDamp = occlusion.hit ? 11 : 4;
         camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
         camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
@@ -2507,7 +2742,13 @@ export async function boot(options = {}) {
       debugHud.update(fps, pDebug, state, pDebug ? player.lastCollisionHits : 0);
     }
 
-    scene.render();
+      scene.render();
+    } catch (runtimeErr) {
+      reportDevError(runtimeErr);
+      ui.showStartError(runtimeErr?.message || 'Runtime update failed');
+      console.error('[boot] Runtime update failed:', runtimeErr);
+      engine.stopRenderLoop();
+    }
   });
 
   window.addEventListener('resize', () => engine.resize());

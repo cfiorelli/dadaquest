@@ -20,9 +20,9 @@ const LANE_Z = LANE_Z2;
 
 // Condo palette — cooler, indoor, pastel
 const P2 = {
-  ground:       [195, 182, 165],
-  platformCard: [210, 195, 170],
-  edgeDark:     [148, 130, 105],
+  ground:       [166, 156, 144],
+  platformCard: [218, 198, 170],
+  edgeDark:     [122, 104, 82],
 };
 
 const LEVEL2_DECOR_Z = 1.35;
@@ -58,6 +58,7 @@ function tagLevel2Decor(node) {
   for (const entry of collectLevel2Nodes(node)) {
     entry.metadata = {
       ...(entry.metadata || {}),
+      decor: true,
       level2Decor: true,
     };
     if (entry instanceof BABYLON.Mesh) {
@@ -65,6 +66,7 @@ function tagLevel2Decor(node) {
       entry.checkCollisions = false;
       entry.metadata = {
         ...(entry.metadata || {}),
+        decor: true,
         cameraIgnore: true,
         cameraBlocker: false,
         level2Decor: true,
@@ -73,10 +75,19 @@ function tagLevel2Decor(node) {
   }
 }
 
+function markLevel2Cull(node) {
+  for (const entry of collectLevel2Nodes(node)) {
+    entry.metadata = {
+      ...(entry.metadata || {}),
+      level2Cull: true,
+    };
+  }
+}
+
 function createRoomPanel(scene, name, {
   x,
   y,
-  z = 6.8,
+  z = 14.8,
   width,
   height,
   color = [228, 220, 208],
@@ -94,6 +105,7 @@ function createRoomPanel(scene, name, {
   wall.parent = root;
   wall.material = makeCardboard(scene, `${name}_wallMat`, ...color, { roughness: 0.96 });
   wall.receiveShadows = true;
+  wall.visibility = 0.06;
 
   const crown = BABYLON.MeshBuilder.CreateBox(`${name}_crown`, {
     width: width + 0.18,
@@ -103,6 +115,7 @@ function createRoomPanel(scene, name, {
   crown.parent = root;
   crown.position.y = (height * 0.5) - 0.12;
   crown.material = makeCardboard(scene, `${name}_crownMat`, ...trim, { roughness: 0.9 });
+  crown.visibility = 0.14;
 
   const baseTrim = BABYLON.MeshBuilder.CreateBox(`${name}_baseTrim`, {
     width: width + 0.12,
@@ -112,6 +125,7 @@ function createRoomPanel(scene, name, {
   baseTrim.parent = root;
   baseTrim.position.y = -(height * 0.5) + 0.09;
   baseTrim.material = crown.material;
+  baseTrim.visibility = 0.14;
 
   for (let i = 0; i < windowCount; i++) {
     const offset = ((i - ((windowCount - 1) * 0.5)) * Math.max(1.8, width / (windowCount + 1)));
@@ -123,6 +137,7 @@ function createRoomPanel(scene, name, {
     frame.parent = root;
     frame.position.set(offset, 0.4, -0.11);
     frame.material = makeCardboard(scene, `${name}_windowMat_${i}`, 182, 198, 212, { roughness: 0.75 });
+    frame.visibility = 0.18;
 
     const muntinV = BABYLON.MeshBuilder.CreateBox(`${name}_muntinV_${i}`, {
       width: 0.08,
@@ -142,6 +157,7 @@ function createRoomPanel(scene, name, {
   }
 
   tagLevel2Decor(root);
+  markLevel2Cull(root);
   return root;
 }
 
@@ -465,11 +481,11 @@ function createPianoVisual(scene, name, { x, y, z = 0, shadowGen }) {
 export function buildWorld2(scene, options = {}) {
   const { animateGoal = true } = options;
   // Scene
-  scene.clearColor = new BABYLON.Color4(0.88, 0.90, 0.94, 1.0);
-  scene.ambientColor = new BABYLON.Color3(0.38, 0.36, 0.40);
+  scene.clearColor = new BABYLON.Color4(0.84, 0.86, 0.90, 1.0);
+  scene.ambientColor = new BABYLON.Color3(0.34, 0.33, 0.37);
   scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-  scene.fogDensity = 0.007;
-  scene.fogColor = new BABYLON.Color3(0.88, 0.90, 0.94);
+  scene.fogDensity = 0.0045;
+  scene.fogColor = new BABYLON.Color3(0.84, 0.86, 0.90);
 
   // Lighting
   const keyLight = new BABYLON.DirectionalLight('keyLight2', new BABYLON.Vector3(-0.5, -0.9, 0.25), scene);
@@ -663,24 +679,26 @@ export function buildWorld2(scene, options = {}) {
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop2', {
     width: 70, height: 22, depth: 0.5,
   }, scene);
-  backdrop.position.set(9, 9, 10.6);
+  backdrop.position.set(9, 9, 13.8);
   const backdropMat = makeCardboard(scene, 'backdrop2Mat', 225, 220, 210, { roughness: 0.96 });
   backdrop.material = backdropMat;
   backdrop.receiveShadows = true;
+  backdrop.visibility = 0.05;
   tagLevel2Decor(backdrop);
+  markLevel2Cull(backdrop);
 
   const roomPanels = [
     createRoomPanel(scene, 'l2_bedroomPanel', {
-      x: -11.0, y: 4.8, z: 6.9, width: 16, height: 10.5, color: [220, 214, 226], trim: [165, 152, 170], windowCount: 1,
+      x: -11.0, y: 4.8, z: 15.2, width: 16, height: 10.5, color: [220, 214, 226], trim: [165, 152, 170], windowCount: 1,
     }),
     createRoomPanel(scene, 'l2_kitchenPanel', {
-      x: 8.4, y: 4.5, z: 6.8, width: 12.5, height: 9.6, color: [217, 226, 214], trim: [165, 176, 154], windowCount: 1,
+      x: 8.4, y: 4.5, z: 15.0, width: 12.5, height: 9.6, color: [217, 226, 214], trim: [165, 176, 154], windowCount: 1,
     }),
     createRoomPanel(scene, 'l2_stairsPanel', {
-      x: 23.2, y: 6.4, z: 6.7, width: 10.8, height: 10.2, color: [224, 217, 206], trim: [171, 156, 138], windowCount: 0,
+      x: 23.2, y: 6.4, z: 14.8, width: 10.8, height: 10.2, color: [224, 217, 206], trim: [171, 156, 138], windowCount: 0,
     }),
     createRoomPanel(scene, 'l2_loftPanel', {
-      x: 36.8, y: 8.0, z: 6.5, width: 12.4, height: 9.4, color: [214, 228, 214], trim: [156, 170, 144], windowCount: 2,
+      x: 36.8, y: 8.0, z: 14.6, width: 12.4, height: 9.4, color: [214, 228, 214], trim: [156, 170, 144], windowCount: 2,
     }),
   ];
   roomPanels.forEach((panel) => setRenderingGroup(panel, 1));

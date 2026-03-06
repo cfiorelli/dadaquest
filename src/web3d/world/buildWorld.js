@@ -949,6 +949,48 @@ function placeLevel1DecorAnchor(anchor, {
   return bounds;
 }
 
+function createBillboardCloud(scene, name, {
+  x,
+  y,
+  z,
+  scale = 1,
+}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  root.scaling.setAll(scale);
+  root.metadata = { ...(root.metadata || {}), cameraIgnore: true };
+
+  const cloudMat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+  cloudMat.diffuseColor = new BABYLON.Color3(0.97, 0.98, 1.0);
+  cloudMat.emissiveColor = new BABYLON.Color3(0.88, 0.92, 0.98);
+  cloudMat.specularColor = BABYLON.Color3.Black();
+  cloudMat.alpha = 0.96;
+  cloudMat.disableLighting = true;
+  cloudMat.backFaceCulling = false;
+  cloudMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+
+  const puffs = [
+    { x: -0.72, y: 0.02, w: 1.02, h: 0.66 },
+    { x: -0.08, y: 0.18, w: 1.30, h: 0.82 },
+    { x: 0.68, y: 0.03, w: 0.98, h: 0.62 },
+    { x: 0.20, y: -0.16, w: 1.12, h: 0.68 },
+  ];
+  for (let i = 0; i < puffs.length; i++) {
+    const puff = puffs[i];
+    const mesh = BABYLON.MeshBuilder.CreatePlane(`${name}_puff${i}`, {
+      width: puff.w,
+      height: puff.h,
+    }, scene);
+    mesh.parent = root;
+    mesh.position.set(puff.x, puff.y, 0);
+    mesh.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    mesh.material = cloudMat;
+    tagDecorMesh(mesh);
+  }
+
+  return root;
+}
+
 /** Cardboard "Welcome to the Petting Zoo" sign on two posts. */
 function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   const root = new BABYLON.TransformNode('pz_welcomeSign', scene);
@@ -956,10 +998,10 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   tagDecorNode(root);
 
   const postMat = makeCardboard(scene, 'pz_signPostMat', ...P.edgeDark, { roughness: 0.88 });
-  const boardWidth = 2.24;
-  const boardHeight = 1.07;
+  const boardWidth = 2.42;
+  const boardHeight = 1.12;
   const boardDepth = 0.09;
-  for (const px of [-1.06, 1.06]) {
+  for (const px of [-1.18, 1.18]) {
     const post = BABYLON.MeshBuilder.CreateBox(`pz_signPost${px}`, {
       width: 0.13, height: 2.55, depth: 0.13,
     }, scene);
@@ -985,13 +1027,25 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   for (let gy = 28; gy < texH; gy += 18) {
     ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(texW, gy + 4); ctx.stroke();
   }
+  const fitFont = (text, startPx, maxWidth) => {
+    let size = startPx;
+    while (size > 42) {
+      ctx.font = `bold ${size}px Georgia, serif`;
+      if (ctx.measureText(text).width <= maxWidth) return size;
+      size -= 2;
+    }
+    return size;
+  };
+  const line1 = 'WELCOME TO THE';
+  const line2 = 'PETTING ZOO';
+  const maxTextWidth = texW - 172;
   ctx.fillStyle = '#2a1308';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = 'bold 76px Georgia, serif';
-  ctx.fillText('WELCOME TO THE', texW / 2, texH * 0.32);
-  ctx.font = 'bold 104px Georgia, serif';
-  ctx.fillText('PETTING ZOO', texW / 2, texH * 0.72);
+  ctx.font = `bold ${fitFont(line1, 92, maxTextWidth)}px Georgia, serif`;
+  ctx.fillText(line1, texW / 2, texH * 0.31);
+  ctx.font = `bold ${fitFont(line2, 128, maxTextWidth)}px Georgia, serif`;
+  ctx.fillText(line2, texW / 2, texH * 0.71);
   signTex.update();
 
   const boardMat = makeCardboard(scene, 'pz_welcomeBoardMat', 201, 152, 84, { roughness: 0.82 });
@@ -1017,7 +1071,7 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
     width: boardWidth * 0.92,
     height: boardHeight * 0.86,
   }, scene);
-  textPlane.position.set(0, 2.3, -(boardDepth * 0.5 + 0.03));
+  textPlane.position.set(0, 2.3, -(boardDepth * 0.5 + 0.05));
   textPlane.parent = root;
   textPlane.material = signMat;
   tagDecorMesh(textPlane);
@@ -1322,7 +1376,7 @@ export function buildWorld(scene, options = {}) {
 
   // === DIORAMA BASE ===
   const groundDef = LEVEL1.ground;
-  createCardboardPlatform(scene, 'ground', {
+  const groundVisual = createCardboardPlatform(scene, 'ground', {
     x: groundDef.x, y: groundDef.y, z: groundDef.z,
     w: groundDef.w, h: groundDef.h, d: groundDef.d,
     slabColor: P.ground,
@@ -1472,6 +1526,7 @@ export function buildWorld(scene, options = {}) {
 
   // === PLATFORMS ===
   const allPlatforms = [groundCollider];
+  const surfaceVisuals = { floor: groundVisual };
 
   for (const def of LEVEL1.platforms) {
     const platformNode = createCardboardPlatform(scene, def.name, {
@@ -1486,6 +1541,7 @@ export function buildWorld(scene, options = {}) {
       shadowGen,
     });
     setRenderingGroup(platformNode, 2);
+    surfaceVisuals[def.name] = platformNode;
 
     const col = BABYLON.MeshBuilder.CreateBox(def.name + '_col', {
       width: def.w,
@@ -2004,33 +2060,30 @@ export function buildWorld(scene, options = {}) {
   setRenderingGroup(pzPanda2, 2);
 
   const cloudCutouts = [];
-  for (let i = 0; i < 10; i++) {
-    const cloud = makeCloudCutout(scene, {
-      name: `cloudCutout_${i}`,
-      seed: 4400 + i,
-      width: 4.0 + random() * 1.2,
-      height: 1.8 + random() * 0.5,
-      thickness: 0.065,
-      x: -22 + i * 7.9 + random() * 0.8,
-      y: 9.8 + random() * 1.9,
-      z: 6.88 + i * 0.03,
-      color: [245, 245, 240],
-      alpha: 0.86,
+  for (let i = 0; i < 12; i++) {
+    const cloud = createBillboardCloud(scene, `cloudCutout_${i}`, {
+      x: -22 + i * 6.1 + random() * 0.8,
+      y: 4.9 + random() * 1.2,
+      z: -6.4 - ((i % 3) * 0.9),
+      scale: 1.6 + random() * 0.72,
     });
     cloud.metadata = {
       ...(cloud.metadata || {}),
       cameraIgnore: true,
-      driftSpeed: 0.07 + ((i % 4) * 0.018),
-      driftMinX: -28,
+      driftSpeed: 0.08 + ((i % 4) * 0.018),
+      driftMinX: -30,
       driftMaxX: 58,
       driftStartX: cloud.position.x,
+      driftBaseY: cloud.position.y,
+      driftPhase: i * 0.58,
     };
-    cloud.renderingGroupId = 0;
+    setRenderingGroup(cloud, 0);
     cloudCutouts.push(cloud);
   }
 
   return {
     ground: groundCollider,
+    groundVisual,
     platforms: allPlatforms,
     goal: dada.goal,
     goalRoot: dada.root,
@@ -2044,6 +2097,7 @@ export function buildWorld(scene, options = {}) {
     hazards,
     crumbles,
     level: LEVEL1,
+    surfaceVisuals,
     signs: signRoots,
     assetAnchors: {
       cribRail,

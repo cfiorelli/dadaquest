@@ -12,7 +12,7 @@
     "bannerModel": ["kenney_flag"],
     "treeModel": ["kenney_tree", "kenney_tree_pine"],
     "bushModel": ["kenney_flowers_tall", "kenney_plant", "kenney_grass"],
-    "cloudModel": ["kenney_rocks"],
+    "cloudModel": [],
     "futureDadModel": ["local_dad"],
     "futureMomModel": ["local_mom"],
     "futureCribModel": ["local_baby_bed"],
