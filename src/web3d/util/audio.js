@@ -50,6 +50,19 @@ const PLINK_RESTS = [
 ];
 const PLINK_VOL = 0.22;   // pluck volume through musicGain
 const PLINK_MS = 1000;    // one plink per second
+const COUNTRY_BPM = 192;
+const COUNTRY_STEP_SEC = 60 / COUNTRY_BPM / 2; // eighth-note feel
+const COUNTRY_SCHEDULE_AHEAD_SEC = 0.45;
+const COUNTRY_SCHEDULER_MS = 120;
+const COUNTRY_LEAD = [
+  392.0, 440.0, 493.88, 587.33, 659.25, 587.33, 493.88, 440.0,
+  392.0, 329.63, 293.66, 329.63, 392.0, 440.0, 493.88, 440.0,
+];
+const COUNTRY_BASS = [
+  98.0, 98.0, 146.83, 146.83, 110.0, 110.0, 98.0, 98.0,
+];
+const COUNTRY_SNARE_STEPS = new Set([2, 6]);
+const COUNTRY_KICK_STEPS = new Set([0, 4]);
 
 export class GameAudio {
   constructor({ enabled = true } = {}) {
@@ -58,6 +71,7 @@ export class GameAudio {
     this.ctx = null;
     this.master = null;
     this.musicGain = null;
+    this.sfxGain = null;
     this.cooldowns = new Map();
     this._unlockBound = null;
     this._pianoRunning = false;
@@ -65,7 +79,11 @@ export class GameAudio {
     this._beatIndex = 0;
     this._pianoScheduleId = null;
     this._birdChirpId = null;
+    this._countrySchedulerId = null;
+    this._countryNextNoteTime = 0;
+    this._countryStep = 0;
     this._musicStyle = 'piano';
+    this._noiseBuffer = null;
   }
 
   _ensureContext() {
@@ -79,6 +97,10 @@ export class GameAudio {
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
     this.musicGain.connect(this.master);
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = 1;
+    this.sfxGain.connect(this.master);
+    this._noiseBuffer = this._createNoiseBuffer();
   }
 
   armOnFirstGesture() {
@@ -116,24 +138,32 @@ export class GameAudio {
     this._musicStyle = style;
     this._plinkIndex = 0;
     this._beatIndex = 0;
+    this._countryStep = 0;
+    this._countryNextNoteTime = this.ctx.currentTime;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0.85, t + Math.max(0.02, fadeSec));
-    if (style === 'banjo') {
+    if (style === 'country') {
+      this._scheduleCountry();
+    } else if (style === 'banjo') {
       this._scheduleBanjo();
     } else {
       this._schedulePlink();
     }
-    this._scheduleBirdChirp();
+    if (style !== 'country') {
+      this._scheduleBirdChirp();
+    }
   }
 
   stopMusic(fadeSec = 0.5) {
     this._pianoRunning = false;
     clearTimeout(this._pianoScheduleId);
     clearTimeout(this._birdChirpId);
+    clearTimeout(this._countrySchedulerId);
     this._pianoScheduleId = null;
     this._birdChirpId = null;
+    this._countrySchedulerId = null;
     if (!this.ctx || !this.musicGain) return;
     const t = this.ctx.currentTime;
     this.musicGain.gain.cancelScheduledValues(t);
@@ -216,6 +246,108 @@ export class GameAudio {
     this._pianoScheduleId = window.setTimeout(() => this._scheduleBanjo(), BANJO_MS);
   }
 
+  _scheduleCountry() {
+    if (!this._pianoRunning || !this.ctx || !this.musicGain) return;
+    const now = this.ctx.currentTime;
+    if (!this._countryNextNoteTime || this._countryNextNoteTime < now) {
+      this._countryNextNoteTime = now + 0.02;
+    }
+    while (this._countryNextNoteTime < now + COUNTRY_SCHEDULE_AHEAD_SEC) {
+      this._scheduleCountryStep(this._countryNextNoteTime, this._countryStep);
+      this._countryNextNoteTime += COUNTRY_STEP_SEC;
+      this._countryStep += 1;
+    }
+    this._countrySchedulerId = window.setTimeout(() => this._scheduleCountry(), COUNTRY_SCHEDULER_MS);
+  }
+
+  _scheduleCountryStep(time, stepIndex) {
+    const leadFreq = COUNTRY_LEAD[stepIndex % COUNTRY_LEAD.length];
+    const bassFreq = COUNTRY_BASS[Math.floor(stepIndex / 2) % COUNTRY_BASS.length];
+    const stepInBar = stepIndex % 8;
+
+    if (stepIndex % 2 === 0 || stepInBar === 3 || stepInBar === 7) {
+      this._playCountryLeadAt(leadFreq, time);
+    }
+    if (stepInBar === 0 || stepInBar === 4) {
+      this._playCountryBassAt(bassFreq, time);
+    }
+    if (COUNTRY_KICK_STEPS.has(stepInBar)) {
+      this._playCountryKickAt(time);
+    }
+    if (COUNTRY_SNARE_STEPS.has(stepInBar)) {
+      this._playCountrySnareAt(time);
+    }
+    if (stepInBar === 1 || stepInBar === 5) {
+      this._playCountryHatAt(time);
+    }
+  }
+
+  _playCountryLeadAt(freq, start) {
+    if (!this.ctx || !this.musicGain || this.muted) return;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.16, start + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.14);
+    osc.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(start);
+    osc.stop(start + 0.18);
+
+    const slapOsc = this.ctx.createOscillator();
+    const slapGain = this.ctx.createGain();
+    slapOsc.type = 'square';
+    slapOsc.frequency.setValueAtTime(freq * 1.01, start + 0.12);
+    slapGain.gain.setValueAtTime(0.0001, start + 0.12);
+    slapGain.gain.linearRampToValueAtTime(0.04, start + 0.125);
+    slapGain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+    slapOsc.connect(slapGain);
+    slapGain.connect(this.musicGain);
+    slapOsc.start(start + 0.12);
+    slapOsc.stop(start + 0.24);
+  }
+
+  _playCountryBassAt(freq, start) {
+    if (!this.ctx || !this.musicGain || this.muted) return;
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, start);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(220, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.12, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(start);
+    osc.stop(start + 0.28);
+  }
+
+  _playCountryKickAt(start) {
+    this._osc(96, 'sine', start, 0.16, 0.065, 48, this.musicGain);
+  }
+
+  _playCountrySnareAt(start) {
+    this._playNoiseBurst(start, 0.075, 0.03, {
+      type: 'bandpass',
+      frequency: 1700,
+      q: 0.7,
+    }, this.musicGain);
+  }
+
+  _playCountryHatAt(start) {
+    this._playNoiseBurst(start, 0.04, 0.018, {
+      type: 'highpass',
+      frequency: 3200,
+      q: 0.6,
+    }, this.musicGain);
+  }
+
   // --- Occasional bird chirps ---
 
   _playBirdChirp() {
@@ -246,7 +378,41 @@ export class GameAudio {
     return true;
   }
 
-  _osc(freq, type, start, duration, volume, endFreq = null) {
+  _createNoiseBuffer() {
+    if (!this.ctx) return null;
+    const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.25, this.ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2) - 1;
+    }
+    return buffer;
+  }
+
+  _playNoiseBurst(start, duration, volume, filterDef = null, destination = null) {
+    if (!this.ctx || !this._noiseBuffer || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(volume, start + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    let tail = gain;
+    if (filterDef) {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = filterDef.type;
+      filter.frequency.setValueAtTime(filterDef.frequency, start);
+      filter.Q.setValueAtTime(filterDef.q ?? 1, start);
+      src.connect(filter);
+      filter.connect(gain);
+    } else {
+      src.connect(gain);
+    }
+    tail.connect(destination || this.sfxGain || this.master);
+    src.start(start);
+    src.stop(start + duration + 0.02);
+  }
+
+  _osc(freq, type, start, duration, volume, endFreq = null, destination = null) {
     if (!this.ctx || !this.master || this.muted) return;
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -261,7 +427,7 @@ export class GameAudio {
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
 
     osc.connect(gain);
-    gain.connect(this.master);
+    gain.connect(destination || this.sfxGain || this.master);
     osc.start(start);
     osc.stop(start + duration + 0.02);
   }
@@ -345,5 +511,49 @@ export class GameAudio {
     this._osc(523, 'sine', t, 0.16, 0.07);
     this._osc(659, 'sine', t + 0.12, 0.16, 0.07);
     this._osc(784, 'sine', t + 0.24, 0.26, 0.08);
+  }
+
+  playAmbientMoo() {
+    if (!this.enabled || !this._allow('ambientMoo', 2400)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const vibrato = this.ctx.createOscillator();
+    const vibratoGain = this.ctx.createGain();
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    vibrato.type = 'sine';
+    vibrato.frequency.value = 4.3;
+    vibratoGain.gain.value = 6;
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.35);
+    vibrato.connect(vibratoGain);
+    vibratoGain.connect(osc.frequency);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(480, t);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(0.04, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain || this.master);
+    vibrato.start(t);
+    osc.start(t);
+    vibrato.stop(t + 0.45);
+    osc.stop(t + 0.45);
+  }
+
+  playAmbientBirds() {
+    if (!this.enabled || !this._allow('ambientBirds', 1800)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const start = t + (i * 0.11);
+      const freq = 2500 + (i * 260);
+      this._osc(freq, 'sine', start, 0.08, 0.015, 4000 - (i * 150), this.sfxGain);
+    }
   }
 }

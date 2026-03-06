@@ -1680,6 +1680,16 @@ export function buildWorld(scene, options = {}) {
   pzDinoAnchor.parent = pzRoot;
   pzDinoAnchor.metadata = { cameraIgnore: true };
 
+  const pzPigAnchor = new BABYLON.TransformNode('pz_pigAnchor', scene);
+  pzPigAnchor.position.set(11.9, getNearestLevel1SurfaceTopY(11.9) + 0.02, 2.22);
+  pzPigAnchor.parent = pzRoot;
+  pzPigAnchor.metadata = { cameraIgnore: true };
+
+  const pzElephantAnchor = new BABYLON.TransformNode('pz_elephantAnchor', scene);
+  pzElephantAnchor.position.set(20.8, getNearestLevel1SurfaceTopY(20.8) + 0.02, 2.7);
+  pzElephantAnchor.parent = pzRoot;
+  pzElephantAnchor.metadata = { cameraIgnore: true };
+
   const pzHayBales = [
     createHayBale(scene, 'pz_hay0', { x: -15.0, y: startPenTopY, z: 3.35, scale: 1.0, shadowGen }),
     createHayBale(scene, 'pz_hay1', { x: -12.2, y: startPenTopY, z: 3.38, scale: 0.92, shadowGen }),
@@ -1765,6 +1775,8 @@ export function buildWorld(scene, options = {}) {
       pettingZooGoat: [pzGoatAnchor],
       pettingZooChickens: pzChickenAnchors,
       pettingZooDino: [pzDinoAnchor],
+      pettingZooPig: [pzPigAnchor],
+      pettingZooElephant: [pzElephantAnchor],
     },
     level1Decor: {
       animalHomes: {

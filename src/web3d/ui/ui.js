@@ -286,9 +286,11 @@ const CSS = `
 .dada-toast-wrap {
   position: absolute;
   top: 14px;
-  right: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
   pointer-events: none;
   z-index: 5;
@@ -329,8 +331,8 @@ const CSS = `
 /* Onesie boost card — centered pop-up overlay */
 .dada-boost-card {
   position: fixed;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%) scale(0.4);
+  top: 16px; left: 50%;
+  transform: translateX(-50%) scale(0.4);
   background: linear-gradient(145deg, #2b6dff, #1a4fcc);
   color: #fff;
   border-radius: 22px;
@@ -343,13 +345,13 @@ const CSS = `
   font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
 }
 @keyframes boostCardIn {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-  65%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  65%  { opacity: 1; transform: translateX(-50%) scale(1.06); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1.0); }
 }
 @keyframes boostCardOut {
-  0%   { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.78); }
+  0%   { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.78); }
 }
 .dada-boost-card.bc-in {
   animation: boostCardIn 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
@@ -571,6 +573,11 @@ export function createUI(uiRoot, options = {}) {
     pulseCancelTimer = setTimeout(() => coinsEl.classList.remove('pulse'), 130);
   }
 
+  function setCoinCount(collected, { pulse = false } = {}) {
+    coinsEl.textContent = `🍼 ${collected} / ${coinTotal}`;
+    if (pulse) pulseCoin();
+  }
+
   function clearToast(id) {
     if (toastTimers.has(id)) {
       clearTimeout(toastTimers.get(id));
@@ -694,7 +701,7 @@ export function createUI(uiRoot, options = {}) {
     /** Show gameplay HUD elements (coin counter, objective, control hints). */
     showGameplayHud(total) {
       coinTotal = total;
-      coinsEl.textContent = `🍼 0 / ${total}`;
+      setCoinCount(0);
       coinsEl.style.display = 'block';
       objectiveEl.style.display = 'block';
       // Show control hints; auto-fade after 5 s
@@ -715,8 +722,10 @@ export function createUI(uiRoot, options = {}) {
 
     /** Update coin counter; provide collected count. */
     updateCoins(collected) {
-      coinsEl.textContent = `🍼 ${collected} / ${coinTotal}`;
-      pulseCoin();
+      setCoinCount(collected, { pulse: true });
+    },
+    setCoins(collected) {
+      setCoinCount(collected, { pulse: false });
     },
 
     /** Update objective arrow direction. playerX < goalX → '→', else '←'. */

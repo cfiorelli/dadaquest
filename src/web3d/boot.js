@@ -1,5 +1,5 @@
 import * as BABYLON from '@babylonjs/core';
-import { buildWorld } from './world/buildWorld.js';
+import { buildWorld, createCoin } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -31,6 +31,13 @@ const CAMERA_FOLLOW_Z = -13.2;
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
   return 1 - ((1 - v) ** 3);
+}
+
+function quadraticBezier(start, mid, end, t) {
+  const omt = 1 - t;
+  return start.scale(omt * omt)
+    .add(mid.scale(2 * omt * t))
+    .add(end.scale(t * t));
 }
 
 function getShotScene() {
@@ -647,8 +654,17 @@ export async function boot(options = {}) {
     intensity: shotMode ? 0.35 : 0.44,
   });
   const availableModels = await getAvailableModels();
+  const availableModelSet = new Set(availableModels);
   window.__DADA_DEBUG__.assetModels = availableModels;
   const shouldLoadLevel2Decor = false;
+  if (levelId === 1) {
+    if (!availableModelSet.has('local_baby_pig')) {
+      console.warn('[assets] missing local_baby_pig; skipping Level 1 pig decor');
+    }
+    if (!availableModelSet.has('local_baby_elephant')) {
+      console.warn('[assets] missing local_baby_elephant; skipping Level 1 elephant decor');
+    }
+  }
 
   const actorState = {
     player: { loaded: false, usingFallback: true, reason: 'not_loaded', bboxSize: [0, 0, 0], worldPos: [0, 0, 0] },
@@ -968,6 +984,27 @@ export async function boot(options = {}) {
 
   // Level 1 Petting Zoo — load animal GLBs onto pre-placed anchors
   if (levelId === 1) {
+    const registerAnimalDecor = (anchor, result, {
+      kind,
+      phase,
+      speed,
+      radius,
+      bob,
+    }) => {
+      const home = getAnchorWorldPosition(anchor) || anchor.position.clone();
+      level1AnimalDecor.push({
+        kind,
+        root: anchor,
+        home,
+        phase,
+        speed,
+        radius,
+        bob,
+        turn: 0,
+        baseYaw: 0,
+      });
+    };
+
     for (const anchor of anchors.pettingZooGoat || []) {
       const result = await attachRoleModel('futureGoatPropModel', anchor, {
         parent: anchor,
@@ -985,17 +1022,12 @@ export async function boot(options = {}) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
-        const home = anchorPos || anchor.position.clone();
-        level1AnimalDecor.push({
+        registerAnimalDecor(anchor, result, {
           kind: 'goat',
-          root: anchor,
-          home,
           phase: 0.7,
           speed: 0.62,
           radius: 0.6,
           bob: 0.028,
-          turn: 0,
-          baseYaw: 0,
         });
       }
     }
@@ -1017,16 +1049,12 @@ export async function boot(options = {}) {
         }
         ensureVisibleMeshes(result.meshes);
         const home = anchorPos || anchor.position.clone();
-        level1AnimalDecor.push({
+        registerAnimalDecor(anchor, result, {
           kind: 'chicken',
-          root: anchor,
-          home,
           phase: home.x * 0.17,
           speed: 0.95,
           radius: 0.4,
           bob: 0.022,
-          turn: 0,
-          baseYaw: 0,
         });
       }
     }
@@ -1047,18 +1075,69 @@ export async function boot(options = {}) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
-        const home = anchorPos || anchor.position.clone();
-        level1AnimalDecor.push({
+        registerAnimalDecor(anchor, result, {
           kind: 'dino',
-          root: anchor,
-          home,
           phase: 1.85,
           speed: 0.56,
           radius: 0.7,
           bob: 0.026,
-          turn: 0,
-          baseYaw: 0,
         });
+      }
+    }
+    if (availableModelSet.has('local_baby_pig')) {
+      for (const anchor of anchors.pettingZooPig || []) {
+        const result = await attachRoleModel('futurePigPropModel', anchor, {
+          parent: anchor,
+          fallbackMaterial: 'cardboard',
+          renderingGroupId: 2,
+        });
+        if (result.loaded) {
+          const anchorPos = getAnchorWorldPosition(anchor);
+          fitLoadedModel(result.roots, {
+            targetHeight: 1.05,
+            groundY: anchorPos ? anchorPos.y : 0,
+            markDecorative: true,
+          });
+          for (const root of result.roots || []) {
+            root.rotation.y += Math.PI;
+          }
+          ensureVisibleMeshes(result.meshes);
+          registerAnimalDecor(anchor, result, {
+            kind: 'pig',
+            phase: 0.42,
+            speed: 0.68,
+            radius: 0.45,
+            bob: 0.024,
+          });
+        }
+      }
+    }
+    if (availableModelSet.has('local_baby_elephant')) {
+      for (const anchor of anchors.pettingZooElephant || []) {
+        const result = await attachRoleModel('futureElephantPropModel', anchor, {
+          parent: anchor,
+          fallbackMaterial: 'cardboard',
+          renderingGroupId: 2,
+        });
+        if (result.loaded) {
+          const anchorPos = getAnchorWorldPosition(anchor);
+          fitLoadedModel(result.roots, {
+            targetHeight: 1.9,
+            groundY: anchorPos ? anchorPos.y : 0,
+            markDecorative: true,
+          });
+          for (const root of result.roots || []) {
+            root.rotation.y += Math.PI;
+          }
+          ensureVisibleMeshes(result.meshes);
+          registerAnimalDecor(anchor, result, {
+            kind: 'elephant',
+            phase: 1.18,
+            speed: 0.48,
+            radius: 0.52,
+            bob: 0.02,
+          });
+        }
       }
     }
   }
@@ -1081,6 +1160,113 @@ export async function boot(options = {}) {
         const targetYaw = Math.atan2(dx, dz) + animal.baseYaw;
         root.rotation.y = damp(root.rotation.y, targetYaw, 5.5, dt);
       }
+    }
+  }
+
+  function updateCoinLossDisplay(dt) {
+    if (!level1CoinLossAnim) return;
+    level1CoinLossAnim.elapsedMs = Math.min(level1CoinLossAnim.durationMs, level1CoinLossAnim.elapsedMs + (dt * 1000));
+    const t = Math.min(1, level1CoinLossAnim.elapsedMs / level1CoinLossAnim.durationMs);
+    const visibleCount = Math.max(0, Math.round(level1CoinLossAnim.startCount * (1 - t)));
+    ui.setCoins(visibleCount);
+    if (t >= 1) {
+      level1CoinLossAnim = null;
+      ui.setCoins(0);
+    }
+  }
+
+  function spawnCoinFlyback(coin, playerPos, index, count) {
+    const angle = (index / Math.max(1, count)) * Math.PI * 2;
+    const start = new BABYLON.Vector3(
+      playerPos.x + Math.cos(angle) * 0.24,
+      playerPos.y + 0.22 + ((index % 3) * 0.06),
+      playerPos.z + Math.sin(angle) * 0.12,
+    );
+    const end = new BABYLON.Vector3(coin.position.x, coin.position.y + 0.2, coin.position.z);
+    const mid = BABYLON.Vector3.Lerp(start, end, 0.5).add(new BABYLON.Vector3(0, 1.2, 0));
+    const flyer = createCoin(scene, `coinFlyback_${coin.node?.name || index}`, {
+      x: start.x,
+      y: start.y,
+      z: start.z,
+    });
+    flyer.isPickable = false;
+    flyer.metadata = { ...(flyer.metadata || {}), cameraIgnore: true };
+    for (const mesh of flyer.getChildMeshes(false)) {
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+      mesh.metadata = { ...(mesh.metadata || {}), cameraIgnore: true };
+      mesh.renderingGroupId = 3;
+    }
+    level1CoinFlyers.push({
+      coin,
+      node: flyer,
+      start,
+      mid,
+      end,
+      elapsedMs: 0,
+      durationMs: 700 + (index * 25),
+    });
+  }
+
+  function updateCoinFlybacks(dt) {
+    if (!level1CoinFlyers.length) return;
+    for (let i = level1CoinFlyers.length - 1; i >= 0; i--) {
+      const flyer = level1CoinFlyers[i];
+      flyer.elapsedMs = Math.min(flyer.durationMs, flyer.elapsedMs + (dt * 1000));
+      const t = Math.min(1, flyer.elapsedMs / flyer.durationMs);
+      const eased = easeOutCubic(t);
+      flyer.node.position.copyFrom(quadraticBezier(flyer.start, flyer.mid, flyer.end, eased));
+      flyer.node.rotation.y += dt * 8;
+      if (t >= 1) {
+        flyer.node.dispose();
+        flyer.coin.collected = false;
+        flyer.coin.node?.setEnabled(true);
+        flyer.coin.node?.position?.copyFrom?.(flyer.coin.position);
+        level1CoinFlyers.splice(i, 1);
+      }
+    }
+  }
+
+  function triggerLevel1FloorPenalty() {
+    if (levelId !== 1 || level1FloorPenaltyCooldownMs > 0) return;
+    const collectedCoins = coins.filter((coin) => coin.collected);
+    if (collectedCoins.length === 0) return;
+    level1FloorPenaltyCooldownMs = 1500;
+    const playerPos = player.mesh.position.clone();
+    for (const coin of coins) {
+      const wasCollected = coin.collected;
+      coin.collected = false;
+      if (!wasCollected) {
+        coin.node?.setEnabled(true);
+      }
+    }
+    const startCount = coinsCollected;
+    coinsCollected = 0;
+    level1CoinLossAnim = {
+      startCount,
+      elapsedMs: 0,
+      durationMs: 700,
+    };
+    ui.showStatus('Dropped all pacifiers!', 1100);
+    for (let i = 0; i < collectedCoins.length; i++) {
+      spawnCoinFlyback(collectedCoins[i], playerPos, i, collectedCoins.length);
+    }
+  }
+
+  function updateLevel1Ambient(dt) {
+    if (levelId !== 1 || shotMode || state !== 'gameplay' || respawnState) return;
+    level1AmbientTimerMs -= dt * 1000;
+    if (level1AmbientBirdDelayMs > 0) {
+      level1AmbientBirdDelayMs -= dt * 1000;
+      if (level1AmbientBirdDelayMs <= 0) {
+        audio.playAmbientBirds();
+        level1AmbientBirdDelayMs = -1;
+      }
+    }
+    if (level1AmbientTimerMs <= 0) {
+      audio.playAmbientMoo();
+      level1AmbientBirdDelayMs = 760 + (Math.random() * 280);
+      level1AmbientTimerMs = 6000 + ((Math.random() * 800) - 400);
     }
   }
 
@@ -1182,8 +1368,19 @@ export async function boot(options = {}) {
   let onesieJumpBoost = 1;
   let puddleInvulnMs = 0;
   let coinsCollected = 0;
+  let prevGrounded = player.grounded;
+  let prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
+  let level1FloorPenaltyCooldownMs = 0;
+  let level1AirborneFromAboveFloor = false;
+  let level1CoinLossAnim = null;
+  let level1CoinFlyers = [];
+  let level1AmbientTimerMs = 6200;
+  let level1AmbientBirdDelayMs = -1;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
   let goalWaveTimer = 0;   // ambient DaDa idle wave
+  const level1FloorTopY = levelId === 1 && world.level?.ground
+    ? world.level.ground.y + (world.level.ground.h * 0.5)
+    : null;
   const checkpointEmissiveBase = new Map();
   for (const checkpoint of checkpoints) {
     if (!checkpoint.marker) continue;
@@ -1378,6 +1575,13 @@ export async function boot(options = {}) {
     onesieJumpBoost = 1;
     puddleInvulnMs = 0;
     coinsCollected = 0;
+    level1FloorPenaltyCooldownMs = 0;
+    level1AirborneFromAboveFloor = false;
+    level1CoinLossAnim = null;
+    for (const flyer of level1CoinFlyers) flyer.node?.dispose?.();
+    level1CoinFlyers = [];
+    level1AmbientTimerMs = 6200;
+    level1AmbientBirdDelayMs = -1;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
     window.__DADA_DEBUG__.checkpointIndex = 0;
@@ -1400,6 +1604,7 @@ export async function boot(options = {}) {
       if (coin.node) coin.node.setEnabled(true);
     }
     coinsCollected = 0;
+    ui.setCoins(0);
     resetCrumbles();
     if (world.level2) world.level2.reset();
     if (world.level3) world.level3.reset();
@@ -1417,6 +1622,8 @@ export async function boot(options = {}) {
     player.setMovementModifiers();
     player.visual.scaling.set(1, 1, 1);
     player.visual.rotation.set(0, 0, 0);
+    prevGrounded = player.grounded;
+    prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
     updatePlayerShadow(player);
     updatePlayerReadabilityLight();
 
@@ -1455,7 +1662,7 @@ export async function boot(options = {}) {
     state = 'gameplay';
     input.consumeAll();
     player.setWinAnimationActive(false);
-    audio.startMusic(0.5, levelId === 1 ? 'banjo' : 'piano');
+    audio.startMusic(0.5, levelId === 1 ? 'country' : 'piano');
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
@@ -1878,6 +2085,9 @@ export async function boot(options = {}) {
       // requestStart() handles transitions directly from keydown.
       // Nothing to do here; render the scene so the title card remains visible.
     } else if (state === 'gameplay') {
+      if (level1FloorPenaltyCooldownMs > 0) {
+        level1FloorPenaltyCooldownMs = Math.max(0, level1FloorPenaltyCooldownMs - (dt * 1000));
+      }
       if (respawnState) {
         if (respawnState.phase === 'fadeOut') {
           respawnState.timer = Math.max(0, respawnState.timer - dt);
@@ -1920,6 +2130,7 @@ export async function boot(options = {}) {
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpJustPressed = jumpPress.edge;
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
+        const { halfH } = player.getCollisionHalfExtents();
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
 
         const playerEvents = player.consumeEvents();
@@ -1939,6 +2150,24 @@ export async function boot(options = {}) {
             const reason = 'fell_off_level';
             triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
           }
+        }
+
+        if (levelId === 1 && level1FloorTopY !== null) {
+          const afterBottomY = player.mesh.position.y - halfH;
+          if (prevGrounded && !player.grounded) {
+            level1AirborneFromAboveFloor = (prevPlayerBottomY - level1FloorTopY) > 0.9;
+          }
+          const landedThisFrame = !prevGrounded && player.grounded;
+          const nearFloor = Math.abs(afterBottomY - level1FloorTopY) < 0.12;
+          const wasFalling = (prevPlayerBottomY - level1FloorTopY) > 0.9;
+          if (landedThisFrame && nearFloor && wasFalling && level1AirborneFromAboveFloor) {
+            triggerLevel1FloorPenalty();
+          }
+          if (landedThisFrame) {
+            level1AirborneFromAboveFloor = false;
+          }
+          prevGrounded = player.grounded;
+          prevPlayerBottomY = afterBottomY;
         }
 
         // HUD updates each frame
@@ -2013,6 +2242,9 @@ export async function boot(options = {}) {
     }
 
     updateLevel1AnimalDecor(dt);
+    updateLevel1Ambient(dt);
+    updateCoinLossDisplay(dt);
+    updateCoinFlybacks(dt);
 
     // Ambient micro-animations — disabled in shot mode
     if (!shotMode) {
