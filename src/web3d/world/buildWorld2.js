@@ -25,6 +25,23 @@ const P2 = {
   edgeDark:     [148, 130, 105],
 };
 
+const LEVEL2_DECOR_Z = 1.35;
+
+function markDecorativeVisual(node) {
+  if (!node) return;
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      cameraIgnore: true,
+      cameraBlocker: false,
+    };
+  }
+}
+
 // ── Slip / hazard zone ────────────────────────────────────────────
 
 function createHazardZone(scene, name, { x, y, z = 0, width, depth }) {
@@ -385,10 +402,11 @@ export function buildWorld2(scene, options = {}) {
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop2', {
     width: 70, height: 22, depth: 0.5,
   }, scene);
-  backdrop.position.set(9, 9, 9.2);
+  backdrop.position.set(9, 9, 10.4);
   const backdropMat = makeCardboard(scene, 'backdrop2Mat', 225, 220, 210, { roughness: 0.96 });
   backdrop.material = backdropMat;
   backdrop.receiveShadows = true;
+  markDecorativeVisual(backdrop);
 
   // === AMANDA PATROL ===
   const amandaDef = LEVEL2.amanda;
@@ -406,10 +424,11 @@ export function buildWorld2(scene, options = {}) {
   let horseX = horseDef.startX;
   let horseSnapped = false;
   const horseVisualRoot = createRockingHorseVisual(scene, 'horseVisual', {
-    x: horseX, y: LEVEL2.platforms.find((p) => p.name === 'platHorse').y, z: LANE_Z,
+    x: horseX, y: LEVEL2.platforms.find((p) => p.name === 'platHorse').y, z: LEVEL2_DECOR_Z,
     shadowGen,
   });
   setRenderingGroup(horseVisualRoot, 2);
+  markDecorativeVisual(horseVisualRoot);
 
   // horseCollider is the invisible platform box for platHorse
   const horseColliderMesh = platformColliders[horseDef.platformName];
@@ -419,39 +438,41 @@ export function buildWorld2(scene, options = {}) {
   babyBedAnchor.position.set(
     LEVEL2.assetAnchors.babyBed.x,
     LEVEL2.assetAnchors.babyBed.y,
-    LEVEL2.assetAnchors.babyBed.z,
+    LEVEL2_DECOR_Z,
   );
   const babyBedVisual = createBedVisual(scene, 'babyBed', {
     x: LEVEL2.assetAnchors.babyBed.x,
     y: LEVEL2.assetAnchors.babyBed.y + 0.1,
-    z: LANE_Z,
+    z: LEVEL2_DECOR_Z,
     shadowGen,
   });
   setRenderingGroup(babyBedVisual, 2);
+  markDecorativeVisual(babyBedVisual);
 
   const pianoAnchor = new BABYLON.TransformNode('pianoAnchor', scene);
   pianoAnchor.position.set(
     LEVEL2.assetAnchors.piano.x,
     LEVEL2.assetAnchors.piano.y,
-    LEVEL2.assetAnchors.piano.z,
+    LEVEL2_DECOR_Z,
   );
   const pianoVisual = createPianoVisual(scene, 'piano', {
     x: LEVEL2.assetAnchors.piano.x,
     y: LEVEL2.assetAnchors.piano.y,
-    z: LANE_Z,
+    z: LEVEL2_DECOR_Z,
     shadowGen,
   });
   setRenderingGroup(pianoVisual, 2);
+  markDecorativeVisual(pianoVisual);
 
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
     LEVEL2.assetAnchors.bianca.x,
     LEVEL2.assetAnchors.bianca.y,
-    LEVEL2.assetAnchors.bianca.z,
+    LEVEL2_DECOR_Z,
   );
 
   const rockingHorseAnchor = new BABYLON.TransformNode('rockingHorseAnchor', scene);
-  rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LANE_Z);
+  rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
 
   // === LEVEL 2 RUNTIME LOGIC ===
   const PLAYER_HALF_W = 0.25;

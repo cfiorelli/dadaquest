@@ -284,6 +284,7 @@ function fitLoadedModel(rootOrRoots, {
       mesh.isPickable = false;
       mesh.metadata = {
         ...(mesh.metadata || {}),
+        cameraIgnore: markDecorative ? true : mesh.metadata?.cameraIgnore,
         cameraBlocker: markDecorative ? false : mesh.metadata?.cameraBlocker,
       };
     }
@@ -346,6 +347,7 @@ function isRenderableCameraObstacle(mesh, ignoredMeshes) {
   if (mesh.name === 'goalTrigger') return false;
   if (ignoredMeshes.has(mesh)) return false;
   if (mesh.metadata?.role === 'player' || mesh.metadata?.role === 'goal') return false;
+  if (mesh.metadata?.cameraIgnore === true) return false;
   if (mesh.metadata?.cameraBlocker === false) return false;
   const bounds = mesh.getBoundingInfo()?.boundingBox;
   if (bounds) {
@@ -378,6 +380,47 @@ function resolveCameraOcclusion(scene, focusPos, desiredPos, ignoredMeshes) {
   return {
     correctedPos: focusPos.add(rayDir.scale(safeDistance)),
     hit: pick,
+  };
+}
+
+function findNearestMeshRayHit(scene, ray, ignoredMeshes) {
+  let nearest = null;
+  for (const mesh of scene.meshes) {
+    if (!isRenderableCameraObstacle(mesh, ignoredMeshes)) continue;
+    if (mesh.getTotalVertices?.() <= 0) continue;
+    mesh.computeWorldMatrix(true);
+    const hit = ray.intersectsMesh(mesh, true);
+    if (!hit?.hit || !Number.isFinite(hit.distance)) continue;
+    if (hit.distance <= 0.0001) continue;
+    if (!nearest || hit.distance < nearest.distance) {
+      nearest = {
+        mesh,
+        distance: hit.distance,
+        pickedPoint: hit.pickedPoint || null,
+      };
+    }
+  }
+  return nearest;
+}
+
+function resolveLevel2CameraOcclusion(scene, headPos, desiredPos, ignoredMeshes) {
+  const toCamera = desiredPos.subtract(headPos);
+  const rayLen = toCamera.length();
+  if (rayLen <= 0.001) {
+    return { correctedPos: desiredPos, hit: null };
+  }
+
+  const rayDir = toCamera.scale(1 / rayLen);
+  const ray = new BABYLON.Ray(headPos, rayDir, rayLen);
+  const nearest = findNearestMeshRayHit(scene, ray, ignoredMeshes);
+  if (!nearest || nearest.distance >= rayLen) {
+    return { correctedPos: desiredPos, hit: null };
+  }
+
+  const safeDistance = Math.max(0.8, nearest.distance - 0.35);
+  return {
+    correctedPos: headPos.add(rayDir.scale(safeDistance)),
+    hit: nearest,
   };
 }
 
@@ -912,14 +955,19 @@ export async function boot(options = {}) {
   playerRimLight.specular = new BABYLON.Color3(0.24, 0.26, 0.32);
   playerRimLight.range = 11;
   const cameraIgnoredMeshes = new Set([player.blobShadow]);
-  const useCameraOcclusionGuard = levelId === 2 || levelId === 3;
+  const useLevel2CameraOcclusionGuard = levelId === 2;
+  const useGenericCameraOcclusionGuard = levelId === 3;
   let level2ProbeTimer = 0;
-  let level2LastProbeMeshId = null;
-  const level2ProbeRestoreTimers = new Map();
+  let level2LoggedOccluderId = null;
 
   // Dev-only debug HUD + rest stability test
   const debugHud = import.meta.env.DEV ? createDebugHud() : null;
   if (import.meta.env.DEV) installRestStabilityTest(player);
+  if (debugMode) {
+    window.__DADA_DEBUG__.sceneRef = scene;
+    window.__DADA_DEBUG__.playerRef = player.mesh;
+    window.__DADA_DEBUG__.cameraRef = camera;
+  }
 
   // Game state machine
   const goalX = world.goalRoot.position.x;
@@ -1079,33 +1127,18 @@ export async function boot(options = {}) {
     );
   }
 
-  function updateLevel2CameraProbe(dt) {
+  function updateLevel2CameraProbe(dt, occlusionHit) {
     if (!import.meta.env.DEV || levelId !== 2) return;
     level2ProbeTimer += dt;
     if (level2ProbeTimer < 1) return;
     level2ProbeTimer = 0;
 
-    const playerHead = player.mesh.position.add(new BABYLON.Vector3(0, 0.9, 0));
-    const toPlayer = playerHead.subtract(camera.position);
-    const rayLength = toPlayer.length();
-    if (rayLength <= 0.001) return;
-
-    const rayDir = toPlayer.scale(1 / rayLength);
-    const ray = new BABYLON.Ray(camera.position, rayDir, rayLength);
-    const pick = scene.pickWithRay(
-      ray,
-      (mesh) => isRenderableCameraObstacle(mesh, cameraIgnoredMeshes),
-      true,
-    );
-
-    if (!pick?.hit || !pick.pickedMesh) {
-      level2LastProbeMeshId = null;
+    if (!occlusionHit?.mesh) {
       return;
     }
-
-    const mesh = pick.pickedMesh;
-    if (mesh.uniqueId === level2LastProbeMeshId) return;
-    level2LastProbeMeshId = mesh.uniqueId;
+    const mesh = occlusionHit.mesh;
+    if (mesh.uniqueId === level2LoggedOccluderId) return;
+    level2LoggedOccluderId = mesh.uniqueId;
     const bounds = mesh.getBoundingInfo()?.boundingBox;
     const pos = mesh.getAbsolutePosition();
     console.log('[L2 camera probe] occluder', {
@@ -1117,21 +1150,6 @@ export async function boot(options = {}) {
       extendSizeWorld: bounds ? [bounds.extendSizeWorld.x, bounds.extendSizeWorld.y, bounds.extendSizeWorld.z] : null,
       parentChain: describeNodeChain(mesh),
     });
-
-    const existing = level2ProbeRestoreTimers.get(mesh.uniqueId);
-    if (existing) {
-      clearTimeout(existing.timerId);
-      mesh.visibility = existing.originalVisibility;
-    }
-    const originalVisibility = mesh.visibility ?? 1;
-    mesh.visibility = 0.15;
-    const timerId = window.setTimeout(() => {
-      if (!mesh.isDisposed()) {
-        mesh.visibility = originalVisibility;
-      }
-      level2ProbeRestoreTimers.delete(mesh.uniqueId);
-    }, 2000);
-    level2ProbeRestoreTimers.set(mesh.uniqueId, { timerId, originalVisibility });
   }
 
   function finishRun() {
@@ -1749,17 +1767,18 @@ export async function boot(options = {}) {
         startGoalCelebration(world.goalRoot.getAbsolutePosition());
       }
 
-      updateLevel2CameraProbe(dt);
-
-      // Smooth camera follow with LOS correction for levels that have large set dressing.
+      // Smooth camera follow with Level 2-specific LOS correction for decorative start props.
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);
       const desiredCameraPos = new BABYLON.Vector3(targetX - 8, py + 4, CAMERA_FOLLOW_Z);
-      const playerHead = new BABYLON.Vector3(px, py + 0.9, 0);
-      const occlusion = useCameraOcclusionGuard
-        ? resolveCameraOcclusion(scene, playerHead, desiredCameraPos, cameraIgnoredMeshes)
-        : { correctedPos: desiredCameraPos, hit: null };
+      const headPos = new BABYLON.Vector3(px, py + 1.2, 0);
+      const occlusion = useLevel2CameraOcclusionGuard
+        ? resolveLevel2CameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
+        : useGenericCameraOcclusionGuard
+          ? resolveCameraOcclusion(scene, headPos, desiredCameraPos, cameraIgnoredMeshes)
+          : { correctedPos: desiredCameraPos, hit: null };
+      updateLevel2CameraProbe(dt, occlusion.hit);
       const cameraDamp = occlusion.hit ? 11 : 4;
       camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
       camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
