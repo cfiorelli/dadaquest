@@ -3,3 +3,7 @@ dist/
 .DS_Store
 *.local
 test-results/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db

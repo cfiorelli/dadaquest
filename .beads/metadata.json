@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "dadaquest",
+  "project_id": "8afc469a-b67a-4214-9119-a5f82020a29c"
+}
