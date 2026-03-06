@@ -189,6 +189,7 @@ export class GameAudio {
     try {
       this.unlock();
       if (!this.ctx) return false;
+      this._duckMusicForCue(levelId, cueName);
       const beatSec = 60 / spec.tempo;
       const startBase = this.ctx.currentTime + 0.02;
       for (const event of events) {
@@ -273,10 +274,29 @@ export class GameAudio {
   }
 
   _getMusicTargetGain(levelId) {
-    if (levelId === 1) return 0.74;
-    if (levelId === 2) return 0.62;
-    if (levelId === 3) return 0.68;
+    if (levelId === 1) return 0.68;
+    if (levelId === 2) return 0.56;
+    if (levelId === 3) return 0.62;
     return 0.7;
+  }
+
+  _duckMusicForCue(levelId, cueName) {
+    if (!this.ctx || !this.musicGain || !this._musicRunning || this._musicLevelId !== levelId) return;
+    const t = this.ctx.currentTime;
+    const baseGain = this._getMusicTargetGain(levelId);
+    let duckTo = baseGain * 0.82;
+    let release = 0.28;
+    if (cueName === 'levelComplete') {
+      duckTo = baseGain * 0.68;
+      release = 0.55;
+    } else if (cueName === 'collision') {
+      duckTo = baseGain * 0.74;
+      release = 0.38;
+    }
+    this.musicGain.gain.cancelScheduledValues(t);
+    this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+    this.musicGain.gain.linearRampToValueAtTime(duckTo, t + 0.04);
+    this.musicGain.gain.linearRampToValueAtTime(baseGain, t + release);
   }
 
   _roleDuration(spec, role) {

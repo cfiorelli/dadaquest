@@ -181,6 +181,7 @@ export function createDad(scene, {
   const shoeMat = makeFlatStandard(scene, `dad_${outfit}_shoes`, outfitSpec.shoes);
   const hairMat = makeFlatStandard(scene, `dad_${outfit}_hair`, outfitSpec.hair);
   const beardMat = makeFlatStandard(scene, `dad_${outfit}_beard`, outfitSpec.beard);
+  const armMeshes = [];
 
   const torso = BABYLON.MeshBuilder.CreateCapsule(`dad_${outfit}_torso`, {
     height: 1.55,
@@ -257,6 +258,7 @@ export function createDad(scene, {
     arm.rotation.z = side * 0.14;
     arm.parent = visualRoot;
     arm.material = jacketMat;
+    armMeshes.push({ mesh: arm, side });
 
     const hand = BABYLON.MeshBuilder.CreateSphere(`dad_${outfit}_hand${side}`, {
       diameter: 0.18,
@@ -341,8 +343,16 @@ export function createDad(scene, {
   if (animate) {
     scene.registerBeforeRender(() => {
       const t = performance.now() * 0.001;
-      visualRoot.rotation.z = Math.sin(t * 1.2) * 0.03;
+      const breathe = Math.sin(t * 1.18);
+      visualRoot.rotation.z = breathe * 0.028;
       visualRoot.rotation.y = Math.sin(t * 0.75) * 0.035;
+      visualRoot.position.y = breathe * 0.03;
+      visualRoot.scaling.y = 1 + (breathe * 0.012);
+      visualRoot.scaling.x = 1 - (breathe * 0.006);
+      visualRoot.scaling.z = 1 - (breathe * 0.006);
+      for (const { mesh, side } of armMeshes) {
+        mesh.rotation.z = (side * 0.14) + (Math.sin(t * 1.35 + (side * 0.8)) * 0.04);
+      }
     });
   }
 
@@ -355,6 +365,7 @@ export function createMom(scene, {
   z = 0,
   pose = 'standing',
   shadowGen = null,
+  animate = true,
 } = {}) {
   const root = new BABYLON.TransformNode(`mom_${pose}`, scene);
   root.position.set(x, y, z);
@@ -366,6 +377,7 @@ export function createMom(scene, {
   const pantsMat = makeFlatStandard(scene, 'mom_pants', '#556173');
   const hairMat = makeFlatStandard(scene, 'mom_hair', '#5d3f2f');
   const shoeMat = makeFlatStandard(scene, 'mom_shoes', '#d8d3ca');
+  const armMeshes = [];
 
   const torso = BABYLON.MeshBuilder.CreateCapsule('mom_torso', {
     height: 1.28,
@@ -420,6 +432,7 @@ export function createMom(scene, {
     }, scene);
     arm.parent = visualRoot;
     arm.material = hoodieMat;
+    armMeshes.push({ mesh: arm, side });
 
     const hand = BABYLON.MeshBuilder.CreateSphere(`mom_hand${side}`, {
       diameter: 0.16,
@@ -506,6 +519,21 @@ export function createMom(scene, {
     for (const mesh of root.getChildMeshes(false)) {
       shadowGen.addShadowCaster(mesh);
     }
+  }
+  if (animate) {
+    scene.registerBeforeRender(() => {
+      const t = performance.now() * 0.001;
+      const breathe = Math.sin(t * 1.06);
+      visualRoot.position.y = breathe * (pose === 'sitting' ? 0.02 : 0.03);
+      visualRoot.rotation.z = breathe * (pose === 'sitting' ? 0.018 : 0.024);
+      visualRoot.scaling.y = 1 + (breathe * 0.01);
+      visualRoot.scaling.x = 1 - (breathe * 0.005);
+      visualRoot.scaling.z = 1 - (breathe * 0.005);
+      for (const { mesh, side } of armMeshes) {
+        const baseRot = pose === 'sitting' ? side * 0.22 : side * 0.1;
+        mesh.rotation.z = baseRot + (Math.sin(t * 1.24 + (side * 0.6)) * (pose === 'sitting' ? 0.02 : 0.035));
+      }
+    });
   }
   return { root };
 }

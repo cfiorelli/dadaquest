@@ -152,16 +152,22 @@ export class JuiceFx {
 
   spawnCoinSparkle(pos) {
     if (!this.enabled) return;
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
       this._spawn(this.sparkleMat, 'coinSpark', pos.x + Math.cos(angle) * 0.18, pos.y + Math.sin(angle) * 0.18, pos.z, {
-        life: 0.28,
-        startScale: 0.10,
-        endScale: 0.32,
-        vx: Math.cos(angle) * 0.8,
-        vy: Math.sin(angle) * 0.8 + 0.3,
+        life: 0.32,
+        startScale: i === 0 ? 0.14 : 0.10,
+        endScale: i === 0 ? 0.42 : 0.34,
+        vx: Math.cos(angle) * 0.95,
+        vy: Math.sin(angle) * 0.72 + 0.34,
       });
     }
+    this._spawn(this.sparkleMat, 'coinSparkCenter', pos.x, pos.y + 0.02, pos.z - 0.02, {
+      life: 0.24,
+      startScale: 0.12,
+      endScale: 0.28,
+      vy: 0.18,
+    });
   }
 
   spawnPickupSparkle(pos) {
@@ -176,6 +182,12 @@ export class JuiceFx {
         vy: 0.18 + i * 0.03,
       });
     }
+    this._spawn(this.sparkleMat, 'pickupSparkleCore', pos.x, pos.y + 0.18, pos.z - 0.02, {
+      life: 0.46,
+      startScale: 0.18,
+      endScale: 0.52,
+      vy: 0.12,
+    });
   }
 
   spawnGoalSparkles(pos) {
@@ -187,6 +199,14 @@ export class JuiceFx {
         startScale: i === 0 ? 0.18 : 0.13,
         endScale: i === 0 ? 0.58 : 0.46,
         vy: 0.10 + i * 0.02,
+      });
+    }
+    for (const offset of [[0.18, 0.68], [-0.18, 0.68], [0, 0.84]]) {
+      this._spawn(this.sparkleMat, 'goalSparkleInner', pos.x + offset[0], pos.y + offset[1], pos.z - 0.08, {
+        life: 0.44,
+        startScale: 0.14,
+        endScale: 0.36,
+        vy: 0.16,
       });
     }
   }

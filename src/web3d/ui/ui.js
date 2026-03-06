@@ -30,8 +30,10 @@ const CSS = `
     linear-gradient(170deg, rgba(249, 240, 221, 0.90), rgba(232, 218, 193, 0.84));
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.30),
+    0 24px 70px rgba(38, 24, 12, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
     inset 0 -1px 0 rgba(130, 102, 72, 0.22);
+  backdrop-filter: blur(6px);
   color: #3a2c1f;
   pointer-events: auto;
 }
@@ -49,6 +51,7 @@ const CSS = `
   color: #4f3c2c;
   margin: 8px 0 2px;
   letter-spacing: 0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .dada-hint {
   font-size: clamp(12px, 1.8vw, 16px);
@@ -158,6 +161,7 @@ const CSS = `
   border: 1px solid rgba(255, 235, 202, 0.36);
   border-radius: 8px;
   padding: 5px 10px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
   opacity: 0;
   transform: translateY(-4px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -189,6 +193,9 @@ const CSS = `
   pointer-events: none;
   color: #fef7e7;
   position: absolute;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(4px);
 }
 
 /* Coin counter — top-left */
@@ -268,6 +275,7 @@ const CSS = `
   border: 1px solid rgba(255, 220, 170, 0.20);
   border-radius: 6px;
   padding: 4px 14px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
   pointer-events: none;
   white-space: nowrap;
   opacity: 1;
@@ -305,6 +313,7 @@ const CSS = `
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.36);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(5px);
   color: #fff;
   font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
   letter-spacing: 0.03em;
@@ -339,7 +348,7 @@ const CSS = `
   padding: 22px 44px 18px;
   text-align: center;
   pointer-events: none;
-  box-shadow: 0 14px 52px rgba(0,0,0,0.44), inset 0 1px 0 rgba(255,255,255,0.22);
+  box-shadow: 0 14px 52px rgba(0,0,0,0.44), 0 28px 72px rgba(14, 48, 126, 0.18), inset 0 1px 0 rgba(255,255,255,0.22);
   opacity: 0;
   z-index: 2100;
   font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
