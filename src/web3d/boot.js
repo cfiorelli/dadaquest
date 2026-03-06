@@ -2,6 +2,7 @@ import * as BABYLON from '@babylonjs/core';
 import { buildWorld, createCoin } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
+import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
@@ -45,16 +46,6 @@ function wrapToPi(angle) {
   while (wrapped > Math.PI) wrapped -= Math.PI * 2;
   while (wrapped < -Math.PI) wrapped += Math.PI * 2;
   return wrapped;
-}
-
-function hashStringSeed(value) {
-  let hash = 2166136261;
-  const text = String(value || '');
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
 }
 
 function getShotScene() {
@@ -363,6 +354,22 @@ function fitLoadedModel(rootOrRoots, {
   }
 
   return { bounds, scaleFactor };
+}
+
+function ensureDecorGrounding(rootOrRoots, groundY, label, debugMode) {
+  const meshes = collectRenderableMeshes(rootOrRoots);
+  if (!meshes.length || !Number.isFinite(groundY)) return;
+  for (const mesh of meshes) mesh.computeWorldMatrix(true);
+  const bounds = combineBounds(meshes);
+  if (bounds.min.y >= groundY - 0.05) return;
+  const lift = groundY - bounds.min.y;
+  const roots = Array.isArray(rootOrRoots) ? rootOrRoots : [rootOrRoots];
+  for (const root of roots.filter(Boolean)) {
+    root.position.y += lift;
+  }
+  if (debugMode) {
+    console.warn(`[decor] lifted ${label} by ${lift.toFixed(3)} to clear surface clipping`);
+  }
 }
 
 function describeNodeChain(node) {
@@ -843,23 +850,6 @@ export async function boot(options = {}) {
     );
   }
 
-  function nextAnimalRandom(animal) {
-    animal.randState = (Math.imul(animal.randState, 1664525) + 1013904223) >>> 0;
-    return animal.randState / 0x100000000;
-  }
-
-  function retargetAnimalDecor(animal, immediate = false) {
-    const angle = nextAnimalRandom(animal) * Math.PI * 2;
-    const radius = animal.radius * (0.22 + (nextAnimalRandom(animal) * 0.78));
-    const target = clampLevel1DecorPoint(
-      animal.surface,
-      animal.home.x + (Math.cos(angle) * radius),
-      animal.home.z + (Math.sin(angle) * radius * 0.82),
-    );
-    animal.target.copyFrom(target);
-    animal.retargetMs = (immediate ? 900 : 2000) + (nextAnimalRandom(animal) * 2000);
-  }
-
   // Procedural baby is the default player visual. External model is opt-in.
   if (useExternalPlayerModel) {
     await attachRoleModel('playerModel', player.visual, {
@@ -1084,40 +1074,39 @@ export async function boot(options = {}) {
   if (levelId === 1) {
     const registerAnimalDecor = (anchor, {
       kind,
+      zone,
       phase,
       speed,
       radius,
-      bob,
+      bobAmp,
       turnSpeed = 7.5,
+      stepFreq = 7.0,
+      pitchAmp = 0.02,
+      rollAmp = 0.03,
+      accel = 7.5,
+      minWalkSpeed = 0.02,
     }) => {
       const surface = getLevel1DecorSurface(anchor);
       const anchorPos = getAnchorWorldPosition(anchor) || anchor.position.clone();
       const home = clampLevel1DecorPoint(surface, anchorPos.x, anchorPos.z);
-      anchor.rotationQuaternion = null;
       anchor.position.copyFrom(home);
-      const animal = {
-        kind,
+      const controller = new AnimalWanderController({
         root: anchor,
         home,
-        pos: home.clone(),
-        target: home.clone(),
-        vel: BABYLON.Vector3.Zero(),
         surface,
-        phase,
         speed,
-        radius,
-        bob,
         turnSpeed,
-        time: 0,
-        currentYaw: anchor.rotation.y,
-        randState: hashStringSeed(`${anchor.name}:${kind}`),
-        retargetMs: 0,
-        pitchAmplitude: kind === 'chicken' ? 0.04 : 0.026,
-        pitchFrequency: kind === 'chicken' ? 10.8 : 7.6,
-        bobFrequency: kind === 'chicken' ? 11.4 : 6.2,
-      };
-      retargetAnimalDecor(animal, true);
-      level1AnimalDecor.push(animal);
+        radius,
+        phase,
+        bobAmp,
+        stepFreq,
+        pitchAmp,
+        rollAmp,
+        accel,
+        minWalkSpeed,
+        seed: `${anchor.name}:${kind}:${zone || 'zone'}`,
+      });
+      level1AnimalDecor.push({ kind, zone, root: anchor, controller, surface });
     };
 
     for (const anchor of anchors.pettingZooGoat || []) {
@@ -1133,16 +1122,22 @@ export async function boot(options = {}) {
           groundY: surface.baseY,
           markDecorative: true,
         });
+        ensureDecorGrounding(result.roots, surface.baseY, anchor.name, debugMode);
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'goat',
-          phase: 0.7,
-          speed: 0.58,
-          radius: 0.6,
-          bob: 0.028,
+          zone: anchor.name.replace('pz_goatAnchor', ''),
+          phase: anchor.position.x * 0.11,
+          speed: 0.62,
+          radius: 1.28,
+          bobAmp: 0.03,
+          stepFreq: 6.8,
+          pitchAmp: 0.018,
+          rollAmp: 0.032,
+          accel: 6.8,
         });
       }
     }
@@ -1161,16 +1156,23 @@ export async function boot(options = {}) {
           groundY: surface.baseY,
           markDecorative: true,
         });
+        ensureDecorGrounding(result.roots, surface.baseY, anchor.name, debugMode);
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'chicken',
+          zone: anchor.name.replace('pz_chicken', ''),
           phase: anchor.position.x * 0.17,
-          speed: 0.82,
-          radius: 0.4,
-          bob: 0.022,
+          speed: 0.88,
+          radius: 0.82,
+          bobAmp: 0.03,
+          stepFreq: 11.6,
+          pitchAmp: 0.04,
+          rollAmp: 0.018,
+          accel: 8.5,
+          minWalkSpeed: 0.025,
         });
       }
     }
@@ -1187,16 +1189,22 @@ export async function boot(options = {}) {
           groundY: surface.baseY,
           markDecorative: true,
         });
+        ensureDecorGrounding(result.roots, surface.baseY, anchor.name, debugMode);
         for (const root of result.roots || []) {
           root.rotation.y += Math.PI;
         }
         ensureVisibleMeshes(result.meshes);
         registerAnimalDecor(anchor, {
           kind: 'dino',
-          phase: 1.85,
-          speed: 0.52,
-          radius: 0.7,
-          bob: 0.026,
+          zone: anchor.name.replace('pz_dinoAnchor', ''),
+          phase: 1.85 + (anchor.position.x * 0.03),
+          speed: 0.48,
+          radius: 1.16,
+          bobAmp: 0.028,
+          stepFreq: 5.2,
+          pitchAmp: 0.02,
+          rollAmp: 0.028,
+          accel: 6.0,
         });
       }
     }
@@ -1214,17 +1222,23 @@ export async function boot(options = {}) {
             groundY: surface.baseY,
             markDecorative: true,
           });
+          ensureDecorGrounding(result.roots, surface.baseY, anchor.name, debugMode);
           for (const root of result.roots || []) {
             root.rotation.y += Math.PI;
           }
           ensureVisibleMeshes(result.meshes);
           registerAnimalDecor(anchor, {
             kind: 'pig',
-            phase: 0.42,
-            speed: 0.62,
-            radius: 0.45,
-            bob: 0.024,
-            turnSpeed: 7.2,
+            zone: anchor.name.replace('pz_pigAnchor', ''),
+            phase: 0.42 + (anchor.position.x * 0.05),
+            speed: 0.56,
+            radius: 0.98,
+            bobAmp: 0.024,
+            turnSpeed: 6.4,
+            stepFreq: 6.1,
+            pitchAmp: 0.018,
+            rollAmp: 0.026,
+            accel: 6.5,
           });
         }
       }
@@ -1244,17 +1258,24 @@ export async function boot(options = {}) {
             groundY: elephantGroundY,
             markDecorative: true,
           });
+          ensureDecorGrounding(result.roots, elephantGroundY, anchor.name, debugMode);
           for (const root of result.roots || []) {
             root.rotation.y += Math.PI;
           }
           ensureVisibleMeshes(result.meshes);
           registerAnimalDecor(anchor, {
             kind: 'elephant',
+            zone: anchor.name.replace('pz_elephantAnchor', ''),
             phase: 1.18,
-            speed: 0.42,
-            radius: 0.92,
-            bob: 0.016,
-            turnSpeed: 6.8,
+            speed: 0.34,
+            radius: 1.34,
+            bobAmp: 0.016,
+            turnSpeed: 5.0,
+            stepFreq: 4.2,
+            pitchAmp: 0.012,
+            rollAmp: 0.038,
+            accel: 5.2,
+            minWalkSpeed: 0.03,
           });
         }
       }
@@ -1264,45 +1285,8 @@ export async function boot(options = {}) {
   function updateLevel1AnimalDecor(dt) {
     if (levelId !== 1 || shotMode || !level1AnimalDecor.length) return;
     for (const animal of level1AnimalDecor) {
-      const root = animal.root;
-      if (!root?.isEnabled?.()) continue;
-      animal.time += dt;
-      animal.retargetMs -= dt * 1000;
-      let toTarget = animal.target.subtract(animal.pos);
-      let dist = Math.sqrt((toTarget.x * toTarget.x) + (toTarget.z * toTarget.z));
-      if (animal.retargetMs <= 0 || dist < 0.15) {
-        retargetAnimalDecor(animal);
-        toTarget = animal.target.subtract(animal.pos);
-        dist = Math.sqrt((toTarget.x * toTarget.x) + (toTarget.z * toTarget.z));
-      }
-
-      let desiredVelX = 0;
-      let desiredVelZ = 0;
-      if (dist > 0.0001) {
-        desiredVelX = (toTarget.x / dist) * animal.speed;
-        desiredVelZ = (toTarget.z / dist) * animal.speed;
-      }
-      animal.vel.x = damp(animal.vel.x, desiredVelX, 7.5, dt);
-      animal.vel.z = damp(animal.vel.z, desiredVelZ, 7.5, dt);
-
-      const nextX = animal.pos.x + (animal.vel.x * dt);
-      const nextZ = animal.pos.z + (animal.vel.z * dt);
-      const clamped = clampLevel1DecorPoint(animal.surface, nextX, nextZ);
-      animal.pos.x = clamped.x;
-      animal.pos.z = clamped.z;
-
-      const planarSpeed = Math.sqrt((animal.vel.x * animal.vel.x) + (animal.vel.z * animal.vel.z));
-      if (planarSpeed > 0.02) {
-        const desiredYaw = Math.atan2(animal.vel.x, animal.vel.z);
-        const delta = wrapToPi(desiredYaw - animal.currentYaw);
-        animal.currentYaw += delta * Math.min(1, dt * animal.turnSpeed);
-      }
-      const bob = Math.sin((animal.time * animal.bobFrequency) + animal.phase) * animal.bob;
-      const stepPitch = Math.sin((animal.time * animal.pitchFrequency) + animal.phase) * animal.pitchAmplitude;
-      root.position.set(animal.pos.x, animal.surface.baseY + bob, animal.pos.z);
-      root.rotationQuaternion = null;
-      root.rotation.y = animal.currentYaw;
-      root.rotation.x = stepPitch;
+      if (!animal.root?.isEnabled?.()) continue;
+      animal.controller.update(dt);
     }
   }
 
