@@ -63,10 +63,11 @@ const BASE_LEVEL2 = {
     { name: 'platKitchen',  x:   6.5, y: 0.40,  w:  7.0, h: 0.80, d: 4.0 },  // surface 0.80
     { name: 'platPiano',    x:  11.0, y: 3.00,  w:  3.2, h: 0.70, d: 4.0 },  // surface 3.35
     { name: 'platLanding',  x:  18.0, y: 4.00,  w:  5.0, h: 0.80, d: 4.0 },  // surface 4.40  (CP2)
-    // Section C — Loft
-    { name: 'platStair1',   x:  23.5, y: 4.80,  w:  3.0, h: 0.80, d: 4.0 },  // surface 5.20
-    { name: 'platStair2',   x:  27.5, y: 6.00,  w:  3.0, h: 0.80, d: 4.0 },  // surface 6.40
-    { name: 'platLoft',     x:  33.0, y: 7.20,  w:  5.0, h: 0.80, d: 4.0 },  // surface 7.60
+    // Section C — Loft stairs (longer + steeper; crumble steps alternate between solid steps)
+    { name: 'platStair1',   x:  21.3, y: 4.80,  w:  2.5, h: 0.80, d: 4.0 },  // surface 5.20
+    { name: 'platStair3',   x:  25.6, y: 6.00,  w:  2.5, h: 0.80, d: 4.0 },  // surface 6.40
+    { name: 'platStair5',   x:  30.0, y: 7.20,  w:  2.6, h: 0.80, d: 4.0 },  // surface 7.60
+    { name: 'platLoft',     x:  34.0, y: 7.95,  w:  4.2, h: 0.80, d: 4.2 },  // surface 8.35
     { name: 'platRoof',     x:  37.5, y: 8.40,  w:  6.0, h: 0.80, d: 5.0 },  // surface 8.80 → goal
   ],
 
@@ -93,9 +94,19 @@ const BASE_LEVEL2 = {
 
   crumbles: [
     {
-      name: 'crumbleB',
-      x: 29.7, y: 6.8, z: L,
-      w: 1.4, h: 0.65, d: 4.0,
+      name: 'crumbleStair2',
+      x: 23.5, y: 5.35, z: L,
+      w: 2.2, h: 0.65, d: 4.0,
+    },
+    {
+      name: 'crumbleStair4',
+      x: 27.7, y: 6.55, z: L,
+      w: 2.2, h: 0.65, d: 4.0,
+    },
+    {
+      name: 'crumbleStair6',
+      x: 32.0, y: 7.75, z: L,
+      w: 2.2, h: 0.65, d: 4.0,
     },
   ],
 
@@ -106,7 +117,7 @@ const BASE_LEVEL2 = {
     { x:  -0.5, y: 3.40, z: L },
     { x:   2.5, y: 1.80, z: L },
     { x:   6.5, y: 1.80, z: L },
-    { x:  11.0, y: 4.15, z: L },
+    { x:  15.8, y: 5.05, z: L },
     { x:  18.0, y: 5.20, z: L },
     { x:  23.5, y: 6.00, z: L },
     { x:  27.5, y: 7.20, z: L },

@@ -2614,6 +2614,15 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.triggerBackflip = () => {
       return triggerGameplayHotkey('KeyF');
     };
+    window.__DADA_DEBUG__.triggerFloorPenalty = () => {
+      triggerFloorPenalty();
+      return {
+        lastRespawnReason: window.__DADA_DEBUG__.lastRespawnReason,
+        coinsCollected: window.__DADA_DEBUG__.coinsCollected,
+        floorPenaltyCount: window.__DADA_DEBUG__.floorPenaltyCount || 0,
+        floorPenaltyLevel: window.__DADA_DEBUG__.lastFloorPenaltyLevel ?? null,
+      };
+    };
     window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
       index,
       collected: coin.collected,

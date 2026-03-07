@@ -637,6 +637,44 @@ function createHazardZone(scene, name, { x, y, z = 0, width, depth }) {
   return mesh;
 }
 
+function createPortalResetVisual(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const ring = BABYLON.MeshBuilder.CreateTorus(`${name}_ring`, {
+    diameter: 1.72,
+    thickness: 0.12,
+    tessellation: 32,
+  }, scene);
+  ring.parent = root;
+  ring.rotation.x = Math.PI / 2;
+  const ringMat = new BABYLON.StandardMaterial(`${name}_ringMat`, scene);
+  ringMat.diffuseColor = new BABYLON.Color3(0.52, 0.82, 1.0);
+  ringMat.emissiveColor = new BABYLON.Color3(0.24, 0.50, 0.92);
+  ringMat.alpha = 0.78;
+  ringMat.backFaceCulling = false;
+  ring.material = ringMat;
+
+  const glow = BABYLON.MeshBuilder.CreateDisc(`${name}_glow`, {
+    radius: 0.74,
+    tessellation: 32,
+  }, scene);
+  glow.parent = root;
+  glow.rotation.x = Math.PI / 2;
+  glow.position.y = -0.02;
+  const glowMat = new BABYLON.StandardMaterial(`${name}_glowMat`, scene);
+  glowMat.diffuseColor = new BABYLON.Color3(0.68, 0.92, 1.0);
+  glowMat.emissiveColor = new BABYLON.Color3(0.18, 0.34, 0.72);
+  glowMat.alpha = 0.16;
+  glowMat.backFaceCulling = false;
+  glowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  glow.material = glowMat;
+
+  tagLevel2Decor(root);
+  setRenderingGroup(root, 1);
+  return root;
+}
+
 // ── Amanda patrol character ────────────────────────────────────────
 
 function createAmandaMesh(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
@@ -1011,11 +1049,19 @@ export function buildWorld2(scene, options = {}) {
     prefixLevel2Gameplay(crCol);
     allPlatforms.push(crCol);
     setRenderingGroup(crRoot, 2);
+    const portalRoot = createPortalResetVisual(scene, `L2_${cr.name}_portal`, {
+      x: cr.x,
+      y: cr.y - 1.22,
+      z: -1.12,
+    });
     crumbles.push({
       root: crRoot,
       colliderMesh: crCol,
       x: cr.x, y: cr.y, z: LANE_Z,
       w: cr.w, h: cr.h,
+      portalRoot,
+      portalReset: true,
+      portalResetY: cr.y - 0.72,
     });
   }
 
@@ -1196,9 +1242,9 @@ export function buildWorld2(scene, options = {}) {
 
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
-    19.3,
+    19.8,
     landingDecorSurface.baseY,
-    1.06,
+    1.04,
   );
   biancaAnchor.rotation.y = Math.PI;
   biancaAnchor.metadata = {
@@ -1347,8 +1393,8 @@ export function buildWorld2(scene, options = {}) {
   const rooftopSign = createWelcomeSign(scene, {
     name: 'l2_rooftopSign',
     x: 21.6,
-    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.4,
-    z: -1.18,
+    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.78,
+    z: 2.16,
     shadowGen,
     textLines: ['TO ROOFTOP GARDEN', '→→→'],
     width: 5.8,
@@ -1489,6 +1535,15 @@ export function buildWorld2(scene, options = {}) {
     update(dt, { pos, triggerReset, player }) {
       updateAmanda(dt, { pos, triggerReset });
       updateHorse(dt, { pos, player });
+      const biancaPos = biancaAnchor.getAbsolutePosition();
+      const biancaHalfW = 0.82;
+      const biancaHalfH = 0.72;
+      if (
+        Math.abs(pos.x - biancaPos.x) < (biancaHalfW + PLAYER_HALF_W)
+        && Math.abs(pos.y - biancaPos.y) < (biancaHalfH + PLAYER_HALF_H)
+      ) {
+        triggerReset('bianca', pos.x < biancaPos.x ? -1 : 1);
+      }
     },
     reset() {
       amandaX = amandaDef.minX;
