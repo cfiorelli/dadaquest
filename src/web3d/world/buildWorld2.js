@@ -804,6 +804,56 @@ function createPortalResetVisual(scene, name, { x, y, z = 0 }) {
   return root;
 }
 
+function createVanishPlatformVisual(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
+  const root = createCardboardPlatform(scene, name, {
+    x,
+    y,
+    z,
+    w,
+    h,
+    d,
+    slabColor: [126, 102, 186],
+    edgeColor: [68, 48, 118],
+    shadowGen,
+  });
+  const swirl = BABYLON.MeshBuilder.CreatePlane(`${name}_swirl`, {
+    width: w * 0.92,
+    height: d * 0.72,
+  }, scene);
+  swirl.parent = root;
+  swirl.position.y = (h * 0.5) + 0.03;
+  swirl.rotation.x = Math.PI / 2;
+  const tex = new BABYLON.DynamicTexture(`${name}_tex`, { width: 256, height: 128 }, scene, false);
+  const ctx = tex.getContext();
+  ctx.clearRect(0, 0, 256, 128);
+  ctx.fillStyle = '#1e1532';
+  ctx.fillRect(0, 0, 256, 128);
+  ctx.strokeStyle = '#d5a4ff';
+  ctx.lineWidth = 5;
+  for (let i = 0; i < 6; i++) {
+    ctx.beginPath();
+    ctx.ellipse(128, 64, 104 - (i * 16), 40 - (i * 5), 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#87e2ff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(18, 32);
+  ctx.bezierCurveTo(72, 6, 180, 118, 238, 90);
+  ctx.stroke();
+  tex.update(false);
+  const swirlMat = new BABYLON.StandardMaterial(`${name}_swirlMat`, scene);
+  swirlMat.diffuseTexture = tex;
+  swirlMat.emissiveTexture = tex;
+  swirlMat.emissiveColor = new BABYLON.Color3(0.26, 0.18, 0.48);
+  swirlMat.specularColor = BABYLON.Color3.Black();
+  swirlMat.alpha = 0.9;
+  swirlMat.backFaceCulling = false;
+  swirlMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  swirl.material = swirlMat;
+  return { root, swirl };
+}
+
 // ── Amanda patrol character ────────────────────────────────────────
 
 function createAmandaMesh(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
@@ -1164,6 +1214,64 @@ export function buildWorld2(scene, options = {}) {
         decelMultiplier: hz.decelMultiplier,
       });
     }
+  }
+
+  const resetPadDef = LEVEL2.resetPad;
+  const resetPadMesh = createHazardZone(scene, 'L2_secretResetPad', {
+    x: resetPadDef.x,
+    y: resetPadDef.y,
+    z: resetPadDef.z,
+    width: resetPadDef.w,
+    depth: resetPadDef.d,
+  });
+  prefixLevel2Gameplay(resetPadMesh);
+  setRenderingGroup(resetPadMesh, 2);
+  const resetPadBounds = {
+    minX: resetPadDef.x - (resetPadDef.w * 0.5),
+    maxX: resetPadDef.x + (resetPadDef.w * 0.5),
+    minY: resetPadDef.y - (resetPadDef.h * 0.5),
+    maxY: resetPadDef.y + 0.34,
+  };
+
+  const vanishPlatforms = [];
+  for (const def of LEVEL2.vanishPlatforms || []) {
+    const { root, swirl } = createVanishPlatformVisual(scene, `L2_${def.name}`, {
+      x: def.x,
+      y: def.y,
+      z: def.z,
+      w: def.w,
+      h: def.h,
+      d: def.d,
+      shadowGen,
+    });
+    prefixLevel2Gameplay(root);
+    setRenderingGroup(root, 2);
+    const colliderMesh = BABYLON.MeshBuilder.CreateBox(`L2_${def.name}_col`, {
+      width: def.w,
+      height: def.h,
+      depth: def.d,
+    }, scene);
+    colliderMesh.position.set(def.x, def.y, def.z);
+    colliderMesh.visibility = 0;
+    colliderMesh.isPickable = false;
+    prefixLevel2Gameplay(colliderMesh);
+    allPlatforms.push(colliderMesh);
+    const portalRoot = createPortalResetVisual(scene, `L2_${def.name}_portal`, {
+      x: def.x,
+      y: def.y - 0.62,
+      z: -1.02,
+    });
+    portalRoot.scaling.setAll(0.72);
+    vanishPlatforms.push({
+      ...def,
+      root,
+      swirl,
+      colliderMesh,
+      portalRoot,
+      visible: true,
+      wasStanding: false,
+      respawnAt: 0,
+    });
   }
 
   // === CRUMBLES ===
@@ -1555,6 +1663,24 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(rooftopSign, 3);
   tagLevel2Decor(rooftopSign);
 
+  const secretPathSign = createWelcomeSign(scene, {
+    name: 'l2_secretPathSign',
+    x: 12.9,
+    y: LEVEL2.platforms.find((p) => p.name === 'platPiano').y + 0.82,
+    z: 2.12,
+    shadowGen,
+    textLines: ['SECRET PATH', '↓'],
+    width: 2.24,
+    height: 1.04,
+    postHeight: 1.92,
+    boardName: 'l2_secretPath',
+    boardColor: [202, 188, 222],
+    postColor: [110, 94, 134],
+    fontFamily: 'Avenir Next, Trebuchet MS, sans-serif',
+  });
+  setRenderingGroup(secretPathSign, 3);
+  tagLevel2Decor(secretPathSign);
+
   const horseSnapGlow = BABYLON.MeshBuilder.CreatePlane('L2_horseSnapGlow', {
     width: 2.4,
     height: 1.0,
@@ -1619,6 +1745,7 @@ export function buildWorld2(scene, options = {}) {
   // === LEVEL 2 RUNTIME LOGIC ===
   const PLAYER_HALF_W = 0.25;
   const PLAYER_HALF_H = 0.4;
+  let level2ClockSec = 0;
 
   function updateAmanda(dt, { pos, triggerReset }) {
     amandaX += amandaDir * amandaDef.speed * dt;
@@ -1737,10 +1864,69 @@ export function buildWorld2(scene, options = {}) {
     rockingHorseAnchor.position.x = horseX;
   }
 
+  function setSecretPlatformColliderState(platformState, playerCollider, enabled) {
+    if (!playerCollider) return;
+    if (!enabled) {
+      playerCollider.minY = -1000;
+      playerCollider.maxY = -999;
+      return;
+    }
+    const ext = platformState.colliderMesh.getBoundingInfo().boundingBox.extendSize;
+    playerCollider.minX = platformState.colliderMesh.position.x - ext.x;
+    playerCollider.maxX = platformState.colliderMesh.position.x + ext.x;
+    playerCollider.minY = platformState.colliderMesh.position.y - ext.y;
+    playerCollider.maxY = platformState.colliderMesh.position.y + ext.y;
+  }
+
+  function updateSecretPlatforms(dt, { pos, player }) {
+    level2ClockSec += dt;
+    const playerBottom = pos.y - PLAYER_HALF_H;
+    for (const platform of vanishPlatforms) {
+      const colliderIndex = player?.colliders ? allPlatforms.indexOf(platform.colliderMesh) : -1;
+      const playerCollider = colliderIndex >= 0 ? player.colliders[colliderIndex] : null;
+      if (!platform.visible && level2ClockSec >= platform.respawnAt) {
+        platform.visible = true;
+        platform.root.setEnabled(true);
+        platform.portalRoot.setEnabled(true);
+      }
+      setSecretPlatformColliderState(platform, playerCollider, platform.visible);
+      if (!platform.visible || !playerCollider) {
+        platform.wasStanding = false;
+        continue;
+      }
+      const topY = platform.colliderMesh.position.y + platform.colliderMesh.getBoundingInfo().boundingBox.extendSize.y;
+      const standing = Math.abs(playerBottom - topY) < 0.09
+        && (pos.x + PLAYER_HALF_W) > playerCollider.minX
+        && (pos.x - PLAYER_HALF_W) < playerCollider.maxX;
+      const swirlMat = platform.swirl.material;
+      if (swirlMat) {
+        swirlMat.alpha = standing ? 0.96 : 0.78;
+      }
+      if (standing) {
+        platform.wasStanding = true;
+      } else if (platform.wasStanding) {
+        platform.wasStanding = false;
+        platform.visible = false;
+        platform.root.setEnabled(false);
+        platform.portalRoot.setEnabled(false);
+        setSecretPlatformColliderState(platform, playerCollider, false);
+        platform.respawnAt = level2ClockSec + (platform.respawnSec ?? 1.2);
+      }
+    }
+  }
+
+  function isTouchingResetPad(pos, floorTopY) {
+    const bottomY = pos.y - PLAYER_HALF_H;
+    return pos.x >= resetPadBounds.minX
+      && pos.x <= resetPadBounds.maxX
+      && Math.abs(bottomY - (floorTopY ?? resetPadDef.y)) < 0.18;
+  }
+
   const level2 = {
-    update(dt, { pos, triggerReset, player }) {
+    update(dt, { pos, triggerReset, player, spawnPoint, floorTopY }) {
       updateAmanda(dt, { pos, triggerReset });
       updateHorse(dt, { pos, player });
+      updateSecretPlatforms(dt, { pos, player });
       const biancaPos = biancaAnchor.getAbsolutePosition();
       const biancaHalfW = 0.82;
       const biancaHalfH = 0.72;
@@ -1749,9 +1935,14 @@ export function buildWorld2(scene, options = {}) {
         && Math.abs(pos.y - biancaPos.y) < (biancaHalfH + PLAYER_HALF_H)
       ) {
         triggerReset('bianca', pos.x < biancaPos.x ? -1 : 1);
+        return;
+      }
+      if (isTouchingResetPad(pos, floorTopY) && spawnPoint) {
+        triggerReset('level2_secret_reset', pos.x < resetPadDef.x ? -1 : 1, spawnPoint);
       }
     },
     reset() {
+      level2ClockSec = 0;
       amandaX = amandaDef.minX;
       amandaDir = 1;
       amandaRoot.position.x = amandaX;
@@ -1769,9 +1960,35 @@ export function buildWorld2(scene, options = {}) {
       horseVisualRoot.position.x = horseX;
       rockingHorseAnchor.position.x = horseX;
       horseStepCollider.position.set(horseX + horseTopSupport.offsetX, horseTopSupport.y, horseTopSupport.z);
+      for (const platform of vanishPlatforms) {
+        platform.visible = true;
+        platform.wasStanding = false;
+        platform.respawnAt = 0;
+        platform.root.setEnabled(true);
+        platform.portalRoot.setEnabled(true);
+        if (platform.swirl.material) {
+          platform.swirl.material.alpha = 0.78;
+        }
+      }
     },
     isHorseSnapped() {
       return horseSnapped;
+    },
+    getSecretState() {
+      return {
+        resetPadY: resetPadMesh.position.y,
+        resetPadBounds,
+        secretCoinPositions: coins
+          .filter((coin) => coin.position.x >= 15.9 && coin.position.x <= 19.4 && coin.position.y <= 2.7)
+          .map((coin) => ({ x: coin.position.x, y: coin.position.y, z: coin.position.z })),
+        vanishPlatforms: vanishPlatforms.map((platform) => ({
+          name: platform.name,
+          x: platform.colliderMesh.position.x,
+          y: platform.colliderMesh.position.y,
+          z: platform.colliderMesh.position.z,
+          visible: platform.visible,
+        })),
+      };
     },
     // Expose anchor nodes for GLB loading in boot.js
     anchors: {

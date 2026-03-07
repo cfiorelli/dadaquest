@@ -142,3 +142,18 @@ test('ui: level 2 floor route cannot trigger the dad goal', async ({ page }) => 
     .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey), { timeout: 20_000 })
     .toBe('EndScene');
 });
+
+test('ui: buff HUD stays as a compact left column', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const box = await page.locator('.dada-buff').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box.width).toBeLessThanOrEqual(240);
+  expect(box.x).toBeLessThanOrEqual(24);
+  expect(box.y).toBeLessThanOrEqual(28);
+
+  await expect(page.locator('.dada-buff-note').last()).toHaveText('Locked. Collect all binkies in Level 1 to unlock');
+});

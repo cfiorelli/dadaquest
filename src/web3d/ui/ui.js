@@ -287,7 +287,7 @@ const CSS = `
 /* Coin counter — top-left */
 .dada-coins {
   top: 12px;
-  left: 14px;
+  left: 248px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -310,11 +310,12 @@ const CSS = `
 
 /* Buff column — left side */
 .dada-buff {
-  top: 56px;
-  left: 14px;
-  font-size: 16px;
+  top: 16px;
+  left: 16px;
+  font-size: 14px;
   display: none;
-  min-width: 160px;
+  width: 220px;
+  max-width: min(220px, calc(100vw - 32px));
   padding: 0;
   background: none;
   border: 0;
@@ -331,13 +332,14 @@ const CSS = `
   grid-template-columns: 42px 1fr;
   gap: 10px;
   align-items: center;
-  min-width: 172px;
-  padding: 10px 12px;
-  background: rgba(40, 30, 20, 0.62);
-  border: 1px solid rgba(255, 230, 190, 0.28);
-  border-radius: 10px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
-  opacity: 0.74;
+  min-width: 200px;
+  padding: 11px 12px;
+  background: rgba(20, 18, 20, 0.76);
+  border: 1px solid rgba(255, 230, 190, 0.24);
+  border-radius: 12px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.26);
+  opacity: 0.96;
+  backdrop-filter: blur(5px);
 }
 .dada-buff-card.active {
   opacity: 1;
@@ -369,8 +371,8 @@ const CSS = `
   gap: 4px;
 }
 .dada-buff-label {
-  font-size: 14px;
-  opacity: 0.84;
+  font-size: 13px;
+  opacity: 0.96;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -381,6 +383,11 @@ const CSS = `
   font-weight: 800;
   letter-spacing: 0.06em;
   color: rgba(255, 242, 225, 0.78);
+}
+.dada-buff-note {
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(247, 239, 224, 0.84);
 }
 .dada-buff-track {
   height: 10px;
@@ -408,11 +415,12 @@ const CSS = `
   letter-spacing: 0.02em;
 }
 .dada-ability-pill {
-  left: 14px;
-  top: 208px;
+  left: 16px;
+  top: 194px;
   display: none;
-  min-width: 154px;
-  padding: 8px 10px;
+  min-width: 188px;
+  padding: 9px 11px;
+  background: rgba(20, 18, 20, 0.76);
 }
 .dada-ability-label {
   display: flex;
@@ -422,6 +430,18 @@ const CSS = `
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.04em;
+}
+@media (max-width: 860px) {
+  .dada-coins {
+    left: 16px;
+    top: 154px;
+  }
+  .dada-buff {
+    width: min(220px, calc(100vw - 32px));
+  }
+  .dada-ability-pill {
+    top: 332px;
+  }
 }
 .dada-ability-state {
   font-size: 11px;
@@ -925,6 +945,7 @@ export function createUI(uiRoot, options = {}) {
         <div class="dada-buff-copy">
           <div class="dada-buff-label">Antigravity Cape <span class="dada-buff-state">LOCKED</span></div>
           <div class="dada-buff-track"><div class="dada-buff-fill cape" style="width:0%"></div></div>
+          <div class="dada-buff-note">Locked. Collect all binkies in Level 1 to unlock</div>
         </div>
       </div>
     </div>
@@ -937,6 +958,7 @@ export function createUI(uiRoot, options = {}) {
   const onesieState = onesieCard.querySelector('.dada-buff-state');
   const capeFill = capeCard.querySelector('.dada-buff-fill.cape');
   const capeState = capeCard.querySelector('.dada-buff-state');
+  const capeNote = capeCard.querySelector('.dada-buff-note');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -1282,12 +1304,16 @@ export function createUI(uiRoot, options = {}) {
       capeCard.classList.toggle('active', active || unlocked);
       if (!unlocked) {
         capeState.textContent = 'LOCKED';
+        if (capeNote) capeNote.textContent = 'Locked. Collect all binkies in Level 1 to unlock';
       } else if (active) {
         capeState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
+        if (capeNote) capeNote.textContent = 'Float mode active';
       } else if (used) {
         capeState.textContent = 'USED';
+        if (capeNote) capeNote.textContent = 'Restart level to restore cape use';
       } else {
         capeState.textContent = 'READY';
+        if (capeNote) capeNote.textContent = 'Press F while airborne to float';
       }
     },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {

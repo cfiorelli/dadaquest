@@ -206,22 +206,6 @@ function createSprinklerVisual(scene, name, {
     streams.push(stream);
   }
 
-  const contactShadow = BABYLON.MeshBuilder.CreateDisc(`${name}_shadow`, {
-    radius: 0.42,
-    tessellation: 20,
-  }, scene);
-  contactShadow.parent = root;
-  contactShadow.position.set(nozzleLocal.x - 0.42, -0.58, 1.26);
-  contactShadow.rotation.x = Math.PI / 2;
-  const shadowMat = new BABYLON.StandardMaterial(`${name}_shadowMat`, scene);
-  shadowMat.diffuseColor = new BABYLON.Color3(0.10, 0.09, 0.08);
-  shadowMat.emissiveColor = new BABYLON.Color3(0.06, 0.05, 0.04);
-  shadowMat.alpha = 0.16;
-  shadowMat.specularColor = BABYLON.Color3.Black();
-  shadowMat.disableLighting = true;
-  shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-  contactShadow.material = shadowMat;
-
   markDecorative(root);
   return {
     root,
@@ -980,8 +964,8 @@ export function buildWorld3(scene, options = {}) {
     const patchTopY = getPlatformTopY(patchPlatform.name);
     const patchCenter = new BABYLON.Vector3(
       sprinkler.x + 0.82,
-      patchTopY + 1.02,
-      0.72,
+      patchTopY + 0.82,
+      0.34,
     );
     const nozzleLocal = new BABYLON.Vector3(-0.42, 0.56, 1.52);
     const targetLocal = new BABYLON.Vector3(

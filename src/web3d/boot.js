@@ -8,6 +8,7 @@ import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
 import { FruitMazeMinigame } from './ui/fruitMaze.js';
+import { PongMinigame } from './ui/pongMinigame.js';
 import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
@@ -862,6 +863,7 @@ export async function boot(options = {}) {
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
   const fruitMaze = levelId === 1 ? new FruitMazeMinigame() : null;
+  const pongMinigame = levelId === 2 ? new PongMinigame() : null;
   const levelTotals = {
     1: LEVEL1.coins.length,
     2: LEVEL2.coins.length,
@@ -1804,6 +1806,7 @@ export async function boot(options = {}) {
           groundY: anchorPos.y,
           markDecorative: true,
         });
+        ensureDecorGrounding(result.roots, anchorPos.y, anchor.name, debugMode);
         if (fit?.hardMaxExtent) {
           clampDecorMaxExtent(result.roots, fit.hardMaxExtent);
         }
@@ -2165,6 +2168,8 @@ export async function boot(options = {}) {
   let goalCarryStartScale = null;
   let goalCarryEndScale = null;
   let fruitMazeSnapshot = null;
+  let pongSnapshot = null;
+  let activeMinigame = null;
   let prevGrounded = player.grounded;
   let prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
   let level1FloorPenaltyCooldownMs = 0;
@@ -2514,10 +2519,20 @@ export async function boot(options = {}) {
     updateBuffHud();
   }
 
+  function capturePongSnapshot() {
+    return captureFruitMazeSnapshot();
+  }
+
+  function restorePongSnapshot(snapshot) {
+    restoreFruitMazeSnapshot(snapshot);
+  }
+
   function startFruitMazeEscape() {
     if (!fruitMaze || levelId !== 1 || fruitMaze.isActive()) return;
     fruitMazeSnapshot = captureFruitMazeSnapshot();
+    activeMinigame = fruitMaze;
     state = 'minigame';
+    window.__DADA_DEBUG__.sceneKey = 'MinigameScene';
     player.vx = 0;
     player.vy = 0;
     audio.stopLevelMusic(0.15);
@@ -2528,15 +2543,58 @@ export async function boot(options = {}) {
         ui.setFade(0);
         restoreFruitMazeSnapshot(fruitMazeSnapshot);
         fruitMazeSnapshot = null;
+        activeMinigame = null;
         state = 'gameplay';
+        window.__DADA_DEBUG__.sceneKey = 'CribScene';
         audio.startLevelMusic(levelId, 0.2);
       },
       onAbort: () => {
         fruitMazeSnapshot = null;
+        activeMinigame = null;
         restartRun('fruit_maze_abort');
         startLoadedLevelWithProgress(levelId, { unlockAudio: false });
       },
     });
+  }
+
+  function startPongEscape() {
+    if (!pongMinigame || levelId !== 2 || pongMinigame.isActive()) return;
+    try {
+      pongSnapshot = capturePongSnapshot();
+      activeMinigame = pongMinigame;
+      state = 'minigame';
+      window.__DADA_DEBUG__.sceneKey = 'MinigameScene';
+      player.vx = 0;
+      player.vy = 0;
+      audio.stopLevelMusic(0.15);
+      ui.showBanner('PONG PANIC!', 'Win 5 points to bounce back into the condo.', 1200);
+      ui.setFade(0.16);
+      pongMinigame.start({
+        onWin: () => {
+          ui.setFade(0);
+          restorePongSnapshot(pongSnapshot);
+          pongSnapshot = null;
+          activeMinigame = null;
+          state = 'gameplay';
+          window.__DADA_DEBUG__.sceneKey = 'CribScene';
+          audio.startLevelMusic(levelId, 0.2);
+        },
+        onAbort: () => {
+          pongSnapshot = null;
+          activeMinigame = null;
+          restartRun('pong_abort');
+          startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+        },
+      });
+    } catch (err) {
+      pongSnapshot = null;
+      activeMinigame = null;
+      ui.setFade(0);
+      reportDevError(err);
+      console.error('[pong] failed to start:', err);
+      restartRun('pong_init_error');
+      startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+    }
   }
 
   function finishRun() {
@@ -2592,10 +2650,11 @@ export async function boot(options = {}) {
     level1CoinFlyers = [];
     level1AmbientTimerMs = 6200;
     level1AmbientBirdDelayMs = -1;
-    if (fruitMaze?.isActive()) {
-      fruitMaze.stop();
-    }
+    if (fruitMaze?.isActive()) fruitMaze.stop();
+    if (pongMinigame?.isActive()) pongMinigame.stop();
     fruitMazeSnapshot = null;
+    pongSnapshot = null;
+    activeMinigame = null;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
     window.__DADA_DEBUG__.checkpointIndex = 0;
@@ -2889,6 +2948,11 @@ export async function boot(options = {}) {
         floorPenaltyLevel: window.__DADA_DEBUG__.lastFloorPenaltyLevel ?? null,
       };
     };
+    window.__DADA_DEBUG__.triggerLevel2Pong = () => {
+      if (levelId !== 2) return false;
+      startPongEscape();
+      return pongMinigame?.isActive?.() ?? false;
+    };
     window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
       index,
       collected: coin.collected,
@@ -2906,6 +2970,7 @@ export async function boot(options = {}) {
       applyCapeVisualState();
       return progression;
     };
+    window.__DADA_DEBUG__.level2Secret = () => world.level2?.getSecretState?.() ?? null;
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -2914,10 +2979,10 @@ export async function boot(options = {}) {
   window.addEventListener('keydown', (ev) => {
     _lastKey = `${ev.key}/${ev.code}`;
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
-    if (fruitMaze?.isActive()) {
+    if (activeMinigame?.isActive?.()) {
       if (ev.code === 'Escape') {
         ev.preventDefault();
-        fruitMaze.handleEscape();
+        activeMinigame.handleEscape();
       }
       return;
     }
@@ -3002,7 +3067,7 @@ export async function boot(options = {}) {
     ui.showPopText('Da Da!', 780);
   }
 
-  function triggerReset(reason, direction = -1) {
+  function triggerReset(reason, direction = -1, overrideSpawn = null) {
     if (respawnState) return;
     const applied = player.applyHit({
       direction,
@@ -3013,7 +3078,7 @@ export async function boot(options = {}) {
     if (!applied) return;
     audio.playReset();
     audio.playCue(levelId, 'collision');
-    respawnState = { phase: 'fadeOut', timer: 0.16, reason };
+    respawnState = { phase: 'fadeOut', timer: 0.16, reason, overrideSpawn };
     window.__DADA_DEBUG__.lastRespawnReason = reason;
     if (reason === 'crumble_portal') {
       resetCrumbles();
@@ -3438,10 +3503,11 @@ export async function boot(options = {}) {
           ui.setFade(0.42 * t);
 
           if (respawnState.timer <= 0) {
-            const resolved = resolveRespawnPosition(respawnPoint);
+            const spawnBase = respawnState.overrideSpawn || respawnPoint;
+            const resolved = resolveRespawnPosition(spawnBase);
             player.spawnAt(resolved.x, resolved.y, resolved.z || 0);
             player.setMovementModifiers();
-            respawnState = { phase: 'fadeIn', timer: 0.22, reason: respawnState.reason };
+            respawnState = { phase: 'fadeIn', timer: 0.22, reason: respawnState.reason, overrideSpawn: null };
           }
         } else {
           respawnState.timer = Math.max(0, respawnState.timer - dt);
@@ -3460,7 +3526,13 @@ export async function boot(options = {}) {
         updateLevelInteractions(dt);
         updateCrumbles(dt);
         if (world.level2) {
-          world.level2.update(dt, { pos: player.mesh.position, triggerReset, player });
+          world.level2.update(dt, {
+            pos: player.mesh.position,
+            triggerReset,
+            player,
+            spawnPoint,
+            floorTopY: currentFloorTopY,
+          });
         }
         if (world.level3) {
           world.level3.update(dt, { pos: player.mesh.position, triggerReset, player });
@@ -3524,6 +3596,8 @@ export async function boot(options = {}) {
           } else if (ev.type === 'outOfBounds') {
             if (levelId === 1 && fruitMaze && currentFloorTopY !== null && player.mesh.position.y < (currentFloorTopY - 6)) {
               startFruitMazeEscape();
+            } else if (levelId === 2 && pongMinigame && currentFloorTopY !== null && player.mesh.position.y < (currentFloorTopY - 6)) {
+              startPongEscape();
             } else {
               const reason = 'fell_off_level';
               triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
@@ -3644,7 +3718,7 @@ export async function boot(options = {}) {
       updatePlayerShadow(player);
       updatePlayerReadabilityLight();
     } else if (state === 'minigame') {
-      fruitMaze?.update(dt, input);
+      activeMinigame?.update(dt, input);
       updatePlayerShadow(player);
       updatePlayerReadabilityLight();
     } else if (state === 'goal') {

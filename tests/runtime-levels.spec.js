@@ -302,3 +302,35 @@ test('runtime: level 2 floor fall clears collected binkies without resetting', a
   expect(afterFall.floorPenaltyCount).toBeGreaterThan(0);
   expect(afterFall.sceneKey).toBe('CribScene');
 });
+
+test('runtime: level 2 pong minigame can be triggered and shows its UI', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const started = await page.evaluate(() => window.__DADA_DEBUG__?.triggerLevel2Pong?.() ?? false);
+  expect(started).toBe(true);
+  await expect(page.locator('#pongTitle')).toHaveText('PONG PANIC', { timeout: 3_000 });
+  await expect(page.locator('.dada-pong').getByText('Win 5 points to bounce back into the condo.')).toBeVisible();
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true, cancelable: true }));
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey), { timeout: 20_000 })
+    .toBe('CribScene');
+});
+
+test('runtime: level 2 secret path debug data exposes floor reset pad and two secret binkies', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const secret = await page.evaluate(() => window.__DADA_DEBUG__?.level2Secret?.() ?? null);
+  expect(secret).not.toBeNull();
+  expect(Math.abs((secret.resetPadY ?? 999) - 0.02)).toBeLessThanOrEqual(0.06);
+  expect(Array.isArray(secret.secretCoinPositions)).toBe(true);
+  expect(secret.secretCoinPositions).toHaveLength(2);
+  expect(Array.isArray(secret.vanishPlatforms)).toBe(true);
+  expect(secret.vanishPlatforms).toHaveLength(3);
+});

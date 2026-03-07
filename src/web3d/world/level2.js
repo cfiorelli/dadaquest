@@ -89,6 +89,17 @@ const BASE_LEVEL2 = {
     },
   ],
 
+  resetPad: {
+    x: 14.2, y: 0.02, z: L,
+    w: 1.9, h: 0.08, d: 3.4,
+  },
+
+  vanishPlatforms: [
+    { name: 'vanishSecret1', x: 15.7, y: 0.55, z: L, w: 1.7, h: 0.22, d: 3.2, respawnSec: 1.2 },
+    { name: 'vanishSecret2', x: 18.3, y: 1.70, z: L, w: 1.8, h: 0.22, d: 3.2, respawnSec: 1.2 },
+    { name: 'vanishSecret3', x: 20.9, y: 2.85, z: L, w: 1.8, h: 0.22, d: 3.2, respawnSec: 1.2 },
+  ],
+
   crumbles: [
     {
       name: 'crumbleStair1',
@@ -131,8 +142,8 @@ const BASE_LEVEL2 = {
     { x:   6.5, y: 1.80, z: L },
     { x:  15.8, y: 5.05, z: L },
     { x:  18.0, y: 5.20, z: L },
-    { x:  23.4, y: 6.30, z: L },
-    { x:  28.4, y: 7.70, z: L },
+    { x:  16.3, y: 1.34, z: L },
+    { x:  18.9, y: 2.48, z: L },
     { x:  33.4, y: 9.10, z: L },
     { x:  36.2, y: 10.20, z: L },
   ],
