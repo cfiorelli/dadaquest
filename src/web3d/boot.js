@@ -2,10 +2,12 @@ import * as BABYLON from '@babylonjs/core';
 import { buildWorld, createCoin } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
+import { buildWorld4 } from './world/buildWorld4.js';
 import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
+import { FruitMazeMinigame } from './ui/fruitMaze.js';
 import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
@@ -18,6 +20,20 @@ import {
 } from './util/assets.js';
 import { GameAudio } from './util/audio.js';
 import { isDebugMode, isShotMode } from '../utils/modes.js';
+import { LEVEL1 } from './world/level1.js';
+import { LEVEL2 } from './world/level2.js';
+import { LEVEL3 } from './world/level3.js';
+import { LEVEL4 } from './world/level4.js';
+import {
+  clearProgress,
+  ensureProgressTotals,
+  getLevelProgress,
+  isLevelUnlocked,
+  loadProgress,
+  markUnlockShown,
+  recordCollectedBinky,
+  saveProgress,
+} from './util/progression.js';
 
 const SHOT_FRAMES_TARGET = 10;
 const DEFAULT_FLAGS = {
@@ -25,11 +41,13 @@ const DEFAULT_FLAGS = {
   audio: true,
   occlusionFade: true,
 };
-const GOAL_CELEBRATION_SEC = 0.48;
+const GOAL_CELEBRATION_SEC = 0.96;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
 const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
+const CAPE_FLOAT_DURATION_MS = 4000;
+const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -843,6 +861,22 @@ export async function boot(options = {}) {
 
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
+  const fruitMaze = levelId === 1 ? new FruitMazeMinigame() : null;
+  const levelTotals = {
+    1: LEVEL1.coins.length,
+    2: LEVEL2.coins.length,
+    3: LEVEL3.coins.length,
+    4: LEVEL4.coins.length,
+  };
+  let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
+  const syncProgressState = (nextProgress) => {
+    progression = ensureProgressTotals(nextProgress, levelTotals);
+    ui.setLockedLevels({
+      4: !isLevelUnlocked(progression, 4),
+    });
+    window.__DADA_DEBUG__.progressState = progression;
+  };
+  syncProgressState(progression);
   const loadingIntent = !shotMode ? readLoadingIntent() : null;
   const autoStartFromQuery = !shotMode && hasAutoStartQuery();
   const autoStartAfterLoad = (!!loadingIntent && loadingIntent.levelId === levelId) || autoStartFromQuery;
@@ -895,7 +929,9 @@ export async function boot(options = {}) {
   // Build the diorama world (route by level)
   let world;
   try {
-    world = levelId === 3
+    world = levelId === 4
+      ? buildWorld4(scene, { animateGoal: !shotMode })
+      : levelId === 3
       ? buildWorld3(scene, { animateGoal: !shotMode })
       : levelId === 2
         ? buildWorld2(scene, { animateGoal: !shotMode })
@@ -1059,6 +1095,7 @@ export async function boot(options = {}) {
   const playerVisualRoot = new BABYLON.TransformNode('playerVisualRoot', scene);
   playerVisualRoot.parent = player.visual;
   playerVisualRoot.position.set(0, PLAYER_MODEL_SLOT_Y, 0);
+  player.setCapeVisible(!!progression.capeUnlocked);
 
   const goalVisualRoot = new BABYLON.TransformNode('goalVisualRoot', scene);
   goalVisualRoot.parent = world.goalRoot;
@@ -1746,8 +1783,10 @@ export async function boot(options = {}) {
       { role: 'futureChickensPropModel', anchors: anchors.futureChickensPropModel || [], fit: { targetHeight: 0.78, targetMaxSize: 1.0 } },
       { role: 'futureGoatPropModel', anchors: anchors.futureGoatPropModel || [], fit: { targetHeight: 1.42, targetMaxSize: 1.9 } },
       { role: 'futureTurkeyPropModel', anchors: anchors.futureTurkeyPropModel || [], fit: { targetHeight: 1.18, targetMaxSize: 1.6 } },
+      { role: 'futurePigPropModel', anchors: anchors.futurePigPropModel || [], fit: { targetHeight: 1.05, targetMaxSize: 1.5 } },
       { role: 'futureRakePropModel', anchors: anchors.futureRakePropModel || [], fit: { targetHeight: 1.32, targetMaxSize: 1.9, hardMaxExtent: 2.6 } },
       { role: 'futureTractorPropModel', anchors: anchors.futureTractorPropModel || [], fit: { targetHeight: 1.7, targetMaxSize: 2.8, hardMaxExtent: 3.6 } },
+      { role: 'futureBunnyPropModel', anchors: anchors.futureBunnyPropModel || [], fit: { targetHeight: 0.92, targetMaxSize: 1.25, hardMaxExtent: 1.6 } },
     ];
     for (const { role, anchors: roleAnchors, fit } of level3OptionalDefs) {
       for (const anchor of roleAnchors) {
@@ -1923,7 +1962,17 @@ export async function boot(options = {}) {
     const collectedCoins = coins.filter((coin) => coin.collected);
     if (collectedCoins.length === 0) return;
     level1FloorPenaltyCooldownMs = 1500;
+    collectiblePickupCooldownMs = FLOOR_PENALTY_PICKUP_COOLDOWN_MS;
     const playerPos = player.mesh.position.clone();
+    if (debugMode) {
+      console.log('[coin-loss] floor_penalty', {
+        levelId,
+        coinsBefore: coinsCollected,
+        bottomY: Number((player.mesh.position.y - player.getCollisionHalfExtents().halfH).toFixed(3)),
+        floorTopY: currentFloorTopY,
+        stack: new Error().stack,
+      });
+    }
     for (const coin of coins) {
       const wasCollected = coin.collected;
       coin.collected = false;
@@ -1942,6 +1991,7 @@ export async function boot(options = {}) {
       durationMs: 700,
     };
     ui.showStatus('Dropped all pacifiers!', 1100);
+    updateBuffHud();
     for (let i = 0; i < collectedCoins.length; i++) {
       spawnCoinFlyback(collectedCoins[i], playerPos, i, collectedCoins.length);
     }
@@ -1989,8 +2039,14 @@ export async function boot(options = {}) {
   ];
   const pickups = world.pickups || [];
   const coins = world.coins || [];
+  coins.forEach((coin, index) => {
+    if (!coin.id) {
+      coin.id = `level${levelId}_coin_${index}`;
+    }
+  });
   const hazards = world.hazards || [];
   const crumbles = world.crumbles || [];
+  const persistentCoinIds = new Set(getLevelProgress(progression, levelId).collectedIds || []);
   // Crumble state machine — each entry links to a player.colliders[] slot.
   const crumbleStates = crumbles.map((cr) => {
     const platformIndex = world.platforms.indexOf(cr.colliderMesh);
@@ -2069,6 +2125,7 @@ export async function boot(options = {}) {
   if (debugMode) {
     window.__DADA_DEBUG__.sceneRef = scene;
     window.__DADA_DEBUG__.playerRef = player.mesh;
+    window.__DADA_DEBUG__.playerController = player;
     window.__DADA_DEBUG__.cameraRef = camera;
   }
 
@@ -2095,8 +2152,19 @@ export async function boot(options = {}) {
   let onesieBuffTimerMs = 0;
   let onesieMaxDurationMs = 10000;
   let onesieJumpBoost = 1;
+  let onesieStoredJumpBoost = 1.24;
+  let onesieCollectedThisRun = false;
   let puddleInvulnMs = 0;
   let coinsCollected = 0;
+  let collectiblePickupCooldownMs = 0;
+  let capeUsedThisRun = false;
+  let capeSuppressedThisRun = false;
+  let flourPuffCooldownMs = 0;
+  let goalCarryStartPos = null;
+  let goalCarryEndPos = null;
+  let goalCarryStartScale = null;
+  let goalCarryEndScale = null;
+  let fruitMazeSnapshot = null;
   let prevGrounded = player.grounded;
   let prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
   let level1FloorPenaltyCooldownMs = 0;
@@ -2308,9 +2376,173 @@ export async function boot(options = {}) {
     }));
   }
 
+  function applyCapeVisualState() {
+    player.setCapeVisible(!!progression.capeUnlocked && !capeSuppressedThisRun);
+  }
+
+  function updateBuffHud() {
+    ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
+    ui.updateDoubleJumpCue(player.hasAirJumpAvailable() && onesieBuffTimerMs > 0);
+    ui.updateCapeBuff({
+      unlocked: !!progression.capeUnlocked && !capeSuppressedThisRun,
+      active: player.isCapeFloating(),
+      remainingMs: player.getCapeFloatRemainingMs(),
+      totalMs: CAPE_FLOAT_DURATION_MS,
+      used: capeUsedThisRun || capeSuppressedThisRun,
+    });
+    ui.updateFlourPuff({
+      visible: levelId === 4,
+      remainingMs: flourPuffCooldownMs,
+      totalMs: world.flourPuff?.cooldownMs ?? 6000,
+    });
+  }
+
+  function persistProgressState(nextState) {
+    syncProgressState(nextState);
+    saveProgress(progression, levelTotals);
+  }
+
+  function maybeShowUnlockBanner(title, subtitle, key, durationMs) {
+    ui.showBanner(title, subtitle, durationMs);
+    if (!progression.unlocksShown?.[key]) {
+      persistProgressState(markUnlockShown(progression, key, levelTotals));
+    }
+  }
+
+  function recordPersistentBinky(coinId) {
+    if (persistentCoinIds.has(coinId)) return;
+    persistentCoinIds.add(coinId);
+    const result = recordCollectedBinky(progression, levelId, coinId, levelTotals);
+    persistProgressState(result.state);
+    if (result.capeUnlockedNow && !progression.unlocksShown?.cape) {
+      maybeShowUnlockBanner('BABY CAPE INSTALLED', 'Cape float unlocked for every level.', 'cape', 2600);
+    }
+    if (result.sourdoughUnlockedNow && !progression.unlocksShown?.sourdough) {
+      maybeShowUnlockBanner('SUPER SOURDOUGH LEVEL UNLOCKED!', 'Collect all binkies to conquer the bakery dreamscape.', 'sourdough', 3000);
+    }
+    applyCapeVisualState();
+  }
+
+  function clearRunBuffs({ suppressCape = false, keepCapeUsage = false } = {}) {
+    onesieBuffTimerMs = 0;
+    onesieMaxDurationMs = 10000;
+    onesieJumpBoost = 1;
+    onesieStoredJumpBoost = 1.24;
+    onesieCollectedThisRun = false;
+    player.stopCapeFloat();
+    if (!keepCapeUsage) {
+      capeUsedThisRun = false;
+    }
+    if (suppressCape) {
+      capeSuppressedThisRun = true;
+      capeUsedThisRun = true;
+    } else if (!keepCapeUsage) {
+      capeSuppressedThisRun = false;
+    }
+    flourPuffCooldownMs = 0;
+    applyCapeVisualState();
+    updateBuffHud();
+  }
+
+  function restoreOnesieOnCheckpointReset() {
+    if (!onesieCollectedThisRun) return;
+    onesieBuffTimerMs = onesieMaxDurationMs;
+    onesieJumpBoost = onesieStoredJumpBoost;
+  }
+
+  function resetBabyToNew() {
+    clearRunBuffs({ suppressCape: true, keepCapeUsage: false });
+    const resolved = resolveRespawnPosition(respawnPoint);
+    player.spawnAt(resolved.x, resolved.y, resolved.z || 0);
+    player.vx = 0;
+    player.vy = 0;
+    updatePlayerShadow(player);
+    updatePlayerReadabilityLight();
+    ui.showStatus('Baby reset to new', 900);
+  }
+
+  function captureFruitMazeSnapshot() {
+    return {
+      checkpointIndex: activeCheckpointIndex,
+      respawnPoint: { ...respawnPoint },
+      playerPos: player.mesh.position.clone(),
+      coinsCollected,
+      coinState: coins.map((coin) => ({ id: coin.id, collected: coin.collected })),
+      pickupState: pickups.map((pickup) => ({ collected: pickup.collected })),
+      onesieBuffTimerMs,
+      onesieMaxDurationMs,
+      onesieJumpBoost,
+      onesieStoredJumpBoost,
+      onesieCollectedThisRun,
+      capeUsedThisRun,
+      capeSuppressedThisRun,
+      flourPuffCooldownMs,
+    };
+  }
+
+  function restoreFruitMazeSnapshot(snapshot) {
+    if (!snapshot) return;
+    activeCheckpointIndex = snapshot.checkpointIndex;
+    respawnPoint = { ...snapshot.respawnPoint };
+    coinsCollected = snapshot.coinsCollected;
+    ui.setCoins(coinsCollected);
+    window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+    coins.forEach((coin) => {
+      const saved = snapshot.coinState.find((entry) => entry.id === coin.id);
+      coin.collected = !!saved?.collected;
+      coin.node?.setEnabled(!coin.collected);
+    });
+    pickups.forEach((pickup, index) => {
+      const saved = snapshot.pickupState[index];
+      pickup.collected = !!saved?.collected;
+      pickup.node?.setEnabled(!pickup.collected);
+    });
+    onesieBuffTimerMs = snapshot.onesieBuffTimerMs;
+    onesieMaxDurationMs = snapshot.onesieMaxDurationMs;
+    onesieJumpBoost = snapshot.onesieJumpBoost;
+    onesieStoredJumpBoost = snapshot.onesieStoredJumpBoost ?? snapshot.onesieJumpBoost ?? 1.24;
+    onesieCollectedThisRun = snapshot.onesieCollectedThisRun;
+    capeUsedThisRun = snapshot.capeUsedThisRun;
+    capeSuppressedThisRun = snapshot.capeSuppressedThisRun;
+    flourPuffCooldownMs = snapshot.flourPuffCooldownMs;
+    applyCapeVisualState();
+    player.spawnAt(snapshot.playerPos.x, snapshot.playerPos.y, snapshot.playerPos.z);
+    player.vx = 0;
+    player.vy = 0;
+    updatePlayerShadow(player);
+    updatePlayerReadabilityLight();
+    updateBuffHud();
+  }
+
+  function startFruitMazeEscape() {
+    if (!fruitMaze || levelId !== 1 || fruitMaze.isActive()) return;
+    fruitMazeSnapshot = captureFruitMazeSnapshot();
+    state = 'minigame';
+    player.vx = 0;
+    player.vy = 0;
+    audio.stopLevelMusic(0.15);
+    ui.showBanner('FRUIT MAZE!', 'Collect the fruit and get back to the zoo.', 1200);
+    ui.setFade(0.2);
+    fruitMaze.start({
+      onWin: () => {
+        ui.setFade(0);
+        restoreFruitMazeSnapshot(fruitMazeSnapshot);
+        fruitMazeSnapshot = null;
+        state = 'gameplay';
+        audio.startLevelMusic(levelId, 0.2);
+      },
+      onAbort: () => {
+        fruitMazeSnapshot = null;
+        restartRun('fruit_maze_abort');
+        startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+      },
+    });
+  }
+
   function finishRun() {
     state = 'end';
     player.setWinAnimationActive(false);
+    player.stopCapeFloat();
     audio.stopLevelMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
     window.__DADA_DEBUG__.menuVisible = false;
@@ -2339,15 +2571,18 @@ export async function boot(options = {}) {
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'title', lastKey: _lastKey });
     goalReached = false;
     goalTimer = 0;
+    goalCarryStartPos = null;
+    goalCarryEndPos = null;
+    goalCarryStartScale = null;
+    goalCarryEndScale = null;
     respawnState = null;
     activeCheckpointIndex = 0;
     respawnPoint = { ...spawnPoint };
-    onesieBuffTimerMs = 0;
-    onesieMaxDurationMs = 10000;
-    onesieJumpBoost = 1;
+    clearRunBuffs({ suppressCape: false, keepCapeUsage: false });
     puddleInvulnMs = 0;
     coinsCollected = 0;
     window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+    collectiblePickupCooldownMs = 0;
     level1FloorPenaltyCooldownMs = 0;
     level1AirborneFromAboveFloor = false;
     level1MaxAirborneBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
@@ -2357,6 +2592,10 @@ export async function boot(options = {}) {
     level1CoinFlyers = [];
     level1AmbientTimerMs = 6200;
     level1AmbientBirdDelayMs = -1;
+    if (fruitMaze?.isActive()) {
+      fruitMaze.stop();
+    }
+    fruitMazeSnapshot = null;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
     window.__DADA_DEBUG__.checkpointIndex = 0;
@@ -2390,6 +2629,7 @@ export async function boot(options = {}) {
     resetCrumbles();
     if (world.level2) world.level2.reset();
     if (world.level3) world.level3.reset();
+    if (world.level4) world.level4.reset();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -2404,11 +2644,13 @@ export async function boot(options = {}) {
     player.setMovementModifiers();
     player.visual.scaling.set(1, 1, 1);
     player.visual.rotation.set(0, 0, 0);
+    applyCapeVisualState();
     prevGrounded = player.grounded;
     prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
     level1MaxAirborneBottomY = prevPlayerBottomY;
     updatePlayerShadow(player);
     updatePlayerReadabilityLight();
+    updateBuffHud();
 
     camera.position.copyFrom(cameraStartPos);
     camera.setTarget(cameraStartTarget.clone());
@@ -2440,6 +2682,8 @@ export async function boot(options = {}) {
     ui.hideGameplayMenu();
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
+    applyCapeVisualState();
+    updateBuffHud();
     ui.updateTitleDebug({ selectedLevel: levelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
     if (debugMode) {
       debugIdleTimerMs = 1000;
@@ -2468,6 +2712,10 @@ export async function boot(options = {}) {
 
   function requestStart(targetLevelId) {
     if (state !== 'title') return; // already loading or playing
+    if (!isLevelUnlocked(progression, targetLevelId)) {
+      ui.showStartError('Collect all binkies in Levels 1–3 to unlock Super Sourdough');
+      return;
+    }
     if (targetLevelId !== levelId) {
       // User selected a different level than the one currently loaded; navigate.
       state = 'loading'; // prevent re-entry while setTimeout is pending
@@ -2501,18 +2749,42 @@ export async function boot(options = {}) {
   function triggerGameplayHotkey(code) {
     if (state !== 'gameplay') return false;
     if (code === 'KeyR') {
+      restoreOnesieOnCheckpointReset();
       triggerReset('manual_reset', player.mesh.position.x < respawnPoint.x ? 1 : -1);
+      updateBuffHud();
       return true;
     }
     if (code === 'KeyF') {
-      const started = player.triggerBackflip();
+      if (!player.canTriggerAirFlip()) return false;
+      let started = false;
+      if (progression.capeUnlocked && !capeUsedThisRun && !capeSuppressedThisRun) {
+        capeUsedThisRun = true;
+        player.startCapeFloat(CAPE_FLOAT_DURATION_MS);
+        started = player.triggerBackflip() || true;
+        ui.showStatus('Cape float!', 900);
+      } else {
+        started = player.triggerBackflip();
+      }
       window.__DADA_DEBUG__.backflip = player.getBackflipState();
+      updateBuffHud();
       return started;
+    }
+    if (code === 'KeyE') {
+      if (levelId !== 4 || flourPuffCooldownMs > 0 || respawnState) return false;
+      flourPuffCooldownMs = world.flourPuff?.cooldownMs ?? 6000;
+      player.vy = Math.max(player.vy, world.flourPuff?.impulseY ?? 8.6);
+      ui.showStatus('Flour puff!', 650);
+      updateBuffHud();
+      return true;
     }
     return false;
   }
 
   function switchLevelFromGameplayMenu(targetLevelId) {
+    if (!isLevelUnlocked(progression, targetLevelId)) {
+      ui.showStatus('Collect all binkies to unlock Super Sourdough', 1300);
+      return false;
+    }
     selectedLevelId = targetLevelId;
     if (targetLevelId === levelId) {
       window.__DADA_DEBUG__.menuVisible = false;
@@ -2539,6 +2811,15 @@ export async function boot(options = {}) {
 
   ui.setGameplayResumeHandler(() => {
     closeGameplayMenu();
+  });
+  ui.setGameplayRestartHandler(() => {
+    closeGameplayMenu();
+    restartRun('menu_restart');
+    startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+  });
+  ui.setResetBabyHandler(() => {
+    closeGameplayMenu();
+    resetBabyToNew();
   });
   ui.setGameplayMenuHandler((targetLevelId) => {
     switchLevelFromGameplayMenu(targetLevelId);
@@ -2615,6 +2896,16 @@ export async function boot(options = {}) {
       y: coin.position.y,
       z: coin.position.z,
     }));
+    window.__DADA_DEBUG__.setProgressState = (nextState) => {
+      persistProgressState(nextState);
+      applyCapeVisualState();
+      return progression;
+    };
+    window.__DADA_DEBUG__.clearProgressState = () => {
+      persistProgressState(clearProgress(levelTotals));
+      applyCapeVisualState();
+      return progression;
+    };
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -2623,6 +2914,13 @@ export async function boot(options = {}) {
   window.addEventListener('keydown', (ev) => {
     _lastKey = `${ev.key}/${ev.code}`;
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
+    if (fruitMaze?.isActive()) {
+      if (ev.code === 'Escape') {
+        ev.preventDefault();
+        fruitMaze.handleEscape();
+      }
+      return;
+    }
     if (ev.code === 'Escape') {
       if (state === 'gameplay') {
         ev.preventDefault();
@@ -2636,7 +2934,7 @@ export async function boot(options = {}) {
       }
     }
     if (state === 'gameplay') {
-      if ((ev.code === 'KeyR' || ev.key === 'r' || ev.key === 'R') && !ev.repeat) {
+      if ((ev.code === 'KeyR' || ev.key === 'r' || ev.key === 'R') && !ev.repeat && !ev.metaKey && !ev.ctrlKey) {
         ev.preventDefault();
         triggerGameplayHotkey('KeyR');
         return;
@@ -2644,6 +2942,11 @@ export async function boot(options = {}) {
       if ((ev.code === 'KeyF' || ev.key === 'f' || ev.key === 'F') && !ev.repeat) {
         ev.preventDefault();
         triggerGameplayHotkey('KeyF');
+        return;
+      }
+      if ((ev.code === 'KeyE' || ev.key === 'e' || ev.key === 'E') && !ev.repeat) {
+        ev.preventDefault();
+        triggerGameplayHotkey('KeyE');
         return;
       }
     }
@@ -2663,8 +2966,10 @@ export async function boot(options = {}) {
   if (autoStartAfterLoad) {
     finishBootLoading();
     setTimeout(() => {
-      if (state === 'title') {
+      if (state === 'title' && isLevelUnlocked(progression, levelId)) {
         startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+      } else if (!isLevelUnlocked(progression, levelId)) {
+        ui.showStartError('Collect all binkies in Levels 1–3 to unlock Super Sourdough');
       }
     }, 70);
   } else {
@@ -2683,6 +2988,10 @@ export async function boot(options = {}) {
     player.setWinAnimationActive(true);
     state = 'goal';
     goalTimer = GOAL_CELEBRATION_SEC;
+    goalCarryStartPos = player.mesh.position.clone();
+    goalCarryEndPos = new BABYLON.Vector3(goalPos.x - 0.28, goalPos.y + 0.78, goalPos.z);
+    goalCarryStartScale = player.visual.scaling.clone();
+    goalCarryEndScale = new BABYLON.Vector3(0.92, 0.92, 0.92);
     goalCamStartPos = camera.position.clone();
     goalCamStartTarget = camera.getTarget().clone();
     goalCamEndPos = new BABYLON.Vector3(goalPos.x - 3.0, goalPos.y + 2.0, -10.5);
@@ -2792,6 +3101,10 @@ export async function boot(options = {}) {
     const pos = player.mesh.position;
     const checkpointPulse = 0.16 + (Math.sin(performance.now() * 0.004) * 0.08);
 
+    if (collectiblePickupCooldownMs > 0) {
+      collectiblePickupCooldownMs = Math.max(0, collectiblePickupCooldownMs - (dt * 1000));
+    }
+
     if (onesieBuffTimerMs > 0) {
       onesieBuffTimerMs = Math.max(0, onesieBuffTimerMs - dt * 1000);
       if (onesieBuffTimerMs === 0) {
@@ -2824,7 +3137,8 @@ export async function boot(options = {}) {
     }
 
     // Coin overlaps
-    for (const coin of coins) {
+    if (collectiblePickupCooldownMs <= 0) {
+      for (const coin of coins) {
       if (coin.collected) continue;
       const dx = pos.x - coin.position.x;
       const dy = pos.y - coin.position.y;
@@ -2834,6 +3148,7 @@ export async function boot(options = {}) {
         if (coin.node) coin.node.setEnabled(false);
         coinsCollected++;
         window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+        recordPersistentBinky(coin.id);
         audio.playCoin();
         juiceFx.spawnCoinSparkle(coin.position);
         ui.updateCoins(coinsCollected);
@@ -2841,6 +3156,7 @@ export async function boot(options = {}) {
           ui.showPopText('All pacifiers! 🍼', 900);
         }
       }
+    }
     }
 
     // Pickup overlaps
@@ -2853,8 +3169,10 @@ export async function boot(options = {}) {
         pickup.collected = true;
         if (pickup.node) pickup.node.setEnabled(false);
         onesieMaxDurationMs = pickup.durationMs ?? 10000;
+        onesieStoredJumpBoost = pickup.jumpBoost ?? 1.2;
         onesieBuffTimerMs = onesieMaxDurationMs;
-        onesieJumpBoost = pickup.jumpBoost ?? 1.2;
+        onesieJumpBoost = onesieStoredJumpBoost;
+        onesieCollectedThisRun = true;
         audio.playPickup();
         juiceFx.spawnPickupSparkle(pickup.position);
         ui.showOnesieBoostCard();
@@ -3110,6 +3428,9 @@ export async function boot(options = {}) {
       if (level1FloorPenaltyCooldownMs > 0) {
         level1FloorPenaltyCooldownMs = Math.max(0, level1FloorPenaltyCooldownMs - (dt * 1000));
       }
+      if (flourPuffCooldownMs > 0) {
+        flourPuffCooldownMs = Math.max(0, flourPuffCooldownMs - (dt * 1000));
+      }
       if (respawnState) {
         if (respawnState.phase === 'fadeOut') {
           respawnState.timer = Math.max(0, respawnState.timer - dt);
@@ -3144,16 +3465,26 @@ export async function boot(options = {}) {
         if (world.level3) {
           world.level3.update(dt, { pos: player.mesh.position, triggerReset, player });
         }
+        if (world.level4) {
+          world.level4.update(dt, { pos: player.mesh.position, triggerReset, player });
+        }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);
         // Player update
         const moveX = idleSuppressed ? 0 : input.getMoveX();
+        const moveY = idleSuppressed ? 0 : input.getMoveY();
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpJustPressed = jumpPress.edge;
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
         const { halfH } = player.getCollisionHalfExtents();
-        player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
+        player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId, {
+          floatMoveY: moveY,
+          floatActive: player.isCapeFloating(),
+        });
+        if (player.grounded && player.isCapeFloating()) {
+          player.stopCapeFloat();
+        }
         if (levelId === 2) {
           const laneDelta = player.mesh.position.z;
           if (player.grounded) {
@@ -3191,8 +3522,12 @@ export async function boot(options = {}) {
             juiceFx.spawnLandDust(player.mesh.position);
             if (!shotMode) camera.position.y -= 0.18; // camera punch
           } else if (ev.type === 'outOfBounds') {
-            const reason = 'fell_off_level';
-            triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
+            if (levelId === 1 && fruitMaze && currentFloorTopY !== null && player.mesh.position.y < (currentFloorTopY - 6)) {
+              startFruitMazeEscape();
+            } else {
+              const reason = 'fell_off_level';
+              triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
+            }
           }
         }
 
@@ -3238,8 +3573,7 @@ export async function boot(options = {}) {
 
         // HUD updates each frame
         ui.updateObjectiveDir(player.mesh.position.x, goalX);
-        ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
-        ui.updateDoubleJumpCue(player.hasAirJumpAvailable() && onesieBuffTimerMs > 0);
+        updateBuffHud();
       }
 
       // Update blob shadow position (follows player X, stays near ground)
@@ -3309,12 +3643,22 @@ export async function boot(options = {}) {
     } else if (state === 'menu') {
       updatePlayerShadow(player);
       updatePlayerReadabilityLight();
+    } else if (state === 'minigame') {
+      fruitMaze?.update(dt, input);
+      updatePlayerShadow(player);
+      updatePlayerReadabilityLight();
     } else if (state === 'goal') {
       goalTimer = Math.max(0, goalTimer - dt);
       const t = 1 - (goalTimer / GOAL_CELEBRATION_SEC);
       const ease = easeOutCubic(t);
       camera.position = BABYLON.Vector3.Lerp(goalCamStartPos, goalCamEndPos, ease);
       camera.setTarget(BABYLON.Vector3.Lerp(goalCamStartTarget, goalCamEndTarget, ease));
+      if (goalCarryStartPos && goalCarryEndPos) {
+        player.mesh.position.copyFrom(BABYLON.Vector3.Lerp(goalCarryStartPos, goalCarryEndPos, ease));
+      }
+      if (goalCarryStartScale && goalCarryEndScale) {
+        player.visual.scaling.copyFrom(BABYLON.Vector3.Lerp(goalCarryStartScale, goalCarryEndScale, ease));
+      }
       player.updateVisualOnly(dt);
       if (goalTimer <= 0) {
         finishRun();
@@ -3325,7 +3669,7 @@ export async function boot(options = {}) {
       }
     }
 
-    if (state !== 'menu') {
+    if (state !== 'menu' && state !== 'minigame') {
       updateLevel1AnimalDecor(dt);
       updateLevel1Clouds(dt);
       updateLevel1Ambient(dt);
@@ -3334,7 +3678,7 @@ export async function boot(options = {}) {
     }
 
     // Ambient micro-animations — disabled in shot mode
-    if (!shotMode && state !== 'menu') {
+    if (!shotMode && state !== 'menu' && state !== 'minigame') {
       goalWaveTimer += dt;
       goalVisualRoot.position.y = GOAL_MODEL_SLOT_Y + Math.sin(goalWaveTimer * 1.4) * 0.06;
 

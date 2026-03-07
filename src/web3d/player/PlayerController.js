@@ -41,6 +41,11 @@ const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
 const INVULN_BLINK_HZ = 20;
 const BACKFLIP_DURATION_SEC = 0.52;
 const BACKFLIP_COOLDOWN_MS = 800;
+const SIDE_JUMP_WINDOW_MS = 350;
+const SIDE_JUMP_PUSH_X = 6.2;
+const CAPE_FLOAT_DEFAULT_MS = 4000;
+const CAPE_FLOAT_X_SPEED = 5.6;
+const CAPE_FLOAT_Y_SPEED = 4.8;
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
@@ -115,6 +120,12 @@ export class PlayerController {
     this.backflipTimerSec = 0;
     this.backflipCooldownMs = 0;
     this.backflipCount = 0;
+    this.sideJumpWindowMs = 0;
+    this.sideJumpUsed = false;
+    this.sideJumpDir = 0;
+    this.sideJumpPlatform = null;
+    this.capeFloatTimerMs = 0;
+    this.capeFloatCount = 0;
   }
 
   setColliders(platforms) {
@@ -162,6 +173,11 @@ export class PlayerController {
     this.airJumpsUsed = 0;
     this.backflipTimerSec = 0;
     this.backflipCooldownMs = 0;
+    this.sideJumpWindowMs = 0;
+    this.sideJumpUsed = false;
+    this.sideJumpDir = 0;
+    this.sideJumpPlatform = null;
+    this.capeFloatTimerMs = 0;
     this.visual.rotation.set(0, 0, 0);
     if (this.babyAnim) {
       this.babyAnim.setWinActive(false);
@@ -250,6 +266,23 @@ export class PlayerController {
     return this.backflipTimerSec > 0;
   }
 
+  canTriggerAirFlip() {
+    return !this.grounded && (this.jumping || Math.abs(this.vy) > 0.5);
+  }
+
+  startCapeFloat(durationMs = CAPE_FLOAT_DEFAULT_MS) {
+    this.capeFloatTimerMs = durationMs;
+    this.capeFloatCount += 1;
+  }
+
+  stopCapeFloat() {
+    this.capeFloatTimerMs = 0;
+  }
+
+  isCapeFloating() {
+    return this.capeFloatTimerMs > 0;
+  }
+
   getBackflipState() {
     return {
       active: this.backflipTimerSec > 0,
@@ -257,6 +290,8 @@ export class PlayerController {
       cooldownMs: this.backflipCooldownMs,
       count: this.backflipCount,
       angle: this.visual.rotation.z,
+      capeFloatMs: this.capeFloatTimerMs,
+      capeFloatCount: this.capeFloatCount,
     };
   }
 
@@ -277,9 +312,11 @@ export class PlayerController {
     return false;
   }
 
-  update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0) {
+  update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0, options = {}) {
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
+    const floatMoveY = clamp(options.floatMoveY ?? 0, -1, 1);
+    const floatActive = !!options.floatActive && this.capeFloatTimerMs > 0;
 
     if (this.invulnTimerMs > 0) {
       this.invulnTimerMs = Math.max(0, this.invulnTimerMs - dt * 1000);
@@ -287,10 +324,20 @@ export class PlayerController {
     if (this.backflipCooldownMs > 0) {
       this.backflipCooldownMs = Math.max(0, this.backflipCooldownMs - dt * 1000);
     }
+    if (this.sideJumpWindowMs > 0) {
+      this.sideJumpWindowMs = Math.max(0, this.sideJumpWindowMs - dt * 1000);
+    }
+    if (this.capeFloatTimerMs > 0) {
+      this.capeFloatTimerMs = Math.max(0, this.capeFloatTimerMs - dt * 1000);
+    }
 
     // Timers
     if (this.grounded) {
       this.timeSinceGround = 0;
+      this.sideJumpUsed = false;
+      this.sideJumpWindowMs = 0;
+      this.sideJumpDir = 0;
+      this.sideJumpPlatform = null;
     } else {
       this.timeSinceGround += dt * 1000;
     }
@@ -315,7 +362,12 @@ export class PlayerController {
       && this.timeSinceGround > COYOTE_MS
       && this.maxAirJumps > 0
       && this.airJumpsUsed < this.maxAirJumps;
-    if (canGroundJump || canAirJump) {
+    const canSideJump = canBuffer
+      && !this.grounded
+      && this.sideJumpWindowMs > 0
+      && !this.sideJumpUsed;
+    if (canGroundJump || canAirJump || canSideJump) {
+      const sideJumpDir = canSideJump ? this.sideJumpDir : 0;
       const jumpReason = canAirJump ? 'air-jump' : 'buffer-consumed';
       recordJump(jumpReason, {
         jumpHeld,
@@ -326,7 +378,10 @@ export class PlayerController {
         coyoteMs: this.timeSinceGround,
       }, this.grounded, pos);
       
-      this.vy = JUMP_VEL * this.jumpVelocityMultiplier;
+      this.vy = (canSideJump ? (JUMP_VEL * 0.92) : JUMP_VEL) * this.jumpVelocityMultiplier;
+      if (canSideJump && sideJumpDir !== 0) {
+        this.vx = sideJumpDir * SIDE_JUMP_PUSH_X;
+      }
       this.jumping = true;
       this.jumpCutApplied = false;
       this.timeSinceGround = COYOTE_MS + 1; // consume coyote
@@ -335,7 +390,11 @@ export class PlayerController {
       if (this.babyAnim) {
         this.babyAnim.onJump();
       }
-      if (canAirJump) {
+      if (canSideJump) {
+        this.sideJumpUsed = true;
+        this.sideJumpWindowMs = 0;
+        this.emitEvent('jump');
+      } else if (canAirJump) {
         this.airJumpsUsed += 1;
         this.emitEvent('doubleJump');
       } else {
@@ -368,8 +427,15 @@ export class PlayerController {
     const maxStep = accelVal * dt;
     this.vx += clamp(diff, -maxStep, maxStep);
 
-    // Gravity
-    this.vy -= GRAVITY * dt;
+    if (floatActive) {
+      this.vx = clamp(moveX * CAPE_FLOAT_X_SPEED, -CAPE_FLOAT_X_SPEED, CAPE_FLOAT_X_SPEED);
+      this.vy = clamp(floatMoveY * CAPE_FLOAT_Y_SPEED, -CAPE_FLOAT_Y_SPEED, CAPE_FLOAT_Y_SPEED * 0.85);
+      this.jumping = false;
+      this.jumpCutApplied = false;
+    } else {
+      // Gravity
+      this.vy -= GRAVITY * dt;
+    }
 
     // Integrate position
     pos.x += this.vx * dt;
@@ -410,9 +476,19 @@ export class PlayerController {
       } else if (minOverlap === overlapLeft) {
         pos.x = c.minX - PLAYER_HALF_W - SKIN_WIDTH;
         this.vx = 0;
+        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
+          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+          this.sideJumpDir = -1;
+          this.sideJumpPlatform = c;
+        }
       } else if (minOverlap === overlapRight) {
         pos.x = c.maxX + PLAYER_HALF_W + SKIN_WIDTH;
         this.vx = 0;
+        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
+          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+          this.sideJumpDir = 1;
+          this.sideJumpPlatform = c;
+        }
       }
     }
 
@@ -441,9 +517,10 @@ export class PlayerController {
     if (this.babyAnim) {
       this.babyAnim.update(dt, {
         vx: this.vx,
-        grounded: this.grounded,
-      });
-    }
+      grounded: this.grounded,
+      capeFloatActive: floatActive,
+    });
+  }
 
     if (this.backflipTimerSec > 0) {
       this.backflipTimerSec = Math.max(0, this.backflipTimerSec - dt);
@@ -473,6 +550,16 @@ export class PlayerController {
 
   hasAirJumpAvailable() {
     return this.maxAirJumps > 0 && this.airJumpsUsed < this.maxAirJumps;
+  }
+
+  setCapeVisible(visible) {
+    if (this.babyRig?.cape) {
+      this.babyRig.cape.setEnabled(!!visible);
+    }
+  }
+
+  getCapeFloatRemainingMs() {
+    return this.capeFloatTimerMs;
   }
 
   setWinAnimationActive(active) {

@@ -19,25 +19,25 @@ function createFaceTexture(scene) {
   ctx.fill();
 
   // Eyes
-  ctx.fillStyle = '#2e2b30';
+  ctx.fillStyle = '#1f1c20';
   ctx.beginPath();
-  ctx.arc(44, 52, 10, 0, Math.PI * 2);
-  ctx.arc(84, 52, 10, 0, Math.PI * 2);
+  ctx.arc(42, 50, 12, 0, Math.PI * 2);
+  ctx.arc(86, 50, 12, 0, Math.PI * 2);
   ctx.fill();
 
   // Eye shine
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.arc(47, 48, 3, 0, Math.PI * 2);
-  ctx.arc(87, 48, 3, 0, Math.PI * 2);
+  ctx.arc(45, 46, 4, 0, Math.PI * 2);
+  ctx.arc(89, 46, 4, 0, Math.PI * 2);
   ctx.fill();
 
   // Smile
-  ctx.strokeStyle = '#5a3e34';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#4d2d26';
+  ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(64, 80, 13, 0.18 * Math.PI, 0.82 * Math.PI);
+  ctx.arc(64, 78, 16, 0.18 * Math.PI, 0.82 * Math.PI);
   ctx.stroke();
 
   tex.hasAlpha = true;
@@ -124,6 +124,19 @@ export function createBabyVisual(scene) {
     roughness: 0.92,
     noiseAmt: 9,
   });
+
+  const curl = BABYLON.MeshBuilder.CreateTube('babyCurl', {
+    path: [
+      new BABYLON.Vector3(-0.02, 0.24, -0.18),
+      new BABYLON.Vector3(0.02, 0.32, -0.20),
+      new BABYLON.Vector3(0.07, 0.28, -0.17),
+      new BABYLON.Vector3(0.03, 0.21, -0.14),
+    ],
+    radius: 0.012,
+    tessellation: 10,
+  }, scene);
+  curl.parent = headPivot;
+  curl.material = hairCap.material;
 
   const earL = BABYLON.MeshBuilder.CreateSphere('babyEarL', { diameter: 0.13, segments: 12 }, scene);
   earL.parent = headPivot;
@@ -225,7 +238,7 @@ export function createBabyVisual(scene) {
 
   const facePlane = BABYLON.MeshBuilder.CreatePlane('babyFace', { width: 0.29, height: 0.29 }, scene);
   facePlane.parent = headPivot;
-  facePlane.position.set(0, -0.02, -0.29);
+  facePlane.position.set(0, -0.01, -0.301);
   const faceTex = createFaceTexture(scene);
   const faceMat = new BABYLON.StandardMaterial('babyFaceMat', scene);
   faceMat.diffuseTexture = faceTex;
@@ -235,10 +248,22 @@ export function createBabyVisual(scene) {
   faceMat.emissiveColor = new BABYLON.Color3(0.12, 0.09, 0.08);
   facePlane.material = faceMat;
 
+  const cape = BABYLON.MeshBuilder.CreatePlane('babyCape', {
+    width: 0.42,
+    height: 0.54,
+  }, scene);
+  cape.parent = bodyPivot;
+  cape.position.set(0, 0.02, 0.18);
+  cape.rotation.x = -0.18;
+  const capeMat = makeFelt(scene, 'babyCapeMat', 185, 62, 80, { roughness: 0.84 });
+  capeMat.backFaceCulling = false;
+  cape.material = capeMat;
+  cape.setEnabled(false);
+
   const shadowMeshes = [
     body, tummy, neck, head, hairCap, earL, earR,
     diaper, diaperRoundL, diaperRoundR, trim,
-    armL, armR, handL, handR, legL, legR, footL, footR,
+    armL, armR, handL, handR, legL, legR, footL, footR, curl, cape,
   ];
 
   return {
@@ -252,6 +277,7 @@ export function createBabyVisual(scene) {
       armRPivot,
       legLPivot,
       legRPivot,
+      cape,
     },
   };
 }

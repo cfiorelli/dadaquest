@@ -36,6 +36,13 @@ export class InputManager {
     return x;
   }
 
+  getMoveY() {
+    let y = 0;
+    if (this.held['KeyW'] || this.held['ArrowUp']) y += 1;
+    if (this.held['KeyS'] || this.held['ArrowDown']) y -= 1;
+    return y;
+  }
+
   /** True while Space is held down. */
   isJumpHeld() {
     return !!this.held['Space'];
@@ -77,6 +84,15 @@ export class InputManager {
 
   isSprintHeld() {
     return !!this.held['ShiftLeft'] || !!this.held['ShiftRight'];
+  }
+
+  consumeAbilityPress(code = 'KeyE') {
+    const isHeld = !!this.held[code];
+    const pressId = this.pressId[code] || 0;
+    const alreadyConsumed = this.consumedPressId[code] === pressId;
+    const isNewPress = isHeld && pressId > 0 && !alreadyConsumed;
+    if (isNewPress) this.consumedPressId[code] = pressId;
+    return isNewPress;
   }
 
   consumeAll() {

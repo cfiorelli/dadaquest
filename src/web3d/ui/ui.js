@@ -143,6 +143,25 @@ const CSS = `
   border-color: rgba(125,64,40,0.5);
   color: #fff;
 }
+.dada-level-btn.locked {
+  background: rgba(72, 62, 52, 0.08);
+  border-color: rgba(98, 84, 70, 0.20);
+  color: rgba(93, 74, 54, 0.55);
+  cursor: not-allowed;
+}
+.dada-level-btn.locked:hover {
+  background: rgba(72, 62, 52, 0.08);
+  transform: none;
+}
+.dada-level-lock {
+  display: block;
+  margin-top: 10px;
+  min-height: 1.2em;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6a5642;
+  letter-spacing: 0.02em;
+}
 .dada-btn {
   margin-top: 24px;
   padding: 14px 32px;
@@ -174,6 +193,23 @@ const CSS = `
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
+}
+.dada-menu-actions {
+  margin-top: 18px;
+}
+.dada-menu-legend {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 8px 14px;
+  text-align: left;
+  font-size: 12px;
+  color: #5d4a36;
+}
+.dada-menu-legend span {
+  color: #b24733;
+  font-family: monospace;
+  font-weight: 700;
 }
 .dada-end-msg {
   font-size: clamp(18px, 3vw, 28px);
@@ -272,22 +308,94 @@ const CSS = `
   white-space: nowrap;
 }
 
-/* Buff bar — bottom-left */
+/* Buff column — left side */
 .dada-buff {
-  bottom: 14px;
+  top: 56px;
   left: 14px;
   font-size: 16px;
   display: none;
-  min-width: 152px;
-  padding: 10px 14px;
+  min-width: 160px;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.dada-buff-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dada-buff-card {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 10px;
+  align-items: center;
+  min-width: 172px;
+  padding: 10px 12px;
+  background: rgba(40, 30, 20, 0.62);
+  border: 1px solid rgba(255, 230, 190, 0.28);
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.14);
+  opacity: 0.74;
+}
+.dada-buff-card.active {
+  opacity: 1;
+  border-color: rgba(255, 244, 196, 0.46);
+}
+.dada-buff-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(255, 250, 238, 0.92);
+  background: rgba(92, 82, 74, 0.65);
+  border: 1px solid rgba(255, 230, 190, 0.16);
+}
+.dada-buff-card.active .dada-buff-icon.onesie {
+  background: linear-gradient(135deg, #406cf3, #2455d6);
+}
+.dada-buff-card.active .dada-buff-icon.cape {
+  background: linear-gradient(135deg, #d86848, #a73cd6);
+}
+.dada-buff-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .dada-buff-label {
   font-size: 14px;
-  opacity: 0.78;
-  margin-bottom: 5px;
+  opacity: 0.84;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dada-buff-state {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: rgba(255, 242, 225, 0.78);
+}
+.dada-buff-track {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.dada-buff-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f5c842, #f0983a);
+  border-radius: 5px;
+  transition: width 0.12s linear;
+}
+.dada-buff-fill.cape {
+  background: linear-gradient(90deg, #8c73ff, #45d4c8);
 }
 .dada-buff-cue {
   display: none;
@@ -299,17 +407,38 @@ const CSS = `
   padding: 2px 8px;
   letter-spacing: 0.02em;
 }
-.dada-buff-track {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 5px;
-  overflow: hidden;
-  margin-top: 3px;
+.dada-ability-pill {
+  left: 14px;
+  top: 208px;
+  display: none;
+  min-width: 154px;
+  padding: 8px 10px;
 }
-.dada-buff-fill {
+.dada-ability-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.dada-ability-state {
+  font-size: 11px;
+  opacity: 0.82;
+}
+.dada-ability-track {
+  margin-top: 6px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.16);
+}
+.dada-ability-fill {
+  width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, #f5c842, #f0983a);
-  border-radius: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f1d276, #f08d3c);
   transition: width 0.12s linear;
 }
 
@@ -388,6 +517,42 @@ const CSS = `
   object-fit: contain;
   flex: none;
 }
+.dada-banner {
+  position: absolute;
+  left: 50%;
+  top: 24%;
+  transform: translate(-50%, -50%) scale(0.88);
+  min-width: min(90vw, 860px);
+  max-width: 92vw;
+  padding: 18px 26px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 223, 154, 0.55);
+  background: linear-gradient(135deg, rgba(198, 58, 30, 0.96), rgba(244, 156, 52, 0.92));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32), 0 0 32px rgba(255, 190, 80, 0.35);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.2s ease;
+  z-index: 8;
+}
+.dada-banner.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.dada-banner-title {
+  font-size: clamp(30px, 4.8vw, 62px);
+  font-weight: 900;
+  letter-spacing: 0.09em;
+  color: #fff6e2;
+  text-shadow: 0 3px 0 rgba(81, 26, 14, 0.42), 0 0 22px rgba(255, 230, 156, 0.35);
+}
+.dada-banner-sub {
+  margin-top: 6px;
+  font-size: clamp(14px, 2vw, 20px);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(255, 244, 226, 0.92);
+}
 /* Onesie boost card — centered pop-up overlay */
 .dada-boost-card {
   position: fixed;
@@ -454,7 +619,13 @@ export function createUI(uiRoot, options = {}) {
 
   // Detect current level from URL (mutable — updated when user clicks level buttons)
   const levelParam = new URLSearchParams(window.location.search).get('level');
-  let _selectedLevel = levelParam === '3' ? 3 : levelParam === '2' ? 2 : 1;
+  let _selectedLevel = levelParam === '4' ? 4 : levelParam === '3' ? 3 : levelParam === '2' ? 2 : 1;
+  let lockedLevels = {
+    1: false,
+    2: false,
+    3: false,
+    4: true,
+  };
 
   // Title overlay
   const titleEl = document.createElement('div');
@@ -478,7 +649,9 @@ export function createUI(uiRoot, options = {}) {
         <button class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="levelBtn1" tabindex="-1">Level 1</button>
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
         <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
+        <button class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="levelBtn4" tabindex="-1">Level 4</button>
       </div>
+      <div class="dada-level-lock" id="titleLevelLock"></div>
       <div class="dada-loading-wrap" id="titleLoadingWrap">
         <div class="dada-loading-text" id="titleLoadingText">Loading Level 1… 0%</div>
         <div class="dada-loading-bar"><div class="dada-loading-fill" id="titleLoadingFill"></div></div>
@@ -498,29 +671,45 @@ export function createUI(uiRoot, options = {}) {
   const titleLoadingWrapEl = titleEl.querySelector('#titleLoadingWrap');
   const titleLoadingTextEl = titleEl.querySelector('#titleLoadingText');
   const titleLoadingFillEl = titleEl.querySelector('#titleLoadingFill');
+  const titleLevelLockEl = titleEl.querySelector('#titleLevelLock');
   const btn1 = titleEl.querySelector('#levelBtn1');
   const btn2 = titleEl.querySelector('#levelBtn2');
   const btn3 = titleEl.querySelector('#levelBtn3');
+  const btn4 = titleEl.querySelector('#levelBtn4');
   let titleErrorVisible = false;
   let menuBtn1 = null;
   let menuBtn2 = null;
   let menuBtn3 = null;
+  let menuBtn4 = null;
   let menuSubEl = null;
+  let menuLockEl = null;
+  let gameplayRestartHandler = null;
+  let resetBabyHandler = null;
 
   function getLevelSubtitle(id) {
-    return id === 3
+    return id === 4
+      ? 'Level 4 — Super Sourdough'
+      : id === 3
       ? 'Level 3 — Grandma\'s House'
       : id === 2
         ? 'Level 2 — Condo Garden'
         : 'Level 1 — Petting Zoo';
   }
 
+  function getLevelLockMessage(id) {
+    if (id !== 4 || !lockedLevels[4]) return '';
+    return '🔒 Collect all binkies in Levels 1–3 to unlock Super Sourdough';
+  }
+
   function resetTitleCopy() {
     if (titleSubEl) titleSubEl.textContent = getLevelSubtitle(_selectedLevel);
+    if (titleLevelLockEl) titleLevelLockEl.textContent = getLevelLockMessage(_selectedLevel);
     if (titleHintEl && !titleErrorVisible) {
       titleHintEl.style.color = '';
       titleHintEl.style.animation = '';
-      titleHintEl.textContent = 'Press SPACE or ENTER to start';
+      titleHintEl.textContent = lockedLevels[_selectedLevel]
+        ? 'Locked until enough binkies are collected'
+        : 'Press SPACE or ENTER to start';
     }
   }
 
@@ -528,16 +717,46 @@ export function createUI(uiRoot, options = {}) {
     if (menuSubEl) {
       menuSubEl.textContent = `Current level: ${getLevelSubtitle(levelId)}`;
     }
+    if (menuLockEl) menuLockEl.textContent = getLevelLockMessage(levelId);
     menuBtn1?.classList.toggle('active', levelId === 1);
     menuBtn2?.classList.toggle('active', levelId === 2);
     menuBtn3?.classList.toggle('active', levelId === 3);
+    menuBtn4?.classList.toggle('active', levelId === 4);
+  }
+
+  function applyLockState(button, locked) {
+    if (!button) return;
+    button.classList.toggle('locked', !!locked);
+    button.toggleAttribute('aria-disabled', !!locked);
+  }
+
+  function refreshLockState() {
+    applyLockState(btn1, lockedLevels[1]);
+    applyLockState(btn2, lockedLevels[2]);
+    applyLockState(btn3, lockedLevels[3]);
+    applyLockState(btn4, lockedLevels[4]);
+    applyLockState(menuBtn1, lockedLevels[1]);
+    applyLockState(menuBtn2, lockedLevels[2]);
+    applyLockState(menuBtn3, lockedLevels[3]);
+    applyLockState(menuBtn4, lockedLevels[4]);
+    resetTitleCopy();
+    updateMenuCopy(_selectedLevel);
   }
 
   function selectLevel(id) {
+    if (lockedLevels[id]) {
+      if (titleHintEl) {
+        titleHintEl.style.color = '#7a5a26';
+        titleHintEl.style.animation = 'none';
+        titleHintEl.textContent = getLevelLockMessage(id);
+      }
+      return;
+    }
     _selectedLevel = id;
     btn1.classList.toggle('active', id === 1);
     btn2.classList.toggle('active', id === 2);
     btn3.classList.toggle('active', id === 3);
+    btn4.classList.toggle('active', id === 4);
     resetTitleCopy();
     const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);
@@ -551,6 +770,7 @@ export function createUI(uiRoot, options = {}) {
   btn1?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(1); });
   btn2?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(2); });
   btn3?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(3); });
+  btn4?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(4); });
 
   const menuEl = document.createElement('div');
   menuEl.className = 'dada-overlay dada-menu-bg hidden';
@@ -566,9 +786,23 @@ export function createUI(uiRoot, options = {}) {
         <a class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="menuLevelBtn1" href="${window.location.pathname}">Level 1</a>
         <a class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="menuLevelBtn2" href="${window.location.pathname}?level=2">Level 2</a>
         <a class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="menuLevelBtn3" href="${window.location.pathname}?level=3">Level 3</a>
+        <a class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="menuLevelBtn4" href="${window.location.pathname}?level=4">Level 4</a>
       </div>
-      <div class="dada-btn-row">
+      <div class="dada-level-lock" id="menuLevelLock"></div>
+      <div class="dada-btn-row dada-menu-actions">
         <button class="dada-btn dada-btn-secondary" id="menuResumeBtn">Resume</button>
+        <button class="dada-btn" id="menuRestartBtn">Restart Level</button>
+        <button class="dada-btn dada-btn-secondary" id="menuResetBabyBtn">Reset Baby to New</button>
+      </div>
+      <div class="dada-menu-legend">
+        <div><span>A/D</span> or <span>← →</span> Move</div>
+        <div><span>Space</span> Jump</div>
+        <div><span>Shift</span> Run</div>
+        <div><span>M</span> Mute</div>
+        <div><span>R</span> Reset checkpoint</div>
+        <div><span>F</span> Flip / cape float</div>
+        <div><span>E</span> Flour puff (L4)</div>
+        <div><span>ESC</span> Menu</div>
       </div>
     </div>
   `;
@@ -577,7 +811,11 @@ export function createUI(uiRoot, options = {}) {
   menuBtn1 = menuEl.querySelector('#menuLevelBtn1');
   menuBtn2 = menuEl.querySelector('#menuLevelBtn2');
   menuBtn3 = menuEl.querySelector('#menuLevelBtn3');
+  menuBtn4 = menuEl.querySelector('#menuLevelBtn4');
+  menuLockEl = menuEl.querySelector('#menuLevelLock');
   const menuResumeBtn = menuEl.querySelector('#menuResumeBtn');
+  const menuRestartBtn = menuEl.querySelector('#menuRestartBtn');
+  const menuResetBabyBtn = menuEl.querySelector('#menuResetBabyBtn');
   menuBtn1?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
@@ -596,11 +834,30 @@ export function createUI(uiRoot, options = {}) {
     ev.currentTarget.blur();
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(3);
   });
+  menuBtn4?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[4]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(4);
+  });
   menuResumeBtn?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
     if (typeof gameplayResumeHandler === 'function') gameplayResumeHandler();
+  });
+  menuRestartBtn?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof gameplayRestartHandler === 'function') gameplayRestartHandler();
+  });
+  menuResetBabyBtn?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof resetBabyHandler === 'function') resetBabyHandler();
   });
 
   // End overlay
@@ -641,15 +898,45 @@ export function createUI(uiRoot, options = {}) {
   objectiveEl.textContent = 'Find DaDa →';
   uiRoot.appendChild(objectiveEl);
 
+  const abilityEl = document.createElement('div');
+  abilityEl.className = 'dada-hud-pill dada-ability-pill';
+  abilityEl.innerHTML = `
+    <div class="dada-ability-label">Flour Puff <span class="dada-ability-state">READY</span></div>
+    <div class="dada-ability-track"><div class="dada-ability-fill"></div></div>
+  `;
+  uiRoot.appendChild(abilityEl);
+  const abilityFill = abilityEl.querySelector('.dada-ability-fill');
+  const abilityState = abilityEl.querySelector('.dada-ability-state');
+
   const buffEl = document.createElement('div');
-  buffEl.className = 'dada-hud-pill dada-buff';
+  buffEl.className = 'dada-buff';
   buffEl.innerHTML = `
-    <div class="dada-buff-label">Onesie boost <span class="dada-buff-cue">x2 jump</span></div>
-    <div class="dada-buff-track"><div class="dada-buff-fill" style="width:100%"></div></div>
+    <div class="dada-buff-col">
+      <div class="dada-buff-card" data-buff="onesie">
+        <div class="dada-buff-icon onesie">JMP</div>
+        <div class="dada-buff-copy">
+          <div class="dada-buff-label">Onesie boost <span class="dada-buff-state">OFF</span></div>
+          <div class="dada-buff-track"><div class="dada-buff-fill onesie" style="width:0%"></div></div>
+          <span class="dada-buff-cue">x2 jump</span>
+        </div>
+      </div>
+      <div class="dada-buff-card" data-buff="cape">
+        <div class="dada-buff-icon cape">CAPE</div>
+        <div class="dada-buff-copy">
+          <div class="dada-buff-label">Antigravity Cape <span class="dada-buff-state">LOCKED</span></div>
+          <div class="dada-buff-track"><div class="dada-buff-fill cape" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
   `;
   uiRoot.appendChild(buffEl);
-  const buffFill = buffEl.querySelector('.dada-buff-fill');
-  const buffCue = buffEl.querySelector('.dada-buff-cue');
+  const onesieCard = buffEl.querySelector('[data-buff="onesie"]');
+  const capeCard = buffEl.querySelector('[data-buff="cape"]');
+  const buffFill = onesieCard.querySelector('.dada-buff-fill.onesie');
+  const buffCue = onesieCard.querySelector('.dada-buff-cue');
+  const onesieState = onesieCard.querySelector('.dada-buff-state');
+  const capeFill = capeCard.querySelector('.dada-buff-fill.cape');
+  const capeState = capeCard.querySelector('.dada-buff-state');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -669,7 +956,18 @@ export function createUI(uiRoot, options = {}) {
   `;
   document.body.appendChild(boostCardEl);
 
+  const bannerEl = document.createElement('div');
+  bannerEl.className = 'dada-banner';
+  bannerEl.innerHTML = `
+    <div class="dada-banner-title" id="bannerTitle"></div>
+    <div class="dada-banner-sub" id="bannerSub"></div>
+  `;
+  uiRoot.appendChild(bannerEl);
+  const bannerTitleEl = bannerEl.querySelector('#bannerTitle');
+  const bannerSubEl = bannerEl.querySelector('#bannerSub');
+
   let boostCardTimer1 = null, boostCardTimer2 = null;
+  let bannerTimer = null;
 
   const canvasEl = document.getElementById('renderCanvas');
 
@@ -709,6 +1007,16 @@ export function createUI(uiRoot, options = {}) {
   let ctrlHintTimer = null;
   let ctrlHintFaded = false;
   let coinTotal = 0;
+
+  function showBanner(title, subtitle = '', durationMs = 2400) {
+    if (bannerTimer) clearTimeout(bannerTimer);
+    bannerTitleEl.textContent = title;
+    bannerSubEl.textContent = subtitle;
+    bannerEl.classList.add('visible');
+    bannerTimer = setTimeout(() => {
+      bannerEl.classList.remove('visible');
+    }, durationMs);
+  }
 
   // Coin pulse animation
   let pulseCancelTimer = null;
@@ -814,6 +1122,19 @@ export function createUI(uiRoot, options = {}) {
     setGameplayResumeHandler(cb) {
       gameplayResumeHandler = cb;
     },
+    setGameplayRestartHandler(cb) {
+      gameplayRestartHandler = cb;
+    },
+    setResetBabyHandler(cb) {
+      resetBabyHandler = cb;
+    },
+    setLockedLevels(nextLockedLevels = {}) {
+      lockedLevels = {
+        ...lockedLevels,
+        ...nextLockedLevels,
+      };
+      refreshLockState();
+    },
     showLoading(levelId) {
       const percent = arguments.length > 1 ? arguments[1] : 0;
       titleErrorVisible = false;
@@ -888,6 +1209,8 @@ export function createUI(uiRoot, options = {}) {
       setCoinCount(0);
       coinsEl.style.display = 'block';
       objectiveEl.style.display = 'block';
+      buffEl.style.display = 'block';
+      abilityEl.style.display = 'none';
       // Show control hints; auto-fade after 5 s
       if (!ctrlHintFaded) {
         ctrlHintEl.style.display = 'block';
@@ -901,6 +1224,7 @@ export function createUI(uiRoot, options = {}) {
       coinsEl.style.display = 'none';
       objectiveEl.style.display = 'none';
       buffEl.style.display = 'none';
+      abilityEl.style.display = 'none';
       ctrlHintEl.style.display = 'none';
     },
 
@@ -941,24 +1265,58 @@ export function createUI(uiRoot, options = {}) {
 
     /** Update onesie buff bar. remainingMs=0 → hide. */
     updateBuff(remainingMs, totalMs) {
-      if (remainingMs <= 0) {
-        buffEl.style.display = 'none';
-        buffCue.style.display = 'none';
-        return;
-      }
       buffEl.style.display = 'block';
+      onesieCard.classList.toggle('active', remainingMs > 0);
+      onesieState.textContent = remainingMs > 0 ? 'ACTIVE' : 'OFF';
       const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
       buffFill.style.width = `${pct}%`;
+      buffCue.style.display = remainingMs > 0 ? 'inline-block' : 'none';
     },
     updateDoubleJumpCue(available) {
       buffCue.style.display = available ? 'inline-block' : 'none';
+    },
+    updateCapeBuff({ unlocked = false, active = false, remainingMs = 0, totalMs = 4000, used = false } = {}) {
+      buffEl.style.display = 'block';
+      const pct = totalMs > 0 ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
+      capeFill.style.width = `${pct}%`;
+      capeCard.classList.toggle('active', active || unlocked);
+      if (!unlocked) {
+        capeState.textContent = 'LOCKED';
+      } else if (active) {
+        capeState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
+      } else if (used) {
+        capeState.textContent = 'USED';
+      } else {
+        capeState.textContent = 'READY';
+      }
+    },
+    updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
+      if (!visible) {
+        abilityEl.style.display = 'none';
+        abilityFill.style.width = '0%';
+        abilityState.textContent = 'READY';
+        return;
+      }
+      abilityEl.style.display = 'block';
+      if (remainingMs <= 0) {
+        abilityFill.style.width = '100%';
+        abilityState.textContent = 'READY';
+        return;
+      }
+      const pct = totalMs > 0 ? Math.max(0, Math.min(100, 100 - ((remainingMs / totalMs) * 100))) : 0;
+      abilityFill.style.width = `${pct}%`;
+      abilityState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
     },
 
     /** Reset all gameplay HUD to initial state for restart. */
     resetGameplayHud() {
       this.hideGameplayHud();
       this.resetControlHints();
+      this.updateBuff(0, 1);
+      this.updateCapeBuff({ unlocked: false, active: false, remainingMs: 0, used: false });
+      this.updateFlourPuff({ visible: false, remainingMs: 0, totalMs: 6000 });
     },
+    showBanner,
     showToast,
     showOnesieBoostToast() {
       showToast({
