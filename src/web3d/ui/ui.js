@@ -276,39 +276,40 @@ const CSS = `
 .dada-buff {
   bottom: 14px;
   left: 14px;
-  font-size: 12px;
+  font-size: 16px;
   display: none;
-  min-width: 110px;
+  min-width: 152px;
+  padding: 10px 14px;
 }
 .dada-buff-label {
-  font-size: 11px;
+  font-size: 14px;
   opacity: 0.78;
-  margin-bottom: 3px;
+  margin-bottom: 5px;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 .dada-buff-cue {
   display: none;
-  font-size: 10px;
+  font-size: 12px;
   color: #fef7e7;
   background: rgba(58, 92, 220, 0.65);
   border: 1px solid rgba(224, 236, 255, 0.6);
   border-radius: 999px;
-  padding: 1px 6px;
+  padding: 2px 8px;
   letter-spacing: 0.02em;
 }
 .dada-buff-track {
-  height: 5px;
+  height: 8px;
   background: rgba(255, 255, 255, 0.18);
-  border-radius: 3px;
+  border-radius: 5px;
   overflow: hidden;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 .dada-buff-fill {
   height: 100%;
   background: linear-gradient(90deg, #f5c842, #f0983a);
-  border-radius: 3px;
+  border-radius: 5px;
   transition: width 0.12s linear;
 }
 

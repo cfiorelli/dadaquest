@@ -1064,6 +1064,7 @@ export async function boot(options = {}) {
   goalVisualRoot.parent = world.goalRoot;
   goalVisualRoot.position.set(0, GOAL_MODEL_SLOT_Y, 0);
   const level1AnimalDecor = [];
+  const level2AnimalDecor = [];
   const level1SurfaceMap = new Map();
   if (levelId === 1 && world.level) {
     const floorFallback = world.level.ground
@@ -1320,6 +1321,48 @@ export async function boot(options = {}) {
 
   if (world.level2) {
     const { anchors: l2anchors, fallbackVisuals: l2fallback } = world.level2;
+    const registerLevel2AnimalDecor = (anchor, {
+      speed,
+      radius,
+      phase = 0,
+      turnSpeed = 6.8,
+      bobAmp = 0.02,
+      stepFreq = 6.2,
+      pitchAmp = 0.018,
+      rollAmp = 0.028,
+    }) => {
+      const surface = anchor.metadata?.level2DecorSurface;
+      if (!surface) return;
+      const home = new BABYLON.Vector3(
+        clamp(anchor.position.x, surface.minX, surface.maxX),
+        surface.baseY,
+        clamp(anchor.position.z, surface.minZ, surface.maxZ),
+      );
+      anchor.position.copyFrom(home);
+      const controller = new AnimalWanderController({
+        root: anchor,
+        home,
+        surface,
+        speed,
+        turnSpeed,
+        radius,
+        phase,
+        bobAmp,
+        stepFreq,
+        pitchAmp,
+        rollAmp,
+        accel: 6.2,
+        minWalkSpeed: 0.025,
+        retargetMinSec: 1.8,
+        retargetMaxSec: 3.6,
+        pauseMinSec: 0.45,
+        pauseMaxSec: 1.1,
+        arrivalThreshold: 0.2,
+        seed: `level2:${anchor.name}`,
+      });
+      level2AnimalDecor.push({ root: anchor, controller, surface });
+    };
+
     const l2propDefs = [
       {
         role: 'futurePianoModel',
@@ -1351,60 +1394,94 @@ export async function boot(options = {}) {
         fallback: null,
         fit: { targetHeight: 1.45, targetMaxSize: 2.0, groundOffset: 0.0 },
       },
+      {
+        role: 'futureTulipFlowerPropModel',
+        anchors: l2anchors.tulips || [],
+        fallback: null,
+        fit: { targetHeight: 0.72, targetMaxSize: 0.9, groundOffset: 0.0 },
+      },
+      {
+        role: 'futureYellowFlowerPropModel',
+        anchors: l2anchors.yellowFlowers || [],
+        fallback: null,
+        fit: { targetHeight: 0.72, targetMaxSize: 0.9, groundOffset: 0.0 },
+      },
     ];
-    for (const { role, anchor, fallback, fit } of l2propDefs) {
-      if (!anchor) continue;
-      const result = await attachOptionalRoleModel(role, anchor, {
-        parent: anchor,
-        fallbackMeshes: fallback ? collectNodeMeshes(fallback) : collectNodeMeshes(anchor),
-        fallbackMaterial: 'plastic',
-        renderingGroupId: 2,
-      });
-      if (result?.loaded) {
-        for (const mesh of result.meshes || []) {
-          if (mesh.name && !mesh.name.startsWith('L2_') && !mesh.name.startsWith('L2_DECOR_')) {
-            mesh.name = `L2_DECOR_${mesh.name}`;
-          }
-          if (mesh.id && !mesh.id.startsWith('L2_') && !mesh.id.startsWith('L2_DECOR_')) {
-            mesh.id = `L2_DECOR_${mesh.id}`;
-          }
-          mesh.metadata = {
-            ...(mesh.metadata || {}),
-            decor: true,
-            level2Decor: true,
-            cameraIgnore: true,
-            cameraBlocker: false,
-          };
-          mesh.isPickable = false;
-          mesh.checkCollisions = false;
-        }
-        const anchorPos = anchor.getAbsolutePosition();
-        fitLoadedModel(anchor, {
-          targetMaxSize: fit?.targetMaxSize ?? 0,
-          targetHeight: fit?.targetHeight ?? 0,
-          groundY: anchorPos.y + (fit?.groundOffset ?? 0),
-          markDecorative: true,
+    for (const { role, anchor, anchors: roleAnchors, fallback, fit } of l2propDefs) {
+      const targets = roleAnchors || (anchor ? [anchor] : []);
+      for (const targetAnchor of targets) {
+        if (!targetAnchor) continue;
+        const result = await attachOptionalRoleModel(role, targetAnchor, {
+          parent: targetAnchor,
+          fallbackMeshes: fallback ? collectNodeMeshes(fallback) : collectNodeMeshes(targetAnchor),
+          fallbackMaterial: 'plastic',
+          renderingGroupId: 2,
         });
-        if (fit?.recenter) {
-          recenterLoadedModelXZ(result.roots, anchorPos.x, anchorPos.z);
-        }
-        if (fit?.hardMaxExtent) {
-          clampDecorMaxExtent(result.roots, fit.hardMaxExtent);
-        }
-        const normalizedBounds = combineBounds(collectRenderableMeshes(result.roots));
-        const stillOversized = normalizedBounds.maxDim > Math.max(6, fit?.hardMaxExtent ?? 0);
-        const badlyOffset = Math.abs(normalizedBounds.center.z - anchorPos.z) > 3.5;
-        if (role === 'futurePackPropModel' && (stillOversized || badlyOffset)) {
-          setNodesEnabled(result.roots, false);
-          setMeshesEnabled(result.meshes, false);
-          if (fallback) fallback.setEnabled(true);
-          continue;
-        }
-        const cullResult = disableLevel2DecorMeshes(scene, { debugMode });
-        window.__DADA_DEBUG__.level2CullResult = cullResult;
-        if (fallback) {
-          const hasVisibleLoadedMesh = (result.meshes || []).some((mesh) => mesh?.isEnabled?.() && (mesh.visibility ?? 1) > 0.02);
-          fallback.setEnabled(!hasVisibleLoadedMesh);
+        if (result?.loaded) {
+          for (const mesh of result.meshes || []) {
+            if (mesh.name && !mesh.name.startsWith('L2_') && !mesh.name.startsWith('L2_DECOR_')) {
+              mesh.name = `L2_DECOR_${mesh.name}`;
+            }
+            if (mesh.id && !mesh.id.startsWith('L2_') && !mesh.id.startsWith('L2_DECOR_')) {
+              mesh.id = `L2_DECOR_${mesh.id}`;
+            }
+            mesh.metadata = {
+              ...(mesh.metadata || {}),
+              decor: true,
+              level2Decor: true,
+              cameraIgnore: true,
+              cameraBlocker: false,
+            };
+            mesh.isPickable = false;
+            mesh.checkCollisions = false;
+          }
+          const anchorPos = targetAnchor.getAbsolutePosition();
+          const anchorSurface = targetAnchor.metadata?.level2DecorSurface;
+          fitLoadedModel(targetAnchor, {
+            targetMaxSize: fit?.targetMaxSize ?? 0,
+            targetHeight: fit?.targetHeight ?? 0,
+            groundY: (anchorSurface?.baseY ?? anchorPos.y) + (fit?.groundOffset ?? 0),
+            markDecorative: true,
+          });
+          if (fit?.recenter) {
+            recenterLoadedModelXZ(result.roots, anchorPos.x, anchorPos.z);
+          }
+          if (fit?.hardMaxExtent) {
+            clampDecorMaxExtent(result.roots, fit.hardMaxExtent);
+          }
+          if (anchorSurface?.baseY !== undefined) {
+            ensureDecorGrounding(result.roots, anchorSurface.baseY, targetAnchor.name, debugMode);
+          }
+          const normalizedBounds = combineBounds(collectRenderableMeshes(result.roots));
+          const stillOversized = normalizedBounds.maxDim > Math.max(6, fit?.hardMaxExtent ?? 0);
+          const badlyOffset = Math.abs(normalizedBounds.center.z - anchorPos.z) > 3.5;
+          if (role === 'futureGoatPropModel') {
+            for (const root of result.roots || []) {
+              root.rotation.y += Math.PI;
+            }
+            registerLevel2AnimalDecor(targetAnchor, {
+              speed: 0.52,
+              radius: 0.96,
+              phase: anchorPos.x * 0.07,
+              turnSpeed: 6.1,
+              bobAmp: 0.022,
+              stepFreq: 6.0,
+              pitchAmp: 0.016,
+              rollAmp: 0.026,
+            });
+          }
+          if (role === 'futurePackPropModel' && (stillOversized || badlyOffset)) {
+            setNodesEnabled(result.roots, false);
+            setMeshesEnabled(result.meshes, false);
+            if (fallback) fallback.setEnabled(true);
+            continue;
+          }
+          const cullResult = disableLevel2DecorMeshes(scene, { debugMode });
+          window.__DADA_DEBUG__.level2CullResult = cullResult;
+          if (fallback) {
+            const hasVisibleLoadedMesh = (result.meshes || []).some((mesh) => mesh?.isEnabled?.() && (mesh.visibility ?? 1) > 0.02);
+            fallback.setEnabled(!hasVisibleLoadedMesh);
+          }
         }
       }
     }
@@ -1730,6 +1807,30 @@ export async function boot(options = {}) {
       }
       if (bounds.min.y < desiredGroundY) {
         animal.root.position.y += desiredGroundY - bounds.min.y;
+        animal.root.computeWorldMatrix?.(true);
+        for (const mesh of meshes) mesh.computeWorldMatrix(true);
+      }
+    }
+  }
+
+  function updateLevel2AnimalDecor(dt) {
+    if (levelId !== 2 || shotMode || !level2AnimalDecor.length) return;
+    for (const animal of level2AnimalDecor) {
+      if (!animal.root?.isEnabled?.()) continue;
+      animal.controller.update(dt);
+      const meshes = collectRenderableMeshes(animal.root);
+      if (!meshes.length) continue;
+      animal.root.computeWorldMatrix?.(true);
+      for (const mesh of meshes) mesh.computeWorldMatrix(true);
+      const bounds = combineBounds(meshes);
+      const desiredGroundY = animal.surface.topY + 0.02;
+      if (bounds.min.y < desiredGroundY) {
+        const lift = desiredGroundY - bounds.min.y;
+        animal.surface.baseY += lift;
+        animal.controller.surface.baseY += lift;
+        animal.controller.home.y += lift;
+        animal.controller.pos.y += lift;
+        animal.root.position.y += lift;
         animal.root.computeWorldMatrix?.(true);
         for (const mesh of meshes) mesh.computeWorldMatrix(true);
       }
@@ -2114,10 +2215,13 @@ export async function boot(options = {}) {
     );
   }
 
-  function updateLevel2OccluderFade(dt, headPos) {
+  function updateLevel2OccluderFade(dt, headPos, playerBottomY) {
     if (levelId !== 2 || !debugFlags.occlusionFade) return [];
     const hits = collectLevel2OccludingMeshes(scene, headPos, camera.position, cameraIgnoredMeshes);
     const activeIds = new Set();
+    const nearGround = Number.isFinite(currentFloorTopY) && Number.isFinite(playerBottomY)
+      ? playerBottomY <= (currentFloorTopY + 0.36)
+      : false;
 
     for (const hit of hits) {
       const mesh = hit.mesh;
@@ -2130,6 +2234,9 @@ export async function boot(options = {}) {
     for (const stateInfo of level2OcclusionState.values()) {
       if (!activeIds.has(stateInfo.mesh.uniqueId)) {
         stateInfo.target = stateInfo.baseVisibility;
+      }
+      if (nearGround && /condowall|roompanel|window|art/i.test(stateInfo.mesh.name || '')) {
+        stateInfo.target = Math.min(stateInfo.target, 0.08);
       }
       stateInfo.current = damp(stateInfo.current, stateInfo.target, 12, dt);
       stateInfo.mesh.visibility = stateInfo.current;
@@ -2947,6 +3054,15 @@ export async function boot(options = {}) {
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
         const { halfH } = player.getCollisionHalfExtents();
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
+        if (levelId === 2) {
+          const laneDelta = player.mesh.position.z;
+          if (Math.abs(laneDelta) > 0.35) {
+            player.mesh.position.z = 0;
+          } else if (Math.abs(laneDelta) > 0.001) {
+            player.mesh.position.z = damp(player.mesh.position.z, 0, 20, dt);
+          }
+        }
+        updateLevel2AnimalDecor(dt);
 
         const playerEvents = player.consumeEvents();
         for (const ev of playerEvents) {
@@ -3041,7 +3157,7 @@ export async function boot(options = {}) {
           0,
         ));
         const level2HeadPos = new BABYLON.Vector3(px, py + 1.2, 0);
-        const occlusionHits = updateLevel2OccluderFade(dt, level2HeadPos);
+        const occlusionHits = updateLevel2OccluderFade(dt, level2HeadPos, playerBottomY);
         updateLevel2CameraProbe(dt, occlusionHits);
       } else {
         const targetX = clamp(px + 2, camTargetMinX, camTargetMaxX);

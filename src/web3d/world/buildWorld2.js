@@ -187,6 +187,9 @@ function createCondoWallSegment(scene, name, {
   }, scene);
   wall.parent = root;
   wall.material = makeCardboard(scene, `${name}_wallMat`, ...color, { roughness: 0.96 });
+  wall.material.backFaceCulling = false;
+  wall.material.alpha = 0.24;
+  wall.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
   const base = BABYLON.MeshBuilder.CreateBox(`${name}_base`, {
     width: width + 0.08,
@@ -196,6 +199,9 @@ function createCondoWallSegment(scene, name, {
   base.parent = root;
   base.position.y = -(height * 0.5) + 0.08;
   base.material = makeCardboard(scene, `${name}_baseMat`, ...trim, { roughness: 0.92 });
+  base.material.backFaceCulling = false;
+  base.material.alpha = 0.22;
+  base.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
   const trimLine = BABYLON.MeshBuilder.CreateBox(`${name}_trim`, {
     width: width + 0.12,
@@ -1219,6 +1225,62 @@ export function buildWorld2(scene, options = {}) {
   loftGoatAnchor.position.set(36.0, LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.4, LEVEL2_DECOR_Z - 0.14);
   tagLevel2Decor(loftGoatAnchor);
 
+  const roofColliderMesh = platformColliders.platRoof;
+  roofColliderMesh?.computeWorldMatrix?.(true);
+  const roofBounds = roofColliderMesh?.getBoundingInfo?.()?.boundingBox;
+  const roofDecorSurface = roofBounds
+    ? {
+      topY: roofBounds.maximumWorld.y,
+      baseY: roofBounds.maximumWorld.y + 0.02,
+      minX: roofBounds.minimumWorld.x + 0.55,
+      maxX: roofBounds.maximumWorld.x - 0.55,
+      minZ: 0.52,
+      maxZ: Math.min(2.0, roofBounds.maximumWorld.z - 0.48),
+    }
+    : {
+      topY: LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.4,
+      baseY: LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.42,
+      minX: 34.9,
+      maxX: 39.8,
+      minZ: 0.52,
+      maxZ: 1.95,
+    };
+  loftGoatAnchor.metadata = {
+    ...(loftGoatAnchor.metadata || {}),
+    level2DecorSurface: roofDecorSurface,
+  };
+
+  const flowerScatter = [
+    { x: 34.8, z: 0.78, kind: 'tulip' },
+    { x: 35.5, z: 1.18, kind: 'yellow' },
+    { x: 36.2, z: 1.58, kind: 'tulip' },
+    { x: 36.9, z: 0.92, kind: 'yellow' },
+    { x: 37.6, z: 1.42, kind: 'tulip' },
+    { x: 38.3, z: 1.82, kind: 'yellow' },
+    { x: 39.0, z: 0.74, kind: 'tulip' },
+    { x: 39.5, z: 1.26, kind: 'yellow' },
+    { x: 35.1, z: 1.78, kind: 'yellow' },
+    { x: 35.9, z: 0.62, kind: 'tulip' },
+    { x: 37.1, z: 1.92, kind: 'yellow' },
+    { x: 38.7, z: 1.12, kind: 'tulip' },
+  ];
+  const roofTulipAnchors = [];
+  const roofYellowAnchors = [];
+  flowerScatter.forEach(({ x, z, kind }, index) => {
+    const anchor = new BABYLON.TransformNode(`roof${kind === 'tulip' ? 'Tulip' : 'Yellow'}Anchor${index}`, scene);
+    anchor.position.set(x, roofDecorSurface.baseY, z);
+    anchor.metadata = {
+      ...(anchor.metadata || {}),
+      level2DecorSurface: roofDecorSurface,
+    };
+    tagLevel2Decor(anchor);
+    if (kind === 'tulip') {
+      roofTulipAnchors.push(anchor);
+    } else {
+      roofYellowAnchors.push(anchor);
+    }
+  });
+
   const bedroomTopY = LEVEL2.platforms.find((p) => p.name === 'platBedroom').y + (LEVEL2.platforms.find((p) => p.name === 'platBedroom').h * 0.5);
   const welcomeSign = createWelcomeSign(scene, {
     name: 'l2_welcomeSign',
@@ -1282,6 +1344,16 @@ export function buildWorld2(scene, options = {}) {
   }
 
   function updateHorse(dt, { pos, player }) {
+    const colliderIndex = player && player.colliders ? allPlatforms.indexOf(horseColliderMesh) : -1;
+    const collider = colliderIndex >= 0 ? player.colliders[colliderIndex] : null;
+    if (collider) {
+      const platDef = LEVEL2.platforms.find((p) => p.name === 'platHorse');
+      const halfW2 = platDef.w / 2;
+      collider.minX = horseX - halfW2;
+      collider.maxX = horseX + halfW2;
+      collider.minY = -1000;
+      collider.maxY = -999;
+    }
     if (horseSnapped) return;
     const inPushZone = pos.x >= horseDef.pushZoneMinX && pos.x <= horseDef.pushZoneMaxX
       && Math.abs(pos.y - (LEVEL2.platforms.find((p) => p.name === 'platHorse').y + 0.4)) < 1.2;
@@ -1300,18 +1372,6 @@ export function buildWorld2(scene, options = {}) {
     // Update collision box position
     if (horseColliderMesh) {
       horseColliderMesh.position.x = horseX;
-    }
-
-    // Update player collider AABB for this platform
-    if (player && player.colliders) {
-      const idx = allPlatforms.indexOf(horseColliderMesh);
-      const collider = idx >= 0 ? player.colliders[idx] : null;
-      if (collider) {
-        const platDef = LEVEL2.platforms.find((p) => p.name === 'platHorse');
-        const halfW2 = platDef.w / 2;
-        collider.minX = horseX - halfW2;
-        collider.maxX = horseX + halfW2;
-      }
     }
   }
 
@@ -1344,6 +1404,8 @@ export function buildWorld2(scene, options = {}) {
       pack: packAnchor,
       goat: loftGoatAnchor,
       cornPatch: cornPatch.anchors,
+      tulips: roofTulipAnchors,
+      yellowFlowers: roofYellowAnchors,
     },
     // Expose fallback visuals so boot.js can hide them when GLBs load
     fallbackVisuals: {
@@ -1393,6 +1455,8 @@ export function buildWorld2(scene, options = {}) {
       futurePackPropModel: [packAnchor],
       futureGoatPropModel: [loftGoatAnchor],
       futureCornPropModel: cornPatch.anchors,
+      futureTulipFlowerPropModel: roofTulipAnchors,
+      futureYellowFlowerPropModel: roofYellowAnchors,
     },
   };
 }

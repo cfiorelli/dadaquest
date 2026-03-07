@@ -111,7 +111,7 @@ const BASE_LEVEL2 = {
     { x:  23.5, y: 6.00, z: L },
     { x:  27.5, y: 7.20, z: L },
     { x:  33.0, y: 8.40, z: L },
-    { x:  37.5, y: 9.60, z: L },
+    { x:  35.4, y: 9.25, z: L },
   ],
 
   // Level-2-specific runtime data (used by buildWorld2 / level2.update)
@@ -137,7 +137,7 @@ const BASE_LEVEL2 = {
     babyBed:      { x: -8.5,  y: 1.75, z: L },  // sits on platBedStep
     rockingHorse: { x: -4.5,  y: 0.40, z: L },  // tracks with platHorse
     piano:        { x: 11.0,  y: 3.00, z: L },  // sits on platPiano
-    bianca:       { x: 14.5,  y: 0.40, z: L },  // static at hazard zone
+    bianca:       { x: 19.6,  y: 4.40, z: L },  // perched near the stairs landing
   },
 };
 
