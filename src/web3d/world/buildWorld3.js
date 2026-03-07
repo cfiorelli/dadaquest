@@ -1023,9 +1023,13 @@ export function buildWorld3(scene, options = {}) {
     });
   }
 
+  // Rake moved to z=0 (player lane) so it is visible and collidable.
+  // Leaned slightly toward the camera for readability.
+  const rakeTopY = getPlatformTopY('tableStone1');
   const rakeAnchor = new BABYLON.TransformNode('l3_rakeAnchor', scene);
-  rakeAnchor.position.set(22.6, getPlatformTopY('tableStone1'), 1.28);
-  rakeAnchor.rotation.y = -0.42;
+  rakeAnchor.position.set(22.6, rakeTopY, 0);
+  rakeAnchor.rotation.y = 0.18;
+  rakeAnchor.rotation.x = -0.28;   // lean handle toward camera
   rakeAnchor.metadata = { ...(rakeAnchor.metadata || {}), cameraIgnore: true, decor: true };
   const rakeFallback = createRakePlaceholder(scene, 'l3_rakeFallback', {
     x: rakeAnchor.position.x,
@@ -1043,12 +1047,12 @@ export function buildWorld3(scene, options = {}) {
     mesh: rakeFallback.getChildMeshes(false)[0] || null,
     active: true,
     handledByLevelRuntime: true,
-    minX: rakeAnchor.position.x - 0.95,
-    maxX: rakeAnchor.position.x + 0.95,
-    minY: rakeAnchor.position.y,
-    maxY: rakeAnchor.position.y + 1.26,
-    minZ: rakeAnchor.position.z - 0.48,
-    maxZ: rakeAnchor.position.z + 0.48,
+    minX: rakeAnchor.position.x - 0.90,
+    maxX: rakeAnchor.position.x + 0.90,
+    minY: rakeTopY,
+    maxY: rakeTopY + 1.30,
+    minZ: -0.5,
+    maxZ: 0.5,
   });
 
   const tractorAnchor = new BABYLON.TransformNode('l3_tractorAnchor', scene);
@@ -1164,10 +1168,12 @@ export function buildWorld3(scene, options = {}) {
     });
   }
 
+  // Grandma moved to crossingStart (orange platform) — away from dad's final porch.
   const porchTopY = getPlatformTopY('grandmaPorch');
+  const crossingStartTopY = getPlatformTopY('crossingStart');
   const grandmaHazard = createGrandma(scene, {
-    x: 75.0,
-    y: porchTopY,
+    x: 43.0,
+    y: crossingStartTopY,
     z: LANE_Z,
     shadowGen,
     animate: true,
@@ -1176,10 +1182,10 @@ export function buildWorld3(scene, options = {}) {
   setRenderingGroup(grandmaHazard.root, 3);
   const grandmaPatrol = {
     root: grandmaHazard.root,
-    x: 75.0,
+    x: 43.0,
     minZ: -1.18,
     maxZ: 1.22,
-    speed: 0.82,
+    speed: 0.65,   // ~21% slower than before for passability
     dir: 1,
     width: 1.1,
     height: 3.0,
@@ -1194,8 +1200,8 @@ export function buildWorld3(scene, options = {}) {
     handledByLevelRuntime: true,
     minX: grandmaPatrol.x - grandmaPatrol.width * 0.5,
     maxX: grandmaPatrol.x + grandmaPatrol.width * 0.5,
-    minY: porchTopY,
-    maxY: porchTopY + grandmaPatrol.height,
+    minY: crossingStartTopY,
+    maxY: crossingStartTopY + grandmaPatrol.height,
     minZ: grandmaPatrol.minZ,
     maxZ: grandmaPatrol.maxZ,
   }];
@@ -1421,6 +1427,19 @@ export function buildWorld3(scene, options = {}) {
         }
       }
 
+      for (const hazard of toolHazards) {
+        if (!hazard.active) continue;
+        const overlaps = playerMaxX > hazard.minX
+          && playerMinX < hazard.maxX
+          && playerMaxY > hazard.minY
+          && playerMinY < hazard.maxY
+          && (hazard.minZ === undefined || (playerMaxZ > hazard.minZ && playerMinZ < hazard.maxZ));
+        if (overlaps) {
+          const sourceX = Number.isFinite(hazard.x) ? hazard.x : (hazard.root?.position?.x ?? pos.x);
+          triggerReset(hazard.reason, pos.x < sourceX ? -1 : 1);
+        }
+      }
+
       for (const dog of dogHazards) {
         updateDogHazard(dog, dt);
         const overlaps = playerMaxX > dog.minX
@@ -1464,8 +1483,8 @@ export function buildWorld3(scene, options = {}) {
         dog.minY = dog.lane.y - dog.height * 0.5;
         dog.maxY = dog.lane.y + dog.height * 0.5;
       }
-      grandmaPatrol.root.position.x = 75.0;
-      grandmaPatrol.root.position.y = getPlatformTopY('grandmaPorch');
+      grandmaPatrol.root.position.x = 43.0;
+      grandmaPatrol.root.position.y = getPlatformTopY('crossingStart');
       grandmaPatrol.root.position.z = 0.86;
       grandmaPatrol.dir = 1;
       updateGrandmaHazard(0);

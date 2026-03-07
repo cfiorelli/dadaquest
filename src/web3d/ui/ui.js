@@ -411,6 +411,9 @@ const CSS = `
 .dada-buff-fill.cape {
   background: linear-gradient(90deg, #8c73ff, #45d4c8);
 }
+.dada-buff-fill.recharging {
+  background: linear-gradient(90deg, #54a0ff, #5f27cd);
+}
 .dada-buff-cue {
   display: none;
   font-size: 12px;
@@ -942,9 +945,9 @@ export function createUI(uiRoot, options = {}) {
   buffEl.innerHTML = `
     <div class="dada-buff-col">
       <div class="dada-buff-card" data-buff="onesie">
-        <div class="dada-buff-icon onesie">JMP</div>
+        <div class="dada-buff-icon onesie">JUMP</div>
         <div class="dada-buff-copy">
-          <div class="dada-buff-label">Onesie boost <span class="dada-buff-state">OFF</span></div>
+          <div class="dada-buff-label">Onesie <span class="dada-buff-state">OFF</span></div>
           <div class="dada-buff-track"><div class="dada-buff-fill onesie" style="width:0%"></div></div>
           <span class="dada-buff-cue">x2 jump</span>
         </div>
@@ -1294,14 +1297,22 @@ export function createUI(uiRoot, options = {}) {
       ctrlHintEl.style.display = 'none';
     },
 
-    /** Update onesie buff bar. remainingMs=0 → hide. */
-    updateBuff(remainingMs, totalMs) {
+    /** Update onesie buff bar. phase: 'IDLE' | 'ACTIVE' | 'RECHARGING' */
+    updateBuff(remainingMs, totalMs, phase = 'IDLE') {
       buffEl.style.display = 'block';
-      onesieCard.classList.toggle('active', remainingMs > 0);
-      onesieState.textContent = remainingMs > 0 ? 'ACTIVE' : 'OFF';
-      const pct = Math.max(0, Math.min(100, (remainingMs / totalMs) * 100));
+      const isActiveOrRecharge = phase === 'ACTIVE' || phase === 'RECHARGING';
+      onesieCard.classList.toggle('active', isActiveOrRecharge);
+      if (phase === 'ACTIVE') {
+        onesieState.textContent = 'ACTIVE';
+      } else if (phase === 'RECHARGING') {
+        onesieState.textContent = 'RECHARGING';
+      } else {
+        onesieState.textContent = 'OFF';
+      }
+      const pct = Math.max(0, Math.min(100, (remainingMs / (totalMs || 1)) * 100));
       buffFill.style.width = `${pct}%`;
-      buffCue.style.display = remainingMs > 0 ? 'inline-block' : 'none';
+      buffFill.classList.toggle('recharging', phase === 'RECHARGING');
+      buffCue.style.display = phase === 'ACTIVE' ? 'inline-block' : 'none';
     },
     updateDoubleJumpCue(available) {
       buffCue.style.display = available ? 'inline-block' : 'none';

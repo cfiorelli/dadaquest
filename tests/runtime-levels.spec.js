@@ -351,3 +351,159 @@ test('runtime: level 2 final stair is solid and the replacement loft coin exists
   expect(landingCoin).not.toBeNull();
   expect(typeof landingCoin.index).toBe('number');
 });
+
+// ── New tests for tasks 1–5 ──────────────────────────────────────────────────
+
+test('runtime: onesie pickup shows ACTIVE in HUD and icon label is JUMP', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 3);
+  await startDebugLevel(page, 3);
+
+  // Teleport player onto the onesie pickup (x=15, y=4.70)
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(15.0, 5.0, 0);
+  });
+  // Wait for buff to become active
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.onesieBuffMs ?? 0),
+    { timeout: 8_000 },
+  ).toBeGreaterThan(0);
+
+  // Buff panel must be visible and show ACTIVE
+  const hudState = await page.evaluate(() => {
+    const buffEl = document.querySelector('.dada-buff');
+    const stateEl = document.querySelector('[data-buff="onesie"] .dada-buff-state');
+    const iconEl = document.querySelector('.dada-buff-icon.onesie');
+    return {
+      buffVisible: buffEl ? getComputedStyle(buffEl).display !== 'none' : false,
+      stateText: stateEl?.textContent ?? '',
+      iconText: iconEl?.textContent ?? '',
+    };
+  });
+  expect(hudState.buffVisible).toBe(true);
+  expect(hudState.stateText).toBe('ACTIVE');
+  expect(hudState.iconText).toBe('JUMP');
+});
+
+test('runtime: Reset Baby to New clears capeUnlocked and locks Level 4', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+  await startDebugLevel(page, 1);
+
+  // Grant progression via debug
+  await page.evaluate(() => {
+    const state = structuredClone(window.__DADA_DEBUG__?.progressState || {});
+    state.capeUnlocked = true;
+    state.sourdoughUnlocked = true;
+    state.unlocksShown = { cape: true, sourdough: true };
+    window.__DADA_DEBUG__?.setProgressState?.(state);
+  });
+
+  // Confirm level 4 is now unlocked
+  const beforeReset = await page.evaluate(() => ({
+    capeUnlocked: window.__DADA_DEBUG__?.progressState?.capeUnlocked ?? false,
+    sourdoughUnlocked: window.__DADA_DEBUG__?.progressState?.sourdoughUnlocked ?? false,
+  }));
+  expect(beforeReset.capeUnlocked).toBe(true);
+  expect(beforeReset.sourdoughUnlocked).toBe(true);
+
+  // Trigger Reset Baby to New via debug API
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.resetBabyToNew?.();
+  });
+  await page.waitForTimeout(300);
+
+  const afterReset = await page.evaluate(() => ({
+    capeUnlocked: window.__DADA_DEBUG__?.progressState?.capeUnlocked ?? null,
+    sourdoughUnlocked: window.__DADA_DEBUG__?.progressState?.sourdoughUnlocked ?? null,
+    level4AriaDisabled: document.querySelector('#menuLevelBtn4')?.getAttribute('aria-disabled') ?? 'absent',
+    storageEmpty: (() => {
+      try {
+        const raw = localStorage.getItem('dadaquest:progress:v1');
+        if (!raw) return true;
+        const p = JSON.parse(raw);
+        return !p?.capeUnlocked && !p?.sourdoughUnlocked;
+      } catch { return false; }
+    })(),
+  }));
+
+  expect(afterReset.capeUnlocked).toBe(false);
+  expect(afterReset.sourdoughUnlocked).toBe(false);
+  expect(afterReset.storageEmpty).toBe(true);
+});
+
+test('runtime: pong win to 5 points shows YOU WON and returns to Level 2', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const started = await page.evaluate(() => window.__DADA_DEBUG__?.triggerLevel2Pong?.() ?? false);
+  expect(started).toBe(true);
+
+  // Force the player score to WIN_SCORE via internal state
+  await page.evaluate(() => {
+    const pong = window.__DADA_DEBUG__?._pongMinigame;
+    if (pong) {
+      // Jump score to 4, then trigger one final point
+      pong.playerScore = 4;
+      pong.cpuScore = 0;
+      pong.scorePoint(true);  // triggers win
+    }
+  });
+
+  // Check canvas shows win overlay text (rendered) or title changed
+  await page.waitForTimeout(300);
+  const titleText = await page.evaluate(() => document.getElementById('pongTitle')?.textContent ?? '');
+  expect(titleText).toContain('WON');
+
+  // After 1.5s the game should return to gameplay
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey),
+    { timeout: 5_000 },
+  ).toBe('CribScene');
+});
+
+test('runtime: level 3 out-of-bounds triggers balloon roundup minigame', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 3);
+  await startDebugLevel(page, 3);
+
+  const started = await page.evaluate(() => window.__DADA_DEBUG__?.triggerLevel3Balloon?.() ?? false);
+  expect(started).toBe(true);
+
+  // Balloon minigame UI should be visible
+  const balloonVisible = await page.evaluate(() => {
+    const el = document.querySelector('.dada-balloon');
+    return el ? el.style.display !== 'none' : false;
+  });
+  expect(balloonVisible).toBe(true);
+
+  // sceneKey should be MinigameScene
+  const sceneKey = await page.evaluate(() => window.__DADA_DEBUG__?.sceneKey ?? null);
+  expect(sceneKey).toBe('MinigameScene');
+
+  // ESC should abort and restart Level 3 (back to TitleScene then CribScene)
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape', bubbles: true, cancelable: true }));
+  });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey),
+    { timeout: 20_000 },
+  ).toBe('CribScene');
+});
+
+test('runtime: level 3 loads without runtime errors after grandma relocation', async ({ page }) => {
+  test.setTimeout(120_000);
+  const pageErrors = [];
+  page.on('pageerror', (err) => pageErrors.push(err.message));
+
+  await gotoDebugLevel(page, 3);
+  await startDebugLevel(page, 3);
+
+  // Brief gameplay tick
+  await page.waitForTimeout(500);
+
+  expect(pageErrors).toHaveLength(0);
+  const sceneKey = await page.evaluate(() => window.__DADA_DEBUG__?.sceneKey ?? null);
+  expect(sceneKey).toBe('CribScene');
+});

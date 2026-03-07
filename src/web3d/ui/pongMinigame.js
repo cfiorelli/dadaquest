@@ -107,6 +107,7 @@ export class PongMinigame {
     this.serveTimer = 0.7;
     this.flashTimer = 0;
     this.message = 'First to 5';
+    this._winPending = false;
     this.render();
   }
 
@@ -154,8 +155,18 @@ export class PongMinigame {
     }
     this.flashTimer = 0.28;
     if (this.playerScore >= WIN_SCORE) {
-      this.stop();
-      this.onWin?.();
+      this._winPending = true;
+      this.title.textContent = 'YOU WON!';
+      this.sub.textContent = 'Bouncing back into the condo...';
+      this.title.style.color = '#ffd700';
+      this._drawWinOverlay();
+      setTimeout(() => {
+        if (this._winPending) {
+          this._winPending = false;
+          this.stop();
+          this.onWin?.();
+        }
+      }, 1500);
       return;
     }
     this.ballX = WIDTH * 0.5;
@@ -165,8 +176,22 @@ export class PongMinigame {
     this.serveTimer = 0.7;
   }
 
+  _drawWinOverlay() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '900 68px Avenir Next, Trebuchet MS, sans-serif';
+    ctx.fillText('YOU WON!', WIDTH * 0.5, HEIGHT * 0.44);
+    ctx.fillStyle = '#b8fbff';
+    ctx.font = '700 22px Avenir Next, Trebuchet MS, sans-serif';
+    ctx.fillText('Returning to the condo...', WIDTH * 0.5, HEIGHT * 0.58);
+  }
+
   update(dt, input) {
-    if (!this.active) return;
+    if (!this.active || this._winPending) return;
 
     this.flashTimer = Math.max(0, this.flashTimer - dt);
     const playerMove = input.getMoveY();

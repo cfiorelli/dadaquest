@@ -9,6 +9,7 @@ import { InputManager } from './util/input.js';
 import { createUI } from './ui/ui.js';
 import { FruitMazeMinigame } from './ui/fruitMaze.js';
 import { PongMinigame } from './ui/pongMinigame.js';
+import { BalloonRoundup } from './ui/balloonRoundup.js';
 import { damp, clamp } from './util/math.js';
 import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
@@ -864,6 +865,7 @@ export async function boot(options = {}) {
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
   const fruitMaze = levelId === 1 ? new FruitMazeMinigame() : null;
   const pongMinigame = levelId === 2 ? new PongMinigame() : null;
+  const balloonRoundup = levelId === 3 ? new BalloonRoundup() : null;
   const levelTotals = {
     1: LEVEL1.coins.length,
     2: LEVEL2.coins.length,
@@ -2157,6 +2159,8 @@ export async function boot(options = {}) {
   let onesieJumpBoost = 1;
   let onesieStoredJumpBoost = 1.24;
   let onesieCollectedThisRun = false;
+  let onesieRechargeMs = 0;
+  const ONESIE_RECHARGE_DURATION_MS = 8000;
   let puddleInvulnMs = 0;
   let coinsCollected = 0;
   let collectiblePickupCooldownMs = 0;
@@ -2169,6 +2173,7 @@ export async function boot(options = {}) {
   let goalCarryEndScale = null;
   let fruitMazeSnapshot = null;
   let pongSnapshot = null;
+  let balloonSnapshot = null;
   let activeMinigame = null;
   let prevGrounded = player.grounded;
   let prevPlayerBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
@@ -2386,7 +2391,21 @@ export async function boot(options = {}) {
   }
 
   function updateBuffHud() {
-    ui.updateBuff(onesieBuffTimerMs, onesieMaxDurationMs);
+    let onesiePhase = 'IDLE';
+    let onesieDisplayMs = 0;
+    let onesieDisplayTotal = onesieMaxDurationMs;
+    if (onesieCollectedThisRun) {
+      if (onesieBuffTimerMs > 0) {
+        onesiePhase = 'ACTIVE';
+        onesieDisplayMs = onesieBuffTimerMs;
+        onesieDisplayTotal = onesieMaxDurationMs;
+      } else {
+        onesiePhase = 'RECHARGING';
+        onesieDisplayMs = onesieRechargeMs;
+        onesieDisplayTotal = ONESIE_RECHARGE_DURATION_MS;
+      }
+    }
+    ui.updateBuff(onesieDisplayMs, onesieDisplayTotal, onesiePhase);
     ui.updateDoubleJumpCue(player.hasAirJumpAvailable() && onesieBuffTimerMs > 0);
     ui.updateCapeBuff({
       unlocked: !!progression.capeUnlocked && !capeSuppressedThisRun,
@@ -2434,6 +2453,7 @@ export async function boot(options = {}) {
     onesieJumpBoost = 1;
     onesieStoredJumpBoost = 1.24;
     onesieCollectedThisRun = false;
+    onesieRechargeMs = 0;
     player.stopCapeFloat();
     if (!keepCapeUsage) {
       capeUsedThisRun = false;
@@ -2453,10 +2473,18 @@ export async function boot(options = {}) {
     if (!onesieCollectedThisRun) return;
     onesieBuffTimerMs = onesieMaxDurationMs;
     onesieJumpBoost = onesieStoredJumpBoost;
+    onesieRechargeMs = 0;
   }
 
   function resetBabyToNew() {
     clearRunBuffs({ suppressCape: true, keepCapeUsage: false });
+    // Wipe all saved progression so cape + level 4 re-lock immediately
+    const cleared = clearProgress(levelTotals);
+    syncProgressState(cleared);
+    applyCapeVisualState();
+    // Also reset to spawn point for a fully clean slate
+    activeCheckpointIndex = 0;
+    respawnPoint = { ...spawnPoint };
     const resolved = resolveRespawnPosition(respawnPoint);
     player.spawnAt(resolved.x, resolved.y, resolved.z || 0);
     player.vx = 0;
@@ -2479,6 +2507,7 @@ export async function boot(options = {}) {
       onesieJumpBoost,
       onesieStoredJumpBoost,
       onesieCollectedThisRun,
+      onesieRechargeMs,
       capeUsedThisRun,
       capeSuppressedThisRun,
       flourPuffCooldownMs,
@@ -2507,6 +2536,7 @@ export async function boot(options = {}) {
     onesieJumpBoost = snapshot.onesieJumpBoost;
     onesieStoredJumpBoost = snapshot.onesieStoredJumpBoost ?? snapshot.onesieJumpBoost ?? 1.24;
     onesieCollectedThisRun = snapshot.onesieCollectedThisRun;
+    onesieRechargeMs = snapshot.onesieRechargeMs ?? 0;
     capeUsedThisRun = snapshot.capeUsedThisRun;
     capeSuppressedThisRun = snapshot.capeSuppressedThisRun;
     flourPuffCooldownMs = snapshot.flourPuffCooldownMs;
@@ -2597,6 +2627,46 @@ export async function boot(options = {}) {
     }
   }
 
+  function startBalloonRoundup() {
+    if (!balloonRoundup || levelId !== 3 || balloonRoundup.isActive()) return;
+    try {
+      balloonSnapshot = captureFruitMazeSnapshot();
+      activeMinigame = balloonRoundup;
+      state = 'minigame';
+      window.__DADA_DEBUG__.sceneKey = 'MinigameScene';
+      player.vx = 0;
+      player.vy = 0;
+      audio.stopLevelMusic(0.15);
+      ui.showBanner('BALLOON ROUNDUP!', 'Float up and collect all 12 balloons!', 1200);
+      ui.setFade(0.18);
+      balloonRoundup.start({
+        onWin: () => {
+          ui.setFade(0);
+          restoreFruitMazeSnapshot(balloonSnapshot);
+          balloonSnapshot = null;
+          activeMinigame = null;
+          state = 'gameplay';
+          window.__DADA_DEBUG__.sceneKey = 'CribScene';
+          audio.startLevelMusic(levelId, 0.2);
+        },
+        onAbort: () => {
+          balloonSnapshot = null;
+          activeMinigame = null;
+          restartRun('balloon_abort');
+          startLoadedLevelWithProgress(levelId, { unlockAudio: false });
+        },
+      });
+    } catch (err) {
+      balloonSnapshot = null;
+      activeMinigame = null;
+      ui.setFade(0);
+      reportDevError(err);
+      console.error('[balloon] failed to start:', err);
+      const reason = 'fell_off_level';
+      triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
+    }
+  }
+
   function finishRun() {
     state = 'end';
     player.setWinAnimationActive(false);
@@ -2652,8 +2722,10 @@ export async function boot(options = {}) {
     level1AmbientBirdDelayMs = -1;
     if (fruitMaze?.isActive()) fruitMaze.stop();
     if (pongMinigame?.isActive()) pongMinigame.stop();
+    if (balloonRoundup?.isActive()) balloonRoundup.stop();
     fruitMazeSnapshot = null;
     pongSnapshot = null;
+    balloonSnapshot = null;
     activeMinigame = null;
     debugIdleTimerMs = 0;
     window.__DADA_DEBUG__.sceneKey = 'TitleScene';
@@ -2953,6 +3025,15 @@ export async function boot(options = {}) {
       startPongEscape();
       return pongMinigame?.isActive?.() ?? false;
     };
+    window.__DADA_DEBUG__.triggerLevel3Balloon = () => {
+      if (levelId !== 3) return false;
+      startBalloonRoundup();
+      return balloonRoundup?.isActive?.() ?? false;
+    };
+    window.__DADA_DEBUG__._pongMinigame = pongMinigame;
+    window.__DADA_DEBUG__.resetBabyToNew = () => {
+      resetBabyToNew();
+    };
     window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
       index,
       collected: coin.collected,
@@ -3185,7 +3266,15 @@ export async function boot(options = {}) {
       onesieBuffTimerMs = Math.max(0, onesieBuffTimerMs - dt * 1000);
       if (onesieBuffTimerMs === 0) {
         onesieJumpBoost = 1;
-        ui.showStatus('Onesie boost faded', 900);
+        onesieRechargeMs = 0;
+        ui.showStatus('Onesie recharging...', 1200);
+      }
+    } else if (onesieCollectedThisRun && onesieRechargeMs < ONESIE_RECHARGE_DURATION_MS) {
+      onesieRechargeMs = Math.min(ONESIE_RECHARGE_DURATION_MS, onesieRechargeMs + dt * 1000);
+      if (onesieRechargeMs >= ONESIE_RECHARGE_DURATION_MS) {
+        onesieBuffTimerMs = onesieMaxDurationMs;
+        onesieJumpBoost = onesieStoredJumpBoost;
+        ui.showStatus('Onesie ready!', 1200);
       }
     }
 
@@ -3609,6 +3698,8 @@ export async function boot(options = {}) {
               startFruitMazeEscape();
             } else if (levelId === 2 && pongMinigame && currentFloorTopY !== null && player.mesh.position.y < (currentFloorTopY - 6)) {
               startPongEscape();
+            } else if (levelId === 3 && balloonRoundup && currentFloorTopY !== null && player.mesh.position.y < (currentFloorTopY - 6)) {
+              startBalloonRoundup();
             } else {
               const reason = 'fell_off_level';
               triggerReset(reason, player.mesh.position.x < respawnPoint.x ? 1 : -1);
