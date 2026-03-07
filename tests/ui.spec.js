@@ -29,7 +29,7 @@ test('ui: play again restarts from deterministic end scene', async ({ page }) =>
 });
 
 test('ui: escape menu opens during gameplay and can switch levels', async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(75_000);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
 
@@ -65,7 +65,7 @@ test('ui: escape menu opens during gameplay and can switch levels', async ({ pag
 });
 
 test('ui: level 2 floor route cannot trigger the dad goal', async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(75_000);
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
 

@@ -1351,12 +1351,6 @@ export async function boot(options = {}) {
         fallback: null,
         fit: { targetHeight: 1.45, targetMaxSize: 2.0, groundOffset: 0.0 },
       },
-      {
-        role: 'futurePackPropModel',
-        anchor: l2anchors.pack,
-        fallback: l2fallback?.pack,
-        fit: { targetHeight: 1.15, targetMaxSize: 2.1, groundOffset: 0.0, hardMaxExtent: 4.0 },
-      },
     ];
     for (const { role, anchor, fallback, fit } of l2propDefs) {
       if (!anchor) continue;

@@ -1161,6 +1161,7 @@ export function buildWorld2(scene, options = {}) {
   tagLevel2Decor(babyBedVisual);
 
   const pianoAnchor = amanda.pianoAnchor;
+  pianoAnchor.rotation.y = Math.PI;
   tagLevel2Decor(pianoAnchor);
   const pianoVisual = amanda.pianoFallback;
   setRenderingGroup(pianoVisual, 2);
@@ -1172,6 +1173,7 @@ export function buildWorld2(scene, options = {}) {
     LEVEL2.assetAnchors.bianca.y,
     LEVEL2_DECOR_Z,
   );
+  biancaAnchor.rotation.y = Math.PI;
   tagLevel2Decor(biancaAnchor);
 
   const highchairAnchor = new BABYLON.TransformNode('highchairAnchor', scene);
