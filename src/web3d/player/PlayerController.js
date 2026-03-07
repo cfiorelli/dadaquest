@@ -39,6 +39,12 @@ const PLAYER_HALF_H = 0.4;
 const SKIN_WIDTH = 0.005;     // separation buffer to prevent re-collision
 const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
 const INVULN_BLINK_HZ = 20;
+const BACKFLIP_DURATION_SEC = 0.52;
+const BACKFLIP_COOLDOWN_MS = 800;
+
+function easeOutCubic(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 export class PlayerController {
   constructor(scene, startPos = { x: -12, y: 3, z: 0 }) {
@@ -106,6 +112,9 @@ export class PlayerController {
     // Feedback state
     this.invulnTimerMs = 0;
     this.eventQueue = [];
+    this.backflipTimerSec = 0;
+    this.backflipCooldownMs = 0;
+    this.backflipCount = 0;
   }
 
   setColliders(platforms) {
@@ -151,6 +160,9 @@ export class PlayerController {
     this.lastJumpPressIdUsed = 0;
     this.outOfBoundsEmitted = false;
     this.airJumpsUsed = 0;
+    this.backflipTimerSec = 0;
+    this.backflipCooldownMs = 0;
+    this.visual.rotation.set(0, 0, 0);
     if (this.babyAnim) {
       this.babyAnim.setWinActive(false);
       this.babyAnim.resetPose();
@@ -224,6 +236,30 @@ export class PlayerController {
     return this.invulnTimerMs > 0;
   }
 
+  triggerBackflip() {
+    if (this.backflipCooldownMs > 0 || this.backflipTimerSec > 0) {
+      return false;
+    }
+    this.backflipTimerSec = BACKFLIP_DURATION_SEC;
+    this.backflipCooldownMs = BACKFLIP_COOLDOWN_MS;
+    this.backflipCount += 1;
+    return true;
+  }
+
+  isBackflipping() {
+    return this.backflipTimerSec > 0;
+  }
+
+  getBackflipState() {
+    return {
+      active: this.backflipTimerSec > 0,
+      timerSec: this.backflipTimerSec,
+      cooldownMs: this.backflipCooldownMs,
+      count: this.backflipCount,
+      angle: this.visual.rotation.z,
+    };
+  }
+
   getCollisionHalfExtents() {
     return { halfW: PLAYER_HALF_W, halfH: PLAYER_HALF_H };
   }
@@ -247,6 +283,9 @@ export class PlayerController {
 
     if (this.invulnTimerMs > 0) {
       this.invulnTimerMs = Math.max(0, this.invulnTimerMs - dt * 1000);
+    }
+    if (this.backflipCooldownMs > 0) {
+      this.backflipCooldownMs = Math.max(0, this.backflipCooldownMs - dt * 1000);
     }
 
     // Timers
@@ -406,6 +445,18 @@ export class PlayerController {
       });
     }
 
+    if (this.backflipTimerSec > 0) {
+      this.backflipTimerSec = Math.max(0, this.backflipTimerSec - dt);
+      const t = 1 - (this.backflipTimerSec / BACKFLIP_DURATION_SEC);
+      const eased = easeOutCubic(clamp(t, 0, 1));
+      this.visual.rotation.z = -Math.PI * 2 * eased;
+      if (this.backflipTimerSec <= 0) {
+        this.visual.rotation.z = 0;
+      }
+    } else if (Math.abs(this.visual.rotation.z) > 0.0001) {
+      this.visual.rotation.z = 0;
+    }
+
     // Blink while invulnerable for clear feedback.
     if (this.invulnTimerMs > 0) {
       const phase = this.invulnTimerMs / 1000;
@@ -510,6 +561,8 @@ export class PlayerController {
       jumping: this.jumping,
       airJumpsUsed: this.airJumpsUsed,
       airJumpsMax: this.maxAirJumps,
+      backflipActive: this.isBackflipping(),
+      backflipCooldownMs: this.backflipCooldownMs.toFixed(0),
     };
   }
 }

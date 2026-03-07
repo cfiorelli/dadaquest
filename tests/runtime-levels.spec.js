@@ -99,3 +99,44 @@ test('runtime: level 2 horse push keeps player near the lane', async ({ page }) 
     .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey), { timeout: 5_000 })
     .toBe('CribScene');
 });
+
+test('runtime: gameplay keybinds R reset to checkpoint and F triggers backflip', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.();
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(6.5, 1.25, 0);
+  });
+  await page.waitForTimeout(150);
+
+  const backflipBeforeCount = await page.evaluate(() => window.__DADA_DEBUG__?.backflip?.count ?? 0);
+  const backflipTriggered = await page.evaluate(() => {
+    const started = window.__DADA_DEBUG__?.gameplayHotkey?.('KeyF') ?? false;
+    return {
+      started,
+      backflip: window.__DADA_DEBUG__?.backflip ?? null,
+    };
+  });
+  expect(backflipTriggered.started).toBe(true);
+  expect(backflipTriggered.backflip).not.toBeNull();
+  expect(backflipTriggered.backflip.cooldownMs).toBeGreaterThan(0);
+  expect(backflipTriggered.backflip.count).toBeGreaterThan(backflipBeforeCount);
+
+  const beforeResetX = await page.evaluate(() => window.__DADA_DEBUG__?.playerRef?.position?.x ?? null);
+  const resetTriggered = await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyR') ?? false);
+  expect(resetTriggered).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnReason), { timeout: 3_000 })
+    .toBe('manual_reset');
+  await page.waitForTimeout(900);
+  const afterResetX = await page.evaluate(() => window.__DADA_DEBUG__?.playerRef?.position?.x ?? null);
+  expect(beforeResetX).not.toBeNull();
+  expect(afterResetX).not.toBeNull();
+  expect(Math.abs(afterResetX - beforeResetX)).toBeGreaterThan(4);
+});

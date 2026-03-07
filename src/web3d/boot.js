@@ -1374,7 +1374,7 @@ export async function boot(options = {}) {
         role: 'futureBiancaModel',
         anchor: l2anchors.bianca,
         fallback: null,
-        fit: { targetHeight: 1.18, targetMaxSize: 1.75, groundOffset: 0.0, hardMaxExtent: 3.0 },
+        fit: { targetHeight: 1.36, targetMaxSize: 2.02, groundOffset: 0.0, hardMaxExtent: 3.0 },
       },
       {
         role: 'futureHighchairModel',
@@ -1472,12 +1472,12 @@ export async function boot(options = {}) {
           }
           if (role === 'futureBiancaModel') {
             registerLevel2AnimalDecor(targetAnchor, {
-              speed: 0.42,
-              radius: 0.62,
+              speed: 0.36,
+              radius: 0.46,
               phase: 0.32 + (anchorPos.x * 0.03),
-              turnSpeed: 5.8,
+              turnSpeed: 5.2,
               bobAmp: 0.016,
-              stepFreq: 5.0,
+              stepFreq: 4.8,
               pitchAmp: 0.012,
               rollAmp: 0.018,
             });
@@ -1920,6 +1920,13 @@ export async function boot(options = {}) {
 
   function triggerFloorPenalty() {
     if (level1FloorPenaltyCooldownMs > 0) return;
+    if (levelId === 2) {
+      level1FloorPenaltyCooldownMs = 1500;
+      window.__DADA_DEBUG__.lastFloorPenaltyLevel = levelId;
+      window.__DADA_DEBUG__.floorPenaltyCount = (window.__DADA_DEBUG__.floorPenaltyCount || 0) + 1;
+      triggerReset('floor_fall', player.mesh.position.x < respawnPoint.x ? 1 : -1);
+      return;
+    }
     const collectedCoins = coins.filter((coin) => coin.collected);
     if (collectedCoins.length === 0) return;
     level1FloorPenaltyCooldownMs = 1500;
@@ -2010,6 +2017,8 @@ export async function boot(options = {}) {
       savedMaxY: collider ? collider.maxY : 0,
       state: 'idle',  // idle | shaking | falling
       timer: 0,
+      playerTriggered: false,
+      portalTriggered: false,
     };
   });
   const juiceFx = new JuiceFx(scene, { enabled: !!debugFlags.juice && !shotMode });
@@ -2247,6 +2256,7 @@ export async function boot(options = {}) {
       player: describe('player', player.visual),
       goal: describe('goal', world.goalRoot),
     };
+    window.__DADA_DEBUG__.backflip = player.getBackflipState();
   }
 
   function updatePlayerReadabilityLight() {
@@ -2503,6 +2513,20 @@ export async function boot(options = {}) {
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
   }
 
+  function triggerGameplayHotkey(code) {
+    if (state !== 'gameplay') return false;
+    if (code === 'KeyR') {
+      triggerReset('manual_reset', player.mesh.position.x < respawnPoint.x ? 1 : -1);
+      return true;
+    }
+    if (code === 'KeyF') {
+      const started = player.triggerBackflip();
+      window.__DADA_DEBUG__.backflip = player.getBackflipState();
+      return started;
+    }
+    return false;
+  }
+
   function switchLevelFromGameplayMenu(targetLevelId) {
     selectedLevelId = targetLevelId;
     if (targetLevelId === levelId) {
@@ -2556,9 +2580,12 @@ export async function boot(options = {}) {
       if (!goalBounds) return false;
       const center = goalBounds.centerWorld;
       const { halfH } = player.getCollisionHalfExtents();
-      const safeGoalY = goalMinBottomY !== null
-        ? Math.max(center.y, goalMinBottomY + halfH + 0.38)
+      const minGoalY = goalBounds.minimumWorld.y + halfH + 0.08;
+      const maxGoalY = goalBounds.maximumWorld.y - halfH - 0.08;
+      const requestedGoalY = goalMinBottomY !== null
+        ? Math.max(center.y, goalMinBottomY + halfH + 0.12)
         : center.y;
+      const safeGoalY = clamp(requestedGoalY, minGoalY, Math.max(minGoalY, maxGoalY));
       player.spawnAt(center.x, safeGoalY, center.z);
       player.vx = 0;
       player.vy = 0;
@@ -2582,6 +2609,10 @@ export async function boot(options = {}) {
     };
     window.__DADA_DEBUG__.switchMenuLevel = (targetLevelId) => {
       return switchLevelFromGameplayMenu(targetLevelId);
+    };
+    window.__DADA_DEBUG__.gameplayHotkey = (code) => triggerGameplayHotkey(code);
+    window.__DADA_DEBUG__.triggerBackflip = () => {
+      return triggerGameplayHotkey('KeyF');
     };
     window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
       index,
@@ -2607,6 +2638,18 @@ export async function boot(options = {}) {
       if (state === 'menu') {
         ev.preventDefault();
         closeGameplayMenu();
+        return;
+      }
+    }
+    if (state === 'gameplay') {
+      if ((ev.code === 'KeyR' || ev.key === 'r' || ev.key === 'R') && !ev.repeat) {
+        ev.preventDefault();
+        triggerGameplayHotkey('KeyR');
+        return;
+      }
+      if ((ev.code === 'KeyF' || ev.key === 'f' || ev.key === 'F') && !ev.repeat) {
+        ev.preventDefault();
+        triggerGameplayHotkey('KeyF');
         return;
       }
     }
@@ -2669,6 +2712,9 @@ export async function boot(options = {}) {
     audio.playCue(levelId, 'collision');
     respawnState = { phase: 'fadeOut', timer: 0.16, reason };
     window.__DADA_DEBUG__.lastRespawnReason = reason;
+    if (reason === 'crumble_portal') {
+      resetCrumbles();
+    }
     ui.showStatus('Try again!', 650);
   }
 
@@ -2872,6 +2918,8 @@ export async function boot(options = {}) {
     for (const cs of crumbleStates) {
       cs.state = 'idle';
       cs.timer = 0;
+      cs.playerTriggered = false;
+      cs.portalTriggered = false;
       cs.cr.root.position.x = cs.cr.x;
       cs.cr.root.position.y = cs.cr.y;
       cs.cr.root.setEnabled(true);
@@ -2898,6 +2946,8 @@ export async function boot(options = {}) {
         if (onTop) {
           cs.state = 'shaking';
           cs.timer = SHAKE_DUR;
+          cs.playerTriggered = true;
+          cs.portalTriggered = false;
           audio.playCrumbleWarn();
         }
       } else if (cs.state === 'shaking') {
@@ -2917,8 +2967,21 @@ export async function boot(options = {}) {
         }
       } else if (cs.state === 'falling') {
         cs.timer = Math.max(0, cs.timer - dt);
+        if (
+          levelId === 2
+          && cs.cr.portalReset
+          && cs.playerTriggered
+          && !cs.portalTriggered
+          && !respawnState
+          && pos.y < cs.cr.portalResetY
+        ) {
+          cs.portalTriggered = true;
+          triggerReset('crumble_portal', pos.x < respawnPoint.x ? 1 : -1);
+        }
         if (cs.timer <= 0) {
           cs.state = 'idle';
+          cs.playerTriggered = false;
+          cs.portalTriggered = false;
           cs.cr.root.setEnabled(true);
           if (cs.collider) {
             cs.collider.minY = cs.savedMinY;
@@ -3099,10 +3162,12 @@ export async function boot(options = {}) {
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId);
         if (levelId === 2) {
           const laneDelta = player.mesh.position.z;
-          if (Math.abs(laneDelta) > 0.35) {
+          if (player.grounded) {
+            player.mesh.position.z = 0;
+          } else if (Math.abs(laneDelta) > 0.6) {
             player.mesh.position.z = 0;
           } else if (Math.abs(laneDelta) > 0.001) {
-            player.mesh.position.z = damp(player.mesh.position.z, 0, 20, dt);
+            player.mesh.position.z = damp(player.mesh.position.z, 0, 12, dt);
           }
           if (!level2HorseHintShown && world.level2?.isHorseSnapped?.() !== true && player.mesh.position.x >= -8.8) {
             level2HorseHintShown = true;
