@@ -1,11 +1,52 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
+const PROGRESS_KEY = 'dadaquest:progress:v1';
 const LEVEL_CASES = [
   { id: 1, url: 'http://127.0.0.1:4173/?debug=1' },
   { id: 2, url: 'http://127.0.0.1:4173/?level=2&debug=1' },
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
+
+async function installCleanStorage(page) {
+  await page.addInitScript((progressKey) => {
+    try {
+      if (!window.sessionStorage.getItem('__pw_storage_reset__')) {
+        window.localStorage.removeItem(progressKey);
+        window.sessionStorage.clear();
+        window.sessionStorage.setItem('__pw_storage_reset__', '1');
+      }
+    } catch {}
+  }, PROGRESS_KEY);
+}
+
+async function gotoDebugLevel(page, levelId = 1) {
+  const url = levelId === 1
+    ? 'http://127.0.0.1:4173/?debug=1'
+    : `http://127.0.0.1:4173/?level=${levelId}&debug=1`;
+  await page.goto(url);
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+}
+
+async function startDebugLevel(page, levelId) {
+  await page.evaluate((targetLevelId) => {
+    window.__DADA_DEBUG__?.startLevel?.(targetLevelId);
+  }, levelId);
+  await expect.poll(
+    () => page.evaluate(() => ({
+      sceneKey: window.__DADA_DEBUG__?.sceneKey,
+      lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError || null,
+    })),
+    { timeout: 90_000 },
+  ).toEqual({
+    sceneKey: 'CribScene',
+    lastRuntimeError: null,
+  });
+}
+
+test.beforeEach(async ({ page }) => {
+  await installCleanStorage(page);
+});
 
 for (const levelCase of LEVEL_CASES) {
   test(`runtime: level ${levelCase.id} starts and can finish without uncaught exceptions`, async ({ page }) => {
@@ -24,22 +65,8 @@ for (const levelCase of LEVEL_CASES) {
     });
 
     await page.goto(levelCase.url);
-    await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 15_000 });
-
-    await page.evaluate(() => {
-      window.__DADA_DEBUG__?.startLevel?.();
-    });
-
-    await expect.poll(
-      () => page.evaluate(() => ({
-        sceneKey: window.__DADA_DEBUG__?.sceneKey,
-        lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError || null,
-      })),
-      { timeout: 90_000 },
-    ).toEqual({
-      sceneKey: 'CribScene',
-      lastRuntimeError: null,
-    });
+    await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+    await startDebugLevel(page, levelCase.id);
 
     if (levelCase.id === 3) {
       await page.evaluate(() => {
@@ -79,13 +106,8 @@ for (const levelCase of LEVEL_CASES) {
 
 test('runtime: level 2 horse push keeps player near the lane', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
-  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 15_000 });
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.();
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.teleportPlayer?.(-4.8, 1.25, 0.3);
@@ -102,13 +124,8 @@ test('runtime: level 2 horse push keeps player near the lane', async ({ page }) 
 
 test('runtime: gameplay hotkey F triggers backflip', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
-  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.();
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.teleportPlayer?.(6.5, 1.25, 0);
@@ -116,7 +133,23 @@ test('runtime: gameplay hotkey F triggers backflip', async ({ page }) => {
   await page.waitForTimeout(150);
 
   const backflipBeforeCount = await page.evaluate(() => window.__DADA_DEBUG__?.backflip?.count ?? 0);
+  const groundedAttempt = await page.evaluate(() => {
+    const started = window.__DADA_DEBUG__?.gameplayHotkey?.('KeyF') ?? false;
+    return {
+      started,
+      backflip: window.__DADA_DEBUG__?.backflip ?? null,
+    };
+  });
+  expect(groundedAttempt.started).toBe(false);
+  expect(groundedAttempt.backflip?.count ?? 0).toBe(backflipBeforeCount);
+
   const backflipTriggered = await page.evaluate(() => {
+    const player = window.__DADA_DEBUG__?.playerController;
+    if (player) {
+      player.grounded = false;
+      player.jumping = true;
+      player.vy = 6;
+    }
     const started = window.__DADA_DEBUG__?.gameplayHotkey?.('KeyF') ?? false;
     return {
       started,
@@ -129,15 +162,89 @@ test('runtime: gameplay hotkey F triggers backflip', async ({ page }) => {
   expect(backflipTriggered.backflip.count).toBeGreaterThan(backflipBeforeCount);
 });
 
-test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
+test('runtime: Cmd+R / Ctrl+R are not intercepted by checkpoint reset handling', async ({ page, browserName }) => {
   test.setTimeout(120_000);
-  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
-  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const result = await page.evaluate(() => {
+    const before = window.__DADA_DEBUG__?.lastRespawnReason ?? null;
+    const ctrlEvt = new KeyboardEvent('keydown', {
+      key: 'r',
+      code: 'KeyR',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const metaEvt = new KeyboardEvent('keydown', {
+      key: 'r',
+      code: 'KeyR',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(ctrlEvt);
+    window.dispatchEvent(metaEvt);
+    return {
+      before,
+      after: window.__DADA_DEBUG__?.lastRespawnReason ?? null,
+      ctrlPrevented: ctrlEvt.defaultPrevented,
+      metaPrevented: metaEvt.defaultPrevented,
+    };
+  });
+
+  expect(result.after).toBe(result.before);
+  expect(result.ctrlPrevented).toBe(false);
+  if (browserName === 'chromium') {
+    expect(result.metaPrevented).toBe(false);
+  }
+});
+
+test('runtime: level 4 stays locked until progress unlocks it, then starts and finishes cleanly', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+
+  const lockedState = await page.evaluate(() => ({
+    menuText: document.getElementById('titleLevelLock')?.textContent ?? '',
+    ariaDisabled: document.getElementById('levelBtn4')?.getAttribute('aria-disabled') ?? '',
+  }));
+  expect(lockedState.ariaDisabled).toBe('');
+
+  const blocked = await page.evaluate(() => {
+    history.replaceState(null, '', `${window.location.pathname}?level=4&debug=1`);
+    window.__DADA_DEBUG__?.startLevel?.(4);
+    return {
+      sceneKey: window.__DADA_DEBUG__?.sceneKey,
+      hint: document.getElementById('titleHint')?.textContent ?? '',
+    };
+  });
+  expect(blocked.sceneKey).toBe('TitleScene');
+  expect(blocked.hint).toContain('unlock Super Sourdough');
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.();
+    const state = structuredClone(window.__DADA_DEBUG__?.progressState || {});
+    state.sourdoughUnlocked = true;
+    state.unlocksShown = { ...(state.unlocksShown || {}) };
+    window.__DADA_DEBUG__?.setProgressState?.(state);
   });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+
+  await page.goto('http://127.0.0.1:4173/?level=4&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+  await startDebugLevel(page, 4);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportToGoal?.();
+  });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey),
+    { timeout: 20_000 },
+  ).toBe('EndScene');
+});
+
+test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.teleportPlayer?.(6.5, 1.25, 0);
@@ -158,17 +265,18 @@ test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) =>
 
 test('runtime: level 2 floor fall clears collected binkies without resetting', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
-  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.();
+  const firstCoin = await page.evaluate(() => {
+    const list = window.__DADA_DEBUG__?.collectibles?.() || [];
+    return list.find((coin) => !coin.collected) || null;
   });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+  expect(firstCoin).not.toBeNull();
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(-16.5, 1.8, 0);
-  });
+  await page.evaluate((coin) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(coin.x, coin.y + 0.28, coin.z);
+  }, firstCoin);
   await expect
     .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0), { timeout: 4_000 })
     .toBeGreaterThanOrEqual(1);
