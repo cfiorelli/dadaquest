@@ -334,3 +334,20 @@ test('runtime: level 2 secret path debug data exposes floor reset pad and two se
   expect(Array.isArray(secret.vanishPlatforms)).toBe(true);
   expect(secret.vanishPlatforms).toHaveLength(3);
 });
+
+test('runtime: level 2 final stair is solid and the replacement loft coin exists', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 2);
+  await startDebugLevel(page, 2);
+
+  const crumble = await page.evaluate(() => window.__DADA_DEBUG__?.level2LastCrumble?.() ?? null);
+  expect(crumble).not.toBeNull();
+  expect(crumble.name).toBe('crumbleStair5');
+
+  const landingCoin = await page.evaluate(() => {
+    const coins = window.__DADA_DEBUG__?.collectibles?.() ?? [];
+    return coins.find((coin) => Math.abs(coin.x - 35.25) < 0.2 && Math.abs(coin.y - 9.86) < 0.2) ?? null;
+  });
+  expect(landingCoin).not.toBeNull();
+  expect(typeof landingCoin.index).toBe('number');
+});

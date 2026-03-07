@@ -63,8 +63,9 @@ const BASE_LEVEL2 = {
     { name: 'platKitchen',  x:   6.5, y: 0.40,  w:  7.0, h: 0.80, d: 4.0 },  // surface 0.80
     { name: 'platPiano',    x:  11.0, y: 3.00,  w:  3.2, h: 0.70, d: 4.0 },  // surface 3.35
     { name: 'platLanding',  x:  18.0, y: 4.00,  w:  5.0, h: 0.80, d: 4.0 },  // surface 4.40  (CP2)
-    // Section C — Loft stairs (longer + steeper; every step is crumble)
-    { name: 'platLoft',     x:  35.0, y: 9.10,  w:  4.4, h: 0.80, d: 4.2 },  // surface 9.50
+    // Section C — Loft stairs (final stair is solid to stabilize the loft landing)
+    { name: 'platStairFinal', x: 33.4, y: 8.45, w: 2.0, h: 0.65, d: 4.0 },
+    { name: 'platLoft',     x:  36.3, y: 9.10,  w:  3.6, h: 0.80, d: 4.2 },  // surface 9.50; shifted to stop overlapping the final crumble
     { name: 'platRoof',     x:  38.8, y: 9.75,  w:  6.2, h: 0.80, d: 5.0 },  // surface 10.15 → goal
   ],
 
@@ -126,11 +127,6 @@ const BASE_LEVEL2 = {
       x: 30.9, y: 7.75, z: L,
       w: 2.0, h: 0.65, d: 4.0,
     },
-    {
-      name: 'crumbleStair6',
-      x: 33.4, y: 8.45, z: L,
-      w: 2.0, h: 0.65, d: 4.0,
-    },
   ],
 
   coins: [
@@ -144,7 +140,7 @@ const BASE_LEVEL2 = {
     { x:  18.0, y: 5.20, z: L },
     { x:  16.3, y: 1.34, z: L },
     { x:  18.9, y: 2.48, z: L },
-    { x:  33.4, y: 9.10, z: L },
+    { x:  35.25, y: 9.86, z: L },
     { x:  36.2, y: 10.20, z: L },
   ],
 

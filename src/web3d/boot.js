@@ -936,7 +936,7 @@ export async function boot(options = {}) {
       : levelId === 3
       ? buildWorld3(scene, { animateGoal: !shotMode })
       : levelId === 2
-        ? buildWorld2(scene, { animateGoal: !shotMode })
+        ? buildWorld2(scene, { animateGoal: !shotMode, debugMode })
         : shotMode
           ? withPatchedRandom(createSeededRandom(1337), () => buildWorld(scene, {
             random: createSeededRandom(7331),
@@ -2971,6 +2971,17 @@ export async function boot(options = {}) {
       return progression;
     };
     window.__DADA_DEBUG__.level2Secret = () => world.level2?.getSecretState?.() ?? null;
+    window.__DADA_DEBUG__.level2LastCrumble = () => {
+      const base = world.level2?.getLastCrumbleState?.() ?? null;
+      if (!base) return null;
+      const runtime = crumbleStates.find((cs) => cs.cr?.name === base.name);
+      return {
+        ...base,
+        state: runtime?.state ?? null,
+        timer: runtime ? Number(runtime.timer.toFixed(3)) : null,
+        playerTriggered: runtime?.playerTriggered ?? false,
+      };
+    };
   }
 
   // Single unconditional keydown handler on window — fires regardless of which

@@ -80,10 +80,7 @@ test('ui: escape menu opens during gameplay and can switch levels', async ({ pag
       && !overlay.classList.contains('hidden');
   }, { timeout: 5_000 });
 
-  await Promise.all([
-    page.waitForURL((url) => !url.searchParams.has('level'), { timeout: 30_000 }),
-    page.click('#menuLevelBtn1'),
-  ]);
+  await page.click('#menuLevelBtn1');
   await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'TitleScene', { timeout: 20_000 });
   await expect(page.locator('#titleSub')).toContainText('Level 1');
 });

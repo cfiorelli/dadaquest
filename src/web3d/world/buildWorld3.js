@@ -1166,7 +1166,7 @@ export function buildWorld3(scene, options = {}) {
 
   const porchTopY = getPlatformTopY('grandmaPorch');
   const grandmaHazard = createGrandma(scene, {
-    x: 73.9,
+    x: 75.0,
     y: porchTopY,
     z: LANE_Z,
     shadowGen,
@@ -1176,7 +1176,7 @@ export function buildWorld3(scene, options = {}) {
   setRenderingGroup(grandmaHazard.root, 3);
   const grandmaPatrol = {
     root: grandmaHazard.root,
-    x: 73.9,
+    x: 75.0,
     minZ: -1.18,
     maxZ: 1.22,
     speed: 0.82,
@@ -1464,7 +1464,7 @@ export function buildWorld3(scene, options = {}) {
         dog.minY = dog.lane.y - dog.height * 0.5;
         dog.maxY = dog.lane.y + dog.height * 0.5;
       }
-      grandmaPatrol.root.position.x = 73.9;
+      grandmaPatrol.root.position.x = 75.0;
       grandmaPatrol.root.position.y = getPlatformTopY('grandmaPorch');
       grandmaPatrol.root.position.z = 0.86;
       grandmaPatrol.dir = 1;

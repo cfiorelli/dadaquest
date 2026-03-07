@@ -1040,7 +1040,7 @@ function createPianoVisual(scene, name, { x, y, z = 0, shadowGen }) {
 // ── Main Level 2 world builder ────────────────────────────────────
 
 export function buildWorld2(scene, options = {}) {
-  const { animateGoal = true } = options;
+  const { animateGoal = true, debugMode = false } = options;
   // Scene
   scene.clearColor = new BABYLON.Color4(0.84, 0.86, 0.90, 1.0);
   scene.ambientColor = new BABYLON.Color3(0.34, 0.33, 0.37);
@@ -1077,6 +1077,43 @@ export function buildWorld2(scene, options = {}) {
   shadowGen.bias = 0.0006;
   shadowGen.normalBias = 0.02;
   shadowGen.setDarkness(0.36);
+
+  function createDebugWireBox(name, { x, y, z, w, h, d, color }) {
+    const mesh = BABYLON.MeshBuilder.CreateBox(name, {
+      width: w,
+      height: h,
+      depth: d,
+    }, scene);
+    mesh.position.set(x, y, z);
+    const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+    mat.wireframe = true;
+    mat.disableLighting = true;
+    mat.emissiveColor = color;
+    mat.alpha = 0.88;
+    mat.backFaceCulling = false;
+    mesh.material = mat;
+    tagLevel2Decor(mesh);
+    setRenderingGroup(mesh, 4);
+    return mesh;
+  }
+
+  function createDebugPickupSphere(name, { x, y, z, radius, color }) {
+    const mesh = BABYLON.MeshBuilder.CreateSphere(name, {
+      diameter: radius * 2,
+      segments: 14,
+    }, scene);
+    mesh.position.set(x, y, z);
+    const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+    mat.wireframe = true;
+    mat.disableLighting = true;
+    mat.emissiveColor = color;
+    mat.alpha = 0.82;
+    mat.backFaceCulling = false;
+    mesh.material = mat;
+    tagLevel2Decor(mesh);
+    setRenderingGroup(mesh, 4);
+    return mesh;
+  }
 
   // === GROUND ===
   const groundDef = LEVEL2.ground;
@@ -1180,18 +1217,30 @@ export function buildWorld2(scene, options = {}) {
 
   // === COINS ===
   const coins = [];
+  let lastCrumbleCoin = null;
+  const lastCrumbleDef = (LEVEL2.crumbles || [])[LEVEL2.crumbles.length - 1] || null;
   for (let i = 0; i < LEVEL2.coins.length; i++) {
     const c = LEVEL2.coins[i];
     const node = createCoin(scene, `L2_coin2_${i}`, { x: c.x, y: c.y, z: LANE_Z });
     node.position.z = LANE_Z;
     prefixLevel2Gameplay(node);
     setRenderingGroup(node, 3);
-    coins.push({
+    const radius = lastCrumbleDef && Math.abs(c.x - lastCrumbleDef.x) <= 0.45 && c.y < 9.4
+      ? 0.56
+      : 0.45;
+    const coinState = {
+      index: i,
       position: new BABYLON.Vector3(c.x, c.y, LANE_Z),
-      radius: 0.45,
+      radius,
       node,
       collected: false,
+    };
+    coins.push({
+      ...coinState,
     });
+    if (lastCrumbleDef && Math.abs(c.x - lastCrumbleDef.x) <= 0.45 && c.y < 9.4) {
+      lastCrumbleCoin = coinState;
+    }
   }
 
   // === HAZARDS ===
@@ -1276,6 +1325,7 @@ export function buildWorld2(scene, options = {}) {
 
   // === CRUMBLES ===
   const crumbles = [];
+  let lastCrumbleState = null;
   for (let i = 0; i < (LEVEL2.crumbles || []).length; i++) {
     const cr = LEVEL2.crumbles[i];
     const { root: crRoot, colliderMesh: crCol } = createCrumblePlatform(scene, `L2_${cr.name}`, {
@@ -1293,7 +1343,8 @@ export function buildWorld2(scene, options = {}) {
       y: cr.y - 1.22,
       z: -1.12,
     });
-    crumbles.push({
+    const crumbleState = {
+      name: cr.name,
       root: crRoot,
       colliderMesh: crCol,
       x: cr.x, y: cr.y, z: LANE_Z,
@@ -1301,7 +1352,42 @@ export function buildWorld2(scene, options = {}) {
       portalRoot,
       portalReset: true,
       portalResetY: cr.y - 0.72,
+    };
+    crumbles.push(crumbleState);
+    if (i === (LEVEL2.crumbles.length - 1)) {
+      lastCrumbleState = crumbleState;
+    }
+  }
+
+  if (debugMode && lastCrumbleState) {
+    const topY = lastCrumbleState.y + (lastCrumbleState.h * 0.5);
+    createDebugWireBox('L2_debug_lastCrumbleCollider', {
+      x: lastCrumbleState.x,
+      y: lastCrumbleState.y,
+      z: LANE_Z,
+      w: lastCrumbleState.w,
+      h: LEVEL2.crumbles[LEVEL2.crumbles.length - 1].h,
+      d: LEVEL2.crumbles[LEVEL2.crumbles.length - 1].d,
+      color: new BABYLON.Color3(0.20, 0.95, 1.0),
     });
+    createDebugWireBox('L2_debug_lastCrumbleTrigger', {
+      x: lastCrumbleState.x,
+      y: topY + 0.025,
+      z: LANE_Z,
+      w: lastCrumbleState.w,
+      h: 0.12,
+      d: LEVEL2.crumbles[LEVEL2.crumbles.length - 1].d,
+      color: new BABYLON.Color3(1.0, 0.45, 0.95),
+    });
+    if (lastCrumbleCoin) {
+      createDebugPickupSphere('L2_debug_lastCrumbleCoinRadius', {
+        x: lastCrumbleCoin.position.x,
+        y: lastCrumbleCoin.position.y,
+        z: lastCrumbleCoin.position.z,
+        radius: lastCrumbleCoin.radius,
+        color: new BABYLON.Color3(1.0, 0.85, 0.25),
+      });
+    }
   }
 
   // === DECORATIVE BACKDROP / ROOM ZONES ===
@@ -1988,6 +2074,37 @@ export function buildWorld2(scene, options = {}) {
           z: platform.colliderMesh.position.z,
           visible: platform.visible,
         })),
+      };
+    },
+    getLastCrumbleState() {
+      if (!lastCrumbleState) return null;
+      const ext = lastCrumbleState.colliderMesh.getBoundingInfo().boundingBox.extendSize;
+      const topY = lastCrumbleState.colliderMesh.position.y + ext.y;
+      return {
+        name: lastCrumbleState.name,
+        x: lastCrumbleState.colliderMesh.position.x,
+        y: lastCrumbleState.colliderMesh.position.y,
+        z: lastCrumbleState.colliderMesh.position.z,
+        topY,
+        bounds: {
+          minX: lastCrumbleState.colliderMesh.position.x - ext.x,
+          maxX: lastCrumbleState.colliderMesh.position.x + ext.x,
+          minY: lastCrumbleState.colliderMesh.position.y - ext.y,
+          maxY: lastCrumbleState.colliderMesh.position.y + ext.y,
+          minZ: lastCrumbleState.colliderMesh.position.z - ext.z,
+          maxZ: lastCrumbleState.colliderMesh.position.z + ext.z,
+        },
+        triggerBand: {
+          minY: topY - 0.05,
+          maxY: topY + 0.07,
+        },
+        coin: lastCrumbleCoin ? {
+          index: lastCrumbleCoin.index,
+          x: lastCrumbleCoin.position.x,
+          y: lastCrumbleCoin.position.y,
+          z: lastCrumbleCoin.position.z,
+          radius: lastCrumbleCoin.radius,
+        } : null,
       };
     },
     // Expose anchor nodes for GLB loading in boot.js

@@ -80,6 +80,13 @@ const CSS = `
   font-family: monospace;
   font-weight: 700;
 }
+.dada-device-note {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6a5642;
+  letter-spacing: 0.02em;
+}
 .dada-loading-wrap {
   margin-top: 16px;
   display: none;
@@ -665,6 +672,7 @@ export function createUI(uiRoot, options = {}) {
         <span>Space</span> Jump &nbsp;\u00b7&nbsp;
         <span>M</span> Mute
       </div>
+      <div class="dada-device-note">Desktop only. Not built for phones.</div>
       <div class="dada-level-row">
         <button class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="levelBtn1" tabindex="-1">Level 1</button>
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
@@ -802,6 +810,7 @@ export function createUI(uiRoot, options = {}) {
       <div class="dada-controls">
         Press <span>Esc</span> to resume, or switch levels below.
       </div>
+      <div class="dada-device-note">Desktop only. Not built for phones.</div>
       <div class="dada-level-row">
         <a class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="menuLevelBtn1" href="${window.location.pathname}">Level 1</a>
         <a class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="menuLevelBtn2" href="${window.location.pathname}?level=2">Level 2</a>
