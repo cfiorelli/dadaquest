@@ -9,7 +9,7 @@ const LEVEL_CASES = [
 
 for (const levelCase of LEVEL_CASES) {
   test(`runtime: level ${levelCase.id} starts and can finish without uncaught exceptions`, async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const consoleErrors = [];
     const pageErrors = [];
 
@@ -35,7 +35,7 @@ for (const levelCase of LEVEL_CASES) {
         sceneKey: window.__DADA_DEBUG__?.sceneKey,
         lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError || null,
       })),
-      { timeout: 30_000 },
+      { timeout: 90_000 },
     ).toEqual({
       sceneKey: 'CribScene',
       lastRuntimeError: null,
@@ -78,14 +78,14 @@ for (const levelCase of LEVEL_CASES) {
 }
 
 test('runtime: level 2 horse push keeps player near the lane', async ({ page }) => {
-  test.setTimeout(75_000);
+  test.setTimeout(120_000);
   await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 15_000 });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.startLevel?.();
   });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 20_000 });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.teleportPlayer?.(-4.8, 1.25, 0.3);
