@@ -617,6 +617,135 @@ function createPackPlaceholder(scene, name, { x, y, z = 0 }) {
   return root;
 }
 
+function createKitchenDecor(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const counterMat = makeCardboard(scene, `${name}_counterMat`, 210, 194, 176, { roughness: 0.92 });
+  const cabinetMat = makeCardboard(scene, `${name}_cabinetMat`, 156, 132, 108, { roughness: 0.9 });
+  const hardwareMat = makePlastic(scene, `${name}_hardwareMat`, 0.72, 0.72, 0.76, { roughness: 0.38 });
+
+  const base = BABYLON.MeshBuilder.CreateBox(`${name}_base`, {
+    width: 3.0,
+    height: 1.0,
+    depth: 0.82,
+  }, scene);
+  base.parent = root;
+  base.position.y = 0.5;
+  base.material = cabinetMat;
+
+  const counter = BABYLON.MeshBuilder.CreateBox(`${name}_counter`, {
+    width: 3.14,
+    height: 0.12,
+    depth: 0.92,
+  }, scene);
+  counter.parent = root;
+  counter.position.y = 1.06;
+  counter.material = counterMat;
+
+  const backsplash = BABYLON.MeshBuilder.CreateBox(`${name}_backsplash`, {
+    width: 3.04,
+    height: 0.84,
+    depth: 0.08,
+  }, scene);
+  backsplash.parent = root;
+  backsplash.position.set(0, 1.46, -0.42);
+  backsplash.material = makeCardboard(scene, `${name}_backsplashMat`, 234, 230, 222, { roughness: 0.96 });
+
+  for (const drawerX of [-0.92, 0, 0.92]) {
+    const drawer = BABYLON.MeshBuilder.CreateBox(`${name}_drawer_${drawerX}`, {
+      width: 0.84,
+      height: 0.26,
+      depth: 0.04,
+    }, scene);
+    drawer.parent = root;
+    drawer.position.set(drawerX, 0.76, 0.42);
+    drawer.material = counterMat;
+
+    const pull = BABYLON.MeshBuilder.CreateBox(`${name}_pull_${drawerX}`, {
+      width: 0.18,
+      height: 0.04,
+      depth: 0.04,
+    }, scene);
+    pull.parent = drawer;
+    pull.position.set(0, 0, 0.05);
+    pull.material = hardwareMat;
+  }
+
+  const upper = BABYLON.MeshBuilder.CreateBox(`${name}_upper`, {
+    width: 2.18,
+    height: 0.82,
+    depth: 0.36,
+  }, scene);
+  upper.parent = root;
+  upper.position.set(0.36, 2.18, -0.22);
+  upper.material = cabinetMat;
+
+  const hood = BABYLON.MeshBuilder.CreateBox(`${name}_hood`, {
+    width: 0.72,
+    height: 0.42,
+    depth: 0.36,
+  }, scene);
+  hood.parent = root;
+  hood.position.set(-1.0, 1.94, -0.18);
+  hood.material = makeCardboard(scene, `${name}_hoodMat`, 212, 214, 220, { roughness: 0.82 });
+
+  tagLevel2Decor(root);
+  return root;
+}
+
+function createFireplaceDecor(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const brickMat = makeCardboard(scene, `${name}_brickMat`, 176, 104, 84, { roughness: 0.94 });
+  const mantleMat = makeCardboard(scene, `${name}_mantleMat`, 140, 116, 96, { roughness: 0.88 });
+
+  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
+    width: 2.4,
+    height: 2.4,
+    depth: 0.7,
+  }, scene);
+  body.parent = root;
+  body.position.y = 1.2;
+  body.material = brickMat;
+
+  const opening = BABYLON.MeshBuilder.CreateBox(`${name}_opening`, {
+    width: 1.26,
+    height: 1.08,
+    depth: 0.42,
+  }, scene);
+  opening.parent = root;
+  opening.position.set(0, 0.74, 0.18);
+  opening.material = makeCardboard(scene, `${name}_openingMat`, 62, 48, 40, { roughness: 0.98 });
+
+  const mantle = BABYLON.MeshBuilder.CreateBox(`${name}_mantle`, {
+    width: 2.64,
+    height: 0.14,
+    depth: 0.88,
+  }, scene);
+  mantle.parent = root;
+  mantle.position.y = 2.04;
+  mantle.material = mantleMat;
+
+  const ember = BABYLON.MeshBuilder.CreatePlane(`${name}_ember`, {
+    width: 0.92,
+    height: 0.42,
+  }, scene);
+  ember.parent = root;
+  ember.position.set(0, 0.56, 0.38);
+  const emberMat = new BABYLON.StandardMaterial(`${name}_emberMat`, scene);
+  emberMat.diffuseColor = new BABYLON.Color3(0.96, 0.64, 0.18);
+  emberMat.emissiveColor = new BABYLON.Color3(0.54, 0.20, 0.08);
+  emberMat.alpha = 0.82;
+  emberMat.backFaceCulling = false;
+  emberMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  ember.material = emberMat;
+
+  tagLevel2Decor(root);
+  return root;
+}
+
 // ── Slip / hazard zone ────────────────────────────────────────────
 
 function createHazardZone(scene, name, { x, y, z = 0, width, depth }) {
@@ -1170,6 +1299,20 @@ export function buildWorld2(scene, options = {}) {
   cornPatch.root.scaling.setAll(1.18);
   setRenderingGroup(cornPatch.root, 2);
 
+  const kitchenDecor = createKitchenDecor(scene, 'l2_kitchenDecor', {
+    x: 7.6,
+    y: LEVEL2.platforms.find((p) => p.name === 'platKitchen').y + 0.42,
+    z: 2.62,
+  });
+  setRenderingGroup(kitchenDecor, 2);
+
+  const fireplaceDecor = createFireplaceDecor(scene, 'l2_fireplaceDecor', {
+    x: 33.0,
+    y: LEVEL2.platforms.find((p) => p.name === 'platLoft').y + 0.42,
+    z: 2.54,
+  });
+  setRenderingGroup(fireplaceDecor, 2);
+
   // === AMANDA PATROL ===
   const amandaDef = LEVEL2.amanda;
   let amandaX = amandaDef.minX;
@@ -1380,9 +1523,9 @@ export function buildWorld2(scene, options = {}) {
     y: LEVEL2.platforms.find((p) => p.name === 'platBedroom').y + 0.4,
     z: 2.18,
     shadowGen,
-    textLines: ['PUSH HORSE', '→'],
-    width: 2.36,
-    height: 1.0,
+    textLines: ['CLIMB THE', 'HORSE →'],
+    width: 2.82,
+    height: 1.12,
     postHeight: 2.15,
     boardName: 'l2_horseHint',
     boardColor: [224, 196, 140],
@@ -1395,9 +1538,9 @@ export function buildWorld2(scene, options = {}) {
 
   const rooftopSign = createWelcomeSign(scene, {
     name: 'l2_rooftopSign',
-    x: 21.6,
-    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.78,
-    z: 2.16,
+    x: 24.8,
+    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 1.06,
+    z: 3.16,
     shadowGen,
     textLines: ['TO ROOFTOP GARDEN', '→→→'],
     width: 5.8,
@@ -1500,6 +1643,8 @@ export function buildWorld2(scene, options = {}) {
     const horseStepPlayerCollider = horseStepIndex >= 0 ? player.colliders[horseStepIndex] : null;
     const horseSupportX = horseX + horseTopSupport.offsetX;
     horseStepCollider.position.set(horseSupportX, horseTopSupport.y, horseTopSupport.z);
+    horseStepVisual.position.x = horseSupportX;
+    horseStepVisual.setEnabled(horseSnapped && !horsePadCollapseState.collapsed);
     if (horsePadPlayerCollider && horsePadColliderMesh) {
       const ext = horsePadColliderMesh.getBoundingInfo().boundingBox.extendSize;
       horsePadPlayerCollider.minX = horsePadColliderMesh.position.x - ext.x;
@@ -1547,6 +1692,7 @@ export function buildWorld2(scene, options = {}) {
         horsePadVisual?.setEnabled(false);
         horseVisualRoot?.setEnabled(false);
         rockingHorseAnchor?.setEnabled(false);
+        horseStepVisual?.setEnabled(false);
       }
     }
 
@@ -1561,6 +1707,7 @@ export function buildWorld2(scene, options = {}) {
         horsePadVisual?.setEnabled(true);
         horseVisualRoot?.setEnabled(true);
         rockingHorseAnchor?.setEnabled(true);
+        horseStepVisual?.setEnabled(false);
       }
       horseVisualRoot.position.x = horseX;
       rockingHorseAnchor.position.x = horseX;
@@ -1583,6 +1730,7 @@ export function buildWorld2(scene, options = {}) {
       horseSnapped = true;
       horsePadCollapseState.armed = false;
       horsePadCollapseState.timerSec = horseDef.crumbleDelaySec ?? 5.0;
+      horseStepVisual?.setEnabled(true);
     }
 
     horseVisualRoot.position.x = horseX;
@@ -1617,6 +1765,7 @@ export function buildWorld2(scene, options = {}) {
       horsePadVisual?.setEnabled(true);
       horseVisualRoot?.setEnabled(true);
       rockingHorseAnchor?.setEnabled(true);
+      horseStepVisual?.setEnabled(false);
       horseVisualRoot.position.x = horseX;
       rockingHorseAnchor.position.x = horseX;
       horseStepCollider.position.set(horseX + horseTopSupport.offsetX, horseTopSupport.y, horseTopSupport.z);

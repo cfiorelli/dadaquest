@@ -252,6 +252,25 @@ function createDogVisual(scene, name, { x, y, z = 0, color = [0.66, 0.50, 0.30] 
   head.position.set(0.58, 0.45, 0);
   head.material = makePlastic(scene, name + '_headMat', 0.92, 0.84, 0.74, { roughness: 0.62 });
 
+  const snout = BABYLON.MeshBuilder.CreateBox(name + '_snout', {
+    width: 0.26,
+    height: 0.20,
+    depth: 0.22,
+  }, scene);
+  snout.parent = root;
+  snout.position.set(0.86, 0.36, 0);
+  snout.material = makePlastic(scene, name + '_snoutMat', 0.90, 0.78, 0.66, { roughness: 0.66 });
+
+  for (const side of [-0.08, 0.08]) {
+    const eye = BABYLON.MeshBuilder.CreateSphere(name + `_eye${side}`, {
+      diameter: 0.06,
+      segments: 8,
+    }, scene);
+    eye.parent = root;
+    eye.position.set(0.74, 0.52, side);
+    eye.material = makePlastic(scene, name + `_eyeMat${side}`, 0.10, 0.08, 0.08, { roughness: 0.32 });
+  }
+
   for (const side of [-0.16, 0.16]) {
     const ear = BABYLON.MeshBuilder.CreateBox(name + `_ear${side}`, {
       width: 0.14,
@@ -481,6 +500,10 @@ function createCritterPlaceholder(scene, name, { x, y, z = 0, kind = 'chicken' }
     bodyColor = [0.82, 0.78, 0.72];
     accentColor = [0.40, 0.28, 0.22];
     scale = 1.0;
+  } else if (kind === 'pig') {
+    bodyColor = [0.94, 0.72, 0.74];
+    accentColor = [0.78, 0.46, 0.54];
+    scale = 0.96;
   } else if (kind === 'turkey') {
     bodyColor = [0.46, 0.30, 0.20];
     accentColor = [0.86, 0.24, 0.16];
@@ -505,6 +528,17 @@ function createCritterPlaceholder(scene, name, { x, y, z = 0, kind = 'chicken' }
   head.position.set(kind === 'chicken' ? 0.28 : 0.44, kind === 'chicken' ? 0.58 : 0.74, 0);
   head.material = body.material;
 
+  if (kind === 'pig') {
+    const snout = BABYLON.MeshBuilder.CreateBox(`${name}_snout`, {
+      width: 0.14,
+      height: 0.10,
+      depth: 0.12,
+    }, scene);
+    snout.parent = root;
+    snout.position.set(0.62, 0.70, 0);
+    snout.material = makePlastic(scene, `${name}_snoutMat`, 0.92, 0.62, 0.68, { roughness: 0.54 });
+  }
+
   const crest = BABYLON.MeshBuilder.CreateBox(`${name}_crest`, {
     width: 0.12,
     height: 0.12,
@@ -513,6 +547,55 @@ function createCritterPlaceholder(scene, name, { x, y, z = 0, kind = 'chicken' }
   crest.parent = root;
   crest.position.set(head.position.x + 0.04, head.position.y + 0.14, 0);
   crest.material = makePlastic(scene, `${name}_crestMat`, ...accentColor, { roughness: 0.5 });
+
+  markDecorative(root);
+  return root;
+}
+
+function createBunnyPlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const furMat = makePlastic(scene, `${name}_furMat`, 0.92, 0.90, 0.86, { roughness: 0.72 });
+  const earMat = makePlastic(scene, `${name}_earMat`, 0.96, 0.78, 0.82, { roughness: 0.74 });
+  const eyeMat = makePlastic(scene, `${name}_eyeMat`, 0.10, 0.08, 0.08, { roughness: 0.28 });
+
+  const body = BABYLON.MeshBuilder.CreateSphere(`${name}_body`, {
+    diameter: 0.78,
+    segments: 12,
+  }, scene);
+  body.parent = root;
+  body.position.set(0, 0.38, 0);
+  body.scaling.z = 1.18;
+  body.material = furMat;
+
+  const head = BABYLON.MeshBuilder.CreateSphere(`${name}_head`, {
+    diameter: 0.46,
+    segments: 10,
+  }, scene);
+  head.parent = root;
+  head.position.set(0.34, 0.62, 0);
+  head.material = furMat;
+
+  for (const side of [-0.08, 0.08]) {
+    const ear = BABYLON.MeshBuilder.CreateBox(`${name}_ear${side}`, {
+      width: 0.10,
+      height: 0.48,
+      depth: 0.10,
+    }, scene);
+    ear.parent = root;
+    ear.position.set(0.34, 1.02, side);
+    ear.rotation.z = side < 0 ? -0.14 : 0.14;
+    ear.material = earMat;
+
+    const eye = BABYLON.MeshBuilder.CreateSphere(`${name}_eye${side}`, {
+      diameter: 0.05,
+      segments: 8,
+    }, scene);
+    eye.parent = root;
+    eye.position.set(0.52, 0.66, side);
+    eye.material = eyeMat;
+  }
 
   markDecorative(root);
   return root;
@@ -738,6 +821,23 @@ export function buildWorld3(scene, options = {}) {
     const platform = platformByName.get(name);
     return platform ? platform.y + (platform.h * 0.5) + 0.02 : floorTopY;
   };
+  const getNearestPlatform = (x, names = null) => {
+    let nearest = null;
+    let bestDx = Number.POSITIVE_INFINITY;
+    const candidates = names?.length
+      ? names.map((name) => platformByName.get(name)).filter(Boolean)
+      : Array.from(platformByName.values());
+    for (const platform of candidates) {
+      const halfW = platform.w * 0.5;
+      const clampedX = Math.max(platform.x - halfW, Math.min(platform.x + halfW, x));
+      const dx = Math.abs(x - clampedX);
+      if (dx < bestDx) {
+        bestDx = dx;
+        nearest = platform;
+      }
+    }
+    return nearest;
+  };
   const groundVisual = createCardboardPlatform(scene, 'ground3', {
     x: groundDef.x,
     y: groundDef.y,
@@ -876,10 +976,12 @@ export function buildWorld3(scene, options = {}) {
   const toolHazards = [];
   const sprinklerCornAnchors = [];
   for (const sprinkler of LEVEL3.sprinklers) {
+    const patchPlatform = getNearestPlatform(sprinkler.x, ['gardenStart', 'gardenRow1', 'gardenRow2', 'gardenRow3']) || LEVEL3.platforms[0];
+    const patchTopY = getPlatformTopY(patchPlatform.name);
     const patchCenter = new BABYLON.Vector3(
       sprinkler.x + 0.82,
-      floorTopY + 1.06,
-      1.78,
+      patchTopY + 1.02,
+      0.72,
     );
     const nozzleLocal = new BABYLON.Vector3(-0.42, 0.56, 1.52);
     const targetLocal = new BABYLON.Vector3(
@@ -903,8 +1005,8 @@ export function buildWorld3(scene, options = {}) {
         const anchor = new BABYLON.TransformNode(`${sprinkler.name}_cornAnchor${patchIndex}`, scene);
         anchor.position.set(
           patchCenter.x + col,
-          floorTopY,
-          1.42 + row,
+          patchTopY,
+          0.34 + row,
         );
         anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true, decor: true };
         const fallback = createPlantPlaceholder(scene, `${sprinkler.name}_cornFallback${patchIndex}`, {
@@ -930,8 +1032,10 @@ export function buildWorld3(scene, options = {}) {
       handledByLevelRuntime: true,
       minX: patchCenter.x - 1.05,
       maxX: patchCenter.x + 1.05,
-      minY: floorTopY + 0.10,
+      minY: patchTopY + 0.10,
       maxY: patchCenter.y + 0.28,
+      minZ: patchCenter.z - 1.05,
+      maxZ: patchCenter.z + 1.05,
     });
   }
 
@@ -959,6 +1063,8 @@ export function buildWorld3(scene, options = {}) {
     maxX: rakeAnchor.position.x + 0.95,
     minY: rakeAnchor.position.y,
     maxY: rakeAnchor.position.y + 1.26,
+    minZ: rakeAnchor.position.z - 0.48,
+    maxZ: rakeAnchor.position.z + 0.48,
   });
 
   const tractorAnchor = new BABYLON.TransformNode('l3_tractorAnchor', scene);
@@ -985,6 +1091,63 @@ export function buildWorld3(scene, options = {}) {
     maxX: tractorAnchor.position.x + 1.2,
     minY: tractorAnchor.position.y,
     maxY: tractorAnchor.position.y + 1.44,
+    minZ: tractorAnchor.position.z - 0.56,
+    maxZ: tractorAnchor.position.z + 0.56,
+  });
+
+  const pigAnchor = new BABYLON.TransformNode('l3_pigAnchor', scene);
+  pigAnchor.position.set(26.2, getPlatformTopY('tableStone2'), 0);
+  pigAnchor.metadata = { ...(pigAnchor.metadata || {}), cameraIgnore: true, decor: true };
+  const pigFallback = createCritterPlaceholder(scene, 'l3_pigFallback', {
+    x: pigAnchor.position.x,
+    y: pigAnchor.position.y,
+    z: pigAnchor.position.z,
+    kind: 'pig',
+  });
+  pigFallback.parent = pigAnchor;
+  pigFallback.position.set(0, 0, 0);
+  setRenderingGroup(pigAnchor, 3);
+  toolHazards.push({
+    name: 'pigHazard',
+    reason: 'pig',
+    statusText: 'Mind the pig!',
+    root: pigAnchor,
+    mesh: pigFallback.getChildMeshes(false)[0] || null,
+    active: true,
+    handledByLevelRuntime: true,
+    minX: pigAnchor.position.x - 0.64,
+    maxX: pigAnchor.position.x + 0.64,
+    minY: pigAnchor.position.y,
+    maxY: pigAnchor.position.y + 1.02,
+    minZ: pigAnchor.position.z - 0.44,
+    maxZ: pigAnchor.position.z + 0.44,
+  });
+
+  const bunnyAnchor = new BABYLON.TransformNode('l3_bunnyAnchor', scene);
+  bunnyAnchor.position.set(59.2, getPlatformTopY('safeIsland'), 0);
+  bunnyAnchor.metadata = { ...(bunnyAnchor.metadata || {}), cameraIgnore: true, decor: true };
+  const bunnyFallback = createBunnyPlaceholder(scene, 'l3_bunnyFallback', {
+    x: bunnyAnchor.position.x,
+    y: bunnyAnchor.position.y,
+    z: bunnyAnchor.position.z,
+  });
+  bunnyFallback.parent = bunnyAnchor;
+  bunnyFallback.position.set(0, 0, 0);
+  setRenderingGroup(bunnyAnchor, 3);
+  toolHazards.push({
+    name: 'bunnyHazard',
+    reason: 'bunny',
+    statusText: 'Hop past the bunny!',
+    root: bunnyAnchor,
+    mesh: bunnyFallback.getChildMeshes(false)[0] || null,
+    active: true,
+    handledByLevelRuntime: true,
+    minX: bunnyAnchor.position.x - 0.58,
+    maxX: bunnyAnchor.position.x + 0.58,
+    minY: bunnyAnchor.position.y,
+    maxY: bunnyAnchor.position.y + 0.88,
+    minZ: bunnyAnchor.position.z - 0.40,
+    maxZ: bunnyAnchor.position.z + 0.40,
   });
 
   const dogHazards = [];
@@ -1029,12 +1192,14 @@ export function buildWorld3(scene, options = {}) {
   setRenderingGroup(grandmaHazard.root, 3);
   const grandmaPatrol = {
     root: grandmaHazard.root,
-    minX: 72.1,
-    maxX: 75.6,
+    x: 73.9,
+    minZ: -1.18,
+    maxZ: 1.22,
     speed: 0.82,
     dir: 1,
     width: 1.1,
     height: 3.0,
+    depth: 0.9,
   };
 
   const hazards = [...timedHazards, ...toolHazards, ...dogHazards, {
@@ -1043,10 +1208,12 @@ export function buildWorld3(scene, options = {}) {
     root: grandmaPatrol.root,
     active: true,
     handledByLevelRuntime: true,
-    minX: grandmaPatrol.minX,
-    maxX: grandmaPatrol.maxX,
+    minX: grandmaPatrol.x - grandmaPatrol.width * 0.5,
+    maxX: grandmaPatrol.x + grandmaPatrol.width * 0.5,
     minY: porchTopY,
     maxY: porchTopY + grandmaPatrol.height,
+    minZ: grandmaPatrol.minZ,
+    maxZ: grandmaPatrol.maxZ,
   }];
   const decorControllers = [];
 
@@ -1078,6 +1245,7 @@ export function buildWorld3(scene, options = {}) {
         turnSpeed: controller.turnSpeed,
         radius: controller.radius,
         phase: controller.phase,
+        yawOffset: controller.yawOffset ?? 0,
         bobAmp: controller.bobAmp,
         stepFreq: controller.stepFreq,
         pitchAmp: controller.pitchAmp,
@@ -1128,17 +1296,17 @@ export function buildWorld3(scene, options = {}) {
   const decorDogAnchors = [
     makeDecorAnimalAnchor('l3_huskyAnchor', {
       x: -10.6, y: floorTopY, z: -1.26, kind: 'dog', controller: {
-        minX: -14.4, maxX: -6.2, minZ: -1.9, maxZ: -0.7, speed: 0.54, turnSpeed: 6.0, radius: 1.2, phase: 0.2, bobAmp: 0.02, stepFreq: 6.2, pitchAmp: 0.02, rollAmp: 0.024, accel: 6.5, minWalkSpeed: 0.02,
+        minX: -14.4, maxX: -6.2, minZ: -1.9, maxZ: -0.7, speed: 0.54, turnSpeed: 6.0, radius: 1.2, phase: 0.2, yawOffset: -Math.PI * 0.5, bobAmp: 0.02, stepFreq: 6.2, pitchAmp: 0.02, rollAmp: 0.024, accel: 6.5, minWalkSpeed: 0.02,
       },
     }),
     makeDecorAnimalAnchor('l3_playfulAnchor', {
       x: 24.8, y: floorTopY, z: -1.18, kind: 'dog', controller: {
-        minX: 20.0, maxX: 29.2, minZ: -1.8, maxZ: -0.7, speed: 0.58, turnSpeed: 6.3, radius: 1.26, phase: 0.7, bobAmp: 0.02, stepFreq: 6.8, pitchAmp: 0.022, rollAmp: 0.026, accel: 6.8, minWalkSpeed: 0.02,
+        minX: 20.0, maxX: 29.2, minZ: -1.8, maxZ: -0.7, speed: 0.58, turnSpeed: 6.3, radius: 1.26, phase: 0.7, yawOffset: -Math.PI * 0.5, bobAmp: 0.02, stepFreq: 6.8, pitchAmp: 0.022, rollAmp: 0.026, accel: 6.8, minWalkSpeed: 0.02,
       },
     }),
     makeDecorAnimalAnchor('l3_taterAnchor', {
       x: 63.8, y: floorTopY, z: -1.22, kind: 'dog', controller: {
-        minX: 60.4, maxX: 69.8, minZ: -1.8, maxZ: -0.7, speed: 0.52, turnSpeed: 5.8, radius: 1.18, phase: 1.4, bobAmp: 0.02, stepFreq: 6.0, pitchAmp: 0.018, rollAmp: 0.022, accel: 6.0, minWalkSpeed: 0.02,
+        minX: 60.4, maxX: 69.8, minZ: -1.8, maxZ: -0.7, speed: 0.52, turnSpeed: 5.8, radius: 1.18, phase: 1.4, yawOffset: -Math.PI * 0.5, bobAmp: 0.02, stepFreq: 6.0, pitchAmp: 0.018, rollAmp: 0.022, accel: 6.0, minWalkSpeed: 0.02,
       },
     }),
   ];
@@ -1213,7 +1381,7 @@ export function buildWorld3(scene, options = {}) {
     dog.maxX = dog.root.position.x + halfW;
     dog.minY = dog.root.position.y - dog.height * 0.5;
     dog.maxY = dog.root.position.y + dog.height * 0.5;
-    const desiredYaw = Math.atan2(dog.speed * dog.dir, 0.0001);
+    const desiredYaw = Math.atan2(dog.speed * dog.dir, 0.0001) - (Math.PI * 0.5);
     let delta = desiredYaw - dog.yaw;
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta < -Math.PI) delta += Math.PI * 2;
@@ -1224,12 +1392,14 @@ export function buildWorld3(scene, options = {}) {
 
   function updateGrandmaHazard(dt) {
     const halfW = grandmaPatrol.width * 0.5;
-    grandmaPatrol.root.position.x += grandmaPatrol.speed * grandmaPatrol.dir * dt;
-    if (grandmaPatrol.dir > 0 && grandmaPatrol.root.position.x > grandmaPatrol.maxX - halfW) {
-      grandmaPatrol.root.position.x = grandmaPatrol.maxX - halfW;
+    const halfD = grandmaPatrol.depth * 0.5;
+    grandmaPatrol.root.position.x = grandmaPatrol.x;
+    grandmaPatrol.root.position.z += grandmaPatrol.speed * grandmaPatrol.dir * dt;
+    if (grandmaPatrol.dir > 0 && grandmaPatrol.root.position.z > grandmaPatrol.maxZ - halfD) {
+      grandmaPatrol.root.position.z = grandmaPatrol.maxZ - halfD;
       grandmaPatrol.dir = -1;
-    } else if (grandmaPatrol.dir < 0 && grandmaPatrol.root.position.x < grandmaPatrol.minX + halfW) {
-      grandmaPatrol.root.position.x = grandmaPatrol.minX + halfW;
+    } else if (grandmaPatrol.dir < 0 && grandmaPatrol.root.position.z < grandmaPatrol.minZ + halfD) {
+      grandmaPatrol.root.position.z = grandmaPatrol.minZ + halfD;
       grandmaPatrol.dir = 1;
     }
     grandmaPatrol.root.rotationQuaternion = null;
@@ -1238,6 +1408,8 @@ export function buildWorld3(scene, options = {}) {
     grandmaPatrol.maxHitX = grandmaPatrol.root.position.x + halfW;
     grandmaPatrol.minHitY = grandmaPatrol.root.position.y;
     grandmaPatrol.maxHitY = grandmaPatrol.root.position.y + grandmaPatrol.height;
+    grandmaPatrol.minHitZ = grandmaPatrol.root.position.z - halfD;
+    grandmaPatrol.maxHitZ = grandmaPatrol.root.position.z + halfD;
   }
 
   const level3 = {
@@ -1248,6 +1420,8 @@ export function buildWorld3(scene, options = {}) {
       const playerMaxX = pos.x + halfW;
       const playerMinY = pos.y - halfH;
       const playerMaxY = pos.y + halfH;
+      const playerMinZ = pos.z - halfW;
+      const playerMaxZ = pos.z + halfW;
 
       for (const hazard of timedHazards) {
         updateTimedHazardState(hazard);
@@ -1255,7 +1429,8 @@ export function buildWorld3(scene, options = {}) {
         const overlaps = playerMaxX > hazard.minX
           && playerMinX < hazard.maxX
           && playerMaxY > hazard.minY
-          && playerMinY < hazard.maxY;
+          && playerMinY < hazard.maxY
+          && (hazard.minZ === undefined || (playerMaxZ > hazard.minZ && playerMinZ < hazard.maxZ));
         if (overlaps) {
           const sourceX = Number.isFinite(hazard.x) ? hazard.x : hazard.root.position.x;
           triggerReset(hazard.reason, pos.x < sourceX ? -1 : 1);
@@ -1267,7 +1442,8 @@ export function buildWorld3(scene, options = {}) {
         const overlaps = playerMaxX > dog.minX
           && playerMinX < dog.maxX
           && playerMaxY > dog.minY
-          && playerMinY < dog.maxY;
+          && playerMinY < dog.maxY
+          && (dog.minZ === undefined || (playerMaxZ > dog.minZ && playerMinZ < dog.maxZ));
         if (overlaps) {
           triggerReset('dog', pos.x < dog.root.position.x ? -1 : 1);
         }
@@ -1277,7 +1453,9 @@ export function buildWorld3(scene, options = {}) {
       const grandmaOverlaps = playerMaxX > grandmaPatrol.minHitX
         && playerMinX < grandmaPatrol.maxHitX
         && playerMaxY > grandmaPatrol.minHitY
-        && playerMinY < grandmaPatrol.maxHitY;
+        && playerMinY < grandmaPatrol.maxHitY
+        && playerMaxZ > grandmaPatrol.minHitZ
+        && playerMinZ < grandmaPatrol.maxHitZ;
       if (grandmaOverlaps) {
         triggerReset('grandma', pos.x < grandmaPatrol.root.position.x ? -1 : 1);
       }
@@ -1304,6 +1482,7 @@ export function buildWorld3(scene, options = {}) {
       }
       grandmaPatrol.root.position.x = 73.9;
       grandmaPatrol.root.position.y = getPlatformTopY('grandmaPorch');
+      grandmaPatrol.root.position.z = 0.86;
       grandmaPatrol.dir = 1;
       updateGrandmaHazard(0);
       for (const controller of decorControllers) {
@@ -1351,8 +1530,10 @@ export function buildWorld3(scene, options = {}) {
       futureChickensPropModel: [endAnimalAnchors[0]],
       futureGoatPropModel: [endAnimalAnchors[1]],
       futureTurkeyPropModel: [endAnimalAnchors[2]],
+      futurePigPropModel: [pigAnchor],
       futureRakePropModel: [rakeAnchor],
       futureTractorPropModel: [tractorAnchor],
+      futureBunnyPropModel: [bunnyAnchor],
     },
   };
 }

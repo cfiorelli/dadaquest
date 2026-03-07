@@ -33,6 +33,7 @@ export class AnimalWanderController {
     rollAmp = 0.03,
     accel = 7.5,
     minWalkSpeed = 0.02,
+    yawOffset = 0,
     retargetMinSec = 1.5,
     retargetMaxSec = 3.5,
     pauseMinSec = 0.4,
@@ -53,6 +54,7 @@ export class AnimalWanderController {
     this.rollAmp = rollAmp;
     this.accel = accel;
     this.minWalkSpeed = minWalkSpeed;
+    this.yawOffset = yawOffset;
     this.retargetMinSec = retargetMinSec;
     this.retargetMaxSec = retargetMaxSec;
     this.pauseMinSec = pauseMinSec;
@@ -158,7 +160,7 @@ export class AnimalWanderController {
     const moving = planarSpeed > this.minWalkSpeed;
     const moveBlend = clamp(planarSpeed / Math.max(this.speed, 0.001), 0, 1);
     if (moving) {
-      const desiredYaw = Math.atan2(this.vel.x, this.vel.z);
+      const desiredYaw = Math.atan2(this.vel.x, this.vel.z) + this.yawOffset;
       const delta = wrapToPi(desiredYaw - this.yaw);
       this.yaw += delta * clamp(dt * this.turnSpeed, 0, 1);
     }

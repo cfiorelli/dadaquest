@@ -18,7 +18,7 @@ function normalizeCoins(layout) {
   function getNearestPlatformTopY(x) {
     let nearest = null;
     let bestDx = Number.POSITIVE_INFINITY;
-    for (const p of [...layout.platforms, layout.ground]) {
+    for (const p of [...layout.platforms, ...(layout.crumbles || []), layout.ground]) {
       const halfW = p.w * 0.5;
       const clampedX = Math.max(p.x - halfW, Math.min(p.x + halfW, x));
       const dx = Math.abs(x - clampedX);
@@ -42,7 +42,7 @@ const L = LANE_Z2;
 const BASE_LEVEL2 = {
   extents: { minX: -22, maxX: 42 },
   spawn: { x: -17.0, y: 1.2, z: L },
-  goal:  { x: 37.5,  y: 9.0, z: L },
+  goal:  { x: 38.8,  y: 10.55, z: L },
 
   checkpoints: [
     { x: -0.5, y: 3.3, z: L, label: 'Nursery' },
@@ -63,12 +63,9 @@ const BASE_LEVEL2 = {
     { name: 'platKitchen',  x:   6.5, y: 0.40,  w:  7.0, h: 0.80, d: 4.0 },  // surface 0.80
     { name: 'platPiano',    x:  11.0, y: 3.00,  w:  3.2, h: 0.70, d: 4.0 },  // surface 3.35
     { name: 'platLanding',  x:  18.0, y: 4.00,  w:  5.0, h: 0.80, d: 4.0 },  // surface 4.40  (CP2)
-    // Section C — Loft stairs (longer + steeper; crumble steps alternate between solid steps)
-    { name: 'platStair1',   x:  21.3, y: 4.80,  w:  2.5, h: 0.80, d: 4.0 },  // surface 5.20
-    { name: 'platStair3',   x:  25.6, y: 6.00,  w:  2.5, h: 0.80, d: 4.0 },  // surface 6.40
-    { name: 'platStair5',   x:  30.0, y: 7.20,  w:  2.6, h: 0.80, d: 4.0 },  // surface 7.60
-    { name: 'platLoft',     x:  34.0, y: 7.95,  w:  4.2, h: 0.80, d: 4.2 },  // surface 8.35
-    { name: 'platRoof',     x:  37.5, y: 8.40,  w:  6.0, h: 0.80, d: 5.0 },  // surface 8.80 → goal
+    // Section C — Loft stairs (longer + steeper; every step is crumble)
+    { name: 'platLoft',     x:  35.0, y: 9.10,  w:  4.4, h: 0.80, d: 4.2 },  // surface 9.50
+    { name: 'platRoof',     x:  38.8, y: 9.75,  w:  6.2, h: 0.80, d: 5.0 },  // surface 10.15 → goal
   ],
 
   pickups: [
@@ -85,7 +82,7 @@ const BASE_LEVEL2 = {
     // Bianca static zone — touching triggers respawn (slip type, same mechanism)
     {
       type: 'slip',
-      x: 14.5, y: 1.1, z: L,
+      x: 19.6, y: 4.6, z: L,
       width: 1.6, depth: 3.2,
       accelMultiplier: 1.0,
       decelMultiplier: 1.0,
@@ -94,19 +91,34 @@ const BASE_LEVEL2 = {
 
   crumbles: [
     {
+      name: 'crumbleStair1',
+      x: 20.9, y: 4.95, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
+    },
+    {
       name: 'crumbleStair2',
-      x: 23.5, y: 5.35, z: L,
-      w: 2.2, h: 0.65, d: 4.0,
+      x: 23.4, y: 5.65, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
+    },
+    {
+      name: 'crumbleStair3',
+      x: 25.9, y: 6.35, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
     },
     {
       name: 'crumbleStair4',
-      x: 27.7, y: 6.55, z: L,
-      w: 2.2, h: 0.65, d: 4.0,
+      x: 28.4, y: 7.05, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
+    },
+    {
+      name: 'crumbleStair5',
+      x: 30.9, y: 7.75, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
     },
     {
       name: 'crumbleStair6',
-      x: 32.0, y: 7.75, z: L,
-      w: 2.2, h: 0.65, d: 4.0,
+      x: 33.4, y: 8.45, z: L,
+      w: 2.0, h: 0.65, d: 4.0,
     },
   ],
 
@@ -119,10 +131,10 @@ const BASE_LEVEL2 = {
     { x:   6.5, y: 1.80, z: L },
     { x:  15.8, y: 5.05, z: L },
     { x:  18.0, y: 5.20, z: L },
-    { x:  23.5, y: 6.00, z: L },
-    { x:  27.5, y: 7.20, z: L },
-    { x:  33.0, y: 8.40, z: L },
-    { x:  35.4, y: 9.25, z: L },
+    { x:  23.4, y: 6.30, z: L },
+    { x:  28.4, y: 7.70, z: L },
+    { x:  33.4, y: 9.10, z: L },
+    { x:  36.2, y: 10.20, z: L },
   ],
 
   // Level-2-specific runtime data (used by buildWorld2 / level2.update)
@@ -141,13 +153,13 @@ const BASE_LEVEL2 = {
     pushZoneMinX: -5.8,
     pushZoneMaxX: -3.2,
     speed: 2.5,
-    crumbleDelaySec: 5.0,
+    crumbleDelaySec: 8.0,
     restoreDelaySec: 2.6,
   },
 
   // Asset anchor positions for GLB models
   assetAnchors: {
-    babyBed:      { x: -8.5,  y: 1.75, z: L },  // sits on platBedStep
+    babyBed:      { x: -11.8, y: 0.40, z: L },  // sits on the floor beside the nursery start
     rockingHorse: { x: -4.5,  y: 0.40, z: L },  // tracks with platHorse
     piano:        { x: 11.0,  y: 3.00, z: L },  // sits on platPiano
     bianca:       { x: 19.6,  y: 4.40, z: L },  // perched near the stairs landing

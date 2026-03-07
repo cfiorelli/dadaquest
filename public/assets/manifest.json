@@ -36,6 +36,7 @@
     "futureTaterDogPropModel": ["local_tater_dog"],
     "futureChickensPropModel": ["local_chickens"],
     "futureTurkeyPropModel": ["local_thanksgiving_turkey"],
+    "futureBunnyPropModel": ["local_bunny"],
     "futureRakePropModel": ["local_gardeners_rake"],
     "futureTractorPropModel": ["local_tractor"]
   },
@@ -301,6 +302,12 @@
     {
       "id": "local_thanksgiving_turkey",
       "path": "assets/models/props/thanksgiving_turkey.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_bunny",
+      "path": "assets/models/props/bunny.glb",
       "scale": 1,
       "yOffset": 0
     },
