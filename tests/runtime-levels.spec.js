@@ -156,7 +156,7 @@ test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) =>
   expect(Math.abs(afterResetX - beforeResetX)).toBeGreaterThan(4);
 });
 
-test('runtime: level 2 floor fall resets without clearing collected binkies', async ({ page }) => {
+test('runtime: level 2 floor fall clears collected binkies without resetting', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
@@ -174,16 +174,23 @@ test('runtime: level 2 floor fall resets without clearing collected binkies', as
     .toBeGreaterThanOrEqual(1);
 
   const beforeFallCoins = await page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(-2.0, 1.2, 0);
+  });
+  await page.waitForTimeout(250);
   const penaltyResult = await page.evaluate(() => window.__DADA_DEBUG__?.triggerFloorPenalty?.() ?? null);
   expect(penaltyResult).not.toBeNull();
-  expect(penaltyResult.lastRespawnReason).toBe('floor_fall');
+  expect(penaltyResult.lastRespawnReason || '').toBe('');
 
   const afterFall = await page.evaluate(() => ({
     coins: window.__DADA_DEBUG__?.coinsCollected ?? 0,
     floorPenaltyLevel: window.__DADA_DEBUG__?.lastFloorPenaltyLevel ?? null,
     floorPenaltyCount: window.__DADA_DEBUG__?.floorPenaltyCount ?? 0,
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
   }));
-  expect(afterFall.coins).toBe(beforeFallCoins);
+  expect(beforeFallCoins).toBeGreaterThan(0);
+  expect(afterFall.coins).toBe(0);
   expect(afterFall.floorPenaltyLevel).toBe(2);
   expect(afterFall.floorPenaltyCount).toBeGreaterThan(0);
+  expect(afterFall.sceneKey).toBe('CribScene');
 });

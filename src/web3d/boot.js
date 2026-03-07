@@ -1920,13 +1920,6 @@ export async function boot(options = {}) {
 
   function triggerFloorPenalty() {
     if (level1FloorPenaltyCooldownMs > 0) return;
-    if (levelId === 2) {
-      level1FloorPenaltyCooldownMs = 1500;
-      window.__DADA_DEBUG__.lastFloorPenaltyLevel = levelId;
-      window.__DADA_DEBUG__.floorPenaltyCount = (window.__DADA_DEBUG__.floorPenaltyCount || 0) + 1;
-      triggerReset('floor_fall', player.mesh.position.x < respawnPoint.x ? 1 : -1);
-      return;
-    }
     const collectedCoins = coins.filter((coin) => coin.collected);
     if (collectedCoins.length === 0) return;
     level1FloorPenaltyCooldownMs = 1500;
@@ -1955,23 +1948,15 @@ export async function boot(options = {}) {
   }
 
   function isSupportedByRaisedSurface(playerPos, playerBottomY) {
-    for (const platform of world.platforms || []) {
-      if (!platform || platform === world.ground) continue;
-      if (!(platform instanceof BABYLON.Mesh)) continue;
-      platform.computeWorldMatrix?.(true);
-      const bounds = platform.getBoundingInfo?.()?.boundingBox;
-      if (!bounds) continue;
-      const surface = {
-        minX: bounds.minimumWorld.x,
-        maxX: bounds.maximumWorld.x,
-        minZ: bounds.minimumWorld.z,
-        maxZ: bounds.maximumWorld.z,
-        topY: bounds.maximumWorld.y,
-      };
+    if (!Array.isArray(player.colliders) || player.colliders.length <= 1) {
+      return false;
+    }
+    for (let i = 1; i < player.colliders.length; i++) {
+      const surface = player.colliders[i];
+      if (!surface) continue;
       const withinX = playerPos.x >= (surface.minX - 0.08) && playerPos.x <= (surface.maxX + 0.08);
-      const withinZ = playerPos.z >= (surface.minZ - 0.22) && playerPos.z <= (surface.maxZ + 0.22);
-      const nearTop = Math.abs(playerBottomY - surface.topY) <= 0.18;
-      if (withinX && withinZ && nearTop) {
+      const nearTop = Math.abs(playerBottomY - surface.maxY) <= 0.18;
+      if (withinX && nearTop) {
         return true;
       }
     }

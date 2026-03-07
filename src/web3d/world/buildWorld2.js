@@ -921,6 +921,7 @@ export function buildWorld2(scene, options = {}) {
   // === PLATFORMS ===
   const allPlatforms = [groundCollider];
   const platformColliders = {};  // name → collider mesh
+  const platformVisuals = {};    // name → visual root
 
   for (const def of LEVEL2.platforms) {
     const platformVisual = createCardboardPlatform(scene, `L2_${def.name}`, {
@@ -941,6 +942,7 @@ export function buildWorld2(scene, options = {}) {
     prefixLevel2Gameplay(col);
     allPlatforms.push(col);
     platformColliders[def.name] = col;
+    platformVisuals[def.name] = platformVisual;
   }
 
   // === GOAL (DaDa) ===
@@ -1192,8 +1194,9 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(horseVisualRoot, 2);
   tagLevel2Decor(horseVisualRoot);
 
-  // horseCollider is the invisible platform box for platHorse
-  const horseColliderMesh = platformColliders[horseDef.platformName];
+  // Static base pad that the horse sits on.
+  const horsePadColliderMesh = platformColliders[horseDef.platformName];
+  const horsePadVisual = platformVisuals[horseDef.platformName];
 
   // === DECORATIVE PROP VISUALS (fallbacks; GLBs loaded by boot.js) ===
   const babyBedAnchor = new BABYLON.TransformNode('babyBedAnchor', scene);
@@ -1429,21 +1432,21 @@ export function buildWorld2(scene, options = {}) {
   rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
   tagLevel2Decor(rockingHorseAnchor);
 
-  const horseStepActive = {
-    x: -1.55,
+  const horseTopSupport = {
+    offsetX: 0,
     y: 1.45,
     z: 0,
-    w: 1.85,
+    w: 1.72,
     h: 0.60,
-    d: 2.8,
+    d: 2.3,
   };
   const horseStepVisual = createCardboardPlatform(scene, 'L2_horseStep', {
-    x: horseStepActive.x,
-    y: horseStepActive.y,
-    z: horseStepActive.z,
-    w: horseStepActive.w,
-    h: horseStepActive.h,
-    d: horseStepActive.d,
+    x: horseX + horseTopSupport.offsetX,
+    y: horseTopSupport.y,
+    z: horseTopSupport.z,
+    w: horseTopSupport.w,
+    h: horseTopSupport.h,
+    d: horseTopSupport.d,
     slabColor: P2.platformCard,
     edgeColor: P2.edgeDark,
     shadowGen,
@@ -1453,15 +1456,22 @@ export function buildWorld2(scene, options = {}) {
   horseStepVisual.setEnabled(false);
 
   const horseStepCollider = BABYLON.MeshBuilder.CreateBox('L2_horseStep_col', {
-    width: horseStepActive.w,
-    height: horseStepActive.h,
-    depth: horseStepActive.d,
+    width: horseTopSupport.w,
+    height: horseTopSupport.h,
+    depth: horseTopSupport.d,
   }, scene);
-  horseStepCollider.position.set(horseStepActive.x, -1000, horseStepActive.z);
+  horseStepCollider.position.set(horseX + horseTopSupport.offsetX, horseTopSupport.y, horseTopSupport.z);
   horseStepCollider.visibility = 0;
   horseStepCollider.isPickable = false;
   prefixLevel2Gameplay(horseStepCollider);
   allPlatforms.push(horseStepCollider);
+
+  const horsePadCollapseState = {
+    armed: false,
+    collapsed: false,
+    timerSec: horseDef.crumbleDelaySec ?? 5.0,
+    restoreSec: 0,
+  };
 
   // === LEVEL 2 RUNTIME LOGIC ===
   const PLAYER_HALF_W = 0.25;
@@ -1484,51 +1494,99 @@ export function buildWorld2(scene, options = {}) {
   }
 
   function updateHorse(dt, { pos, player }) {
-    const colliderIndex = player && player.colliders ? allPlatforms.indexOf(horseColliderMesh) : -1;
-    const collider = colliderIndex >= 0 ? player.colliders[colliderIndex] : null;
+    const horsePadIndex = player && player.colliders ? allPlatforms.indexOf(horsePadColliderMesh) : -1;
+    const horsePadPlayerCollider = horsePadIndex >= 0 ? player.colliders[horsePadIndex] : null;
     const horseStepIndex = player && player.colliders ? allPlatforms.indexOf(horseStepCollider) : -1;
     const horseStepPlayerCollider = horseStepIndex >= 0 ? player.colliders[horseStepIndex] : null;
-    if (collider) {
-      const platDef = LEVEL2.platforms.find((p) => p.name === 'platHorse');
-      const halfW2 = platDef.w / 2;
-      collider.minX = horseX - halfW2;
-      collider.maxX = horseX + halfW2;
-      collider.minY = -1000;
-      collider.maxY = -999;
-    }
-    if (horseStepPlayerCollider) {
-      if (horseSnapped) {
-        const ext = horseStepCollider.getBoundingInfo().boundingBox.extendSize;
-        horseStepPlayerCollider.minX = horseStepActive.x - ext.x;
-        horseStepPlayerCollider.maxX = horseStepActive.x + ext.x;
-        horseStepPlayerCollider.minY = horseStepActive.y - ext.y;
-        horseStepPlayerCollider.maxY = horseStepActive.y + ext.y;
+    const horseSupportX = horseX + horseTopSupport.offsetX;
+    horseStepCollider.position.set(horseSupportX, horseTopSupport.y, horseTopSupport.z);
+    if (horsePadPlayerCollider && horsePadColliderMesh) {
+      const ext = horsePadColliderMesh.getBoundingInfo().boundingBox.extendSize;
+      horsePadPlayerCollider.minX = horsePadColliderMesh.position.x - ext.x;
+      horsePadPlayerCollider.maxX = horsePadColliderMesh.position.x + ext.x;
+      if (horsePadCollapseState.collapsed) {
+        horsePadPlayerCollider.minY = -1000;
+        horsePadPlayerCollider.maxY = -999;
       } else {
-        horseStepPlayerCollider.minY = -1000;
-        horseStepPlayerCollider.maxY = -999;
+        horsePadPlayerCollider.minY = horsePadColliderMesh.position.y - ext.y;
+        horsePadPlayerCollider.maxY = horsePadColliderMesh.position.y + ext.y;
       }
     }
-    if (horseSnapped) return;
+    if (horseStepPlayerCollider) {
+      if (horsePadCollapseState.collapsed) {
+        horseStepPlayerCollider.minY = -1000;
+        horseStepPlayerCollider.maxY = -999;
+      } else {
+        const ext = horseStepCollider.getBoundingInfo().boundingBox.extendSize;
+        horseStepPlayerCollider.minX = horseSupportX - ext.x;
+        horseStepPlayerCollider.maxX = horseSupportX + ext.x;
+        horseStepPlayerCollider.minY = horseTopSupport.y - ext.y;
+        horseStepPlayerCollider.maxY = horseTopSupport.y + ext.y;
+      }
+    }
+
+    const horsePadTopY = horsePadColliderMesh
+      ? horsePadColliderMesh.position.y + horsePadColliderMesh.getBoundingInfo().boundingBox.extendSize.y
+      : (LEVEL2.platforms.find((p) => p.name === 'platHorse').y + 0.4);
+    const playerBottom = pos.y - PLAYER_HALF_H;
+    const onHorsePad = !horsePadCollapseState.collapsed
+      && horsePadPlayerCollider
+      && Math.abs(playerBottom - horsePadTopY) < 0.08
+      && (pos.x + PLAYER_HALF_W) > horsePadPlayerCollider.minX
+      && (pos.x - PLAYER_HALF_W) < horsePadPlayerCollider.maxX;
+    if (!horseSnapped && onHorsePad && !horsePadCollapseState.armed) {
+      horsePadCollapseState.armed = true;
+      horsePadCollapseState.timerSec = horseDef.crumbleDelaySec ?? 5.0;
+    }
+
+    if (horsePadCollapseState.armed && !horsePadCollapseState.collapsed && !horseSnapped) {
+      horsePadCollapseState.timerSec = Math.max(0, horsePadCollapseState.timerSec - dt);
+      if (horsePadCollapseState.timerSec <= 0) {
+        horsePadCollapseState.collapsed = true;
+        horsePadCollapseState.restoreSec = horseDef.restoreDelaySec ?? 2.6;
+        horsePadVisual?.setEnabled(false);
+        horseVisualRoot?.setEnabled(false);
+        rockingHorseAnchor?.setEnabled(false);
+      }
+    }
+
+    if (horsePadCollapseState.collapsed) {
+      horsePadCollapseState.restoreSec = Math.max(0, horsePadCollapseState.restoreSec - dt);
+      if (horsePadCollapseState.restoreSec <= 0) {
+        horseX = horseDef.startX;
+        horseSnapped = false;
+        horsePadCollapseState.armed = false;
+        horsePadCollapseState.collapsed = false;
+        horsePadCollapseState.timerSec = horseDef.crumbleDelaySec ?? 5.0;
+        horsePadVisual?.setEnabled(true);
+        horseVisualRoot?.setEnabled(true);
+        rockingHorseAnchor?.setEnabled(true);
+      }
+      horseVisualRoot.position.x = horseX;
+      rockingHorseAnchor.position.x = horseX;
+      return;
+    }
+
+    if (horseSnapped) {
+      horseVisualRoot.position.x = horseX;
+      rockingHorseAnchor.position.x = horseX;
+      return;
+    }
+
     const inPushZone = pos.x >= horseDef.pushZoneMinX && pos.x <= horseDef.pushZoneMaxX
-      && Math.abs(pos.y - (LEVEL2.platforms.find((p) => p.name === 'platHorse').y + 0.4)) < 1.2;
+      && Math.abs(pos.y - horsePadTopY) < 1.2;
     if (!inPushZone) return;
 
     horseX = Math.min(horseDef.snapX, horseX + horseDef.speed * dt);
     if (horseX >= horseDef.snapX) {
       horseX = horseDef.snapX;
       horseSnapped = true;
-      horseStepVisual.setEnabled(true);
-      horseStepCollider.position.set(horseStepActive.x, horseStepActive.y, horseStepActive.z);
+      horsePadCollapseState.armed = false;
+      horsePadCollapseState.timerSec = horseDef.crumbleDelaySec ?? 5.0;
     }
 
-    // Move visual
     horseVisualRoot.position.x = horseX;
     rockingHorseAnchor.position.x = horseX;
-
-    // Update collision box position
-    if (horseColliderMesh) {
-      horseColliderMesh.position.x = horseX;
-    }
   }
 
   const level2 = {
@@ -1552,13 +1610,16 @@ export function buildWorld2(scene, options = {}) {
 
       horseX = horseDef.startX;
       horseSnapped = false;
+      horsePadCollapseState.armed = false;
+      horsePadCollapseState.collapsed = false;
+      horsePadCollapseState.timerSec = horseDef.crumbleDelaySec ?? 5.0;
+      horsePadCollapseState.restoreSec = 0;
+      horsePadVisual?.setEnabled(true);
+      horseVisualRoot?.setEnabled(true);
+      rockingHorseAnchor?.setEnabled(true);
       horseVisualRoot.position.x = horseX;
       rockingHorseAnchor.position.x = horseX;
-      if (horseColliderMesh) {
-        horseColliderMesh.position.x = horseX;
-      }
-      horseStepVisual.setEnabled(false);
-      horseStepCollider.position.set(horseStepActive.x, -1000, horseStepActive.z);
+      horseStepCollider.position.set(horseX + horseTopSupport.offsetX, horseTopSupport.y, horseTopSupport.z);
     },
     isHorseSnapped() {
       return horseSnapped;

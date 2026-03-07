@@ -57,7 +57,7 @@ const BASE_LEVEL2 = {
     // Section A — Nursery / bedroom
     { name: 'platBedroom',  x: -16.0, y: 0.40,  w: 10.0, h: 0.80, d: 5.0 },  // surface 0.80
     { name: 'platBedStep',  x:  -8.5, y: 1.75,  w:  4.0, h: 0.80, d: 4.0 },  // surface 2.15
-    { name: 'platHorse',    x:  -4.5, y: 0.40,  w:  2.8, h: 0.80, d: 3.0 },  // moveable; surface 0.80
+    { name: 'platHorse',    x:  -4.5, y: 0.40,  w:  4.8, h: 0.80, d: 4.0 },  // static horse pad; surface 0.80
     { name: 'platShelf',    x:   0.5, y: 2.90,  w:  4.0, h: 0.80, d: 4.0 },  // surface 3.30  (CP1)
     // Section B — Kitchen corridor
     { name: 'platKitchen',  x:   6.5, y: 0.40,  w:  7.0, h: 0.80, d: 4.0 },  // surface 0.80
@@ -134,13 +134,15 @@ const BASE_LEVEL2 = {
   },
 
   horse: {
-    // platHorse starts at x=-4.5; player walks into push zone → horse slides right to snapX
+    // Static horse pad at platHorse; horse itself slides right across it.
     platformName: 'platHorse',
     startX: -4.5,
-    snapX:  -1.5,
-    pushZoneMinX: -5.5,
-    pushZoneMaxX: -4.2,
+    snapX:  -1.7,
+    pushZoneMinX: -5.8,
+    pushZoneMaxX: -3.2,
     speed: 2.5,
+    crumbleDelaySec: 5.0,
+    restoreDelaySec: 2.6,
   },
 
   // Asset anchor positions for GLB models
