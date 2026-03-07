@@ -12,9 +12,10 @@ import {
   createCheckpointMarker,
   createOnesiePickup,
   createCrumblePlatform,
+  createWelcomeSign,
   setRenderingGroup,
 } from './buildWorld.js';
-import { createDad, createMom, createSimpleChair } from './characters.js';
+import { createDad, createMom } from './characters.js';
 
 const LANE_Z = LANE_Z2;
 
@@ -635,28 +636,54 @@ function createHazardZone(scene, name, { x, y, z = 0, width, depth }) {
 function createAmandaMesh(scene, name, { x, y, z = 0, w, h, d, shadowGen }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
+  root.metadata = {
+    ...(root.metadata || {}),
+    cameraIgnore: true,
+  };
 
-  const body = BABYLON.MeshBuilder.CreateBox(name + '_body', {
-    width: w, height: h, depth: d,
-  }, scene);
-  body.position.y = 0;
-  body.parent = root;
-  const bodyMat = makePlastic(scene, name + '_bodyMat', 0.76, 0.48, 0.62, { roughness: 0.55 });
-  body.material = bodyMat;
-  body.receiveShadows = true;
-  if (shadowGen) shadowGen.addShadowCaster(body);
+  const mom = createMom(scene, {
+    x: 0,
+    y: 0,
+    z: 0.02,
+    pose: 'standing',
+    shadowGen,
+  });
+  mom.root.parent = root;
+  mom.root.position.set(0, -(h * 0.5) + 0.04, 0.02);
+  mom.root.rotation.y = -0.16;
 
-  // Head blob
-  const head = BABYLON.MeshBuilder.CreateSphere(name + '_head', {
-    diameter: w * 0.85, segments: 8,
-  }, scene);
-  head.position.y = h * 0.5 + w * 0.36;
-  head.parent = root;
-  const headMat = makePlastic(scene, name + '_headMat', 1.0, 0.84, 0.72, { roughness: 0.62 });
-  head.material = headMat;
-  if (shadowGen) shadowGen.addShadowCaster(head);
+  const pianoAnchor = new BABYLON.TransformNode(`${name}_pianoAnchor`, scene);
+  pianoAnchor.parent = root;
+  pianoAnchor.position.set(-1.46, -0.12, LEVEL2_DECOR_Z - z);
+  pianoAnchor.metadata = {
+    ...(pianoAnchor.metadata || {}),
+    decor: true,
+    level2Decor: true,
+    cameraIgnore: true,
+  };
 
-  return root;
+  const pianoFallback = createPianoVisual(scene, `${name}_piano`, {
+    x: 0,
+    y: 0,
+    z: 0,
+    shadowGen,
+  });
+  pianoFallback.parent = pianoAnchor;
+  pianoFallback.position.set(0, 0, 0);
+  pianoFallback.rotation.y = 0.12;
+
+  for (const mesh of [root, ...root.getChildMeshes(false)]) {
+    if (mesh instanceof BABYLON.Mesh) {
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+      mesh.metadata = {
+        ...(mesh.metadata || {}),
+        cameraIgnore: true,
+      };
+    }
+  }
+
+  return { root, pianoAnchor, pianoFallback };
 }
 
 // ── Rocking horse visual ──────────────────────────────────────────
@@ -1070,13 +1097,6 @@ export function buildWorld2(scene, options = {}) {
   }
   setRenderingGroup(condoTrim, 1);
 
-  const stairsSign = createStairsDirectionSign(scene, 'l2_upstairsSign', {
-    x: 21.2,
-    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 1.86,
-    z: -1.16,
-  });
-  setRenderingGroup(stairsSign, 3);
-
   const wateringDecor = createWateringDecor(scene, 'l2_loftWatering', {
     x: 33.7,
     y: LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.42,
@@ -1100,11 +1120,12 @@ export function buildWorld2(scene, options = {}) {
   const amandaDef = LEVEL2.amanda;
   let amandaX = amandaDef.minX;
   let amandaDir = 1;
-  const amandaRoot = createAmandaMesh(scene, 'amanda', {
+  const amanda = createAmandaMesh(scene, 'amanda', {
     x: amandaX, y: amandaDef.y, z: LANE_Z,
     w: amandaDef.w, h: amandaDef.h, d: amandaDef.d,
     shadowGen,
   });
+  const amandaRoot = amanda.root;
   prefixLevel2Gameplay(amandaRoot);
   setRenderingGroup(amandaRoot, 3);
 
@@ -1139,43 +1160,11 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(babyBedVisual, 2);
   tagLevel2Decor(babyBedVisual);
 
-  const pianoAnchor = new BABYLON.TransformNode('pianoAnchor', scene);
-  pianoAnchor.position.set(
-    LEVEL2.assetAnchors.piano.x,
-    LEVEL2.assetAnchors.piano.y,
-    LEVEL2_DECOR_Z,
-  );
+  const pianoAnchor = amanda.pianoAnchor;
   tagLevel2Decor(pianoAnchor);
-  const pianoVisual = createPianoVisual(scene, 'piano', {
-    x: LEVEL2.assetAnchors.piano.x,
-    y: LEVEL2.assetAnchors.piano.y,
-    z: LEVEL2_DECOR_Z,
-    shadowGen,
-  });
+  const pianoVisual = amanda.pianoFallback;
   setRenderingGroup(pianoVisual, 2);
   tagLevel2Decor(pianoVisual);
-
-  const momChair = createSimpleChair(scene, {
-    x: LEVEL2.assetAnchors.piano.x - 1.3,
-    y: LEVEL2.platforms.find((p) => p.name === 'platPiano').y + 0.35,
-    z: LEVEL2_DECOR_Z + 0.02,
-    shadowGen,
-    seatColor: '#cfb190',
-    legColor: '#7e5b3d',
-  });
-  setRenderingGroup(momChair, 2);
-  tagLevel2Decor(momChair);
-
-  const momAtPiano = createMom(scene, {
-    x: LEVEL2.assetAnchors.piano.x - 1.34,
-    y: LEVEL2.platforms.find((p) => p.name === 'platPiano').y + 0.36,
-    z: LEVEL2_DECOR_Z - 0.02,
-    pose: 'sitting',
-    shadowGen,
-  });
-  momAtPiano.root.rotation.y = 0.38;
-  setRenderingGroup(momAtPiano.root, 3);
-  tagLevel2Decor(momAtPiano.root);
 
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
@@ -1227,6 +1216,44 @@ export function buildWorld2(scene, options = {}) {
   const loftGoatAnchor = new BABYLON.TransformNode('loftGoatAnchor', scene);
   loftGoatAnchor.position.set(36.0, LEVEL2.platforms.find((p) => p.name === 'platRoof').y + 0.4, LEVEL2_DECOR_Z - 0.14);
   tagLevel2Decor(loftGoatAnchor);
+
+  const bedroomTopY = LEVEL2.platforms.find((p) => p.name === 'platBedroom').y + (LEVEL2.platforms.find((p) => p.name === 'platBedroom').h * 0.5);
+  const welcomeSign = createWelcomeSign(scene, {
+    name: 'l2_welcomeSign',
+    x: -19.4,
+    y: bedroomTopY,
+    z: 2.28,
+    shadowGen,
+    textLines: ['WELCOME TO', 'CONDO GARDEN'],
+    width: 3.42,
+    height: 1.46,
+    postHeight: 2.82,
+    boardName: 'l2_welcome',
+    boardColor: [208, 180, 128],
+    postColor: [118, 92, 68],
+    fontFamily: 'Avenir Next, Trebuchet MS, sans-serif',
+  });
+  setRenderingGroup(welcomeSign, 3);
+  tagLevel2Decor(welcomeSign);
+
+  const rooftopSign = createWelcomeSign(scene, {
+    name: 'l2_rooftopSign',
+    x: 21.6,
+    y: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.4,
+    z: -1.18,
+    shadowGen,
+    textLines: ['TO ROOFTOP GARDEN', '→→→'],
+    width: 5.8,
+    height: 1.62,
+    postHeight: 2.48,
+    boardName: 'l2_rooftop',
+    boardColor: [232, 215, 172],
+    postColor: [112, 86, 62],
+    fontFamily: 'Avenir Next, Trebuchet MS, sans-serif',
+    textEmissive: new BABYLON.Color3(0.44, 0.30, 0.18),
+  });
+  setRenderingGroup(rooftopSign, 3);
+  tagLevel2Decor(rooftopSign);
 
   const rockingHorseAnchor = new BABYLON.TransformNode('rockingHorseAnchor', scene);
   rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
@@ -1344,6 +1371,7 @@ export function buildWorld2(scene, options = {}) {
     goalGuardMinX: goalDef.x - 4.5,
     signs: [],
     level2,
+    goalMinBottomY: (LEVEL2.platforms.find((p) => p.name === 'platRoof').y + (LEVEL2.platforms.find((p) => p.name === 'platRoof').h * 0.5)) - 0.2,
     assetAnchors: {
       cribRail: null,    // Level 2 has no crib rail; null avoids truthy-array trap in boot.js
       toyBlocks: [],

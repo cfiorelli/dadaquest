@@ -27,3 +27,68 @@ test('ui: play again restarts from deterministic end scene', async ({ page }) =>
   );
   expect(endHidden).toBe(true);
 });
+
+test('ui: escape menu opens during gameplay and can switch levels', async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
+
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__.startLevel();
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 15_000 });
+
+  await page.evaluate(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Escape',
+      code: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    }));
+  });
+  await page.waitForFunction(() => {
+    const overlay = document.querySelector('.dada-menu-bg');
+    return !!document.getElementById('menuResumeBtn')
+      && !!overlay
+      && !overlay.classList.contains('hidden');
+  }, { timeout: 5_000 });
+
+  await Promise.all([
+    page.waitForURL((url) => !url.searchParams.has('level'), { timeout: 15_000 }),
+    page.evaluate(() => {
+      window.__DADA_DEBUG__?.switchMenuLevel?.(1);
+    }),
+  ]);
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'TitleScene', { timeout: 20_000 });
+  await expect(page.locator('#titleSub')).toContainText('Level 1');
+});
+
+test('ui: level 2 floor route cannot trigger the dad goal', async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
+
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 15_000 });
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__.startLevel();
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 15_000 });
+
+  await page.evaluate(() => {
+    const floorTop = window.__DADA_DEBUG__?.floorTopY ?? 0;
+    window.__DADA_DEBUG__?.teleportPlayer?.(37.5, floorTop + 0.405, 0);
+  });
+  await page.waitForTimeout(1200);
+
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey), { timeout: 4_000 })
+    .toBe('CribScene');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportToGoal?.();
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.sceneKey), { timeout: 10_000 })
+    .toBe('EndScene');
+});

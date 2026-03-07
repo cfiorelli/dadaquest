@@ -1004,21 +1004,49 @@ function createBillboardCloud(scene, name, {
   return root;
 }
 
-/** Cardboard "Welcome to the Petting Zoo" sign on two posts. */
-function createWelcomeSign(scene, { x, y, z, shadowGen }) {
-  const root = new BABYLON.TransformNode('pz_welcomeSign', scene);
+function fitSignLine(ctx, text, maxWidth, maxSize, minSize = 28, fontFamily = 'Georgia, serif') {
+  let size = maxSize;
+  while (size > minSize) {
+    ctx.font = `bold ${size}px ${fontFamily}`;
+    if (ctx.measureText(text).width <= maxWidth) return size;
+    size -= 2;
+  }
+  return size;
+}
+
+/** Cardboard welcome/directional sign on two posts. */
+function createWelcomeSign(scene, {
+  name = 'pz_welcomeSign',
+  x,
+  y,
+  z,
+  shadowGen,
+  textLines = ['WELCOME TO THE', 'PETTING ZOO'],
+  width = 2.42,
+  height = 1.12,
+  postHeight = 2.55,
+  boardDepth = 0.09,
+  textInsetPx = 72,
+  fontFamily = 'Georgia, serif',
+  postSpread = null,
+  boardColor = [201, 152, 84],
+  postColor = P.edgeDark,
+  textEmissive = new BABYLON.Color3(0.36, 0.26, 0.12),
+  boardName = 'welcome',
+} = {}) {
+  const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
   tagDecorNode(root);
 
-  const postMat = makeCardboard(scene, 'pz_signPostMat', ...P.edgeDark, { roughness: 0.88 });
-  const boardWidth = 2.42;
-  const boardHeight = 1.12;
-  const boardDepth = 0.09;
-  for (const px of [-1.18, 1.18]) {
-    const post = BABYLON.MeshBuilder.CreateBox(`pz_signPost${px}`, {
-      width: 0.13, height: 2.55, depth: 0.13,
+  const postMat = makeCardboard(scene, `${boardName}_signPostMat`, ...postColor, { roughness: 0.88 });
+  const boardWidth = width;
+  const boardHeight = height;
+  const postX = postSpread ?? ((boardWidth * 0.5) + 0.18);
+  for (const px of [-postX, postX]) {
+    const post = BABYLON.MeshBuilder.CreateBox(`${name}_post${px}`, {
+      width: 0.13, height: postHeight, depth: 0.13,
     }, scene);
-    post.position.set(px, 1.27, 0.02);
+    post.position.set(px, postHeight * 0.5, 0.02);
     post.parent = root;
     post.material = postMat;
     if (shadowGen) shadowGen.addShadowCaster(post);
@@ -1027,7 +1055,7 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
 
   // DynamicTexture sign board
   const texW = 512; const texH = 256;
-  const signTex = new BABYLON.DynamicTexture('pz_welcomeTex', { width: texW, height: texH }, scene, true);
+  const signTex = new BABYLON.DynamicTexture(`${name}_tex`, { width: texW, height: texH }, scene, true);
   const ctx = signTex.getContext();
   ctx.fillStyle = '#c8974a';
   ctx.fillRect(0, 0, texW, texH);
@@ -1040,59 +1068,58 @@ function createWelcomeSign(scene, { x, y, z, shadowGen }) {
   for (let gy = 28; gy < texH; gy += 18) {
     ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(texW, gy + 4); ctx.stroke();
   }
-  const fitFont = (text, startPx, maxWidth) => {
-    let size = startPx;
-    while (size > 42) {
-      ctx.font = `bold ${size}px Georgia, serif`;
-      if (ctx.measureText(text).width <= maxWidth) return size;
-      size -= 2;
-    }
-    return size;
-  };
-  const line1 = 'WELCOME TO THE';
-  const line2 = 'PETTING ZOO';
-  const maxTextWidth = texW - 172;
+  const maxTextWidth = texW - (textInsetPx * 2);
   ctx.fillStyle = '#2a1308';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.font = `bold ${fitFont(line1, 92, maxTextWidth)}px Georgia, serif`;
-  ctx.fillText(line1, texW / 2, texH * 0.31);
-  ctx.font = `bold ${fitFont(line2, 128, maxTextWidth)}px Georgia, serif`;
-  ctx.fillText(line2, texW / 2, texH * 0.71);
+  const verticalPositions = textLines.length <= 1
+    ? [texH * 0.5]
+    : textLines.map((_, index) => {
+      const start = texH * 0.34;
+      const step = textLines.length === 2 ? texH * 0.36 : (texH * 0.44) / Math.max(1, textLines.length - 1);
+      return start + (index * step);
+    });
+  const startSize = textLines.length <= 1 ? 116 : 96;
+  for (let i = 0; i < textLines.length; i++) {
+    const line = textLines[i];
+    const fontSize = fitSignLine(ctx, line, maxTextWidth, startSize - (i * 10), 34, fontFamily);
+    ctx.font = `bold ${fontSize}px ${fontFamily}`;
+    ctx.fillText(line, texW / 2, verticalPositions[i]);
+  }
   signTex.update();
 
-  const boardMat = makeCardboard(scene, 'pz_welcomeBoardMat', 201, 152, 84, { roughness: 0.82 });
-  const signMat = new BABYLON.StandardMaterial('pz_welcomeSignMat', scene);
+  const boardMat = makeCardboard(scene, `${boardName}_boardMat`, ...boardColor, { roughness: 0.82 });
+  const signMat = new BABYLON.StandardMaterial(`${name}_signMat`, scene);
   signMat.diffuseTexture = signTex;
   signMat.opacityTexture = signTex;
   signMat.useAlphaFromDiffuseTexture = false;
   signMat.emissiveTexture = signTex;
-  signMat.emissiveColor = new BABYLON.Color3(0.36, 0.26, 0.12);
+  signMat.emissiveColor = textEmissive;
   signMat.specularColor = BABYLON.Color3.Black();
   signMat.backFaceCulling = false;
 
-  const board = BABYLON.MeshBuilder.CreateBox('pz_welcomeBoard', {
+  const board = BABYLON.MeshBuilder.CreateBox(`${name}_board`, {
     width: boardWidth, height: boardHeight, depth: boardDepth,
   }, scene);
-  board.position.set(0, 2.3, 0);
+  board.position.set(0, (postHeight * 0.78), 0);
   board.parent = root;
   board.material = boardMat;
   if (shadowGen) shadowGen.addShadowCaster(board);
   tagDecorMesh(board);
 
-  const textPlane = BABYLON.MeshBuilder.CreatePlane('pz_welcomeText', {
+  const textPlane = BABYLON.MeshBuilder.CreatePlane(`${name}_text`, {
     width: boardWidth * 0.92,
     height: boardHeight * 0.86,
   }, scene);
-  textPlane.position.set(0, 2.3, -(boardDepth * 0.5 + 0.05));
+  textPlane.position.set(0, board.position.y, -(boardDepth * 0.5 + 0.03));
   textPlane.parent = root;
   textPlane.material = signMat;
   tagDecorMesh(textPlane);
 
   // Feet cross-pieces
-  const footMat = makeCardboard(scene, 'pz_signFootMat', ...P.edgeDark, { roughness: 0.92 });
+  const footMat = makeCardboard(scene, `${boardName}_signFootMat`, ...postColor, { roughness: 0.92 });
   for (const px of [-0.54, 0.54]) {
-    const foot = BABYLON.MeshBuilder.CreateBox(`pz_signFoot${px}`, {
+    const foot = BABYLON.MeshBuilder.CreateBox(`${name}_foot${px}`, {
       width: 0.4, height: 0.08, depth: 0.28,
     }, scene);
     foot.position.set(px, 0.04, 0.03);
@@ -1337,6 +1364,7 @@ export {
   createCoin,
   createCheckpointMarker,
   createDaDa,
+  createWelcomeSign,
   createOnesiePickup,
   createCrumblePlatform,
   setRenderingGroup,
@@ -2123,6 +2151,7 @@ export function buildWorld(scene, options = {}) {
     hazards,
     crumbles,
     level: LEVEL1,
+    goalMinBottomY: (LEVEL1.platforms.find((p) => p.name === 'platRoof').y + (LEVEL1.platforms.find((p) => p.name === 'platRoof').h * 0.5)) - 0.2,
     surfaceVisuals,
     signs: signRoots,
     assetAnchors: {

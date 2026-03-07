@@ -11,6 +11,7 @@ import {
   createCoin,
   createCheckpointMarker,
   createOnesiePickup,
+  createWelcomeSign,
   setRenderingGroup,
 } from './buildWorld.js';
 import { createDad } from './characters.js';
@@ -374,6 +375,77 @@ function createCritterPlaceholder(scene, name, { x, y, z = 0, kind = 'chicken' }
 }
 
 function createGrandmaBackdrop(scene, shadowGen) {
+  const skyTex = new BABYLON.DynamicTexture('grandmaForestSkyTex', { width: 2048, height: 512 }, scene, true);
+  const skyCtx = skyTex.getContext();
+  const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
+  skyGrad.addColorStop(0, '#8cc8f4');
+  skyGrad.addColorStop(0.55, '#d7ecff');
+  skyGrad.addColorStop(1, '#f0d8a2');
+  skyCtx.fillStyle = skyGrad;
+  skyCtx.fillRect(0, 0, 2048, 512);
+  skyCtx.fillStyle = '#506f47';
+  skyCtx.beginPath();
+  skyCtx.moveTo(0, 338);
+  for (let x = 0; x <= 2048; x += 48) {
+    const ridgeY = 324 + (Math.sin(x * 0.018) * 14) + (Math.cos(x * 0.009) * 10);
+    skyCtx.lineTo(x, ridgeY);
+  }
+  skyCtx.lineTo(2048, 512);
+  skyCtx.lineTo(0, 512);
+  skyCtx.closePath();
+  skyCtx.fill();
+  skyCtx.fillStyle = '#6d8c60';
+  for (let i = 0; i < 56; i++) {
+    const cx = 24 + (i * 36);
+    const h = 26 + ((i % 5) * 6);
+    skyCtx.beginPath();
+    skyCtx.moveTo(cx - 16, 334);
+    skyCtx.lineTo(cx, 334 - h);
+    skyCtx.lineTo(cx + 16, 334);
+    skyCtx.closePath();
+    skyCtx.fill();
+  }
+  skyTex.update();
+
+  const skyMat = new BABYLON.StandardMaterial('grandmaForestSkyMat', scene);
+  skyMat.diffuseTexture = skyTex;
+  skyMat.emissiveTexture = skyTex;
+  skyMat.specularColor = BABYLON.Color3.Black();
+
+  const skyPlane = BABYLON.MeshBuilder.CreatePlane('grandmaForestSky', {
+    width: 134,
+    height: 26,
+  }, scene);
+  skyPlane.position.set(28, 11.8, 11.6);
+  skyPlane.material = skyMat;
+  markDecorative(skyPlane);
+
+  const sunTex = new BABYLON.DynamicTexture('grandmaSunTex', { width: 256, height: 256 }, scene, true);
+  const sunCtx = sunTex.getContext();
+  const sunGrad = sunCtx.createRadialGradient(128, 128, 18, 128, 128, 108);
+  sunGrad.addColorStop(0, 'rgba(255,244,184,0.98)');
+  sunGrad.addColorStop(0.55, 'rgba(255,216,112,0.92)');
+  sunGrad.addColorStop(1, 'rgba(255,216,112,0)');
+  sunCtx.fillStyle = sunGrad;
+  sunCtx.fillRect(0, 0, 256, 256);
+  sunTex.update();
+
+  const sunMat = new BABYLON.StandardMaterial('grandmaSunMat', scene);
+  sunMat.diffuseTexture = sunTex;
+  sunMat.opacityTexture = sunTex;
+  sunMat.emissiveTexture = sunTex;
+  sunMat.useAlphaFromDiffuseTexture = true;
+  sunMat.specularColor = BABYLON.Color3.Black();
+  sunMat.backFaceCulling = false;
+
+  const sun = BABYLON.MeshBuilder.CreatePlane('grandmaSun', {
+    width: 5.8,
+    height: 5.8,
+  }, scene);
+  sun.position.set(57.5, 15.8, 11.2);
+  sun.material = sunMat;
+  markDecorative(sun);
+
   const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop3', {
     width: 110,
     height: 24,
@@ -568,6 +640,25 @@ export function buildWorld3(scene, options = {}) {
   }
 
   createGrandmaBackdrop(scene, shadowGen);
+  const gardenTopY = LEVEL3.platforms.find((p) => p.name === 'gardenStart').y + (LEVEL3.platforms.find((p) => p.name === 'gardenStart').h * 0.5);
+  const welcomeSign = createWelcomeSign(scene, {
+    name: 'l3_welcomeSign',
+    x: -21.2,
+    y: gardenTopY,
+    z: 2.28,
+    shadowGen,
+    textLines: ['WELCOME TO', "GRANDMA'S HOUSE"],
+    width: 3.62,
+    height: 1.48,
+    postHeight: 2.92,
+    boardName: 'l3_welcome',
+    boardColor: [210, 172, 110],
+    postColor: [126, 96, 68],
+    fontFamily: 'Avenir Next, Trebuchet MS, sans-serif',
+    textEmissive: new BABYLON.Color3(0.42, 0.26, 0.12),
+  });
+  markDecorative(welcomeSign);
+  setRenderingGroup(welcomeSign, 3);
 
   const goalDef = LEVEL3.goal;
   const dada = createDad(scene, {
@@ -986,6 +1077,7 @@ export function buildWorld3(scene, options = {}) {
     signs: [],
     level3,
     goalGuardMinX: goalDef.x - 4.5,
+    goalMinBottomY: (LEVEL3.platforms.find((p) => p.name === 'grandmaPorch').y + (LEVEL3.platforms.find((p) => p.name === 'grandmaPorch').h * 0.5)) - 0.2,
     assetAnchors: {
       cribRail: null,
       toyBlocks: [],

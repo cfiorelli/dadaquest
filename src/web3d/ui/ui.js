@@ -20,6 +20,9 @@ const CSS = `
 .dada-end-bg {
   background: radial-gradient(ellipse at center, rgba(72,88,62,0.52) 0%, rgba(20,18,16,0.58) 100%);
 }
+.dada-menu-bg {
+  background: radial-gradient(ellipse at center, rgba(48,58,52,0.56) 0%, rgba(20,18,16,0.64) 100%);
+}
 .dada-card {
   min-width: min(88vw, 540px);
   max-width: 92vw;
@@ -114,6 +117,9 @@ const CSS = `
   margin-top: 18px;
 }
 .dada-level-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 7px 20px;
   font-size: clamp(12px, 1.8vw, 15px);
   font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
@@ -126,6 +132,7 @@ const CSS = `
   letter-spacing: 0.04em;
   pointer-events: auto;
   transition: background 0.15s, transform 0.12s;
+  text-decoration: none;
 }
 .dada-level-btn:hover {
   background: rgba(90,68,46,0.20);
@@ -154,6 +161,19 @@ const CSS = `
 .dada-btn:hover {
   background: linear-gradient(135deg, #db6948, #b64930);
   transform: scale(1.05);
+}
+.dada-btn-secondary {
+  background: linear-gradient(135deg, #6f7d7b, #4f5d5b);
+  border-color: rgba(56, 74, 72, 0.34);
+}
+.dada-btn-secondary:hover {
+  background: linear-gradient(135deg, #7b8987, #586664);
+}
+.dada-btn-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 .dada-end-msg {
   font-size: clamp(18px, 3vw, 28px);
@@ -429,7 +449,7 @@ export function createUI(uiRoot, options = {}) {
 
   // Keep UI above canvas and allow overlays/buttons to manage pointer events.
   uiRoot.style.zIndex = '1000';
-  uiRoot.style.pointerEvents = 'none';
+  uiRoot.style.pointerEvents = 'auto';
 
   // Detect current level from URL (mutable — updated when user clicks level buttons)
   const levelParam = new URLSearchParams(window.location.search).get('level');
@@ -469,6 +489,8 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.appendChild(titleEl);
 
   let levelSelectHandler = null;
+  let gameplayMenuHandler = null;
+  let gameplayResumeHandler = null;
   const titleSubEl = titleEl.querySelector('#titleSub');
   const titleHintEl = titleEl.querySelector('#titleHint');
   const titleDebugEl = titleEl.querySelector('#titleDebug');
@@ -479,6 +501,10 @@ export function createUI(uiRoot, options = {}) {
   const btn2 = titleEl.querySelector('#levelBtn2');
   const btn3 = titleEl.querySelector('#levelBtn3');
   let titleErrorVisible = false;
+  let menuBtn1 = null;
+  let menuBtn2 = null;
+  let menuBtn3 = null;
+  let menuSubEl = null;
 
   function getLevelSubtitle(id) {
     return id === 3
@@ -497,6 +523,15 @@ export function createUI(uiRoot, options = {}) {
     }
   }
 
+  function updateMenuCopy(levelId) {
+    if (menuSubEl) {
+      menuSubEl.textContent = `Current level: ${getLevelSubtitle(levelId)}`;
+    }
+    menuBtn1?.classList.toggle('active', levelId === 1);
+    menuBtn2?.classList.toggle('active', levelId === 2);
+    menuBtn3?.classList.toggle('active', levelId === 3);
+  }
+
   function selectLevel(id) {
     _selectedLevel = id;
     btn1.classList.toggle('active', id === 1);
@@ -505,6 +540,7 @@ export function createUI(uiRoot, options = {}) {
     resetTitleCopy();
     const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);
+    updateMenuCopy(id);
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
   }
 
@@ -514,6 +550,57 @@ export function createUI(uiRoot, options = {}) {
   btn1?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(1); });
   btn2?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(2); });
   btn3?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(3); });
+
+  const menuEl = document.createElement('div');
+  menuEl.className = 'dada-overlay dada-menu-bg hidden';
+  menuEl.style.zIndex = '1200';
+  menuEl.innerHTML = `
+    <div class="dada-card">
+      <div class="dada-h1" style="font-size:clamp(28px,4.8vw,50px)">MAIN MENU</div>
+      <div class="dada-sub" id="menuSub">${getLevelSubtitle(_selectedLevel)}</div>
+      <div class="dada-controls">
+        Press <span>Esc</span> to resume, or switch levels below.
+      </div>
+      <div class="dada-level-row">
+        <a class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="menuLevelBtn1" href="${window.location.pathname}">Level 1</a>
+        <a class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="menuLevelBtn2" href="${window.location.pathname}?level=2">Level 2</a>
+        <a class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="menuLevelBtn3" href="${window.location.pathname}?level=3">Level 3</a>
+      </div>
+      <div class="dada-btn-row">
+        <button class="dada-btn dada-btn-secondary" id="menuResumeBtn">Resume</button>
+      </div>
+    </div>
+  `;
+  uiRoot.appendChild(menuEl);
+  menuSubEl = menuEl.querySelector('#menuSub');
+  menuBtn1 = menuEl.querySelector('#menuLevelBtn1');
+  menuBtn2 = menuEl.querySelector('#menuLevelBtn2');
+  menuBtn3 = menuEl.querySelector('#menuLevelBtn3');
+  const menuResumeBtn = menuEl.querySelector('#menuResumeBtn');
+  menuBtn1?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(1);
+  });
+  menuBtn2?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(2);
+  });
+  menuBtn3?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(3);
+  });
+  menuResumeBtn?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (typeof gameplayResumeHandler === 'function') gameplayResumeHandler();
+  });
 
   // End overlay
   const endEl = document.createElement('div');
@@ -720,6 +807,12 @@ export function createUI(uiRoot, options = {}) {
     setLevelSelectHandler(cb) {
       levelSelectHandler = cb;
     },
+    setGameplayMenuHandler(cb) {
+      gameplayMenuHandler = cb;
+    },
+    setGameplayResumeHandler(cb) {
+      gameplayResumeHandler = cb;
+    },
     showLoading(levelId) {
       const percent = arguments.length > 1 ? arguments[1] : 0;
       titleErrorVisible = false;
@@ -751,6 +844,20 @@ export function createUI(uiRoot, options = {}) {
     updateTitleDebug({ selectedLevel, currentLevel, titleState, lastKey } = {}) {
       if (!titleDebugEl) return;
       titleDebugEl.textContent = `sel:${selectedLevel ?? '?'} cur:${currentLevel ?? '?'} s:${titleState ?? '?'} k:${lastKey ?? '\u2014'}`;
+    },
+    showGameplayMenu(levelId = _selectedLevel) {
+      updateMenuCopy(levelId);
+      menuEl.classList.remove('hidden');
+      setCanvasInputEnabled(false);
+    },
+    hideGameplayMenu() {
+      menuEl.classList.add('hidden');
+      if (endEl.classList.contains('hidden')) {
+        setCanvasInputEnabled(true);
+      }
+    },
+    isGameplayMenuVisible() {
+      return !menuEl.classList.contains('hidden');
     },
     showPopText(text, durationMs = 760) {
       if (popTimer) clearTimeout(popTimer);

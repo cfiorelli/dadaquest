@@ -101,6 +101,29 @@ function clearLoadingIntent() {
   } catch {}
 }
 
+function buildLevelUrl(targetLevelId, { autoStart = false } = {}) {
+  if (typeof window === 'undefined') return '/';
+  const params = new URLSearchParams();
+  if (targetLevelId !== 1) params.set('level', String(targetLevelId));
+  if (autoStart) params.set('start', '1');
+  const query = params.toString();
+  return query ? `${window.location.pathname}?${query}` : window.location.pathname;
+}
+
+function hasAutoStartQuery() {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('start') === '1';
+}
+
+function stripAutoStartQuery() {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('start')) return;
+  params.delete('start');
+  const query = params.toString();
+  history.replaceState(null, '', query ? `${window.location.pathname}?${query}` : window.location.pathname);
+}
+
 function createSeededRandom(seed = 1337) {
   let state = seed >>> 0;
   return () => {
@@ -821,7 +844,11 @@ export async function boot(options = {}) {
   // UI
   const ui = createUI(uiRoot, { disableToasts: shotMode && !shotToast });
   const loadingIntent = !shotMode ? readLoadingIntent() : null;
-  const autoStartAfterLoad = !!loadingIntent && loadingIntent.levelId === levelId;
+  const autoStartFromQuery = !shotMode && hasAutoStartQuery();
+  const autoStartAfterLoad = (!!loadingIntent && loadingIntent.levelId === levelId) || autoStartFromQuery;
+  if (autoStartFromQuery) {
+    stripAutoStartQuery();
+  }
   let bootLoadingRaf = 0;
   let bootLoadingDone = false;
   let bootLoadingPercent = 0;
@@ -1298,7 +1325,7 @@ export async function boot(options = {}) {
         role: 'futurePianoModel',
         anchor: l2anchors.piano,
         fallback: l2fallback?.piano,
-        fit: { targetMaxSize: 7.0, groundOffset: 0.35 },
+        fit: { targetMaxSize: 3.6, groundOffset: 0.2, hardMaxExtent: 4.8 },
       },
       {
         role: 'futureBiancaModel',
@@ -1323,6 +1350,12 @@ export async function boot(options = {}) {
         anchor: l2anchors.goat,
         fallback: null,
         fit: { targetHeight: 1.45, targetMaxSize: 2.0, groundOffset: 0.0 },
+      },
+      {
+        role: 'futurePackPropModel',
+        anchor: l2anchors.pack,
+        fallback: l2fallback?.pack,
+        fit: { targetHeight: 1.15, targetMaxSize: 2.1, groundOffset: 0.0, hardMaxExtent: 4.0 },
       },
     ];
     for (const { role, anchor, fallback, fit } of l2propDefs) {
@@ -1912,9 +1945,11 @@ export async function boot(options = {}) {
   // Game state machine
   const goalX = world.goalRoot.position.x;
   const goalGuardMinX = Number.isFinite(world.goalGuardMinX) ? world.goalGuardMinX : null;
+  const goalMinBottomY = Number.isFinite(world.goalMinBottomY) ? world.goalMinBottomY : null;
   let warnedEarlyGoal = false;
+  let warnedLowGoal = false;
 
-  let state = 'title'; // title | gameplay | loading | end
+  let state = 'title'; // title | gameplay | loading | menu | goal | end
   let _lastKey = '—';
 
   let goalReached = false;
@@ -1961,6 +1996,11 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.onesieBuffMs = 0;
   window.__DADA_DEBUG__.coinsCollected = coinsCollected;
   window.__DADA_DEBUG__.floorTopY = currentFloorTopY;
+  window.__DADA_DEBUG__.goalGate = {
+    minX: goalGuardMinX,
+    minBottomY: goalMinBottomY,
+  };
+  window.__DADA_DEBUG__.menuVisible = false;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
     const LANE_Z = 0;
@@ -2135,6 +2175,8 @@ export async function boot(options = {}) {
     player.setWinAnimationActive(false);
     audio.stopLevelMusic(0.5);
     window.__DADA_DEBUG__.sceneKey = 'EndScene';
+    window.__DADA_DEBUG__.menuVisible = false;
+    ui.hideGameplayMenu();
     ui.showEnd();
   }
 
@@ -2144,6 +2186,7 @@ export async function boot(options = {}) {
     }
 
     ui.setFade(0);
+    ui.hideGameplayMenu();
     ui.hideEnd();
     ui.showTitle();
     ui.clearLoading();
@@ -2154,6 +2197,7 @@ export async function boot(options = {}) {
     audio.stopLevelMusic(0.2);
 
     state = 'title';
+    window.__DADA_DEBUG__.menuVisible = false;
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'title', lastKey: _lastKey });
     goalReached = false;
     goalTimer = 0;
@@ -2249,10 +2293,12 @@ export async function boot(options = {}) {
       audio.unlock();
     }
     state = 'gameplay';
+    window.__DADA_DEBUG__.menuVisible = false;
     input.consumeAll();
     player.setWinAnimationActive(false);
     audio.startLevelMusic(levelId, 0.5);
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
+    ui.hideGameplayMenu();
     ui.hideTitle();
     ui.showGameplayHud(coins.length);
     ui.updateTitleDebug({ selectedLevel: levelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
@@ -2289,14 +2335,61 @@ export async function boot(options = {}) {
       ui.showLoading(targetLevelId, 0);
       ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
       writeLoadingIntent(targetLevelId);
-      const url = targetLevelId === 1
-        ? window.location.pathname
-        : `${window.location.pathname}?level=${targetLevelId}`;
-      setTimeout(() => { window.location.href = url; }, 80);
+      window.location.assign(buildLevelUrl(targetLevelId, { autoStart: true }));
       return;
     }
     startLoadedLevelWithProgress(targetLevelId, { unlockAudio: true });
   }
+
+  function openGameplayMenu() {
+    if (state !== 'gameplay') return;
+    state = 'menu';
+    input.consumeAll();
+    window.__DADA_DEBUG__.menuVisible = true;
+    ui.showGameplayMenu(selectedLevelId);
+    ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'menu', lastKey: _lastKey });
+  }
+
+  function closeGameplayMenu() {
+    if (state !== 'menu') return;
+    state = 'gameplay';
+    input.consumeAll();
+    window.__DADA_DEBUG__.menuVisible = false;
+    ui.hideGameplayMenu();
+    ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
+  }
+
+  function switchLevelFromGameplayMenu(targetLevelId) {
+    selectedLevelId = targetLevelId;
+    if (targetLevelId === levelId) {
+      window.__DADA_DEBUG__.menuVisible = false;
+      ui.hideGameplayMenu();
+      input.consumeAll();
+      restartRun('menu');
+      selectedLevelId = targetLevelId;
+      requestStart(targetLevelId);
+      return true;
+    }
+
+    window.__DADA_DEBUG__.menuVisible = false;
+    ui.hideGameplayMenu();
+    ui.resetGameplayHud();
+    ui.showTitle();
+    ui.showLoading(targetLevelId, 0);
+    audio.stopLevelMusic(0.18);
+    state = 'loading';
+    ui.updateTitleDebug({ selectedLevel: targetLevelId, currentLevel: levelId, titleState: 'loading', lastKey: _lastKey });
+    writeLoadingIntent(targetLevelId);
+    window.location.assign(buildLevelUrl(targetLevelId, { autoStart: true }));
+    return true;
+  }
+
+  ui.setGameplayResumeHandler(() => {
+    closeGameplayMenu();
+  });
+  ui.setGameplayMenuHandler((targetLevelId) => {
+    switchLevelFromGameplayMenu(targetLevelId);
+  });
 
   if (debugMode) {
     window.__DADA_DEBUG__.startLevel = (targetLevelId = levelId) => {
@@ -2318,7 +2411,11 @@ export async function boot(options = {}) {
       const goalBounds = world.goal.getBoundingInfo()?.boundingBox;
       if (!goalBounds) return false;
       const center = goalBounds.centerWorld;
-      player.spawnAt(center.x, center.y, center.z);
+      const { halfH } = player.getCollisionHalfExtents();
+      const safeGoalY = goalMinBottomY !== null
+        ? Math.max(center.y, goalMinBottomY + halfH + 0.38)
+        : center.y;
+      player.spawnAt(center.x, safeGoalY, center.z);
       player.vx = 0;
       player.vy = 0;
       updatePlayerShadow(player);
@@ -2330,6 +2427,17 @@ export async function boot(options = {}) {
       player.vy = 0;
       updatePlayerShadow(player);
       return { x, y, z };
+    };
+    window.__DADA_DEBUG__.toggleGameplayMenu = () => {
+      if (state === 'menu') {
+        closeGameplayMenu();
+      } else if (state === 'gameplay') {
+        openGameplayMenu();
+      }
+      return window.__DADA_DEBUG__.menuVisible;
+    };
+    window.__DADA_DEBUG__.switchMenuLevel = (targetLevelId) => {
+      return switchLevelFromGameplayMenu(targetLevelId);
     };
     window.__DADA_DEBUG__.collectibles = () => coins.map((coin, index) => ({
       index,
@@ -2346,6 +2454,18 @@ export async function boot(options = {}) {
   window.addEventListener('keydown', (ev) => {
     _lastKey = `${ev.key}/${ev.code}`;
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
+    if (ev.code === 'Escape') {
+      if (state === 'gameplay') {
+        ev.preventDefault();
+        openGameplayMenu();
+        return;
+      }
+      if (state === 'menu') {
+        ev.preventDefault();
+        closeGameplayMenu();
+        return;
+      }
+    }
     if (
       ev.code === 'Space' ||
       ev.key === 'Enter' ||
@@ -2890,6 +3010,7 @@ export async function boot(options = {}) {
 
       // Check goal
       const pPos = player.getPosition();
+      const playerBottomY = pPos.y - player.getCollisionHalfExtents().halfH;
       const goalBounds = world.goal.getBoundingInfo().boundingBox;
       const goalInside = pPos.x >= goalBounds.minimumWorld.x
         && pPos.x <= goalBounds.maximumWorld.x
@@ -2900,6 +3021,11 @@ export async function boot(options = {}) {
           if (import.meta.env.DEV && !warnedEarlyGoal) {
             warnedEarlyGoal = true;
             console.error(`[goal] blocked early win on level ${levelId} at x=${pPos.x.toFixed(2)} (< ${goalGuardMinX.toFixed(2)})`);
+          }
+        } else if (goalMinBottomY !== null && playerBottomY < goalMinBottomY) {
+          if (import.meta.env.DEV && !warnedLowGoal) {
+            warnedLowGoal = true;
+            console.error(`[goal] blocked low-approach win on level ${levelId} at bottomY=${playerBottomY.toFixed(2)} (< ${goalMinBottomY.toFixed(2)})`);
           }
         } else {
           goalReached = true;
@@ -2942,6 +3068,9 @@ export async function boot(options = {}) {
           0,
         ));
       }
+    } else if (state === 'menu') {
+      updatePlayerShadow(player);
+      updatePlayerReadabilityLight();
     } else if (state === 'goal') {
       goalTimer = Math.max(0, goalTimer - dt);
       const t = 1 - (goalTimer / GOAL_CELEBRATION_SEC);
@@ -2958,14 +3087,16 @@ export async function boot(options = {}) {
       }
     }
 
-    updateLevel1AnimalDecor(dt);
-    updateLevel1Clouds(dt);
-    updateLevel1Ambient(dt);
-    updateCoinLossDisplay(dt);
-    updateCoinFlybacks(dt);
+    if (state !== 'menu') {
+      updateLevel1AnimalDecor(dt);
+      updateLevel1Clouds(dt);
+      updateLevel1Ambient(dt);
+      updateCoinLossDisplay(dt);
+      updateCoinFlybacks(dt);
+    }
 
     // Ambient micro-animations — disabled in shot mode
-    if (!shotMode) {
+    if (!shotMode && state !== 'menu') {
       goalWaveTimer += dt;
       goalVisualRoot.position.y = GOAL_MODEL_SLOT_Y + Math.sin(goalWaveTimer * 1.4) * 0.06;
 
