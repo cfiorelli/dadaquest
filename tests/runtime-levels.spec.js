@@ -100,7 +100,7 @@ test('runtime: level 2 horse push keeps player near the lane', async ({ page }) 
     .toBe('CribScene');
 });
 
-test('runtime: gameplay keybinds R reset to checkpoint and F triggers backflip', async ({ page }) => {
+test('runtime: gameplay hotkey F triggers backflip', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
@@ -127,7 +127,22 @@ test('runtime: gameplay keybinds R reset to checkpoint and F triggers backflip',
   expect(backflipTriggered.backflip).not.toBeNull();
   expect(backflipTriggered.backflip.cooldownMs).toBeGreaterThan(0);
   expect(backflipTriggered.backflip.count).toBeGreaterThan(backflipBeforeCount);
+});
 
+test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.();
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(6.5, 1.25, 0);
+  });
+  await page.waitForTimeout(1000);
   const beforeResetX = await page.evaluate(() => window.__DADA_DEBUG__?.playerRef?.position?.x ?? null);
   const resetTriggered = await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyR') ?? false);
   expect(resetTriggered).toBe(true);
@@ -139,4 +154,36 @@ test('runtime: gameplay keybinds R reset to checkpoint and F triggers backflip',
   expect(beforeResetX).not.toBeNull();
   expect(afterResetX).not.toBeNull();
   expect(Math.abs(afterResetX - beforeResetX)).toBeGreaterThan(4);
+});
+
+test('runtime: level 2 floor fall resets without clearing collected binkies', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('http://127.0.0.1:4173/?level=2&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.();
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 60_000 });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(-16.5, 1.8, 0);
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0), { timeout: 4_000 })
+    .toBeGreaterThanOrEqual(1);
+
+  const beforeFallCoins = await page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0);
+  const penaltyResult = await page.evaluate(() => window.__DADA_DEBUG__?.triggerFloorPenalty?.() ?? null);
+  expect(penaltyResult).not.toBeNull();
+  expect(penaltyResult.lastRespawnReason).toBe('floor_fall');
+
+  const afterFall = await page.evaluate(() => ({
+    coins: window.__DADA_DEBUG__?.coinsCollected ?? 0,
+    floorPenaltyLevel: window.__DADA_DEBUG__?.lastFloorPenaltyLevel ?? null,
+    floorPenaltyCount: window.__DADA_DEBUG__?.floorPenaltyCount ?? 0,
+  }));
+  expect(afterFall.coins).toBe(beforeFallCoins);
+  expect(afterFall.floorPenaltyLevel).toBe(2);
+  expect(afterFall.floorPenaltyCount).toBeGreaterThan(0);
 });
