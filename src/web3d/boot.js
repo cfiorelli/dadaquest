@@ -1746,6 +1746,8 @@ export async function boot(options = {}) {
       { role: 'futureChickensPropModel', anchors: anchors.futureChickensPropModel || [], fit: { targetHeight: 0.78, targetMaxSize: 1.0 } },
       { role: 'futureGoatPropModel', anchors: anchors.futureGoatPropModel || [], fit: { targetHeight: 1.42, targetMaxSize: 1.9 } },
       { role: 'futureTurkeyPropModel', anchors: anchors.futureTurkeyPropModel || [], fit: { targetHeight: 1.18, targetMaxSize: 1.6 } },
+      { role: 'futureRakePropModel', anchors: anchors.futureRakePropModel || [], fit: { targetHeight: 1.32, targetMaxSize: 1.9, hardMaxExtent: 2.6 } },
+      { role: 'futureTractorPropModel', anchors: anchors.futureTractorPropModel || [], fit: { targetHeight: 1.7, targetMaxSize: 2.8, hardMaxExtent: 3.6 } },
     ];
     for (const { role, anchors: roleAnchors, fit } of level3OptionalDefs) {
       for (const anchor of roleAnchors) {
@@ -1763,6 +1765,9 @@ export async function boot(options = {}) {
           groundY: anchorPos.y,
           markDecorative: true,
         });
+        if (fit?.hardMaxExtent) {
+          clampDecorMaxExtent(result.roots, fit.hardMaxExtent);
+        }
       }
     }
   }

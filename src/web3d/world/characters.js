@@ -63,14 +63,14 @@ function dadOutfitSpec(outfit) {
   }
   if (outfit === 'level3') {
     return {
-      torso: '#8b4f42',
-      jacket: '#9a6048',
+      torso: '#e7f0ea',
+      jacket: '#f2efe8',
       pants: '#5c4b40',
       shoes: '#5d3b24',
       hair: '#38281e',
       beard: '#38281e',
-      accent: '#f4ddb6',
-      decal: 'plaid',
+      accent: '#d79e63',
+      decal: 'chef',
     };
   }
   return {
@@ -87,31 +87,48 @@ function dadOutfitSpec(outfit) {
 
 function addDadTorsoDecal(scene, parent, outfit, accentHex) {
   if (outfit === 'level3') {
-    const mat = makeDecalTexture(scene, `dad_plaid_${accentHex}`, (ctx, w, h) => {
-      ctx.strokeStyle = '#f7d6b5';
-      ctx.lineWidth = 12;
-      for (let i = -w; i < w * 2; i += 44) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i + 80, h);
-        ctx.stroke();
-      }
-      ctx.strokeStyle = '#5b2d22';
-      ctx.lineWidth = 8;
-      for (let i = -w; i < w * 2; i += 52) {
-        ctx.beginPath();
-        ctx.moveTo(i + 30, 0);
-        ctx.lineTo(i + 90, h);
-        ctx.stroke();
-      }
-    });
-    const decal = BABYLON.MeshBuilder.CreatePlane('dadPlaidDecal', {
-      width: 0.58,
-      height: 0.66,
+    const strapMat = makeFlatStandard(scene, 'dadChefApronStrapMat', accentHex);
+    const apronBodyMat = makeFlatStandard(scene, 'dadChefApronBodyMat', '#f6f0df');
+    const apronBorderMat = makeFlatStandard(scene, 'dadChefApronBorderMat', '#d6c4aa');
+
+    const apron = BABYLON.MeshBuilder.CreateBox('dadChefApron', {
+      width: 0.54,
+      height: 0.78,
+      depth: 0.04,
     }, scene);
-    decal.position.set(0, 1.52, -0.34);
-    decal.parent = parent;
-    decal.material = mat;
+    apron.position.set(0, 1.44, -0.34);
+    apron.parent = parent;
+    apron.material = apronBodyMat;
+
+    const hem = BABYLON.MeshBuilder.CreateBox('dadChefApronHem', {
+      width: 0.58,
+      height: 0.08,
+      depth: 0.05,
+    }, scene);
+    hem.position.set(0, 1.09, -0.34);
+    hem.parent = parent;
+    hem.material = apronBorderMat;
+
+    for (const side of [-1, 1]) {
+      const strap = BABYLON.MeshBuilder.CreateBox(`dadChefApronStrap${side}`, {
+        width: 0.08,
+        height: 0.68,
+        depth: 0.04,
+      }, scene);
+      strap.position.set(side * 0.16, 1.78, -0.18);
+      strap.rotation.z = side * 0.18;
+      strap.parent = parent;
+      strap.material = strapMat;
+    }
+
+    const pocket = BABYLON.MeshBuilder.CreateBox('dadChefApronPocket', {
+      width: 0.24,
+      height: 0.16,
+      depth: 0.03,
+    }, scene);
+    pocket.position.set(0, 1.28, -0.35);
+    pocket.parent = parent;
+    pocket.material = strapMat;
     return;
   }
 
@@ -247,6 +264,33 @@ export function createDad(scene, {
   beard.position.set(0, 2.55, -0.31);
   beard.parent = visualRoot;
   beard.material = beardMat;
+
+  if (outfit === 'level3') {
+    const hatBand = BABYLON.MeshBuilder.CreateCylinder(`dad_${outfit}_chefBand`, {
+      height: 0.20,
+      diameter: 0.56,
+      tessellation: 18,
+    }, scene);
+    hatBand.position.set(0, 3.12, -0.02);
+    hatBand.parent = visualRoot;
+    hatBand.material = makeFlatStandard(scene, `dad_${outfit}_chefBandMat`, '#f5f4f0');
+
+    const hatPuffMat = makeFlatStandard(scene, `dad_${outfit}_chefPuffMat`, '#fffaf0');
+    for (const def of [
+      { x: 0, y: 3.34, z: -0.02, d: 0.40 },
+      { x: -0.18, y: 3.28, z: -0.08, d: 0.28 },
+      { x: 0.18, y: 3.28, z: -0.08, d: 0.28 },
+      { x: 0, y: 3.24, z: 0.14, d: 0.24 },
+    ]) {
+      const puff = BABYLON.MeshBuilder.CreateSphere(`dad_${outfit}_chefPuff_${def.x}_${def.y}`, {
+        diameter: def.d,
+        segments: 10,
+      }, scene);
+      puff.position.set(def.x, def.y, def.z);
+      puff.parent = visualRoot;
+      puff.material = hatPuffMat;
+    }
+  }
 
   for (const side of [-1, 1]) {
     const arm = BABYLON.MeshBuilder.CreateCylinder(`dad_${outfit}_arm${side}`, {
@@ -532,6 +576,195 @@ export function createMom(scene, {
       for (const { mesh, side } of armMeshes) {
         const baseRot = pose === 'sitting' ? side * 0.22 : side * 0.1;
         mesh.rotation.z = baseRot + (Math.sin(t * 1.24 + (side * 0.6)) * (pose === 'sitting' ? 0.02 : 0.035));
+      }
+    });
+  }
+  return { root };
+}
+
+export function createGrandma(scene, {
+  x,
+  y,
+  z = 0,
+  shadowGen = null,
+  animate = true,
+} = {}) {
+  const root = new BABYLON.TransformNode('grandma', scene);
+  root.position.set(x, y, z);
+  const visualRoot = new BABYLON.TransformNode('grandma_visual', scene);
+  visualRoot.parent = root;
+
+  const skinMat = makePlastic(scene, 'grandma_skin', 0.95, 0.82, 0.74, { roughness: 0.6 });
+  const cardiganMat = makeFlatStandard(scene, 'grandma_cardigan', '#b08aa5');
+  const skirtMat = makeFlatStandard(scene, 'grandma_skirt', '#67727d');
+  const shoeMat = makeFlatStandard(scene, 'grandma_shoes', '#5b4d46');
+  const hairMat = makeFlatStandard(scene, 'grandma_hair', '#d6d8dc');
+  const glassesMat = makeFlatStandard(scene, 'grandma_glasses', '#5e4f4a');
+  const armMeshes = [];
+
+  const torso = BABYLON.MeshBuilder.CreateCapsule('grandma_torso', {
+    height: 1.22,
+    radius: 0.28,
+    tessellation: 12,
+  }, scene);
+  torso.parent = visualRoot;
+  torso.position.y = 1.34;
+  torso.material = cardiganMat;
+
+  const cardiganFront = BABYLON.MeshBuilder.CreateBox('grandma_cardiganFront', {
+    width: 0.56,
+    height: 1.0,
+    depth: 0.08,
+  }, scene);
+  cardiganFront.parent = visualRoot;
+  cardiganFront.position.set(0, 1.34, -0.22);
+  cardiganFront.material = makeFlatStandard(scene, 'grandma_cardiganFrontMat', '#d9bf95');
+
+  const head = BABYLON.MeshBuilder.CreateSphere('grandma_head', {
+    diameter: 0.6,
+    segments: 16,
+  }, scene);
+  head.parent = visualRoot;
+  head.position.y = 2.12;
+  head.material = skinMat;
+
+  const hairCap = BABYLON.MeshBuilder.CreateBox('grandma_hairCap', {
+    width: 0.60,
+    height: 0.22,
+    depth: 0.54,
+  }, scene);
+  hairCap.parent = visualRoot;
+  hairCap.position.set(0, 2.36, -0.02);
+  hairCap.material = hairMat;
+
+  const bun = BABYLON.MeshBuilder.CreateSphere('grandma_bun', {
+    diameter: 0.26,
+    segments: 10,
+  }, scene);
+  bun.parent = visualRoot;
+  bun.position.set(0, 2.26, 0.24);
+  bun.material = hairMat;
+
+  for (const side of [-1, 1]) {
+    const sideHair = BABYLON.MeshBuilder.CreateBox(`grandma_sideHair${side}`, {
+      width: 0.10,
+      height: 0.28,
+      depth: 0.16,
+    }, scene);
+    sideHair.parent = visualRoot;
+    sideHair.position.set(side * 0.22, 2.02, -0.06);
+    sideHair.material = hairMat;
+
+    const arm = BABYLON.MeshBuilder.CreateCylinder(`grandma_arm${side}`, {
+      height: 0.92,
+      diameter: 0.14,
+      tessellation: 10,
+    }, scene);
+    arm.parent = visualRoot;
+    arm.position.set(side * 0.44, 1.42, 0);
+    arm.rotation.z = side * 0.12;
+    arm.material = cardiganMat;
+    armMeshes.push({ mesh: arm, side });
+
+    const hand = BABYLON.MeshBuilder.CreateSphere(`grandma_hand${side}`, {
+      diameter: 0.15,
+      segments: 10,
+    }, scene);
+    hand.parent = visualRoot;
+    hand.position.set(side * 0.50, 0.96, 0);
+    hand.material = skinMat;
+
+    const leg = BABYLON.MeshBuilder.CreateCylinder(`grandma_leg${side}`, {
+      height: 1.08,
+      diameter: 0.16,
+      tessellation: 10,
+    }, scene);
+    leg.parent = visualRoot;
+    leg.position.set(side * 0.16, 0.58, 0);
+    leg.material = skirtMat;
+
+    const shoe = BABYLON.MeshBuilder.CreateBox(`grandma_shoe${side}`, {
+      width: 0.22,
+      height: 0.10,
+      depth: 0.34,
+    }, scene);
+    shoe.parent = visualRoot;
+    shoe.position.set(side * 0.16, -0.02, -0.05);
+    shoe.material = shoeMat;
+  }
+
+  const skirt = BABYLON.MeshBuilder.CreateBox('grandma_skirt', {
+    width: 0.62,
+    height: 0.72,
+    depth: 0.42,
+  }, scene);
+  skirt.parent = visualRoot;
+  skirt.position.set(0, 0.78, 0);
+  skirt.material = skirtMat;
+
+  const glassesBridge = BABYLON.MeshBuilder.CreateBox('grandma_glassesBridge', {
+    width: 0.18,
+    height: 0.03,
+    depth: 0.02,
+  }, scene);
+  glassesBridge.parent = visualRoot;
+  glassesBridge.position.set(0, 2.14, -0.30);
+  glassesBridge.material = glassesMat;
+
+  for (const side of [-1, 1]) {
+    const lens = BABYLON.MeshBuilder.CreateTorus(`grandma_glassesLens${side}`, {
+      diameter: 0.14,
+      thickness: 0.02,
+      tessellation: 18,
+    }, scene);
+    lens.parent = visualRoot;
+    lens.position.set(side * 0.12, 2.14, -0.31);
+    lens.rotation.x = Math.PI / 2;
+    lens.material = glassesMat;
+  }
+
+  const faceTex = new BABYLON.DynamicTexture('grandma_faceTex', { width: 128, height: 128 }, scene, true);
+  const ctx = faceTex.getContext();
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.fillStyle = '#201a18';
+  ctx.beginPath();
+  ctx.arc(42, 50, 6, 0, Math.PI * 2);
+  ctx.arc(86, 50, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#201a18';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(64, 74, 17, 0.18 * Math.PI, 0.82 * Math.PI);
+  ctx.stroke();
+  faceTex.update();
+  faceTex.hasAlpha = true;
+  const face = BABYLON.MeshBuilder.CreatePlane('grandma_face', {
+    width: 0.30,
+    height: 0.30,
+  }, scene);
+  face.parent = visualRoot;
+  face.position.set(0, 2.12, -0.32);
+  const faceMat = new BABYLON.StandardMaterial('grandma_faceMat', scene);
+  faceMat.diffuseTexture = faceTex;
+  faceMat.opacityTexture = faceTex;
+  faceMat.useAlphaFromDiffuseTexture = true;
+  faceMat.specularColor = BABYLON.Color3.Black();
+  face.material = faceMat;
+
+  tagActorNode(root);
+  if (shadowGen) {
+    for (const mesh of root.getChildMeshes(false)) {
+      shadowGen.addShadowCaster(mesh);
+    }
+  }
+  if (animate) {
+    scene.registerBeforeRender(() => {
+      const t = performance.now() * 0.001;
+      const breathe = Math.sin(t * 0.92);
+      visualRoot.position.y = breathe * 0.024;
+      visualRoot.rotation.z = breathe * 0.018;
+      for (const { mesh, side } of armMeshes) {
+        mesh.rotation.z = (side * 0.12) + (Math.sin(t * 1.1 + (side * 0.4)) * 0.02);
       }
     });
   }

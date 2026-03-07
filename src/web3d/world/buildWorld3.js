@@ -14,7 +14,7 @@ import {
   createWelcomeSign,
   setRenderingGroup,
 } from './buildWorld.js';
-import { createDad } from './characters.js';
+import { createDad, createGrandma } from './characters.js';
 
 const LANE_Z = LANE_Z3;
 
@@ -42,6 +42,7 @@ function markDecorative(node) {
   node.metadata = {
     ...(node.metadata || {}),
     cameraIgnore: true,
+    decor: true,
   };
   const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
   for (const mesh of meshes) {
@@ -52,8 +53,39 @@ function markDecorative(node) {
       ...(mesh.metadata || {}),
       cameraIgnore: true,
       cameraBlocker: false,
+      decor: true,
     };
   }
+}
+
+function makeGrassMaterial(scene, name) {
+  const tex = new BABYLON.DynamicTexture(name, { width: 1024, height: 256 }, scene, true);
+  const ctx = tex.getContext();
+  ctx.fillStyle = '#6a9052';
+  ctx.fillRect(0, 0, 1024, 256);
+  for (let i = 0; i < 2200; i++) {
+    const x = (i * 37) % 1024;
+    const y = (i * 91) % 256;
+    const alpha = 0.08 + ((i % 7) * 0.012);
+    ctx.fillStyle = `rgba(${72 + (i % 24)}, ${108 + (i % 42)}, ${54 + (i % 18)}, ${alpha.toFixed(3)})`;
+    ctx.fillRect(x, y, 3 + (i % 3), 12 + (i % 15));
+  }
+  for (let i = 0; i < 180; i++) {
+    const x = (i * 53) % 1024;
+    const y = (i * 29) % 256;
+    const w = 30 + ((i * 7) % 46);
+    const h = 10 + ((i * 11) % 24);
+    ctx.fillStyle = `rgba(56, 84, 44, ${(0.06 + ((i % 5) * 0.018)).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, h, ((i % 9) * 0.18), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  tex.update();
+  const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+  mat.diffuseTexture = tex;
+  mat.emissiveTexture = tex;
+  mat.specularColor = BABYLON.Color3.Black();
+  return mat;
 }
 
 function createSteamHazardVisual(scene, name, {
@@ -120,63 +152,83 @@ function createSprinklerVisual(scene, name, {
   x,
   y,
   z = 0,
-  width,
-  height,
+  nozzleLocal = new BABYLON.Vector3(-0.44, 0.52, 1.54),
+  targetLocal = new BABYLON.Vector3(0.76, -0.18, 1.82),
 }) {
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(x, y, z);
 
-  const hose = BABYLON.MeshBuilder.CreateCylinder(`${name}_hose`, {
-    height: 1.3,
-    diameter: 0.08,
-    tessellation: 10,
+  const hosePath = [
+    new BABYLON.Vector3(-1.18, -0.56, 1.28),
+    new BABYLON.Vector3(-0.96, -0.34, 1.34),
+    new BABYLON.Vector3(-0.70, -0.08, 1.42),
+    new BABYLON.Vector3(-0.54, 0.26, 1.48),
+    nozzleLocal.clone(),
+  ];
+  const hose = BABYLON.MeshBuilder.CreateTube(`${name}_hose`, {
+    path: hosePath,
+    radius: 0.055,
+    tessellation: 12,
+    cap: BABYLON.Mesh.CAP_ALL,
   }, scene);
   hose.parent = root;
-  hose.position.set(-0.34, -0.24, 0);
-  hose.rotation.z = -0.76;
   hose.material = makePlastic(scene, `${name}_hoseMat`, 0.27, 0.58, 0.18, { roughness: 0.56 });
 
-  const stand = BABYLON.MeshBuilder.CreateCylinder(`${name}_stand`, {
-    height: 0.48,
-    diameter: 0.16,
+  const nozzle = BABYLON.MeshBuilder.CreateCylinder(`${name}_nozzle`, {
+    height: 0.26,
+    diameter: 0.14,
     tessellation: 12,
   }, scene);
-  stand.parent = root;
-  stand.position.y = -(height * 0.5) + 0.24;
-  stand.material = makeCardboard(scene, `${name}_standMat`, 116, 108, 96, { roughness: 0.92 });
-
-  const head = BABYLON.MeshBuilder.CreateCylinder(`${name}_head`, {
-    height: 0.28,
-    diameter: 0.2,
-    tessellation: 12,
-  }, scene);
-  head.parent = root;
-  head.position.set(0, height * 0.5 - 0.14, 0);
-  head.rotation.z = Math.PI / 2;
-  head.material = makePlastic(scene, `${name}_headMat`, 0.62, 0.68, 0.72, { roughness: 0.46 });
+  nozzle.parent = root;
+  nozzle.position.copyFrom(nozzleLocal);
+  nozzle.rotation.x = Math.PI / 2;
+  nozzle.material = makePlastic(scene, `${name}_headMat`, 0.62, 0.68, 0.72, { roughness: 0.46 });
 
   const streamMat = new BABYLON.StandardMaterial(`${name}_streamMat`, scene);
   streamMat.diffuseColor = new BABYLON.Color3(0.56, 0.80, 0.98);
-  streamMat.emissiveColor = new BABYLON.Color3(0.16, 0.34, 0.46);
+  streamMat.emissiveColor = new BABYLON.Color3(0.24, 0.44, 0.56);
   streamMat.specularColor = BABYLON.Color3.Black();
-  streamMat.alpha = 0.28;
+  streamMat.alpha = 0.32;
   streamMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
 
   const streams = [];
-  for (const offset of [-0.3, 0, 0.3]) {
-    const stream = BABYLON.MeshBuilder.CreatePlane(`${name}_stream${offset}`, {
-      width: Math.max(0.22, width * 0.45),
-      height,
+  for (const [index, offset] of [0, -0.18, 0.18].entries()) {
+    const target = targetLocal.add(new BABYLON.Vector3(offset * 0.4, 0.04 - (index * 0.02), offset));
+    const mid = BABYLON.Vector3.Lerp(nozzleLocal, target, 0.5).add(new BABYLON.Vector3(0.12, -0.08, 0));
+    const stream = BABYLON.MeshBuilder.CreateTube(`${name}_stream${index}`, {
+      path: [nozzleLocal.clone(), mid, target],
+      radius: index === 0 ? 0.05 : 0.032,
+      tessellation: 10,
+      cap: BABYLON.Mesh.CAP_ALL,
     }, scene);
     stream.parent = root;
-    stream.position.set(offset, 0, 0);
-    stream.rotation.z = offset * 0.18;
     stream.material = streamMat;
     streams.push(stream);
   }
 
+  const contactShadow = BABYLON.MeshBuilder.CreateDisc(`${name}_shadow`, {
+    radius: 0.42,
+    tessellation: 20,
+  }, scene);
+  contactShadow.parent = root;
+  contactShadow.position.set(nozzleLocal.x - 0.42, -0.58, 1.26);
+  contactShadow.rotation.x = Math.PI / 2;
+  const shadowMat = new BABYLON.StandardMaterial(`${name}_shadowMat`, scene);
+  shadowMat.diffuseColor = new BABYLON.Color3(0.10, 0.09, 0.08);
+  shadowMat.emissiveColor = new BABYLON.Color3(0.06, 0.05, 0.04);
+  shadowMat.alpha = 0.16;
+  shadowMat.specularColor = BABYLON.Color3.Black();
+  shadowMat.disableLighting = true;
+  shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  contactShadow.material = shadowMat;
+
   markDecorative(root);
-  return { root, streams };
+  return {
+    root,
+    streams,
+    nozzleTip: root.position.add(nozzleLocal),
+    targetPoint: root.position.add(targetLocal),
+  };
 }
 
 function createDogVisual(scene, name, { x, y, z = 0, color = [0.66, 0.50, 0.30] }) {
@@ -241,6 +293,98 @@ function createDogVisual(scene, name, { x, y, z = 0, color = [0.66, 0.50, 0.30] 
   tail.position.set(-0.78, 0.42, 0);
   tail.rotation.z = 0.62;
   tail.material = body.material;
+
+  markDecorative(root);
+  setRenderingGroup(root, 3);
+  return root;
+}
+
+function createRakePlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const handle = BABYLON.MeshBuilder.CreateCylinder(`${name}_handle`, {
+    height: 1.9,
+    diameter: 0.08,
+    tessellation: 10,
+  }, scene);
+  handle.parent = root;
+  handle.position.set(0.28, 0.94, 0);
+  handle.rotation.z = -0.42;
+  handle.material = makeCardboard(scene, `${name}_handleMat`, 166, 126, 84, { roughness: 0.88 });
+
+  const head = BABYLON.MeshBuilder.CreateBox(`${name}_head`, {
+    width: 0.68,
+    height: 0.10,
+    depth: 0.12,
+  }, scene);
+  head.parent = root;
+  head.position.set(-0.16, 0.22, 0);
+  head.material = makeCardboard(scene, `${name}_headMat`, 114, 116, 122, { roughness: 0.84 });
+
+  for (let i = 0; i < 5; i++) {
+    const tine = BABYLON.MeshBuilder.CreateBox(`${name}_tine${i}`, {
+      width: 0.04,
+      height: 0.22,
+      depth: 0.04,
+    }, scene);
+    tine.parent = root;
+    tine.position.set(-0.42 + (i * 0.13), 0.08, 0);
+    tine.material = head.material;
+  }
+
+  markDecorative(root);
+  setRenderingGroup(root, 3);
+  return root;
+}
+
+function createTractorPlaceholder(scene, name, { x, y, z = 0 }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
+    width: 1.5,
+    height: 0.82,
+    depth: 0.82,
+  }, scene);
+  body.parent = root;
+  body.position.y = 0.62;
+  body.material = makePlastic(scene, `${name}_bodyMat`, 0.76, 0.18, 0.12, { roughness: 0.48 });
+
+  const cab = BABYLON.MeshBuilder.CreateBox(`${name}_cab`, {
+    width: 0.7,
+    height: 0.72,
+    depth: 0.64,
+  }, scene);
+  cab.parent = root;
+  cab.position.set(0.28, 1.14, 0);
+  cab.material = makeCardboard(scene, `${name}_cabMat`, 184, 198, 196, { roughness: 0.92 });
+
+  const hood = BABYLON.MeshBuilder.CreateBox(`${name}_hood`, {
+    width: 0.84,
+    height: 0.46,
+    depth: 0.66,
+  }, scene);
+  hood.parent = root;
+  hood.position.set(-0.34, 0.74, 0);
+  hood.material = body.material;
+
+  for (const [index, def] of [
+    { x: -0.52, y: 0.24, d: 0.62 },
+    { x: 0.42, y: 0.28, d: 0.78 },
+  ].entries()) {
+    for (const zOff of [-0.34, 0.34]) {
+      const wheel = BABYLON.MeshBuilder.CreateCylinder(`${name}_wheel_${index}_${zOff}`, {
+        height: 0.16,
+        diameter: def.d,
+        tessellation: 20,
+      }, scene);
+      wheel.parent = root;
+      wheel.position.set(def.x, def.y, zOff);
+      wheel.rotation.x = Math.PI / 2;
+      wheel.material = makePlastic(scene, `${name}_wheelMat_${index}_${zOff}`, 0.16, 0.18, 0.2, { roughness: 0.62 });
+    }
+  }
 
   markDecorative(root);
   setRenderingGroup(root, 3);
@@ -378,30 +522,30 @@ function createGrandmaBackdrop(scene, shadowGen) {
   const skyTex = new BABYLON.DynamicTexture('grandmaForestSkyTex', { width: 2048, height: 512 }, scene, true);
   const skyCtx = skyTex.getContext();
   const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 512);
-  skyGrad.addColorStop(0, '#8cc8f4');
-  skyGrad.addColorStop(0.55, '#d7ecff');
-  skyGrad.addColorStop(1, '#f0d8a2');
+  skyGrad.addColorStop(0, '#8fc7f5');
+  skyGrad.addColorStop(0.58, '#dbeeff');
+  skyGrad.addColorStop(1, '#f0d7a2');
   skyCtx.fillStyle = skyGrad;
   skyCtx.fillRect(0, 0, 2048, 512);
-  skyCtx.fillStyle = '#506f47';
+  skyCtx.fillStyle = '#5b7b4f';
   skyCtx.beginPath();
-  skyCtx.moveTo(0, 338);
-  for (let x = 0; x <= 2048; x += 48) {
-    const ridgeY = 324 + (Math.sin(x * 0.018) * 14) + (Math.cos(x * 0.009) * 10);
+  skyCtx.moveTo(0, 352);
+  for (let x = 0; x <= 2048; x += 56) {
+    const ridgeY = 336 + (Math.sin(x * 0.016) * 12) + (Math.cos(x * 0.007) * 8);
     skyCtx.lineTo(x, ridgeY);
   }
   skyCtx.lineTo(2048, 512);
   skyCtx.lineTo(0, 512);
   skyCtx.closePath();
   skyCtx.fill();
-  skyCtx.fillStyle = '#6d8c60';
-  for (let i = 0; i < 56; i++) {
-    const cx = 24 + (i * 36);
-    const h = 26 + ((i % 5) * 6);
+  skyCtx.fillStyle = '#5d7c53';
+  for (let i = 0; i < 34; i++) {
+    const cx = 28 + (i * 60);
+    const h = 18 + ((i % 7) * 7);
     skyCtx.beginPath();
-    skyCtx.moveTo(cx - 16, 334);
-    skyCtx.lineTo(cx, 334 - h);
-    skyCtx.lineTo(cx + 16, 334);
+    skyCtx.moveTo(cx - 18, 346);
+    skyCtx.lineTo(cx, 346 - h);
+    skyCtx.lineTo(cx + 18, 346);
     skyCtx.closePath();
     skyCtx.fill();
   }
@@ -413,10 +557,10 @@ function createGrandmaBackdrop(scene, shadowGen) {
   skyMat.specularColor = BABYLON.Color3.Black();
 
   const skyPlane = BABYLON.MeshBuilder.CreatePlane('grandmaForestSky', {
-    width: 134,
-    height: 26,
+    width: 152,
+    height: 28,
   }, scene);
-  skyPlane.position.set(28, 11.8, 11.6);
+  skyPlane.position.set(28, 11.6, 13.6);
   skyPlane.material = skyMat;
   markDecorative(skyPlane);
 
@@ -442,32 +586,20 @@ function createGrandmaBackdrop(scene, shadowGen) {
     width: 5.8,
     height: 5.8,
   }, scene);
-  sun.position.set(57.5, 15.8, 11.2);
+  sun.position.set(56.8, 16.2, 13.2);
   sun.material = sunMat;
   markDecorative(sun);
-
-  const backdrop = BABYLON.MeshBuilder.CreateBox('backdrop3', {
-    width: 110,
-    height: 24,
-    depth: 0.5,
-  }, scene);
-  backdrop.position.set(28, 9.5, 9.2);
-  backdrop.material = makePaper(scene, 'backdrop3Mat', 234, 221, 204, {
-    roughness: 0.98,
-    grainScale: 2.6,
-    noiseAmt: 12,
-  });
-  backdrop.receiveShadows = true;
 
   const barn = BABYLON.MeshBuilder.CreateBox('grandmaBarnSilhouette', {
     width: 13,
     height: 7.8,
     depth: 0.8,
   }, scene);
-  barn.position.set(75, 5.0, 6.8);
+  barn.position.set(75, 5.0, 12.3);
   barn.material = makeCardboard(scene, 'grandmaBarnMat', 176, 116, 88, { roughness: 0.9 });
   barn.receiveShadows = true;
   shadowGen.addShadowCaster(barn);
+  markDecorative(barn);
 
   const roof = BABYLON.MeshBuilder.CreateCylinder('grandmaRoof', {
     diameterTop: 0,
@@ -476,35 +608,26 @@ function createGrandmaBackdrop(scene, shadowGen) {
     tessellation: 3,
   }, scene);
   roof.rotation.z = Math.PI / 2;
-  roof.position.set(75.4, 9.0, 6.9);
+  roof.position.set(75.4, 9.0, 12.45);
   roof.material = makeCardboard(scene, 'grandmaRoofMat', 162, 86, 64, { roughness: 0.88 });
   roof.receiveShadows = true;
   shadowGen.addShadowCaster(roof);
+  markDecorative(roof);
 
   const silo = BABYLON.MeshBuilder.CreateCylinder('grandmaSilo', {
     diameter: 2.4,
     height: 8.2,
     tessellation: 18,
   }, scene);
-  silo.position.set(67.8, 4.2, 7.0);
+  silo.position.set(67.8, 4.2, 12.2);
   silo.material = makeCardboard(scene, 'grandmaSiloMat', 196, 188, 176, { roughness: 0.94 });
   markDecorative(silo);
-
-  const gardenFence = BABYLON.MeshBuilder.CreateBox('gardenFence3', {
-    width: 22,
-    height: 2.6,
-    depth: 0.4,
-  }, scene);
-  gardenFence.position.set(-8.0, 1.0, 6.6);
-  gardenFence.material = makeCardboard(scene, 'gardenFence3Mat', 208, 191, 172, { roughness: 0.92 });
-  gardenFence.receiveShadows = true;
-  markDecorative(gardenFence);
 
   const goalBanner = BABYLON.MeshBuilder.CreatePlane('grandmaGoalBanner', {
     width: 4.4,
     height: 1.0,
   }, scene);
-  goalBanner.position.set(74.8, 9.2, 5.9);
+  goalBanner.position.set(74.8, 9.2, 11.3);
   const bannerMat = makePaper(scene, 'grandmaGoalBannerMat', 255, 239, 198, {
     roughness: 0.98,
     grainScale: 2.2,
@@ -520,7 +643,7 @@ function createGrandmaBackdrop(scene, shadowGen) {
     height: 1.5,
     depth: 0.12,
   }, scene);
-  bannerPoleLeft.position.set(72.7, 8.75, 6.0);
+  bannerPoleLeft.position.set(72.7, 8.75, 11.38);
   bannerPoleLeft.material = makeCardboard(scene, 'grandmaGoalPoleLMat', 156, 112, 88, { roughness: 0.88 });
   markDecorative(bannerPoleLeft);
 
@@ -529,41 +652,46 @@ function createGrandmaBackdrop(scene, shadowGen) {
     height: 1.5,
     depth: 0.12,
   }, scene);
-  bannerPoleRight.position.set(76.9, 8.75, 6.0);
+  bannerPoleRight.position.set(76.9, 8.75, 11.38);
   bannerPoleRight.material = makeCardboard(scene, 'grandmaGoalPoleRMat', 156, 112, 88, { roughness: 0.88 });
   markDecorative(bannerPoleRight);
 
-  for (let i = 0; i < 6; i++) {
-    const tree = BABYLON.MeshBuilder.CreateCylinder(`farmTree_${i}`, {
-      diameterTop: 0.2,
-      diameterBottom: 0.34,
-      height: 3.2,
+  for (let i = 0; i < 24; i++) {
+    const trunk = BABYLON.MeshBuilder.CreateCylinder(`farmPineTrunk_${i}`, {
+      diameterTop: 0.10,
+      diameterBottom: 0.20,
+      height: 1.6 + ((i % 4) * 0.18),
       tessellation: 8,
     }, scene);
-    tree.position.set(-8 + (i * 24), 2.1, 7.6 + (i * 0.08));
-    tree.material = makeCardboard(scene, `farmTreeTrunkMat_${i}`, 110, 82, 58, { roughness: 0.92 });
-    markDecorative(tree);
+    trunk.position.set(-18 + (i * 4.6), 1.2, 12.6 + ((i % 3) * 0.08));
+    trunk.material = makeCardboard(scene, `farmPineTrunkMat_${i}`, 96, 74, 58, { roughness: 0.92 });
+    markDecorative(trunk);
 
-    const canopy = BABYLON.MeshBuilder.CreateSphere(`farmTreeCanopy_${i}`, {
-      diameter: 2.4,
-      segments: 10,
-    }, scene);
-    canopy.position.set(tree.position.x, 4.2, tree.position.z - 0.06);
-    canopy.material = makePaper(scene, `farmTreeCanopyMat_${i}`, 142, 174, 112, {
-      roughness: 0.98,
-      grainScale: 2.4,
-      noiseAmt: 10,
-    });
-    markDecorative(canopy);
+    for (const [layer, size] of [2.2, 1.8, 1.4].entries()) {
+      const canopy = BABYLON.MeshBuilder.CreateCylinder(`farmPineCanopy_${i}_${layer}`, {
+        diameterTop: 0,
+        diameterBottom: size,
+        height: 1.5,
+        tessellation: 3,
+      }, scene);
+      canopy.position.set(trunk.position.x, 2.1 + (layer * 0.82), trunk.position.z - 0.04);
+      canopy.material = makePaper(scene, `farmPineMat_${i}_${layer}`, 82, 114, 72, {
+        roughness: 0.98,
+        grainScale: 2.1,
+        noiseAmt: 10,
+      });
+      canopy.receiveShadows = false;
+      markDecorative(canopy);
+    }
   }
 
-  for (const [index, x] of [-12, 14, 42, 70].entries()) {
+  for (const [index, x] of [-14, 8, 30, 54, 76].entries()) {
     const fence = BABYLON.MeshBuilder.CreateBox(`grandmaBackdropFence_${index}`, {
-      width: 18,
-      height: 1.8,
+      width: 15,
+      height: 1.5,
       depth: 0.18,
     }, scene);
-    fence.position.set(x, 1.2, 6.2 + (index * 0.12));
+    fence.position.set(x, 1.0, 11.8 + (index * 0.08));
     fence.material = makeCardboard(scene, `grandmaBackdropFenceMat_${index}`, 198, 184, 160, { roughness: 0.94 });
     markDecorative(fence);
   }
@@ -605,7 +733,12 @@ export function buildWorld3(scene, options = {}) {
   shadowGen.setDarkness(0.36);
 
   const groundDef = LEVEL3.ground;
-  createCardboardPlatform(scene, 'ground3', {
+  const platformByName = new Map(LEVEL3.platforms.map((platform) => [platform.name, platform]));
+  const getPlatformTopY = (name) => {
+    const platform = platformByName.get(name);
+    return platform ? platform.y + (platform.h * 0.5) + 0.02 : floorTopY;
+  };
+  const groundVisual = createCardboardPlatform(scene, 'ground3', {
     x: groundDef.x,
     y: groundDef.y,
     z: groundDef.z,
@@ -616,8 +749,20 @@ export function buildWorld3(scene, options = {}) {
     edgeColor: P3.edgeDark,
     shadowGen,
   });
+  setRenderingGroup(groundVisual, 2);
 
   const groundCollider = makeInvisibleCollider(scene, 'groundCol3', groundDef);
+  groundCollider.computeWorldMatrix(true);
+  const floorTopY = groundCollider.getBoundingInfo().boundingBox.maximumWorld.y + 0.02;
+  const grassMat = makeGrassMaterial(scene, 'level3_groundGrass');
+  const grassEdgeMat = makeCardboard(scene, 'level3_groundGrassEdge', 92, 112, 68, { roughness: 0.94 });
+  for (const mesh of groundVisual.getChildMeshes(false)) {
+    if (mesh.name.includes('_slab')) {
+      mesh.material = grassMat;
+    } else if (mesh.name.includes('_edge') || mesh.name.includes('_bevel')) {
+      mesh.material = grassEdgeMat;
+    }
+  }
   const allPlatforms = [groundCollider];
 
   for (const def of LEVEL3.platforms) {
@@ -640,7 +785,7 @@ export function buildWorld3(scene, options = {}) {
   }
 
   createGrandmaBackdrop(scene, shadowGen);
-  const gardenTopY = LEVEL3.platforms.find((p) => p.name === 'gardenStart').y + (LEVEL3.platforms.find((p) => p.name === 'gardenStart').h * 0.5);
+  const gardenTopY = getPlatformTopY('gardenStart') - 0.02;
   const welcomeSign = createWelcomeSign(scene, {
     name: 'l3_welcomeSign',
     x: -21.2,
@@ -728,15 +873,52 @@ export function buildWorld3(scene, options = {}) {
   }
 
   const timedHazards = [];
+  const toolHazards = [];
+  const sprinklerCornAnchors = [];
   for (const sprinkler of LEVEL3.sprinklers) {
+    const patchCenter = new BABYLON.Vector3(
+      sprinkler.x + 0.82,
+      floorTopY + 1.06,
+      1.78,
+    );
+    const nozzleLocal = new BABYLON.Vector3(-0.42, 0.56, 1.52);
+    const targetLocal = new BABYLON.Vector3(
+      patchCenter.x - sprinkler.x,
+      patchCenter.y - sprinkler.y,
+      patchCenter.z,
+    );
     const visual = createSprinklerVisual(scene, sprinkler.name, {
       x: sprinkler.x,
       y: sprinkler.y,
-      z: LANE_Z,
-      width: sprinkler.width,
-      height: sprinkler.height,
+      z: 0,
+      nozzleLocal,
+      targetLocal,
     });
     setRenderingGroup(visual.root, 3);
+    const patchRows = [-0.34, 0.34];
+    const patchCols = [-0.76, 0, 0.76];
+    let patchIndex = 0;
+    for (const row of patchRows) {
+      for (const col of patchCols) {
+        const anchor = new BABYLON.TransformNode(`${sprinkler.name}_cornAnchor${patchIndex}`, scene);
+        anchor.position.set(
+          patchCenter.x + col,
+          floorTopY,
+          1.42 + row,
+        );
+        anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true, decor: true };
+        const fallback = createPlantPlaceholder(scene, `${sprinkler.name}_cornFallback${patchIndex}`, {
+          x: anchor.position.x,
+          y: anchor.position.y,
+          z: anchor.position.z,
+          kind: 'corn',
+        });
+        fallback.parent = anchor;
+        fallback.position.set(0, 0, 0);
+        sprinklerCornAnchors.push(anchor);
+        patchIndex += 1;
+      }
+    }
     timedHazards.push({
       ...sprinkler,
       reason: 'sprinkler',
@@ -746,37 +928,64 @@ export function buildWorld3(scene, options = {}) {
       streamMeshes: visual.streams,
       active: false,
       handledByLevelRuntime: true,
-      minX: sprinkler.x - sprinkler.width * 0.5,
-      maxX: sprinkler.x + sprinkler.width * 0.5,
-      minY: sprinkler.y - sprinkler.height * 0.5,
-      maxY: sprinkler.y + sprinkler.height * 0.5,
+      minX: patchCenter.x - 1.05,
+      maxX: patchCenter.x + 1.05,
+      minY: floorTopY + 0.10,
+      maxY: patchCenter.y + 0.28,
     });
   }
-  for (const vent of LEVEL3.steamVents) {
-    const visual = createSteamHazardVisual(scene, vent.name, {
-      x: vent.x,
-      y: vent.y,
-      z: LANE_Z,
-      width: vent.width,
-      height: vent.height,
-      color: [0.92, 0.90, 0.84],
-      warm: true,
-    });
-    setRenderingGroup(visual.root, 3);
-    timedHazards.push({
-      ...vent,
-      reason: 'steam',
-      statusText: 'Too hot!',
-      root: visual.root,
-      mesh: visual.column,
-      active: false,
-      handledByLevelRuntime: true,
-      minX: vent.x - vent.width * 0.5,
-      maxX: vent.x + vent.width * 0.5,
-      minY: vent.y - vent.height * 0.5,
-      maxY: vent.y + vent.height * 0.5,
-    });
-  }
+
+  const rakeAnchor = new BABYLON.TransformNode('l3_rakeAnchor', scene);
+  rakeAnchor.position.set(22.6, getPlatformTopY('tableStone1'), 1.28);
+  rakeAnchor.rotation.y = -0.42;
+  rakeAnchor.metadata = { ...(rakeAnchor.metadata || {}), cameraIgnore: true, decor: true };
+  const rakeFallback = createRakePlaceholder(scene, 'l3_rakeFallback', {
+    x: rakeAnchor.position.x,
+    y: rakeAnchor.position.y,
+    z: rakeAnchor.position.z,
+  });
+  rakeFallback.parent = rakeAnchor;
+  rakeFallback.position.set(0, 0, 0);
+  setRenderingGroup(rakeAnchor, 3);
+  toolHazards.push({
+    name: 'rakeHazard',
+    reason: 'rake',
+    statusText: 'Watch the rake!',
+    root: rakeAnchor,
+    mesh: rakeFallback.getChildMeshes(false)[0] || null,
+    active: true,
+    handledByLevelRuntime: true,
+    minX: rakeAnchor.position.x - 0.95,
+    maxX: rakeAnchor.position.x + 0.95,
+    minY: rakeAnchor.position.y,
+    maxY: rakeAnchor.position.y + 1.26,
+  });
+
+  const tractorAnchor = new BABYLON.TransformNode('l3_tractorAnchor', scene);
+  tractorAnchor.position.set(31.2, getPlatformTopY('tableStone3'), 1.34);
+  tractorAnchor.rotation.y = Math.PI;
+  tractorAnchor.metadata = { ...(tractorAnchor.metadata || {}), cameraIgnore: true, decor: true };
+  const tractorFallback = createTractorPlaceholder(scene, 'l3_tractorFallback', {
+    x: tractorAnchor.position.x,
+    y: tractorAnchor.position.y,
+    z: tractorAnchor.position.z,
+  });
+  tractorFallback.parent = tractorAnchor;
+  tractorFallback.position.set(0, 0, 0);
+  setRenderingGroup(tractorAnchor, 3);
+  toolHazards.push({
+    name: 'tractorHazard',
+    reason: 'tractor',
+    statusText: 'Watch the tractor!',
+    root: tractorAnchor,
+    mesh: tractorFallback.getChildMeshes(false)[0] || null,
+    active: true,
+    handledByLevelRuntime: true,
+    minX: tractorAnchor.position.x - 1.2,
+    maxX: tractorAnchor.position.x + 1.2,
+    minY: tractorAnchor.position.y,
+    maxY: tractorAnchor.position.y + 1.44,
+  });
 
   const dogHazards = [];
   for (const lane of LEVEL3.dogLanes) {
@@ -797,6 +1006,7 @@ export function buildWorld3(scene, options = {}) {
         mesh: root.getChildMeshes(false)[0] || null,
         width: 1.4,
         height: 1.0,
+        yaw: dogDef.dir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5,
         active: true,
         handledByLevelRuntime: true,
         minX: dogDef.startX - 0.7,
@@ -807,9 +1017,37 @@ export function buildWorld3(scene, options = {}) {
     });
   }
 
-  const hazards = [...timedHazards, ...dogHazards];
-  const floorTopY = groundDef.y + (groundDef.h * 0.5) + 0.02;
-  const porchTopY = LEVEL3.platforms.find((p) => p.name === 'grandmaPorch').y + 0.42;
+  const porchTopY = getPlatformTopY('grandmaPorch');
+  const grandmaHazard = createGrandma(scene, {
+    x: 73.9,
+    y: porchTopY,
+    z: LANE_Z,
+    shadowGen,
+    animate: true,
+  });
+  markDecorative(grandmaHazard.root);
+  setRenderingGroup(grandmaHazard.root, 3);
+  const grandmaPatrol = {
+    root: grandmaHazard.root,
+    minX: 72.1,
+    maxX: 75.6,
+    speed: 0.82,
+    dir: 1,
+    width: 1.1,
+    height: 3.0,
+  };
+
+  const hazards = [...timedHazards, ...toolHazards, ...dogHazards, {
+    name: 'grandmaHazard',
+    reason: 'grandma',
+    root: grandmaPatrol.root,
+    active: true,
+    handledByLevelRuntime: true,
+    minX: grandmaPatrol.minX,
+    maxX: grandmaPatrol.maxX,
+    minY: porchTopY,
+    maxY: porchTopY + grandmaPatrol.height,
+  }];
   const decorControllers = [];
 
   function makeDecorAnimalAnchor(name, { x, y, z, kind, controller }) {
@@ -852,63 +1090,40 @@ export function buildWorld3(scene, options = {}) {
     return anchor;
   }
 
-  const tulipAnchors = [
-    new BABYLON.TransformNode('l3_tulipAnchor0', scene),
-    new BABYLON.TransformNode('l3_tulipAnchor1', scene),
-  ];
-  const yellowFlowerAnchors = [
-    new BABYLON.TransformNode('l3_yellowFlowerAnchor0', scene),
-    new BABYLON.TransformNode('l3_yellowFlowerAnchor1', scene),
-  ];
-  const cornAnchors = [
-    new BABYLON.TransformNode('l3_cornAnchor0', scene),
-    new BABYLON.TransformNode('l3_cornAnchor1', scene),
-    new BABYLON.TransformNode('l3_cornAnchor2', scene),
-    new BABYLON.TransformNode('l3_cornAnchor3', scene),
-  ];
-  tulipAnchors[0].position.set(-13.8, floorTopY, 1.5);
-  tulipAnchors[1].position.set(47.8, floorTopY, 1.5);
-  yellowFlowerAnchors[0].position.set(-7.4, floorTopY, 1.4);
-  yellowFlowerAnchors[1].position.set(58.6, floorTopY, 1.4);
-  cornAnchors[0].position.set(-12.1, floorTopY, 1.9);
-  cornAnchors[1].position.set(-6.3, floorTopY, 1.95);
-  cornAnchors[2].position.set(16.6, floorTopY, 1.88);
-  cornAnchors[3].position.set(66.2, floorTopY, 1.96);
-
-  for (const anchor of [...tulipAnchors, ...yellowFlowerAnchors, ...cornAnchors]) {
-    anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true };
+  function makePlantAnchor(name, { x, y, z, kind }) {
+    const anchor = new BABYLON.TransformNode(name, scene);
+    anchor.position.set(x, y, z);
+    anchor.metadata = { ...(anchor.metadata || {}), cameraIgnore: true, decor: true };
+    const fallback = createPlantPlaceholder(scene, `${name}_fallback`, {
+      x,
+      y,
+      z,
+      kind,
+    });
+    fallback.parent = anchor;
+    fallback.position.set(0, 0, 0);
+    return anchor;
   }
 
-  tulipAnchors.forEach((anchor, index) => {
-    const fallback = createPlantPlaceholder(scene, `l3_tulipFallback${index}`, {
-      x: anchor.position.x,
-      y: anchor.position.y,
-      z: anchor.position.z,
-      kind: 'flower',
-    });
-    fallback.parent = anchor;
-    fallback.position.set(0, 0, 0);
-  });
-  yellowFlowerAnchors.forEach((anchor, index) => {
-    const fallback = createPlantPlaceholder(scene, `l3_yellowFallback${index}`, {
-      x: anchor.position.x,
-      y: anchor.position.y,
-      z: anchor.position.z,
-      kind: 'yellow',
-    });
-    fallback.parent = anchor;
-    fallback.position.set(0, 0, 0);
-  });
-  cornAnchors.forEach((anchor, index) => {
-    const fallback = createPlantPlaceholder(scene, `l3_cornFallback${index}`, {
-      x: anchor.position.x,
-      y: anchor.position.y,
-      z: anchor.position.z,
-      kind: 'corn',
-    });
-    fallback.parent = anchor;
-    fallback.position.set(0, 0, 0);
-  });
+  const tulipAnchors = [
+    makePlantAnchor('l3_tulipAnchor0', { x: -15.0, y: floorTopY, z: 1.44, kind: 'flower' }),
+    makePlantAnchor('l3_tulipAnchor1', { x: 46.8, y: floorTopY, z: 1.50, kind: 'flower' }),
+    makePlantAnchor('l3_tulipAnchor2', { x: 54.0, y: floorTopY, z: 1.48, kind: 'flower' }),
+    makePlantAnchor('l3_tulipAnchor3', { x: 68.6, y: floorTopY, z: 1.52, kind: 'flower' }),
+  ];
+  const yellowFlowerAnchors = [
+    makePlantAnchor('l3_yellowFlowerAnchor0', { x: -8.2, y: floorTopY, z: 1.38, kind: 'yellow' }),
+    makePlantAnchor('l3_yellowFlowerAnchor1', { x: 49.8, y: floorTopY, z: 1.42, kind: 'yellow' }),
+    makePlantAnchor('l3_yellowFlowerAnchor2', { x: 58.6, y: floorTopY, z: 1.44, kind: 'yellow' }),
+    makePlantAnchor('l3_yellowFlowerAnchor3', { x: 70.8, y: floorTopY, z: 1.36, kind: 'yellow' }),
+  ];
+  const extraCornAnchors = [
+    makePlantAnchor('l3_cornAnchor0', { x: 16.6, y: floorTopY, z: 1.86, kind: 'corn' }),
+    makePlantAnchor('l3_cornAnchor1', { x: 47.8, y: floorTopY, z: 1.84, kind: 'corn' }),
+    makePlantAnchor('l3_cornAnchor2', { x: 66.2, y: floorTopY, z: 1.94, kind: 'corn' }),
+    makePlantAnchor('l3_cornAnchor3', { x: 69.4, y: floorTopY, z: 1.90, kind: 'corn' }),
+  ];
+  const cornAnchors = [...sprinklerCornAnchors, ...extraCornAnchors];
 
   const decorDogAnchors = [
     makeDecorAnimalAnchor('l3_huskyAnchor', {
@@ -948,7 +1163,7 @@ export function buildWorld3(scene, options = {}) {
 
   const hayDecor = [
     createHayBale(scene, 'l3_hay0', { x: -15.2, y: floorTopY, z: 2.2, scale: 0.9 }),
-    createHayBale(scene, 'l3_hay1', { x: 17.4, y: LEVEL3.platforms.find((p) => p.name === 'tableEntry').y + 0.42, z: 2.1, scale: 0.78 }),
+    createHayBale(scene, 'l3_hay1', { x: 17.4, y: getPlatformTopY('tableEntry'), z: 2.1, scale: 0.78 }),
     createHayBale(scene, 'l3_hay2', { x: 69.2, y: floorTopY, z: 2.3, scale: 1.0 }),
     createHayBale(scene, 'l3_hay3', { x: 47.4, y: floorTopY, z: 2.18, scale: 0.86 }),
     createHayBale(scene, 'l3_hay4', { x: 61.8, y: floorTopY, z: 2.32, scale: 0.94 }),
@@ -998,6 +1213,31 @@ export function buildWorld3(scene, options = {}) {
     dog.maxX = dog.root.position.x + halfW;
     dog.minY = dog.root.position.y - dog.height * 0.5;
     dog.maxY = dog.root.position.y + dog.height * 0.5;
+    const desiredYaw = Math.atan2(dog.speed * dog.dir, 0.0001);
+    let delta = desiredYaw - dog.yaw;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    dog.yaw += delta * Math.min(1, dt * 6.0);
+    dog.root.rotationQuaternion = null;
+    dog.root.rotation.y = dog.yaw;
+  }
+
+  function updateGrandmaHazard(dt) {
+    const halfW = grandmaPatrol.width * 0.5;
+    grandmaPatrol.root.position.x += grandmaPatrol.speed * grandmaPatrol.dir * dt;
+    if (grandmaPatrol.dir > 0 && grandmaPatrol.root.position.x > grandmaPatrol.maxX - halfW) {
+      grandmaPatrol.root.position.x = grandmaPatrol.maxX - halfW;
+      grandmaPatrol.dir = -1;
+    } else if (grandmaPatrol.dir < 0 && grandmaPatrol.root.position.x < grandmaPatrol.minX + halfW) {
+      grandmaPatrol.root.position.x = grandmaPatrol.minX + halfW;
+      grandmaPatrol.dir = 1;
+    }
+    grandmaPatrol.root.rotationQuaternion = null;
+    grandmaPatrol.root.rotation.y = grandmaPatrol.dir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+    grandmaPatrol.minHitX = grandmaPatrol.root.position.x - halfW;
+    grandmaPatrol.maxHitX = grandmaPatrol.root.position.x + halfW;
+    grandmaPatrol.minHitY = grandmaPatrol.root.position.y;
+    grandmaPatrol.maxHitY = grandmaPatrol.root.position.y + grandmaPatrol.height;
   }
 
   const level3 = {
@@ -1017,7 +1257,8 @@ export function buildWorld3(scene, options = {}) {
           && playerMaxY > hazard.minY
           && playerMinY < hazard.maxY;
         if (overlaps) {
-          triggerReset(hazard.reason, pos.x < hazard.x ? -1 : 1);
+          const sourceX = Number.isFinite(hazard.x) ? hazard.x : hazard.root.position.x;
+          triggerReset(hazard.reason, pos.x < sourceX ? -1 : 1);
         }
       }
 
@@ -1030,6 +1271,15 @@ export function buildWorld3(scene, options = {}) {
         if (overlaps) {
           triggerReset('dog', pos.x < dog.root.position.x ? -1 : 1);
         }
+      }
+
+      updateGrandmaHazard(dt);
+      const grandmaOverlaps = playerMaxX > grandmaPatrol.minHitX
+        && playerMinX < grandmaPatrol.maxHitX
+        && playerMaxY > grandmaPatrol.minHitY
+        && playerMinY < grandmaPatrol.maxHitY;
+      if (grandmaOverlaps) {
+        triggerReset('grandma', pos.x < grandmaPatrol.root.position.x ? -1 : 1);
       }
 
       for (const controller of decorControllers) {
@@ -1046,11 +1296,16 @@ export function buildWorld3(scene, options = {}) {
       for (const dog of dogHazards) {
         dog.root.position.x = dog.startX;
         dog.root.position.y = dog.lane.y;
+        dog.yaw = dog.dir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
         dog.minX = dog.startX - dog.width * 0.5;
         dog.maxX = dog.startX + dog.width * 0.5;
         dog.minY = dog.lane.y - dog.height * 0.5;
         dog.maxY = dog.lane.y + dog.height * 0.5;
       }
+      grandmaPatrol.root.position.x = 73.9;
+      grandmaPatrol.root.position.y = getPlatformTopY('grandmaPorch');
+      grandmaPatrol.dir = 1;
+      updateGrandmaHazard(0);
       for (const controller of decorControllers) {
         controller.reset();
       }
@@ -1096,6 +1351,8 @@ export function buildWorld3(scene, options = {}) {
       futureChickensPropModel: [endAnimalAnchors[0]],
       futureGoatPropModel: [endAnimalAnchors[1]],
       futureTurkeyPropModel: [endAnimalAnchors[2]],
+      futureRakePropModel: [rakeAnchor],
+      futureTractorPropModel: [tractorAnchor],
     },
   };
 }

@@ -35,7 +35,9 @@
     "futurePlayfulDogPropModel": ["local_playful_dog"],
     "futureTaterDogPropModel": ["local_tater_dog"],
     "futureChickensPropModel": ["local_chickens"],
-    "futureTurkeyPropModel": ["local_thanksgiving_turkey"]
+    "futureTurkeyPropModel": ["local_thanksgiving_turkey"],
+    "futureRakePropModel": ["local_gardeners_rake"],
+    "futureTractorPropModel": ["local_tractor"]
   },
   "models": [
     {
@@ -299,6 +301,18 @@
     {
       "id": "local_thanksgiving_turkey",
       "path": "assets/models/props/thanksgiving_turkey.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_gardeners_rake",
+      "path": "assets/models/props/gardeners_rake.glb",
+      "scale": 1,
+      "yOffset": 0
+    },
+    {
+      "id": "local_tractor",
+      "path": "assets/models/props/tractor.glb",
       "scale": 1,
       "yOffset": 0
     },
