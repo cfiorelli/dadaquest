@@ -1173,13 +1173,38 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(pianoVisual, 2);
   tagLevel2Decor(pianoVisual);
 
+  const landingColliderMesh = platformColliders.platLanding;
+  landingColliderMesh?.computeWorldMatrix?.(true);
+  const landingBounds = landingColliderMesh?.getBoundingInfo?.()?.boundingBox;
+  const landingDecorSurface = landingBounds
+    ? {
+      topY: landingBounds.maximumWorld.y,
+      baseY: landingBounds.maximumWorld.y + 0.02,
+      minX: landingBounds.minimumWorld.x + 0.45,
+      maxX: landingBounds.maximumWorld.x - 0.45,
+      minZ: 0.72,
+      maxZ: Math.min(1.68, landingBounds.maximumWorld.z - 0.36),
+    }
+    : {
+      topY: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.4,
+      baseY: LEVEL2.platforms.find((p) => p.name === 'platLanding').y + 0.42,
+      minX: 16.2,
+      maxX: 19.8,
+      minZ: 0.72,
+      maxZ: 1.52,
+    };
+
   const biancaAnchor = new BABYLON.TransformNode('biancaAnchor', scene);
   biancaAnchor.position.set(
-    LEVEL2.assetAnchors.bianca.x,
-    LEVEL2.assetAnchors.bianca.y,
-    LEVEL2_DECOR_Z,
+    19.3,
+    landingDecorSurface.baseY,
+    1.06,
   );
   biancaAnchor.rotation.y = Math.PI;
+  biancaAnchor.metadata = {
+    ...(biancaAnchor.metadata || {}),
+    level2DecorSurface: landingDecorSurface,
+  };
   tagLevel2Decor(biancaAnchor);
 
   const highchairAnchor = new BABYLON.TransformNode('highchairAnchor', scene);
@@ -1300,6 +1325,25 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(welcomeSign, 3);
   tagLevel2Decor(welcomeSign);
 
+  const horseHintSign = createWelcomeSign(scene, {
+    name: 'l2_horseHint',
+    x: -7.2,
+    y: LEVEL2.platforms.find((p) => p.name === 'platBedroom').y + 0.4,
+    z: 2.18,
+    shadowGen,
+    textLines: ['PUSH HORSE', '→'],
+    width: 2.36,
+    height: 1.0,
+    postHeight: 2.15,
+    boardName: 'l2_horseHint',
+    boardColor: [224, 196, 140],
+    postColor: [112, 86, 60],
+    fontFamily: 'Avenir Next, Trebuchet MS, sans-serif',
+    textInsetPx: 64,
+  });
+  setRenderingGroup(horseHintSign, 3);
+  tagLevel2Decor(horseHintSign);
+
   const rooftopSign = createWelcomeSign(scene, {
     name: 'l2_rooftopSign',
     x: 21.6,
@@ -1319,9 +1363,59 @@ export function buildWorld2(scene, options = {}) {
   setRenderingGroup(rooftopSign, 3);
   tagLevel2Decor(rooftopSign);
 
+  const horseSnapGlow = BABYLON.MeshBuilder.CreatePlane('L2_horseSnapGlow', {
+    width: 2.4,
+    height: 1.0,
+  }, scene);
+  horseSnapGlow.position.set(horseDef.snapX + 0.08, 0.03, -1.18);
+  horseSnapGlow.rotation.x = Math.PI / 2;
+  const horseSnapGlowMat = new BABYLON.StandardMaterial('L2_horseSnapGlowMat', scene);
+  horseSnapGlowMat.diffuseColor = new BABYLON.Color3(1.0, 0.88, 0.48);
+  horseSnapGlowMat.emissiveColor = new BABYLON.Color3(0.66, 0.54, 0.2);
+  horseSnapGlowMat.alpha = 0.18;
+  horseSnapGlowMat.backFaceCulling = false;
+  horseSnapGlowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  horseSnapGlow.material = horseSnapGlowMat;
+  tagLevel2Decor(horseSnapGlow);
+  setRenderingGroup(horseSnapGlow, 1);
+
   const rockingHorseAnchor = new BABYLON.TransformNode('rockingHorseAnchor', scene);
   rockingHorseAnchor.position.set(horseX, LEVEL2.platforms.find((p) => p.name === 'platHorse').y, LEVEL2_DECOR_Z);
   tagLevel2Decor(rockingHorseAnchor);
+
+  const horseStepActive = {
+    x: -1.55,
+    y: 1.45,
+    z: 0,
+    w: 1.85,
+    h: 0.60,
+    d: 2.8,
+  };
+  const horseStepVisual = createCardboardPlatform(scene, 'L2_horseStep', {
+    x: horseStepActive.x,
+    y: horseStepActive.y,
+    z: horseStepActive.z,
+    w: horseStepActive.w,
+    h: horseStepActive.h,
+    d: horseStepActive.d,
+    slabColor: P2.platformCard,
+    edgeColor: P2.edgeDark,
+    shadowGen,
+  });
+  prefixLevel2Gameplay(horseStepVisual);
+  setRenderingGroup(horseStepVisual, 2);
+  horseStepVisual.setEnabled(false);
+
+  const horseStepCollider = BABYLON.MeshBuilder.CreateBox('L2_horseStep_col', {
+    width: horseStepActive.w,
+    height: horseStepActive.h,
+    depth: horseStepActive.d,
+  }, scene);
+  horseStepCollider.position.set(horseStepActive.x, -1000, horseStepActive.z);
+  horseStepCollider.visibility = 0;
+  horseStepCollider.isPickable = false;
+  prefixLevel2Gameplay(horseStepCollider);
+  allPlatforms.push(horseStepCollider);
 
   // === LEVEL 2 RUNTIME LOGIC ===
   const PLAYER_HALF_W = 0.25;
@@ -1346,6 +1440,8 @@ export function buildWorld2(scene, options = {}) {
   function updateHorse(dt, { pos, player }) {
     const colliderIndex = player && player.colliders ? allPlatforms.indexOf(horseColliderMesh) : -1;
     const collider = colliderIndex >= 0 ? player.colliders[colliderIndex] : null;
+    const horseStepIndex = player && player.colliders ? allPlatforms.indexOf(horseStepCollider) : -1;
+    const horseStepPlayerCollider = horseStepIndex >= 0 ? player.colliders[horseStepIndex] : null;
     if (collider) {
       const platDef = LEVEL2.platforms.find((p) => p.name === 'platHorse');
       const halfW2 = platDef.w / 2;
@@ -1353,6 +1449,18 @@ export function buildWorld2(scene, options = {}) {
       collider.maxX = horseX + halfW2;
       collider.minY = -1000;
       collider.maxY = -999;
+    }
+    if (horseStepPlayerCollider) {
+      if (horseSnapped) {
+        const ext = horseStepCollider.getBoundingInfo().boundingBox.extendSize;
+        horseStepPlayerCollider.minX = horseStepActive.x - ext.x;
+        horseStepPlayerCollider.maxX = horseStepActive.x + ext.x;
+        horseStepPlayerCollider.minY = horseStepActive.y - ext.y;
+        horseStepPlayerCollider.maxY = horseStepActive.y + ext.y;
+      } else {
+        horseStepPlayerCollider.minY = -1000;
+        horseStepPlayerCollider.maxY = -999;
+      }
     }
     if (horseSnapped) return;
     const inPushZone = pos.x >= horseDef.pushZoneMinX && pos.x <= horseDef.pushZoneMaxX
@@ -1363,6 +1471,8 @@ export function buildWorld2(scene, options = {}) {
     if (horseX >= horseDef.snapX) {
       horseX = horseDef.snapX;
       horseSnapped = true;
+      horseStepVisual.setEnabled(true);
+      horseStepCollider.position.set(horseStepActive.x, horseStepActive.y, horseStepActive.z);
     }
 
     // Move visual
@@ -1392,6 +1502,11 @@ export function buildWorld2(scene, options = {}) {
       if (horseColliderMesh) {
         horseColliderMesh.position.x = horseX;
       }
+      horseStepVisual.setEnabled(false);
+      horseStepCollider.position.set(horseStepActive.x, -1000, horseStepActive.z);
+    },
+    isHorseSnapped() {
+      return horseSnapped;
     },
     // Expose anchor nodes for GLB loading in boot.js
     anchors: {

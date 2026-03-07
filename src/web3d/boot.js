@@ -1374,7 +1374,7 @@ export async function boot(options = {}) {
         role: 'futureBiancaModel',
         anchor: l2anchors.bianca,
         fallback: null,
-        fit: { targetHeight: 2.2, targetMaxSize: 3.0, groundOffset: 0.0 },
+        fit: { targetHeight: 1.18, targetMaxSize: 1.75, groundOffset: 0.0, hardMaxExtent: 3.0 },
       },
       {
         role: 'futureHighchairModel',
@@ -1468,6 +1468,18 @@ export async function boot(options = {}) {
               stepFreq: 6.0,
               pitchAmp: 0.016,
               rollAmp: 0.026,
+            });
+          }
+          if (role === 'futureBiancaModel') {
+            registerLevel2AnimalDecor(targetAnchor, {
+              speed: 0.42,
+              radius: 0.62,
+              phase: 0.32 + (anchorPos.x * 0.03),
+              turnSpeed: 5.8,
+              bobAmp: 0.016,
+              stepFreq: 5.0,
+              pitchAmp: 0.012,
+              rollAmp: 0.018,
             });
           }
           if (role === 'futurePackPropModel' && (stillOversized || badlyOffset)) {
@@ -1930,6 +1942,30 @@ export async function boot(options = {}) {
     }
   }
 
+  function isSupportedByRaisedSurface(playerPos, playerBottomY) {
+    for (const platform of world.platforms || []) {
+      if (!platform || platform === world.ground) continue;
+      if (!(platform instanceof BABYLON.Mesh)) continue;
+      platform.computeWorldMatrix?.(true);
+      const bounds = platform.getBoundingInfo?.()?.boundingBox;
+      if (!bounds) continue;
+      const surface = {
+        minX: bounds.minimumWorld.x,
+        maxX: bounds.maximumWorld.x,
+        minZ: bounds.minimumWorld.z,
+        maxZ: bounds.maximumWorld.z,
+        topY: bounds.maximumWorld.y,
+      };
+      const withinX = playerPos.x >= (surface.minX - 0.08) && playerPos.x <= (surface.maxX + 0.08);
+      const withinZ = playerPos.z >= (surface.minZ - 0.22) && playerPos.z <= (surface.maxZ + 0.22);
+      const nearTop = Math.abs(playerBottomY - surface.topY) <= 0.18;
+      if (withinX && withinZ && nearTop) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function updateLevel1Ambient(dt) {
     if (levelId !== 1 || shotMode || state !== 'gameplay' || respawnState) return;
     level1AmbientTimerMs -= dt * 1000;
@@ -2069,6 +2105,7 @@ export async function boot(options = {}) {
   let level1MaxAirborneBottomY = prevPlayerBottomY;
   let level1CoinLossAnim = null;
   let level1CoinFlyers = [];
+  let level2HorseHintShown = false;
   let level1AmbientTimerMs = 6200;
   let level1AmbientBirdDelayMs = -1;
   let debugIdleTimerMs = 0; // suppress input for N ms in debug mode after spawn
@@ -2315,6 +2352,7 @@ export async function boot(options = {}) {
     level1AirborneFromAboveFloor = false;
     level1MaxAirborneBottomY = player.mesh.position.y - player.getCollisionHalfExtents().halfH;
     level1CoinLossAnim = null;
+    level2HorseHintShown = false;
     for (const flyer of level1CoinFlyers) flyer.node?.dispose?.();
     level1CoinFlyers = [];
     level1AmbientTimerMs = 6200;
@@ -3061,6 +3099,17 @@ export async function boot(options = {}) {
           } else if (Math.abs(laneDelta) > 0.001) {
             player.mesh.position.z = damp(player.mesh.position.z, 0, 20, dt);
           }
+          if (!level2HorseHintShown && world.level2?.isHorseSnapped?.() !== true && player.mesh.position.x >= -8.8) {
+            level2HorseHintShown = true;
+            ui.showToast({
+              id: 'level2-horse-hint',
+              title: 'Push the horse under the ledge!',
+              bgColor: '#7c8b54',
+              durationMs: 2200,
+              enterMs: 110,
+              exitMs: 180,
+            });
+          }
         }
         updateLevel2AnimalDecor(dt);
 
@@ -3095,9 +3144,24 @@ export async function boot(options = {}) {
             level1MaxAirborneBottomY = Math.max(level1MaxAirborneBottomY, prevPlayerBottomY, afterBottomY);
           }
           const landedThisFrame = !prevGrounded && player.grounded;
-          const nearFloor = Math.abs(afterBottomY - currentFloorTopY) < 0.25;
-          const fellFromAbove = (level1MaxAirborneBottomY - currentFloorTopY) > 1.0;
-          if (landedThisFrame && nearFloor && fellFromAbove && level1AirborneFromAboveFloor) {
+          const nearFloorThreshold = levelId === 2 ? 0.12 : 0.25;
+          const fallHeightThreshold = levelId === 2 ? 1.2 : 1.0;
+          const nearFloor = Math.abs(afterBottomY - currentFloorTopY) < nearFloorThreshold;
+          const fellFromAbove = (level1MaxAirborneBottomY - currentFloorTopY) > fallHeightThreshold;
+          const supportedByRaisedSurface = isSupportedByRaisedSurface(player.mesh.position, afterBottomY);
+          if (debugMode && landedThisFrame && nearFloor && level1AirborneFromAboveFloor) {
+            console.log('[floor-penalty-check]', {
+              levelId,
+              bottomY: Number(afterBottomY.toFixed(3)),
+              floorTopY: Number(currentFloorTopY.toFixed(3)),
+              maxAirborneBottomY: Number(level1MaxAirborneBottomY.toFixed(3)),
+              landedThisFrame,
+              nearFloor,
+              fellFromAbove,
+              supportedByRaisedSurface,
+            });
+          }
+          if (landedThisFrame && nearFloor && fellFromAbove && level1AirborneFromAboveFloor && !supportedByRaisedSurface) {
             triggerFloorPenalty();
           }
           if (landedThisFrame) {
