@@ -105,6 +105,43 @@ function makeInvisibleCollider(scene, name, def) {
   return mesh;
 }
 
+function createBreadLoaf(scene, name, { x, y, z }) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+
+  const crustMat = makeSourdoughMaterial(scene, `${name}_crust`, [214, 138, 56], 0.12);
+  const domeMat  = makeSourdoughMaterial(scene, `${name}_dome`,  [238, 175, 84], 0.16);
+  const baseMat  = makeSourdoughMaterial(scene, `${name}_base`,  [172, 108, 40], 0.08);
+
+  // Loaf body
+  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
+    width: 2.0, height: 0.82, depth: 0.72,
+  }, scene);
+  body.parent = root;
+  body.material = crustMat;
+
+  // Rounded dome top
+  const dome = BABYLON.MeshBuilder.CreateSphere(`${name}_dome`, {
+    diameter: 2.0, segments: 10,
+  }, scene);
+  dome.parent = root;
+  dome.position.y = 0.32;
+  dome.scaling.set(1.0, 0.46, 0.36);
+  dome.material = domeMat;
+
+  // Score slash across the crown
+  const score = BABYLON.MeshBuilder.CreateBox(`${name}_score`, {
+    width: 1.12, height: 0.08, depth: 0.06,
+  }, scene);
+  score.parent = root;
+  score.position.set(0, 0.68, -0.34);
+  score.rotation.z = 0.18;
+  score.material = baseMat;
+
+  markDecor(root);
+  return root;
+}
+
 function createBackdrop(scene, shadowGen) {
   const root = new BABYLON.TransformNode('L4_backdropRoot', scene);
 
@@ -199,7 +236,33 @@ function createBackdrop(scene, shadowGen) {
   titleSign.parent = root;
   markDecor(titleSign);
 
-  return { root, flourStorms };
+  // Raining bread loaves — 22 loaves scattered across the background.
+  const breadRain = [];
+  const LOAF_COUNT = 22;
+  const LOAF_TOP_Y  =  30;
+  const LOAF_BOT_Y  = -10;
+  for (let i = 0; i < LOAF_COUNT; i++) {
+    // Spread x deterministically across the level span (-24 → 90).
+    const x = -22 + (i * 5.3) + ((i % 4) * 2.6);
+    // Stagger start Y so the first frame has loaves at all heights.
+    const y = LOAF_BOT_Y + ((i * 11) % (LOAF_TOP_Y - LOAF_BOT_Y + 4));
+    // Vary depth: z -22 to -29 (behind flour storms, in front of sky).
+    const z = -22 - (i % 4) * 1.8;
+    const loaf = createBreadLoaf(scene, `L4_breadRain${i}`, { x, y, z });
+    loaf.parent = root;
+    // Bake per-loaf motion params into metadata so update() reads them cheaply.
+    loaf.metadata = {
+      ...(loaf.metadata || {}),
+      cameraIgnore: true, decor: true,
+      fallSpeed:    3.2 + (i % 6) * 0.72,   // 3.2 – 5.8 u/s
+      driftX:       ((i % 7) - 3) * 0.18,   // -0.54 – 0.54 u/s sideways
+      tumble:       0.5 + (i % 5) * 0.30,   // 0.5 – 1.7 rad/s
+      tumbleAxis:   i % 3,                   // 0=z 1=x 2=both
+    };
+    breadRain.push(loaf);
+  }
+
+  return { root, flourStorms, breadRain };
 }
 
 function createHeatGateVisual(scene, name, def) {
@@ -426,6 +489,24 @@ export function buildWorld4(scene, options = {}) {
       for (const storm of backdrop.flourStorms) {
         storm.position.x += dt * 0.4;
         if (storm.position.x > 90) storm.position.x = -20;
+      }
+      for (const loaf of backdrop.breadRain) {
+        const m = loaf.metadata;
+        loaf.position.y -= m.fallSpeed * dt;
+        loaf.position.x += m.driftX * dt;
+        if (m.tumbleAxis === 0) {
+          loaf.rotation.z += m.tumble * dt;
+        } else if (m.tumbleAxis === 1) {
+          loaf.rotation.x += m.tumble * dt;
+        } else {
+          loaf.rotation.z += m.tumble * dt * 0.65;
+          loaf.rotation.x += m.tumble * dt * 0.45;
+        }
+        if (loaf.position.y < -10) {
+          loaf.position.y = 30;
+          loaf.position.x = -22 + Math.random() * 114;
+          loaf.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        }
       }
     },
     reset() {
