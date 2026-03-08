@@ -866,11 +866,15 @@ export async function boot(options = {}) {
   const fruitMaze = levelId === 1 ? new FruitMazeMinigame() : null;
   const pongMinigame = levelId === 2 ? new PongMinigame() : null;
   const balloonRoundup = levelId === 3 ? new BalloonRoundup() : null;
+  const getLevelCollectibleTotal = (level) => {
+    const configuredTotal = Number(level?.totalCollectibles);
+    return Number.isFinite(configuredTotal) ? configuredTotal : (level?.coins?.length ?? 0);
+  };
   const levelTotals = {
-    1: LEVEL1.coins.length,
-    2: LEVEL2.coins.length,
-    3: LEVEL3.coins.length,
-    4: LEVEL4.coins.length,
+    1: getLevelCollectibleTotal(LEVEL1),
+    2: getLevelCollectibleTotal(LEVEL2),
+    3: getLevelCollectibleTotal(LEVEL3),
+    4: getLevelCollectibleTotal(LEVEL4),
   };
   let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
   const syncProgressState = (nextProgress) => {
@@ -2812,7 +2816,7 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideGameplayMenu();
     ui.hideTitle();
-    ui.showGameplayHud(coins.length);
+    ui.showGameplayHud(levelTotals[levelId] ?? coins.length);
     applyCapeVisualState();
     updateBuffHud();
     ui.updateTitleDebug({ selectedLevel: levelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
@@ -3317,7 +3321,7 @@ export async function boot(options = {}) {
         audio.playCoin();
         juiceFx.spawnCoinSparkle(coin.position);
         ui.updateCoins(coinsCollected);
-        if (coinsCollected === coins.length) {
+        if (coinsCollected === (levelTotals[levelId] ?? coins.length)) {
           ui.showPopText('All pacifiers! 🍼', 900);
         }
       }

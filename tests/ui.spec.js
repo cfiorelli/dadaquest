@@ -154,3 +154,12 @@ test('ui: buff HUD stays as a compact left column', async ({ page }) => {
 
   await expect(page.locator('.dada-buff-note').last()).toHaveText('Locked. Collect all binkies in Level 1 to unlock');
 });
+
+test('ui: level 3 HUD expects 11 binkies', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await gotoDebugLevel(page, 3);
+  await startDebugLevel(page, 3);
+
+  await expect(page.locator('.dada-coins')).toHaveText('🍼 0 / 11');
+});

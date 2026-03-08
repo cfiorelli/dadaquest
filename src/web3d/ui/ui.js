@@ -1062,7 +1062,10 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function setCoinCount(collected, { pulse = false } = {}) {
-    coinsEl.textContent = `🍼 ${collected} / ${coinTotal}`;
+    const safeCollected = Number.isFinite(collected)
+      ? Math.max(0, Math.min(coinTotal, collected))
+      : 0;
+    coinsEl.textContent = `🍼 ${safeCollected} / ${coinTotal}`;
     if (pulse) pulseCoin();
   }
 

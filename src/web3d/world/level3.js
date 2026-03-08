@@ -126,5 +126,6 @@ const BASE_LEVEL3 = {
 
 export const LEVEL3 = {
   ...BASE_LEVEL3,
+  totalCollectibles: 11,
   coins: normalizeCoins(BASE_LEVEL3),
 };
