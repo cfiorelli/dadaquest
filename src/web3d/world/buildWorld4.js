@@ -105,41 +105,233 @@ function makeInvisibleCollider(scene, name, def) {
   return mesh;
 }
 
-function createBreadLoaf(scene, name, { x, y, z }) {
-  const root = new BABYLON.TransformNode(name, scene);
-  root.position.set(x, y, z);
+// ─────────────────────────────────────────────────────────────────────────────
+// BREAD / TOASTER RAIN — Level 4 background decoration
+// ─────────────────────────────────────────────────────────────────────────────
+/*
+ * 16-bit palette (7 flat unlit colours, shared across all rain objects):
+ *   Bread:   CRUST #C8733A  DOME #E8A454  DARK #7A3E18
+ *   Toaster: BODY  #5A8090  TRIM #2E4A58  KNOB #D4B86A  SLOT #111826
+ *
+ * Three depth layers (all Z behind gameplay lane Z ≈ 0):
+ *   FAR  Z -26…-30  scale 0.58×  speed ×0.72  brightness 0.50  48 objects
+ *   MID  Z -21…-25  scale 0.90×  speed ×1.00  brightness 0.75  48 objects
+ *   NEAR Z -17…-20  scale 1.22×  speed ×1.28  brightness 1.00  24 objects
+ *
+ * Pool: 120 objects (60 loaves + 60 toasters), allocated once at startup,
+ * recycled by resetting Y when an object drops below RAIN_BOT_Y.
+ * Tune via RAIN_LAYERS, RAIN_TOP_Y, RAIN_BOT_Y below.
+ */
 
-  const crustMat = makeSourdoughMaterial(scene, `${name}_crust`, [214, 138, 56], 0.12);
-  const domeMat  = makeSourdoughMaterial(scene, `${name}_dome`,  [238, 175, 84], 0.16);
-  const baseMat  = makeSourdoughMaterial(scene, `${name}_base`,  [172, 108, 40], 0.08);
+const RAIN_RC = {
+  breadCrust: [0.784, 0.451, 0.227],  // #C8733A
+  breadDome:  [0.910, 0.643, 0.329],  // #E8A454
+  breadDark:  [0.478, 0.243, 0.094],  // #7A3E18
+  toastBody:  [0.353, 0.502, 0.565],  // #5A8090
+  toastTrim:  [0.180, 0.290, 0.345],  // #2E4A58
+  toastKnob:  [0.831, 0.722, 0.416],  // #D4B86A
+  toastSlot:  [0.067, 0.094, 0.149],  // #111826
+};
 
-  // Loaf body
-  const body = BABYLON.MeshBuilder.CreateBox(`${name}_body`, {
-    width: 2.0, height: 0.82, depth: 0.72,
-  }, scene);
-  body.parent = root;
-  body.material = crustMat;
+const RAIN_LAYERS = [
+  { zNear: -26, zFar: -30, scaleBase: 0.58, speedMul: 0.72, bri: 0.50, count: 48 },
+  { zNear: -21, zFar: -25, scaleBase: 0.90, speedMul: 1.00, bri: 0.75, count: 48 },
+  { zNear: -17, zFar: -20, scaleBase: 1.22, speedMul: 1.28, bri: 1.00, count: 24 },
+];
+const RAIN_TOP_Y  =  32;
+const RAIN_BOT_Y  = -10;
+const RAIN_X_MIN  = -32;
+const RAIN_X_MAX  = 100;
+const RAIN_SPD_LO =   6;  // base fall speed range (u/s) before layer multiplier
+const RAIN_SPD_HI =  10;
 
-  // Rounded dome top
-  const dome = BABYLON.MeshBuilder.CreateSphere(`${name}_dome`, {
-    diameter: 2.0, segments: 10,
-  }, scene);
-  dome.parent = root;
-  dome.position.y = 0.32;
-  dome.scaling.set(1.0, 0.46, 0.36);
-  dome.material = domeMat;
+function _rainMat(scene, name, r, g, b, bri) {
+  const mat = new BABYLON.StandardMaterial(name, scene);
+  mat.disableLighting = true;
+  mat.emissiveColor = new BABYLON.Color3(r * bri, g * bri, b * bri);
+  return mat;
+}
 
-  // Score slash across the crown
-  const score = BABYLON.MeshBuilder.CreateBox(`${name}_score`, {
-    width: 1.12, height: 0.08, depth: 0.06,
-  }, scene);
-  score.parent = root;
-  score.position.set(0, 0.68, -0.34);
-  score.rotation.z = 0.18;
-  score.material = baseMat;
+function _rainDecor(node) {
+  node.isPickable = false;
+  node.checkCollisions = false;
+  node.metadata = { cameraIgnore: true, decor: true };
+}
 
-  markDecor(root);
-  return root;
+function createBreadRainSystem(scene) {
+  // Pre-build 21 shared materials (7 types × 3 layers).
+  const M = {};
+  for (let li = 0; li < RAIN_LAYERS.length; li++) {
+    const bri = RAIN_LAYERS[li].bri;
+    M[`lB${li}`]  = _rainMat(scene, `L4r_lB${li}`,  ...RAIN_RC.breadCrust, bri);
+    M[`lD${li}`]  = _rainMat(scene, `L4r_lD${li}`,  ...RAIN_RC.breadDome,  bri);
+    M[`lS${li}`]  = _rainMat(scene, `L4r_lS${li}`,  ...RAIN_RC.breadDark,  bri);
+    M[`tC${li}`]  = _rainMat(scene, `L4r_tC${li}`,  ...RAIN_RC.toastBody,  bri);
+    M[`tTr${li}`] = _rainMat(scene, `L4r_tTr${li}`, ...RAIN_RC.toastTrim,  bri);
+    M[`tK${li}`]  = _rainMat(scene, `L4r_tK${li}`,  ...RAIN_RC.toastKnob,  bri);
+    M[`tSl${li}`] = _rainMat(scene, `L4r_tSl${li}`, ...RAIN_RC.toastSlot,  bri);
+  }
+
+  // Build a chunky 16-bit loaf node: body box + dome cap + score slash.
+  function buildLoaf(name, li) {
+    const root = new BABYLON.TransformNode(name, scene);
+    root.metadata = { cameraIgnore: true, decor: true };
+
+    const body = BABYLON.MeshBuilder.CreateBox(`${name}_b`, { width: 1.0, height: 0.52, depth: 0.42 }, scene);
+    body.parent = root;
+    body.material = M[`lB${li}`];
+    _rainDecor(body);
+
+    // Stepped dome cap — two boxes give chunky 16-bit silhouette.
+    const dome = BABYLON.MeshBuilder.CreateBox(`${name}_d`, { width: 0.74, height: 0.28, depth: 0.34 }, scene);
+    dome.parent = root;
+    dome.position.y = 0.38;
+    dome.material = M[`lD${li}`];
+    _rainDecor(dome);
+
+    const score = BABYLON.MeshBuilder.CreateBox(`${name}_s`, { width: 0.50, height: 0.07, depth: 0.04 }, scene);
+    score.parent = root;
+    score.position.set(0, 0.54, -0.16);
+    score.rotation.z = 0.22;
+    score.material = M[`lS${li}`];
+    _rainDecor(score);
+
+    return root;
+  }
+
+  // Build a chunky 16-bit toaster: chassis + base trim + top slot + hex knob.
+  function buildToaster(name, li) {
+    const root = new BABYLON.TransformNode(name, scene);
+    root.metadata = { cameraIgnore: true, decor: true };
+
+    const chassis = BABYLON.MeshBuilder.CreateBox(`${name}_c`, { width: 1.0, height: 0.86, depth: 0.44 }, scene);
+    chassis.parent = root;
+    chassis.material = M[`tC${li}`];
+    _rainDecor(chassis);
+
+    // Base trim strip (darker colour).
+    const trim = BABYLON.MeshBuilder.CreateBox(`${name}_t`, { width: 1.04, height: 0.10, depth: 0.48 }, scene);
+    trim.parent = root;
+    trim.position.y = -0.38;
+    trim.material = M[`tTr${li}`];
+    _rainDecor(trim);
+
+    // Slot recess on top.
+    const slot = BABYLON.MeshBuilder.CreateBox(`${name}_sl`, { width: 0.54, height: 0.10, depth: 0.30 }, scene);
+    slot.parent = root;
+    slot.position.y = 0.43;
+    slot.material = M[`tSl${li}`];
+    _rainDecor(slot);
+
+    // Hex knob on the side (tessellation=6 for chunky 16-bit look).
+    const knob = BABYLON.MeshBuilder.CreateCylinder(`${name}_k`, {
+      diameter: 0.18, height: 0.10, tessellation: 6,
+    }, scene);
+    knob.parent = root;
+    knob.position.set(0.54, 0.08, 0);
+    knob.rotation.z = Math.PI / 2;
+    knob.material = M[`tK${li}`];
+    _rainDecor(knob);
+
+    return root;
+  }
+
+  // Allocate pool: even mix of loaves and toasters across all layers.
+  const pool = [];
+  const poolData = []; // parallel per-object motion data
+
+  let globalIdx = 0;
+  for (let li = 0; li < RAIN_LAYERS.length; li++) {
+    const layer = RAIN_LAYERS[li];
+    const xSpan = RAIN_X_MAX - RAIN_X_MIN;
+    const ySpan = RAIN_TOP_Y  - RAIN_BOT_Y;
+    const zSpan = Math.abs(layer.zFar - layer.zNear);
+
+    for (let oi = 0; oi < layer.count; oi++) {
+      const isToaster = (oi % 2 === 1);
+      const node = isToaster
+        ? buildToaster(`L4r_${li}_${oi}`, li)
+        : buildLoaf(`L4r_${li}_${oi}`, li);
+
+      // Stagger initial Y so rain is spread on first frame (not a burst from top).
+      const initY = RAIN_BOT_Y + (oi / layer.count) * ySpan;
+      // Deterministic but irregular X distribution.
+      const initX = RAIN_X_MIN + ((oi * 9.1 + li * 17.3) % xSpan);
+      // Z varies continuously within the layer band.
+      const initZ = layer.zNear - ((oi * 0.73 + 0.1) % zSpan);
+
+      node.position.set(initX, initY, initZ);
+      node.rotation.set(
+        (oi * 1.31) % (Math.PI * 2),
+        (oi * 2.71) % (Math.PI * 2),
+        (oi * 0.87) % (Math.PI * 2),
+      );
+
+      // Scale: base × ±20% variance.
+      const scaleVar = 0.8 + ((oi * 3 + li * 7) % 5) / 5 * 0.4;
+      node.scaling.setAll(layer.scaleBase * scaleVar);
+
+      // Motion params.
+      const baseSpd = RAIN_SPD_LO + ((oi * 1.7 + li * 3.1) % (RAIN_SPD_HI - RAIN_SPD_LO));
+      poolData.push({
+        fallSpeed: baseSpd * layer.speedMul,
+        driftX:   (((oi * 5 + li * 11) % 9) - 4) / 4 * 0.4,   // ±0.4 u/s
+        tumbleY:  (((oi * 3 + 1) % 8) / 7) * 1.2,              // 0–1.2 rad/s
+        tumbleZ:  (((oi * 7 + 2) % 6) / 5 - 0.5) * 0.7,        // ±0.35 rad/s
+        zVal:     initZ,
+      });
+      pool.push(node);
+      globalIdx++;
+    }
+  }
+
+  return {
+    update(dt) {
+      for (let i = 0; i < pool.length; i++) {
+        const node = pool[i];
+        const d = poolData[i];
+        node.position.y -= d.fallSpeed * dt;
+        node.position.x += d.driftX   * dt;
+        node.rotation.y += d.tumbleY  * dt;
+        node.rotation.z += d.tumbleZ  * dt;
+        if (node.position.y < RAIN_BOT_Y) {
+          node.position.y = RAIN_TOP_Y + Math.random() * 6;
+          node.position.x = RAIN_X_MIN + Math.random() * (RAIN_X_MAX - RAIN_X_MIN);
+          node.rotation.x = Math.random() * Math.PI * 2;
+          node.rotation.y = Math.random() * Math.PI * 2;
+        }
+      }
+    },
+    reset() {
+      let gi = 0;
+      for (let li = 0; li < RAIN_LAYERS.length; li++) {
+        const layer = RAIN_LAYERS[li];
+        const xSpan = RAIN_X_MAX - RAIN_X_MIN;
+        const ySpan = RAIN_TOP_Y  - RAIN_BOT_Y;
+        const zSpan = Math.abs(layer.zFar - layer.zNear);
+        for (let oi = 0; oi < layer.count; oi++) {
+          const node = pool[gi];
+          node.position.y = RAIN_BOT_Y + (oi / layer.count) * ySpan;
+          node.position.x = RAIN_X_MIN + ((oi * 9.1 + li * 17.3) % xSpan);
+          node.position.z = layer.zNear - ((oi * 0.73 + 0.1) % zSpan);
+          node.rotation.set(
+            (oi * 1.31) % (Math.PI * 2),
+            (oi * 2.71) % (Math.PI * 2),
+            (oi * 0.87) % (Math.PI * 2),
+          );
+          gi++;
+        }
+      }
+    },
+    dispose() {
+      for (const node of pool) {
+        for (const m of node.getChildMeshes(false)) m.dispose();
+        node.dispose();
+      }
+      pool.length = 0;
+      for (const mat of Object.values(M)) mat.dispose();
+    },
+  };
 }
 
 function createBackdrop(scene, shadowGen) {
@@ -236,33 +428,7 @@ function createBackdrop(scene, shadowGen) {
   titleSign.parent = root;
   markDecor(titleSign);
 
-  // Raining bread loaves — 22 loaves scattered across the background.
-  const breadRain = [];
-  const LOAF_COUNT = 22;
-  const LOAF_TOP_Y  =  30;
-  const LOAF_BOT_Y  = -10;
-  for (let i = 0; i < LOAF_COUNT; i++) {
-    // Spread x deterministically across the level span (-24 → 90).
-    const x = -22 + (i * 5.3) + ((i % 4) * 2.6);
-    // Stagger start Y so the first frame has loaves at all heights.
-    const y = LOAF_BOT_Y + ((i * 11) % (LOAF_TOP_Y - LOAF_BOT_Y + 4));
-    // Vary depth: z -22 to -29 (behind flour storms, in front of sky).
-    const z = -22 - (i % 4) * 1.8;
-    const loaf = createBreadLoaf(scene, `L4_breadRain${i}`, { x, y, z });
-    loaf.parent = root;
-    // Bake per-loaf motion params into metadata so update() reads them cheaply.
-    loaf.metadata = {
-      ...(loaf.metadata || {}),
-      cameraIgnore: true, decor: true,
-      fallSpeed:    3.2 + (i % 6) * 0.72,   // 3.2 – 5.8 u/s
-      driftX:       ((i % 7) - 3) * 0.18,   // -0.54 – 0.54 u/s sideways
-      tumble:       0.5 + (i % 5) * 0.30,   // 0.5 – 1.7 rad/s
-      tumbleAxis:   i % 3,                   // 0=z 1=x 2=both
-    };
-    breadRain.push(loaf);
-  }
-
-  return { root, flourStorms, breadRain };
+  return { root, flourStorms };
 }
 
 function createHeatGateVisual(scene, name, def) {
@@ -379,6 +545,7 @@ export function buildWorld4(scene, options = {}) {
   dad.root.position.z = 0;
 
   const backdrop = createBackdrop(scene, shadowGen);
+  const breadRain = createBreadRainSystem(scene);
 
   const conveyorDefs = LEVEL4.conveyors.map((def, index) => {
     const visual = BABYLON.MeshBuilder.CreateBox(`L4_conveyorVisual_${index}`, {
@@ -490,24 +657,7 @@ export function buildWorld4(scene, options = {}) {
         storm.position.x += dt * 0.4;
         if (storm.position.x > 90) storm.position.x = -20;
       }
-      for (const loaf of backdrop.breadRain) {
-        const m = loaf.metadata;
-        loaf.position.y -= m.fallSpeed * dt;
-        loaf.position.x += m.driftX * dt;
-        if (m.tumbleAxis === 0) {
-          loaf.rotation.z += m.tumble * dt;
-        } else if (m.tumbleAxis === 1) {
-          loaf.rotation.x += m.tumble * dt;
-        } else {
-          loaf.rotation.z += m.tumble * dt * 0.65;
-          loaf.rotation.x += m.tumble * dt * 0.45;
-        }
-        if (loaf.position.y < -10) {
-          loaf.position.y = 30;
-          loaf.position.x = -22 + Math.random() * 114;
-          loaf.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        }
-      }
+      breadRain.update(dt);
     },
     reset() {
       for (const conveyor of conveyorDefs) {
@@ -521,6 +671,7 @@ export function buildWorld4(scene, options = {}) {
         gate.active = true;
         gate.visual.root.setEnabled(true);
       }
+      breadRain.reset();
     },
   };
 
