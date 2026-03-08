@@ -1122,21 +1122,16 @@ export function buildWorld3(scene, options = {}) {
   bunnyFallback.parent = bunnyAnchor;
   bunnyFallback.position.set(0, 0, 0);
   setRenderingGroup(bunnyAnchor, 3);
-  toolHazards.push({
-    name: 'bunnyHazard',
-    reason: 'bunny',
-    statusText: 'Hop past the bunny!',
+  // Bunny is purely decorative — no hazard.
+  const bunnyWander = {
     root: bunnyAnchor,
-    mesh: bunnyFallback.getChildMeshes(false)[0] || null,
-    active: true,
-    handledByLevelRuntime: true,
-    minX: bunnyAnchor.position.x - 0.58,
-    maxX: bunnyAnchor.position.x + 0.58,
-    minY: bunnyAnchor.position.y,
-    maxY: bunnyAnchor.position.y + 0.88,
-    minZ: bunnyAnchor.position.z - 0.40,
-    maxZ: bunnyAnchor.position.z + 0.40,
-  });
+    baseY: bunnyAnchor.position.y,
+    minX: 57.6,
+    maxX: 60.8,
+    speed: 0.55,
+    dir: 1,
+    hopPhase: 0,
+  };
 
   const dogHazards = [];
   for (const lane of LEVEL3.dogLanes) {
@@ -1466,6 +1461,19 @@ export function buildWorld3(scene, options = {}) {
       for (const controller of decorControllers) {
         controller.update(dt);
       }
+
+      // Bunny wander — gentle patrol + hop on the safeIsland platform.
+      bunnyWander.hopPhase += dt * 3.8;
+      bunnyWander.root.position.x += bunnyWander.dir * bunnyWander.speed * dt;
+      bunnyWander.root.position.y = bunnyWander.baseY + Math.max(0, Math.sin(bunnyWander.hopPhase) * 0.14);
+      bunnyWander.root.rotation.y = bunnyWander.dir > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+      if (bunnyWander.root.position.x >= bunnyWander.maxX) {
+        bunnyWander.root.position.x = bunnyWander.maxX;
+        bunnyWander.dir = -1;
+      } else if (bunnyWander.root.position.x <= bunnyWander.minX) {
+        bunnyWander.root.position.x = bunnyWander.minX;
+        bunnyWander.dir = 1;
+      }
     },
     reset() {
       runtimeMs = 0;
@@ -1491,6 +1499,10 @@ export function buildWorld3(scene, options = {}) {
       for (const controller of decorControllers) {
         controller.reset();
       }
+      bunnyWander.root.position.x = 59.2;
+      bunnyWander.root.position.y = bunnyWander.baseY;
+      bunnyWander.dir = 1;
+      bunnyWander.hopPhase = 0;
     },
   };
 
