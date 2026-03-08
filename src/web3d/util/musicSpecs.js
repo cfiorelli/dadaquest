@@ -28,6 +28,11 @@ const CHORDS = {
   Gm: ['G2', 'Bb2', 'D3'],
   'F#m': ['F#2', 'A2', 'C#3'],
   E7home: ['E2', 'G#2', 'B2', 'D3'],
+
+  // Level 4 — D minor / "slow bubbly tron"
+  Dm:     ['D3', 'F3', 'A3'],
+  Bb:     ['Bb2', 'D3', 'F3'],
+  Dmadd9: ['D3', 'F3', 'A3', 'E4'],
 };
 
 function steps(...values) {
@@ -367,8 +372,281 @@ export const LEVEL3_MUSIC_SPEC = {
   },
 };
 
+/*
+ * Level 4 — Slow Bubbly Tron (Super Sourdough bakery)
+ * Tempo: 80 BPM
+ * Key: D minor (with one add9 "tron color" chord in Section C)
+ * Motif: D4 F4 A4 C5  (rising D minor arp cell)
+ * Roles:
+ * - chord:   neon pad  (soft sawtooth + lowpass, slow attack)
+ * - lead:    bubbly pluck / arp  (triangle + sine, short decay)
+ * - bass:    sub bass  (pure sine, downbeat root notes)
+ * - counter: sparkle top  (high sine bell ticks)
+ * - accent:  ultra-quiet sparkle accent
+ * Cue palette:
+ * - checkpoint:   bright "bloop" + small chord stab
+ * - nearMiss:     tiny "pew" blip with gliss
+ * - collision:    soft down-gliss "whoop"
+ * - levelComplete: cute neon cadence + sparkle
+ * 24-bar form A/B/C (8 bars each):
+ * A: i  | i  | VI | VI | iv | iv | VII | VII
+ *    Dm    Dm   Bb   Bb   Gm   Gm   C     C
+ * B: i  | VII | VI | iv | i  | VII | iv | VII
+ *    Dm   C     Bb   Gm   Dm   C     Gm   C
+ * C: i  | i(add9) | iv | iv | VI | VII | iv | VII
+ *    Dm   Dmadd9    Gm   Gm   Bb   C     Gm   C
+ */
+export const LEVEL4_MUSIC_SPEC = {
+  levelId: 4,
+  title: 'Slow bubbly tron',
+  explanation: 'Atmospheric neon arp loop with sub bass, bubbly pluck lead, sparkle top, and slow pad — surreal bakery tron feel.',
+  tempo: 80,
+  key: 'D minor',
+  motif: ['D4', 'F4', 'A4', 'C5'],
+  roles: {
+    chord:    'neon pad (soft saw + lowpass, slow attack)',
+    lead:     'bubbly pluck arp (triangle + sine, short decay)',
+    bass:     'sub bass (sine, downbeat roots)',
+    counter:  'sparkle top (high sine bell ticks)',
+    accent:   'ultra-quiet sparkle accent',
+    percussion: 'sub kick + tron hi-hat tick',
+  },
+  cuePalette: {
+    checkpoint:   'Bright bloop + small chord stab',
+    nearMiss:     'Tiny pew blip with downward gliss',
+    collision:    'Soft down-gliss whoop',
+    levelComplete: 'Cute neon cadence + sparkle',
+  },
+  sections: [
+    {
+      name: 'A',
+      progression: ['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'C', 'C'],
+      bars: [
+        // Bar 1 — Dm ascending arp
+        bar('Dm', {
+          lead:  steps('D4', null, 'F4', null, 'A4', null, 'C5', null),
+          bass:  steps('D2', null, null, null, 'D3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 2 — Dm descend + counter sparkle
+        bar('Dm', {
+          lead:    steps(null, null, 'C5', null, 'A4', null, 'F4', null),
+          counter: steps(null, null, null, null, null, null, null, 'F5'),
+          bass:    steps('D2', null, null, null, 'D3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 3 — Bb ascending
+        bar('Bb', {
+          lead:  steps('Bb3', null, 'D4', null, 'F4', null, 'Bb4', null),
+          bass:  steps('Bb1', null, null, null, 'Bb2', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 4 — Bb descend
+        bar('Bb', {
+          lead:  steps(null, null, 'Bb4', null, 'F4', null, 'D4', null),
+          bass:  steps('Bb1', null, null, null, 'Bb2', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 5 — Gm ascending
+        bar('Gm', {
+          lead:  steps('G3', null, 'Bb3', null, 'D4', null, 'G4', null),
+          bass:  steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 6 — Gm descend + counter sparkle
+        bar('Gm', {
+          lead:    steps(null, null, 'G4', null, 'D4', null, 'Bb3', null),
+          counter: steps(null, null, null, null, null, null, null, 'G5'),
+          bass:    steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 7 — C ascending
+        bar('C', {
+          lead:  steps('C4', null, 'E4', null, 'G4', null, 'C5', null),
+          bass:  steps('C2', null, null, null, 'C3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 8 — C descend (resolves back to Dm)
+        bar('C', {
+          lead:    steps(null, null, 'C5', null, 'G4', null, 'E4', null),
+          counter: steps(null, null, null, null, null, null, 'G5', null),
+          bass:    steps('C2', null, null, null, 'C3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+      ],
+    },
+    {
+      name: 'B',
+      progression: ['Dm', 'C', 'Bb', 'Gm', 'Dm', 'C', 'Gm', 'C'],
+      bars: [
+        // Bar 9 — Dm slightly busier arp
+        bar('Dm', {
+          lead:  steps('D4', null, 'F4', 'A4', null, 'C5', null, 'A4'),
+          bass:  steps('D2', null, null, null, 'D3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 10 — C ascending with echo
+        bar('C', {
+          lead:    steps('E4', null, 'G4', null, 'C5', null, 'G4', null),
+          counter: steps(null, null, null, null, null, null, null, 'C5'),
+          bass:    steps('C2', null, null, null, 'C3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 11 — Bb inner voice movement
+        bar('Bb', {
+          lead:  steps('D4', null, 'F4', null, 'Bb4', null, 'F4', null),
+          bass:  steps('Bb1', null, null, null, 'Bb2', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 12 — Gm with sparkle
+        bar('Gm', {
+          lead:    steps('D4', null, 'G4', null, 'Bb4', null, 'G4', null),
+          counter: steps(null, null, null, null, null, null, 'D5', null),
+          bass:    steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 13 — Dm higher register
+        bar('Dm', {
+          lead:  steps('A4', null, 'C5', null, 'D5', null, 'C5', null),
+          bass:  steps('D2', null, null, null, 'D3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 14 — C descend
+        bar('C', {
+          lead:  steps('C5', null, 'G4', null, 'E4', null, 'G4', null),
+          bass:  steps('C2', null, null, null, 'C3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 15 — Gm descend with counter
+        bar('Gm', {
+          lead:    steps('G4', null, 'D4', null, 'Bb3', null, 'D4', null),
+          counter: steps(null, null, null, null, 'G4', null, null, null),
+          bass:    steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 16 — C rising (anticipates Section C)
+        bar('C', {
+          lead:    steps('E4', null, 'G4', null, 'C5', null, 'E5', null),
+          counter: steps(null, null, null, null, null, null, null, 'G5'),
+          bass:    steps('C2', null, null, null, 'C3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+      ],
+    },
+    {
+      name: 'C',
+      progression: ['Dm', 'Dmadd9', 'Gm', 'Gm', 'Bb', 'C', 'Gm', 'C'],
+      bars: [
+        // Bar 17 — Dm strong ascent with accent sparkle
+        bar('Dm', {
+          lead:   steps('D4', null, 'F4', null, 'A4', null, 'D5', null),
+          accent: steps(null, null, null, null, null, null, null, 'F5'),
+          bass:   steps('D2', null, null, null, 'D3', null, null, null),
+          hat:    [1, 2, 3, 5, 6, 7],
+          kick:   [0, 4],
+        }),
+        // Bar 18 — Dmadd9 (tasteful add9 "tron color" — E is the 9th)
+        bar('Dmadd9', {
+          lead:    steps('E4', null, 'A4', null, 'D5', null, 'A4', null),
+          counter: steps(null, null, null, null, null, null, 'E5', null),
+          bass:    steps('D2', null, null, null, 'D3', null, null, null),
+          hat:     [1, 2, 3, 5, 6, 7],
+          kick:    [0, 4],
+        }),
+        // Bar 19 — Gm high
+        bar('Gm', {
+          lead:  steps('G4', null, 'Bb4', null, 'D5', null, 'Bb4', null),
+          bass:  steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 20 — Gm descend
+        bar('Gm', {
+          lead:  steps(null, null, 'G4', null, 'D4', null, 'Bb3', null),
+          bass:  steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 21 — Bb
+        bar('Bb', {
+          lead:  steps('Bb3', null, 'D4', null, 'F4', null, 'D4', null),
+          bass:  steps('Bb1', null, null, null, 'Bb2', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 22 — C with sparkle counter
+        bar('C', {
+          lead:    steps('C4', null, 'G4', null, 'E4', null, 'G4', null),
+          counter: steps(null, null, null, null, null, 'G5', null, null),
+          bass:    steps('C2', null, null, null, 'C3', null, null, null),
+          hat:     [1, 2, 3, 5, 6, 7],
+          kick:    [0, 4],
+        }),
+        // Bar 23 — Gm wide reach
+        bar('Gm', {
+          lead:  steps('G3', null, 'D4', null, 'G4', null, 'D4', null),
+          bass:  steps('G2', null, null, null, 'G3', null, null, null),
+          hat:   [1, 2, 3, 5, 6, 7],
+          kick:  [0, 4],
+        }),
+        // Bar 24 — C final rising (loops cleanly back to Dm)
+        bar('C', {
+          lead:    steps('E4', null, 'G4', null, 'C5', null, 'E5', null),
+          counter: steps(null, null, null, null, null, null, 'G5', null),
+          bass:    steps('C2', null, null, null, 'C3', null, null, null),
+          hat:     [1, 2, 3, 5, 6, 7],
+          kick:    [0, 4],
+        }),
+      ],
+    },
+  ],
+  cues: {
+    // Bright "bloop" + small chord stab
+    checkpoint: [
+      { beat: 0,    role: 'lead',  note: 'D5',                              duration: 0.12, gain: 0.14 },
+      { beat: 0.1,  role: 'lead',  note: 'A5',                              duration: 0.15, gain: 0.14 },
+      { beat: 0.25, role: 'chord', notes: ['D4', 'F4', 'A4'],               duration: 0.65, gain: 0.09 },
+      { beat: 0.35, role: 'counter', note: 'D6',                            duration: 0.28, gain: 0.1  },
+    ],
+    // Tiny "pew" blip with downward gliss
+    nearMiss: [
+      { beat: 0,    role: 'lead',  note: 'G5', duration: 0.10, gain: 0.11, glideTo: 'C5' },
+    ],
+    // Soft down-gliss "whoop"
+    collision: [
+      { beat: 0,    role: 'counter', note: 'A4', duration: 0.5, gain: 0.12, glideTo: 'D4' },
+      { beat: 0.1,  role: 'bass',   note: 'D3', duration: 0.4, gain: 0.09 },
+    ],
+    // Cute neon cadence + sparkle
+    levelComplete: [
+      { beat: 0,    role: 'chord',   notes: ['D4', 'F4', 'A4'], duration: 1.4, gain: 0.10 },
+      { beat: 0,    role: 'lead',    note: 'D5',                duration: 0.3, gain: 0.14 },
+      { beat: 0.5,  role: 'lead',    note: 'F5',                duration: 0.3, gain: 0.14 },
+      { beat: 1.0,  role: 'lead',    note: 'A5',                duration: 0.4, gain: 0.14 },
+      { beat: 1.5,  role: 'counter', note: 'D6',                duration: 0.6, gain: 0.11 },
+    ],
+  },
+};
+
 export const LEVEL_MUSIC_SPECS = {
   1: LEVEL1_MUSIC_SPEC,
   2: LEVEL2_MUSIC_SPEC,
   3: LEVEL3_MUSIC_SPEC,
+  4: LEVEL4_MUSIC_SPEC,
 };

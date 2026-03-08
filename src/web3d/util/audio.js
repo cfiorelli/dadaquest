@@ -131,9 +131,14 @@ export class GameAudio {
   }
 
   startLevelMusic(levelId, fadeSec = 0.5) {
-    if (!this.enabled) return false;
     const spec = LEVEL_MUSIC_SPECS[levelId];
     if (!spec) return false;
+
+    if (typeof window !== 'undefined' && window.__DADA_DEBUG__) {
+      window.__DADA_DEBUG__.musicLevelId = levelId;
+    }
+
+    if (!this.enabled) return false;
 
     try {
       this.unlock();
@@ -143,6 +148,9 @@ export class GameAudio {
       this.stopLevelMusic(0.05);
       this._musicRunning = true;
       this._musicLevelId = levelId;
+      if (typeof window !== 'undefined' && window.__DADA_DEBUG__) {
+        window.__DADA_DEBUG__.musicLevelId = levelId;
+      }
       this._musicSpec = spec;
       this._musicStepIndex = 0;
       this._musicNextStepTime = this.ctx.currentTime + 0.03;
@@ -162,6 +170,9 @@ export class GameAudio {
     this._musicRunning = false;
     this._musicLevelId = 0;
     this._musicSpec = null;
+    if (typeof window !== 'undefined' && window.__DADA_DEBUG__) {
+      window.__DADA_DEBUG__.musicLevelId = 0;
+    }
     clearTimeout(this._musicSchedulerId);
     this._musicSchedulerId = null;
     if (!this.ctx || !this.musicGain) return;
@@ -277,6 +288,7 @@ export class GameAudio {
     if (levelId === 1) return 0.68;
     if (levelId === 2) return 0.56;
     if (levelId === 3) return 0.62;
+    if (levelId === 4) return 0.52;
     return 0.7;
   }
 
@@ -301,10 +313,21 @@ export class GameAudio {
 
   _roleDuration(spec, role) {
     const beatSec = 60 / spec.tempo;
-    if (role === 'lead') return spec.levelId === 2 ? beatSec * 0.72 : beatSec * 0.78;
-    if (role === 'counter') return spec.levelId === 2 ? beatSec * 0.92 : beatSec * 0.88;
+    if (role === 'lead') {
+      if (spec.levelId === 2) return beatSec * 0.72;
+      if (spec.levelId === 4) return beatSec * 0.55;
+      return beatSec * 0.78;
+    }
+    if (role === 'counter') {
+      if (spec.levelId === 2) return beatSec * 0.92;
+      if (spec.levelId === 4) return beatSec * 0.42;
+      return beatSec * 0.88;
+    }
     if (role === 'accent') return beatSec * 0.34;
-    if (role === 'bass') return beatSec * 0.95;
+    if (role === 'bass') {
+      if (spec.levelId === 4) return beatSec * 0.80;
+      return beatSec * 0.95;
+    }
     return beatSec * 0.9;
   }
 
@@ -320,6 +343,10 @@ export class GameAudio {
     }
     if (spec.levelId === 2) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.6, 0.046);
+      return;
+    }
+    if (spec.levelId === 4) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 4.0, 0.038);
       return;
     }
     this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.0, 0.05);
@@ -341,6 +368,12 @@ export class GameAudio {
     if (levelId === 2) {
       for (let i = 0; i < freqs.length; i++) {
         this._playRhodesChordTone(freqs[i], start, duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 4) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playNeonPadTone(freqs[i], start + (i * 0.015), duration, scaledGain / freqs.length);
       }
       return;
     }
@@ -375,6 +408,19 @@ export class GameAudio {
         this._playRoundedBass(freq, start, duration, scaledGain * 0.9, 180);
       } else if (role === 'accent') {
         this._playMutedBell(freq, start, duration * 0.75, scaledGain * 0.75);
+      }
+      return;
+    }
+
+    if (levelId === 4) {
+      if (role === 'lead') {
+        this._playBubblyPluck(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playSparkle4(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playSubBass4(freq, start, duration, scaledGain);
+      } else if (role === 'accent') {
+        this._playSparkle4(freq, start, duration * 0.6, scaledGain * 0.6);
       }
       return;
     }
@@ -529,6 +575,30 @@ export class GameAudio {
     this._playOscVoice({ freq: freq * 1.002, start: start + 0.006, duration: duration * 0.92, peak: gain * 0.22, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
   }
 
+  // Level 4 — "slow bubbly tron" synth voices
+
+  _playNeonPadTone(freq, start, duration, gain) {
+    // Soft sawtooth + lowpass, slow attack = neon pad
+    this._playOscVoice({ freq, start, duration, peak: gain * 0.68, type: 'sawtooth', attack: 0.09, filterType: 'lowpass', filterFreq: 780, q: 0.6 });
+    this._playOscVoice({ freq: freq * 1.003, start, duration: duration * 0.94, peak: gain * 0.22, type: 'triangle', attack: 0.12, filterType: 'lowpass', filterFreq: 560, q: 0.5 });
+  }
+
+  _playBubblyPluck(freq, start, duration, gain, glideTo = 0) {
+    // Triangle + sine harmonic, short decay = bubbly pluck
+    this._playOscVoice({ freq, start, duration: Math.max(0.10, duration * 0.72), peak: gain * 0.82, type: 'triangle', attack: 0.004, filterType: 'lowpass', filterFreq: 2100, q: 0.7, endFreq: glideTo || null });
+    this._playOscVoice({ freq: freq * 2, start, duration: Math.max(0.06, duration * 0.40), peak: gain * 0.26, type: 'sine', attack: 0.003, filterType: 'highpass', filterFreq: 620 });
+  }
+
+  _playSparkle4(freq, start, duration, gain, glideTo = 0) {
+    // High sine bell tick = sparkle top
+    this._playOscVoice({ freq, start, duration: Math.max(0.06, duration * 0.65), peak: gain * 0.72, type: 'sine', attack: 0.003, filterType: 'bandpass', filterFreq: 3200, q: 0.65, endFreq: glideTo || null });
+  }
+
+  _playSubBass4(freq, start, duration, gain) {
+    // Pure sine, tight lowpass = sub bass
+    this._playOscVoice({ freq, start, duration: Math.max(0.15, duration * 0.60), peak: gain, type: 'sine', attack: 0.008, filterType: 'lowpass', filterFreq: 150, q: 0.7 });
+  }
+
   _playVinylWash(start, duration) {
     if (!this.ctx || !this._noiseBuffer || this.muted || this._stemLevels.vinyl <= 0.0001) return;
     const src = this.ctx.createBufferSource();
@@ -574,6 +644,15 @@ export class GameAudio {
         this._playNoiseBurst(start, 0.03, 0.008 * drumGain, { type: 'highpass', frequency: 4200, q: 0.6 }, this.musicGain);
       } else if (drum === 'rim') {
         this._playNoiseBurst(start, 0.025, 0.007 * drumGain, { type: 'bandpass', frequency: 2400, q: 0.8 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 4) {
+      if (drum === 'kick') {
+        this._osc(82, 'sine', start, 0.18, 0.042 * drumGain, 38, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.022, 0.003 * drumGain, { type: 'highpass', frequency: 5000, q: 0.5 }, this.musicGain);
       }
       return;
     }
