@@ -241,6 +241,114 @@ test('runtime: level 4 stays locked until progress unlocks it, then starts and f
   ).toBe('EndScene');
 });
 
+test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanly for 10 seconds', async ({ page }) => {
+  test.setTimeout(120_000);
+  const consoleErrors = [];
+  const pageErrors = [];
+
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+  page.on('pageerror', (err) => {
+    pageErrors.push(err.message);
+  });
+
+  await gotoDebugLevel(page, 1);
+
+  const blocked = await page.evaluate(() => {
+    history.replaceState(null, '', `${window.location.pathname}?level=5&debug=1`);
+    window.__DADA_DEBUG__?.startLevel?.(5);
+    return {
+      sceneKey: window.__DADA_DEBUG__?.sceneKey,
+      hint: document.getElementById('titleHint')?.textContent ?? '',
+    };
+  });
+  expect(blocked.sceneKey).toBe('TitleScene');
+  expect(blocked.hint).toContain('Beat Super Sourdough');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setProgress?.({
+      sourdoughUnlocked: true,
+      levelCompleted: { 4: true },
+    });
+  });
+
+  await page.goto('http://127.0.0.1:4173/?level=5&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(10_000);
+
+  const runtimeState = await page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError || null,
+    musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+  }));
+  expect(runtimeState.sceneKey).toBe('CribScene');
+  expect(runtimeState.lastRuntimeError).toBeNull();
+  expect(runtimeState.musicLevelId).toBe(5);
+
+  if (pageErrors.length > 0) {
+    throw new Error(`Page errors on level 5: ${pageErrors.join('\n')}`);
+  }
+  if (consoleErrors.length > 0) {
+    throw new Error(`Console errors on level 5: ${consoleErrors.join('\n')}`);
+  }
+});
+
+test('runtime: bubble shield blocks the first Level 5 hazard reset and pops on use', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setProgress?.({
+      sourdoughUnlocked: true,
+      bubbleShieldUnlocked: true,
+      levelCompleted: { 4: true, 5: true },
+      unlocksShown: { bubbleShield: true },
+    });
+  });
+
+  await startDebugLevel(page, 5);
+
+  const shieldBefore = await page.evaluate(() => window.__DADA_DEBUG__?.bubbleShield ?? null);
+  expect(shieldBefore?.unlocked).toBe(true);
+  expect(shieldBefore?.usedThisRun).toBe(false);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eelRailB');
+  });
+  await page.waitForTimeout(250);
+
+  const afterFirstHit = await page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey,
+    shield: window.__DADA_DEBUG__?.bubbleShield ?? null,
+    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+  }));
+  expect(afterFirstHit.sceneKey).toBe('CribScene');
+  expect(afterFirstHit.shield?.usedThisRun).toBe(true);
+  expect(afterFirstHit.lastRespawnReason).toContain('shielded');
+
+  await expect.poll(
+    () => page.evaluate(() => ({
+      graceMs: window.__DADA_DEBUG__?.bubbleShield?.graceMs ?? 9999,
+      invulnMs: window.__DADA_DEBUG__?.playerController?.invulnTimerMs ?? 9999,
+    })),
+    { timeout: 8_000 },
+  ).toEqual({
+    graceMs: 0,
+    invulnMs: 0,
+  });
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eelRailB');
+  });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnReason ?? ''), { timeout: 4_000 })
+    .toBe('eel_rail');
+});
+
 test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 2);

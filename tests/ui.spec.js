@@ -152,7 +152,8 @@ test('ui: buff HUD stays as a compact left column', async ({ page }) => {
   expect(box.x).toBeLessThanOrEqual(24);
   expect(box.y).toBeLessThanOrEqual(28);
 
-  await expect(page.locator('.dada-buff-note').last()).toHaveText('Locked. Collect all binkies in Level 1 to unlock');
+  await expect(page.locator('[data-buff="cape"] .dada-buff-note')).toHaveText('Locked. Collect all binkies in Level 1 to unlock');
+  await expect(page.locator('[data-buff="shield"] .dada-buff-note')).toHaveText('Locked. Beat Level 5 to unlock');
 });
 
 test('ui: level 3 HUD expects 11 binkies', async ({ page }) => {

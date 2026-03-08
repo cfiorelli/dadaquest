@@ -799,6 +799,15 @@ export class GameAudio {
     this._osc(140, 'sine', t + 0.02, 0.12, 0.02, 95);
   }
 
+  playBubblePop() {
+    if (!this.enabled || !this._allow('bubblePop', 180)) return;
+    this.unlock();
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._osc(520, 'sine', t, 0.08, 0.04, 320);
+    this._osc(210, 'triangle', t + 0.02, 0.12, 0.025, 120);
+  }
+
   playWin() {
     if (!this.enabled || !this._allow('win', 500)) return;
     this.unlock();

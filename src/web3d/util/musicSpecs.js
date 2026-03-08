@@ -644,9 +644,135 @@ export const LEVEL4_MUSIC_SPEC = {
   },
 };
 
+/*
+ * Level 5 — Neon underwater synthwave
+ * Tempo: 96 BPM
+ * Key: D Dorian
+ * Loop: 48 bars (A/B/C/D, 12 bars each)
+ */
+export const LEVEL5_MUSIC_SPEC = {
+  levelId: 5,
+  title: 'Neon underwater synthwave',
+  explanation: 'Glassy aquarium pulse with warm pad, bell lead, soft sub bass, light brushed hats, and a subtle bubbling arp that grows across the four-act run.',
+  tempo: 96,
+  key: 'D Dorian',
+  motif: ['D5', 'F5', 'G5', 'A5'],
+  roles: {
+    chord: 'warm pad',
+    lead: 'glassy bell lead',
+    bass: 'soft sub bass',
+    counter: 'bubbly arp',
+    accent: 'shimmer layer',
+    percussion: 'rim + brushed hat',
+  },
+  cuePalette: {
+    checkpoint: 'Bubble chime',
+    nearMiss: 'Short sonar ping',
+    collision: 'Muted blorp',
+    levelComplete: 'Shimmer cadence',
+  },
+  sections: [
+    {
+      name: 'A',
+      progression: ['Dmadd9', 'Dmadd9', 'C', 'C', 'Gm', 'Gm', 'Am7', 'Am7', 'Dmadd9', 'C', 'Gm', 'Am7'],
+      bars: [
+        bar('Dmadd9', { lead: steps('D5', null, 'F5', null, 'A5', null, 'G5', null), counter: steps(null, 'A5', null, 'D6', null, 'A5', null, 'F5'), bass: steps('D2', null, null, null, 'A2', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Dmadd9', { lead: steps(null, null, 'D5', null, 'F5', null, 'G5', null), counter: steps('A5', null, 'D6', null, 'A5', null, 'F5', null), bass: steps('D2', null, null, null, 'A2', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps('E5', null, 'G5', null, 'A5', null, 'G5', null), counter: steps(null, 'G5', null, 'C6', null, 'G5', null, 'E5'), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps(null, null, 'E5', null, 'G5', null, 'A5', null), counter: steps('G5', null, 'C6', null, 'G5', null, 'E5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', null, 'A5', null, 'G5', null), counter: steps(null, 'Bb5', null, 'D6', null, 'Bb5', null, 'G5'), bass: steps('G2', null, null, null, 'D3', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps(null, null, 'D5', null, 'G5', null, 'A5', null), counter: steps('Bb5', null, 'D6', null, 'Bb5', null, 'G5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', null, 'C6', null, 'A5', null), counter: steps(null, 'G5', null, 'C6', null, 'G5', null, 'E5'), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps(null, null, 'E5', null, 'A5', null, 'C6', null), counter: steps('G5', null, 'C6', null, 'G5', null, 'E5', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Dmadd9', { lead: steps('D5', null, 'F5', null, 'A5', null, 'D6', null), counter: steps(null, 'A5', null, 'F5', null, 'A5', null, 'G5'), bass: steps('D2', null, null, null, 'A2', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps('E5', null, 'G5', null, 'A5', null, 'G5', null), counter: steps(null, null, 'C6', null, 'G5', null, 'E5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', null, 'Bb5', null, 'A5', null), counter: steps('D6', null, 'Bb5', null, 'G5', null, 'D5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', null, 'C6', null, 'A5', null), counter: steps('G5', null, 'C6', null, 'G5', null, 'E5', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+      ],
+    },
+    {
+      name: 'B',
+      progression: ['Dmadd9', 'C', 'Gm', 'Am7', 'Dmadd9', 'C', 'Gm', 'Am7', 'Dmadd9', 'C', 'Gm', 'Am7'],
+      bars: [
+        bar('Dmadd9', { lead: steps('A5', null, 'D6', null, 'F6', null, 'D6', null), counter: steps('F5', null, 'A5', null, 'D6', null, 'A5', null), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('G5', null, 'C6', null, 'E6', null, 'C6', null), counter: steps('E5', null, 'G5', null, 'C6', null, 'G5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Gm',     { lead: steps('G5', null, 'Bb5', null, 'D6', null, 'Bb5', null), counter: steps('D5', null, 'G5', null, 'Bb5', null, 'G5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('A5', null, 'C6', null, 'E6', null, 'C6', null), counter: steps('E5', null, 'A5', null, 'C6', null, 'A5', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Dmadd9', { lead: steps('F5', null, 'A5', null, 'D6', null, 'A5', null), counter: steps('D5', null, 'F5', null, 'A5', null, 'F5', null), bass: steps('D2', null, null, null, 'A2', null, null, null), rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('E5', null, 'G5', null, 'C6', null, 'G5', null), counter: steps('C5', null, 'E5', null, 'G5', null, 'E5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', null, 'Bb5', null, 'D6', null), counter: steps('G5', null, 'Bb5', null, 'D6', null, 'Bb5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', null, 'C6', null, 'E6', null), counter: steps('A5', null, 'C6', null, 'E6', null, 'C6', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Dmadd9', { lead: steps('D5', null, 'F5', null, 'A5', null, 'D6', null), counter: steps('A5', null, 'D6', null, 'F6', null, 'A5', null), bass: steps('D2', null, null, null, 'A2', null, null, null), rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('G5', null, 'A5', null, 'C6', null, 'G5', null), counter: steps('E5', null, 'G5', null, 'C6', null, 'G5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', null, 'Bb5', null, 'G5', null), counter: steps('Bb5', null, 'D6', null, 'Bb5', null, 'G5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', null, 'C6', null, 'A5', null), counter: steps('C6', null, 'E6', null, 'C6', null, 'A5', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+      ],
+    },
+    {
+      name: 'C',
+      progression: ['Dmadd9', 'Dmadd9', 'Am7', 'Am7', 'Gm', 'Gm', 'C', 'C', 'Dmadd9', 'Am7', 'Gm', 'C'],
+      bars: [
+        bar('Dmadd9', { lead: steps('D5', 'F5', 'A5', 'D6', 'A5', 'F5', 'D5', null), counter: steps(null, 'A5', null, 'F5', null, 'D5', null, 'A5'), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Dmadd9', { lead: steps('F5', 'A5', 'D6', 'F6', 'D6', 'A5', 'F5', null), counter: steps(null, 'D6', null, 'A5', null, 'F5', null, 'D5'), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps('E5', 'A5', 'C6', 'E6', 'C6', 'A5', 'E5', null), counter: steps(null, 'G5', null, 'C6', null, 'A5', null, 'E5'), bass: steps('A2', null, null, null, 'E3', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps('A5', 'C6', 'E6', 'G6', 'E6', 'C6', 'A5', null), counter: steps(null, 'E6', null, 'C6', null, 'A5', null, 'E5'), bass: steps('A2', null, null, null, 'E3', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps('D5', 'G5', 'Bb5', 'D6', 'Bb5', 'G5', 'D5', null), counter: steps(null, 'Bb5', null, 'D6', null, 'G5', null, 'D5'), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps('G5', 'Bb5', 'D6', 'G6', 'D6', 'Bb5', 'G5', null), counter: steps(null, 'D6', null, 'Bb5', null, 'G5', null, 'D5'), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps('E5', 'G5', 'A5', 'C6', 'A5', 'G5', 'E5', null), counter: steps(null, 'G5', null, 'C6', null, 'G5', null, 'E5'), bass: steps('C3', null, null, null, 'G2', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps('G5', 'A5', 'C6', 'E6', 'C6', 'A5', 'G5', null), counter: steps(null, 'C6', null, 'G5', null, 'E5', null, 'C5'), bass: steps('C3', null, null, null, 'G2', null, null, null), rim: [2, 6], hat: [1, 3, 5, 7] }),
+        bar('Dmadd9', { lead: steps('D5', null, 'A5', 'D6', null, 'A5', 'F5', null), counter: steps('A5', null, 'D6', null, 'F6', null, 'A5', null), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', 'C6', null, 'A5', 'E5', null), counter: steps('G5', null, 'C6', null, 'E6', null, 'C6', null), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', 'Bb5', null, 'G5', 'D5', null), counter: steps('Bb5', null, 'D6', null, 'Bb5', null, 'G5', null), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+        bar('C',      { lead: steps('E5', null, 'G5', 'A5', null, 'G5', 'E5', null), counter: steps('C6', null, 'G5', null, 'E5', null, 'C5', null), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], hat: [1, 3, 5, 7] }),
+      ],
+    },
+    {
+      name: 'D',
+      progression: ['Dmadd9', 'C', 'Gm', 'Am7', 'Dmadd9', 'C', 'Gm', 'Am7', 'Dmadd9', 'Dmadd9', 'C', 'Am7'],
+      bars: [
+        bar('Dmadd9', { lead: steps('D5', null, 'F5', 'A5', 'D6', null, 'A5', 'F5'), counter: steps('A5', 'D6', 'F6', 'A6', 'F6', 'D6', 'A5', 'F5'), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('E5', null, 'G5', 'A5', 'C6', null, 'G5', 'E5'), counter: steps('G5', 'C6', 'E6', 'G6', 'E6', 'C6', 'G5', 'E5'), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Gm',     { lead: steps('D5', null, 'G5', 'Bb5', 'D6', null, 'Bb5', 'G5'), counter: steps('Bb5', 'D6', 'G6', 'Bb6', 'G6', 'D6', 'Bb5', 'G5'), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('E5', null, 'A5', 'C6', 'E6', null, 'C6', 'A5'), counter: steps('C6', 'E6', 'G6', 'A6', 'G6', 'E6', 'C6', 'A5'), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Dmadd9', { lead: steps('F5', null, 'A5', 'D6', 'F6', null, 'D6', 'A5'), counter: steps('A5', 'D6', 'F6', 'A6', 'F6', 'D6', 'A5', 'F5'), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('G5', null, 'A5', 'C6', 'E6', null, 'C6', 'G5'), counter: steps('E5', 'G5', 'C6', 'E6', 'C6', 'G5', 'E5', 'C5'), bass: steps('C3', null, null, null, 'G2', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Gm',     { lead: steps('G5', null, 'Bb5', 'D6', 'G6', null, 'D6', 'Bb5'), counter: steps('D5', 'G5', 'Bb5', 'D6', 'Bb5', 'G5', 'D5', 'Bb4'), bass: steps('G2', null, null, null, 'D3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('A5', null, 'C6', 'E6', 'A6', null, 'E6', 'C6'), counter: steps('E5', 'A5', 'C6', 'E6', 'C6', 'A5', 'E5', 'C5'), bass: steps('A2', null, null, null, 'E3', null, null, null), kick: [0, 4], rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Dmadd9', { lead: steps('D5', 'F5', 'A5', 'D6', 'F6', 'A6', 'D7', null), counter: steps('A5', null, 'F5', null, 'D5', null, 'A4', null), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Dmadd9', { lead: steps('D7', null, 'A6', null, 'F6', null, 'D6', null), counter: steps('A5', null, 'F5', null, 'D5', null, 'A4', null), bass: steps('D2', null, null, null, 'A2', null, null, null), kick: [0, 4], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('C',      { lead: steps('C6', null, 'E6', null, 'G6', null, 'E6', null), counter: steps('G5', null, 'C6', null, 'E6', null, 'C6', null), bass: steps('C3', null, null, null, 'G2', null, null, null), rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+        bar('Am7',    { lead: steps('A5', null, 'C6', null, 'E6', null, 'A6', null), counter: steps('E5', null, 'A5', null, 'C6', null, 'E6', null), bass: steps('A2', null, null, null, 'E3', null, null, null), rim: [2, 6], hat: [1, 2, 3, 5, 6, 7] }),
+      ],
+    },
+  ],
+  cues: {
+    checkpoint: [
+      { beat: 0, role: 'lead', note: 'D6', duration: 0.16, gain: 0.16 },
+      { beat: 0.15, role: 'lead', note: 'A6', duration: 0.2, gain: 0.16 },
+      { beat: 0.4, role: 'accent', note: 'D7', duration: 0.45, gain: 0.09 },
+    ],
+    nearMiss: [
+      { beat: 0, role: 'lead', note: 'A5', duration: 0.12, gain: 0.11 },
+      { beat: 0.12, role: 'counter', note: 'D6', duration: 0.22, gain: 0.1 },
+    ],
+    collision: [
+      { beat: 0, role: 'counter', note: 'D5', duration: 0.24, gain: 0.10, glideTo: 'A4' },
+      { beat: 0.18, role: 'bass', note: 'D3', duration: 0.28, gain: 0.08 },
+    ],
+    levelComplete: [
+      { beat: 0, role: 'chord', notes: ['D4', 'F4', 'A4'], duration: 1.4, gain: 0.10 },
+      { beat: 0.0, role: 'lead', note: 'D6', duration: 0.3, gain: 0.14 },
+      { beat: 0.4, role: 'lead', note: 'F6', duration: 0.3, gain: 0.14 },
+      { beat: 0.8, role: 'lead', note: 'A6', duration: 0.4, gain: 0.15 },
+      { beat: 1.25, role: 'accent', note: 'D7', duration: 0.7, gain: 0.1 },
+    ],
+  },
+};
+
 export const LEVEL_MUSIC_SPECS = {
   1: LEVEL1_MUSIC_SPEC,
   2: LEVEL2_MUSIC_SPEC,
   3: LEVEL3_MUSIC_SPEC,
   4: LEVEL4_MUSIC_SPEC,
+  5: LEVEL5_MUSIC_SPEC,
 };

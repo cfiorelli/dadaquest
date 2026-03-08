@@ -3,6 +3,7 @@ import { buildWorld, createCoin } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
 import { buildWorld4 } from './world/buildWorld4.js';
+import { buildWorld5 } from './world/buildWorld5.js';
 import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
@@ -26,12 +27,14 @@ import { LEVEL1 } from './world/level1.js';
 import { LEVEL2 } from './world/level2.js';
 import { LEVEL3 } from './world/level3.js';
 import { LEVEL4 } from './world/level4.js';
+import { LEVEL5 } from './world/level5.js';
 import {
   clearProgress,
   ensureProgressTotals,
   getLevelProgress,
   isLevelUnlocked,
   loadProgress,
+  markLevelCompleted,
   markUnlockShown,
   recordCollectedBinky,
   saveProgress,
@@ -50,6 +53,7 @@ const CAMERA_FOLLOW_Z = -13.2;
 const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
 const CAPE_FLOAT_DURATION_MS = 4000;
 const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
+const BUBBLE_SHIELD_GRACE_MS = 900;
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -875,12 +879,17 @@ export async function boot(options = {}) {
     2: getLevelCollectibleTotal(LEVEL2),
     3: getLevelCollectibleTotal(LEVEL3),
     4: getLevelCollectibleTotal(LEVEL4),
+    5: getLevelCollectibleTotal(LEVEL5),
   };
   let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
   const syncProgressState = (nextProgress) => {
     progression = ensureProgressTotals(nextProgress, levelTotals);
     ui.setLockedLevels({
       4: !isLevelUnlocked(progression, 4),
+      5: !isLevelUnlocked(progression, 5),
+    }, {
+      4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
+      5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
     });
     window.__DADA_DEBUG__.progressState = progression;
   };
@@ -937,7 +946,9 @@ export async function boot(options = {}) {
   // Build the diorama world (route by level)
   let world;
   try {
-    world = levelId === 4
+    world = levelId === 5
+      ? buildWorld5(scene, { animateGoal: !shotMode })
+      : levelId === 4
       ? buildWorld4(scene, { animateGoal: !shotMode })
       : levelId === 3
       ? buildWorld3(scene, { animateGoal: !shotMode })
@@ -2170,6 +2181,8 @@ export async function boot(options = {}) {
   let collectiblePickupCooldownMs = 0;
   let capeUsedThisRun = false;
   let capeSuppressedThisRun = false;
+  let bubbleShieldUsedThisRun = false;
+  let bubbleShieldGraceMs = 0;
   let flourPuffCooldownMs = 0;
   let goalCarryStartPos = null;
   let goalCarryEndPos = null;
@@ -2208,6 +2221,11 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
   window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+  window.__DADA_DEBUG__.bubbleShield = {
+    unlocked: !!progression.bubbleShieldUnlocked,
+    usedThisRun: false,
+    graceMs: 0,
+  };
   window.__DADA_DEBUG__.floorTopY = currentFloorTopY;
   window.__DADA_DEBUG__.goalGate = {
     minX: goalGuardMinX,
@@ -2418,11 +2436,20 @@ export async function boot(options = {}) {
       totalMs: CAPE_FLOAT_DURATION_MS,
       used: capeUsedThisRun || capeSuppressedThisRun,
     });
+    ui.updateBubbleShieldBuff({
+      unlocked: !!progression.bubbleShieldUnlocked,
+      used: bubbleShieldUsedThisRun,
+    });
     ui.updateFlourPuff({
       visible: levelId === 4,
       remainingMs: flourPuffCooldownMs,
       totalMs: world.flourPuff?.cooldownMs ?? 6000,
     });
+    window.__DADA_DEBUG__.bubbleShield = {
+      unlocked: !!progression.bubbleShieldUnlocked,
+      usedThisRun: bubbleShieldUsedThisRun,
+      graceMs: Math.round(bubbleShieldGraceMs),
+    };
   }
 
   function persistProgressState(nextState) {
@@ -2468,6 +2495,8 @@ export async function boot(options = {}) {
     } else if (!keepCapeUsage) {
       capeSuppressedThisRun = false;
     }
+    bubbleShieldUsedThisRun = false;
+    bubbleShieldGraceMs = 0;
     flourPuffCooldownMs = 0;
     applyCapeVisualState();
     updateBuffHud();
@@ -2482,7 +2511,7 @@ export async function boot(options = {}) {
 
   function resetBabyToNew() {
     clearRunBuffs({ suppressCape: true, keepCapeUsage: false });
-    // Wipe all saved progression so cape + level 4 re-lock immediately
+    // Wipe all saved progression so unlocks and sequential level gates reset immediately.
     const cleared = clearProgress(levelTotals);
     syncProgressState(cleared);
     applyCapeVisualState();
@@ -2514,6 +2543,8 @@ export async function boot(options = {}) {
       onesieRechargeMs,
       capeUsedThisRun,
       capeSuppressedThisRun,
+      bubbleShieldUsedThisRun,
+      bubbleShieldGraceMs,
       flourPuffCooldownMs,
     };
   }
@@ -2543,6 +2574,8 @@ export async function boot(options = {}) {
     onesieRechargeMs = snapshot.onesieRechargeMs ?? 0;
     capeUsedThisRun = snapshot.capeUsedThisRun;
     capeSuppressedThisRun = snapshot.capeSuppressedThisRun;
+    bubbleShieldUsedThisRun = snapshot.bubbleShieldUsedThisRun ?? false;
+    bubbleShieldGraceMs = snapshot.bubbleShieldGraceMs ?? 0;
     flourPuffCooldownMs = snapshot.flourPuffCooldownMs;
     applyCapeVisualState();
     player.spawnAt(snapshot.playerPos.x, snapshot.playerPos.y, snapshot.playerPos.z);
@@ -2672,6 +2705,11 @@ export async function boot(options = {}) {
   }
 
   function finishRun() {
+    const completionResult = markLevelCompleted(progression, levelId, levelTotals);
+    persistProgressState(completionResult.state);
+    if (completionResult.bubbleShieldUnlockedNow && !progression.unlocksShown?.bubbleShield) {
+      maybeShowUnlockBanner('BUBBLE SHIELD UNLOCKED!', 'Absorbs one hazard reset per run before it pops.', 'bubbleShield', 3200);
+    }
     state = 'end';
     player.setWinAnimationActive(false);
     player.stopCapeFloat();
@@ -2765,6 +2803,7 @@ export async function boot(options = {}) {
     if (world.level2) world.level2.reset();
     if (world.level3) world.level3.reset();
     if (world.level4) world.level4.reset();
+    if (world.level5) world.level5.reset();
 
     for (const pickup of pickups) {
       pickup.collected = false;
@@ -2845,10 +2884,20 @@ export async function boot(options = {}) {
     window.requestAnimationFrame(tick);
   }
 
+  function getLockedLevelMessage(targetLevelId) {
+    if (targetLevelId === 4) {
+      return 'Collect all binkies in Levels 1–3 to unlock Super Sourdough';
+    }
+    if (targetLevelId === 5) {
+      return 'Locked. Beat Super Sourdough (Level 4) to unlock.';
+    }
+    return `Level ${targetLevelId} is locked`;
+  }
+
   function requestStart(targetLevelId) {
     if (state !== 'title') return; // already loading or playing
     if (!isLevelUnlocked(progression, targetLevelId)) {
-      ui.showStartError('Collect all binkies in Levels 1–3 to unlock Super Sourdough');
+      ui.showStartError(getLockedLevelMessage(targetLevelId));
       return;
     }
     if (targetLevelId !== levelId) {
@@ -2917,7 +2966,7 @@ export async function boot(options = {}) {
 
   function switchLevelFromGameplayMenu(targetLevelId) {
     if (!isLevelUnlocked(progression, targetLevelId)) {
-      ui.showStatus('Collect all binkies to unlock Super Sourdough', 1300);
+      ui.showStatus(getLockedLevelMessage(targetLevelId), 1600);
       return false;
     }
     selectedLevelId = targetLevelId;
@@ -3045,14 +3094,38 @@ export async function boot(options = {}) {
       y: coin.position.y,
       z: coin.position.z,
     }));
+    const mergeProgressPatch = (patch = {}) => ({
+      ...progression,
+      ...patch,
+      levels: {
+        ...(progression.levels || {}),
+        ...(patch.levels || {}),
+      },
+      levelCompleted: {
+        ...(progression.levelCompleted || {}),
+        ...(patch.levelCompleted || {}),
+      },
+      unlocksShown: {
+        ...(progression.unlocksShown || {}),
+        ...(patch.unlocksShown || {}),
+      },
+    });
     window.__DADA_DEBUG__.setProgressState = (nextState) => {
       persistProgressState(nextState);
       applyCapeVisualState();
+      updateBuffHud();
+      return progression;
+    };
+    window.__DADA_DEBUG__.setProgress = (patch = {}) => {
+      persistProgressState(mergeProgressPatch(patch));
+      applyCapeVisualState();
+      updateBuffHud();
       return progression;
     };
     window.__DADA_DEBUG__.clearProgressState = () => {
       persistProgressState(clearProgress(levelTotals));
       applyCapeVisualState();
+      updateBuffHud();
       return progression;
     };
     window.__DADA_DEBUG__.level2Secret = () => world.level2?.getSecretState?.() ?? null;
@@ -3066,6 +3139,14 @@ export async function boot(options = {}) {
         timer: runtime ? Number(runtime.timer.toFixed(3)) : null,
         playerTriggered: runtime?.playerTriggered ?? false,
       };
+    };
+    window.__DADA_DEBUG__.triggerLevel5Hazard = (name = 'eelRailB') => {
+      if (levelId !== 5) return false;
+      return world.level5?.debugForceHazard?.(name, {
+        pos: player.mesh.position,
+        player,
+        triggerReset,
+      }) ?? false;
     };
   }
 
@@ -3130,7 +3211,7 @@ export async function boot(options = {}) {
       if (state === 'title' && isLevelUnlocked(progression, levelId)) {
         startLoadedLevelWithProgress(levelId, { unlockAudio: false });
       } else if (!isLevelUnlocked(progression, levelId)) {
-        ui.showStartError('Collect all binkies in Levels 1–3 to unlock Super Sourdough');
+        ui.showStartError(getLockedLevelMessage(levelId));
       }
     }, 70);
   } else {
@@ -3163,15 +3244,44 @@ export async function boot(options = {}) {
     ui.showPopText('Da Da!', 780);
   }
 
+  function isBubbleShieldEligibleReason(reason) {
+    return ![
+      'manual_reset',
+      'fell_off_level',
+      'crumble_portal',
+      'menu',
+      'menu_restart',
+      'playAgain',
+      'debug',
+      'keyboard',
+    ].includes(reason);
+  }
+
   function triggerReset(reason, direction = -1, overrideSpawn = null) {
     if (respawnState) return;
+    if (bubbleShieldGraceMs > 0 && isBubbleShieldEligibleReason(reason)) {
+      return false;
+    }
+    if (progression.bubbleShieldUnlocked && !bubbleShieldUsedThisRun && isBubbleShieldEligibleReason(reason)) {
+      bubbleShieldUsedThisRun = true;
+      bubbleShieldGraceMs = BUBBLE_SHIELD_GRACE_MS;
+      player.invulnTimerMs = Math.max(player.invulnTimerMs, BUBBLE_SHIELD_GRACE_MS);
+      player.vx *= 0.4;
+      player.vy = Math.max(player.vy, 0);
+      juiceFx.spawnBubbleBurst(player.mesh.position);
+      audio.playBubblePop();
+      ui.showStatus('Bubble shield popped!', 900);
+      updateBuffHud();
+      window.__DADA_DEBUG__.lastRespawnReason = `${reason}_shielded`;
+      return false;
+    }
     const applied = player.applyHit({
       direction,
       knockback: 4.2,
       upward: 3.8,
       invulnMs: 800,
     });
-    if (!applied) return;
+    if (!applied) return false;
     audio.playReset();
     audio.playCue(levelId, 'collision');
     respawnState = { phase: 'fadeOut', timer: 0.16, reason, overrideSpawn };
@@ -3180,6 +3290,7 @@ export async function boot(options = {}) {
       resetCrumbles();
     }
     ui.showStatus('Try again!', 650);
+    return true;
   }
 
   function resolveRespawnPosition(baseSpawn) {
@@ -3264,6 +3375,9 @@ export async function boot(options = {}) {
 
     if (collectiblePickupCooldownMs > 0) {
       collectiblePickupCooldownMs = Math.max(0, collectiblePickupCooldownMs - (dt * 1000));
+    }
+    if (bubbleShieldGraceMs > 0) {
+      bubbleShieldGraceMs = Math.max(0, bubbleShieldGraceMs - (dt * 1000));
     }
 
     if (onesieBuffTimerMs > 0) {
@@ -3644,6 +3758,17 @@ export async function boot(options = {}) {
         if (world.level4) {
           world.level4.update(dt, { pos: player.mesh.position, triggerReset, player });
           if (debugMode) window.__DADA_DEBUG__.l4RainActiveCount = world.level4.rainCount;
+        }
+        if (world.level5) {
+          world.level5.update(dt, {
+            pos: player.mesh.position,
+            player,
+            triggerReset,
+            triggerNearMissCue,
+          });
+          if (debugMode) {
+            window.__DADA_DEBUG__.level5State = world.level5.getDebugState?.() ?? null;
+          }
         }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;

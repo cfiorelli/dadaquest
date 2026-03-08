@@ -20,14 +20,26 @@ function normalize(raw, levelTotals = {}) {
     };
   }
 
+  const levelCompleted = {};
+  const completionKeys = new Set([
+    ...Object.keys(levelTotals || {}),
+    ...Object.keys(raw?.levelCompleted || {}),
+  ]);
+  for (const levelKey of completionKeys) {
+    levelCompleted[levelKey] = !!raw?.levelCompleted?.[levelKey];
+  }
+
   const state = {
     levels,
+    levelCompleted,
     capeUnlocked: !!raw?.capeUnlocked,
     sourdoughUnlocked: !!raw?.sourdoughUnlocked,
+    bubbleShieldUnlocked: !!raw?.bubbleShieldUnlocked,
     allBinkiesCollected: !!raw?.allBinkiesCollected,
     unlocksShown: {
       cape: !!raw?.unlocksShown?.cape,
       sourdough: !!raw?.unlocksShown?.sourdough,
+      bubbleShield: !!raw?.unlocksShown?.bubbleShield,
     },
   };
   recomputeFlags(state, levelTotals);
@@ -41,6 +53,9 @@ function recomputeFlags(state, levelTotals = {}) {
     } else {
       state.levels[levelKey].total = total;
     }
+    if (typeof state.levelCompleted[levelKey] !== 'boolean') {
+      state.levelCompleted[levelKey] = false;
+    }
   }
 
   const level1 = state.levels['1'];
@@ -53,6 +68,7 @@ function recomputeFlags(state, levelTotals = {}) {
 
   state.capeUnlocked = state.capeUnlocked || level1Complete;
   state.sourdoughUnlocked = state.sourdoughUnlocked || coreComplete;
+  state.bubbleShieldUnlocked = state.bubbleShieldUnlocked || !!state.levelCompleted['5'];
   state.allBinkiesCollected = allComplete;
   return state;
 }
@@ -99,6 +115,20 @@ export function recordCollectedBinky(state, levelId, collectibleId, levelTotals 
   };
 }
 
+export function markLevelCompleted(state, levelId, levelTotals = {}) {
+  const next = normalize(state, levelTotals);
+  const levelKey = String(levelId);
+  const wasComplete = !!next.levelCompleted[levelKey];
+  const prevBubbleShield = next.bubbleShieldUnlocked;
+  next.levelCompleted[levelKey] = true;
+  recomputeFlags(next, levelTotals);
+  return {
+    state: next,
+    levelCompletedNow: !wasComplete && next.levelCompleted[levelKey],
+    bubbleShieldUnlockedNow: !prevBubbleShield && next.bubbleShieldUnlocked,
+  };
+}
+
 export function markUnlockShown(state, unlockKey, levelTotals = {}) {
   const next = normalize(state, levelTotals);
   next.unlocksShown[unlockKey] = true;
@@ -116,8 +146,11 @@ export function getLevelProgress(state, levelId) {
 }
 
 export function isLevelUnlocked(state, levelId) {
+  if (levelId <= 1) return true;
+  if (levelId === 2 || levelId === 3) return true;
   if (levelId === 4) return !!state?.sourdoughUnlocked;
-  return true;
+  if (levelId === 5) return !!state?.levelCompleted?.['4'];
+  return !!state?.levelCompleted?.[String(levelId - 1)];
 }
 
 export function getProgressStorageKey() {

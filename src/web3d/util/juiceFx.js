@@ -226,6 +226,21 @@ export class JuiceFx {
     }
   }
 
+  spawnBubbleBurst(pos) {
+    if (!this.enabled) return;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      this._spawn(this.sparkleMat, 'bubbleBurst', pos.x + Math.cos(angle) * 0.12, pos.y + 0.2, pos.z + Math.sin(angle) * 0.08, {
+        life: 0.36,
+        startScale: 0.10,
+        endScale: 0.42,
+        vx: Math.cos(angle) * 0.74,
+        vy: 0.22 + (Math.sin(angle) * 0.08),
+        vz: Math.sin(angle) * 0.18,
+      });
+    }
+  }
+
   update(dt) {
     if (!this.enabled) return;
     for (const p of this.particles) {

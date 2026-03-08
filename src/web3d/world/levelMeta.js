@@ -1,10 +1,11 @@
-export const LEVEL_ORDER = [1, 2, 3, 4];
+export const LEVEL_ORDER = [1, 2, 3, 4, 5];
 
 export const LEVEL_SUBTITLES = {
   1: 'Level 1 — Petting Zoo',
   2: 'Level 2 — Condo Garden',
   3: 'Level 3 — Grandma\'s House',
   4: 'Level 4 — Super Sourdough',
+  5: 'Level 5 — Neon Night Aquarium',
 };
 
 export function getLevelSubtitle(levelId) {

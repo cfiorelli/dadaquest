@@ -372,6 +372,9 @@ const CSS = `
 .dada-buff-card.active .dada-buff-icon.cape {
   background: linear-gradient(135deg, #d86848, #a73cd6);
 }
+.dada-buff-card.active .dada-buff-icon.shield {
+  background: linear-gradient(135deg, #4cd4ff, #2b79d7);
+}
 .dada-buff-copy {
   display: flex;
   flex-direction: column;
@@ -410,6 +413,9 @@ const CSS = `
 }
 .dada-buff-fill.cape {
   background: linear-gradient(90deg, #8c73ff, #45d4c8);
+}
+.dada-buff-fill.shield {
+  background: linear-gradient(90deg, #8beaff, #4d8eff);
 }
 .dada-buff-fill.recharging {
   background: linear-gradient(90deg, #54a0ff, #5f27cd);
@@ -649,12 +655,18 @@ export function createUI(uiRoot, options = {}) {
 
   // Detect current level from URL (mutable — updated when user clicks level buttons)
   const levelParam = new URLSearchParams(window.location.search).get('level');
-  let _selectedLevel = levelParam === '4' ? 4 : levelParam === '3' ? 3 : levelParam === '2' ? 2 : 1;
+  const requestedLevel = Number.parseInt(levelParam || '1', 10);
+  let _selectedLevel = [1, 2, 3, 4, 5].includes(requestedLevel) ? requestedLevel : 1;
   let lockedLevels = {
     1: false,
     2: false,
     3: false,
     4: true,
+    5: true,
+  };
+  let lockMessages = {
+    4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
+    5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
   };
 
   // Title overlay
@@ -663,13 +675,7 @@ export function createUI(uiRoot, options = {}) {
   titleEl.innerHTML = `
     <div class="dada-card">
       <div class="dada-h1">DA DA QUEST</div>
-      <div class="dada-sub" id="titleSub">${
-        _selectedLevel === 3
-          ? 'Level 3 \u2014 Grandma\'s House'
-          : _selectedLevel === 2
-            ? 'Level 2 \u2014 Condo Garden'
-            : 'Level 1 \u2014 Petting Zoo'
-      }</div>
+      <div class="dada-sub" id="titleSub"></div>
       <div class="dada-controls">
         <span>A/D</span> or <span>\u2190 \u2192</span> Move &nbsp;\u00b7&nbsp;
         <span>Space</span> Jump &nbsp;\u00b7&nbsp;
@@ -681,6 +687,7 @@ export function createUI(uiRoot, options = {}) {
         <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
         <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
         <button class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="levelBtn4" tabindex="-1">Level 4</button>
+        <button class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="levelBtn5" tabindex="-1">Level 5</button>
       </div>
       <div class="dada-level-lock" id="titleLevelLock"></div>
       <div class="dada-loading-wrap" id="titleLoadingWrap">
@@ -707,18 +714,22 @@ export function createUI(uiRoot, options = {}) {
   const btn2 = titleEl.querySelector('#levelBtn2');
   const btn3 = titleEl.querySelector('#levelBtn3');
   const btn4 = titleEl.querySelector('#levelBtn4');
+  const btn5 = titleEl.querySelector('#levelBtn5');
   let titleErrorVisible = false;
   let menuBtn1 = null;
   let menuBtn2 = null;
   let menuBtn3 = null;
   let menuBtn4 = null;
+  let menuBtn5 = null;
   let menuSubEl = null;
   let menuLockEl = null;
   let gameplayRestartHandler = null;
   let resetBabyHandler = null;
 
   function getLevelSubtitle(id) {
-    return id === 4
+    return id === 5
+      ? 'Level 5 — Neon Night Aquarium'
+      : id === 4
       ? 'Level 4 — Super Sourdough'
       : id === 3
       ? 'Level 3 — Grandma\'s House'
@@ -728,8 +739,8 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function getLevelLockMessage(id) {
-    if (id !== 4 || !lockedLevels[4]) return '';
-    return '🔒 Collect all binkies in Levels 1–3 to unlock Super Sourdough';
+    if (!lockedLevels[id]) return '';
+    return lockMessages[id] || '';
   }
 
   function resetTitleCopy() {
@@ -739,7 +750,7 @@ export function createUI(uiRoot, options = {}) {
       titleHintEl.style.color = '';
       titleHintEl.style.animation = '';
       titleHintEl.textContent = lockedLevels[_selectedLevel]
-        ? 'Locked until enough binkies are collected'
+        ? getLevelLockMessage(_selectedLevel)
         : 'Press SPACE or ENTER to start';
     }
   }
@@ -753,6 +764,7 @@ export function createUI(uiRoot, options = {}) {
     menuBtn2?.classList.toggle('active', levelId === 2);
     menuBtn3?.classList.toggle('active', levelId === 3);
     menuBtn4?.classList.toggle('active', levelId === 4);
+    menuBtn5?.classList.toggle('active', levelId === 5);
   }
 
   function applyLockState(button, locked) {
@@ -766,10 +778,12 @@ export function createUI(uiRoot, options = {}) {
     applyLockState(btn2, lockedLevels[2]);
     applyLockState(btn3, lockedLevels[3]);
     applyLockState(btn4, lockedLevels[4]);
+    applyLockState(btn5, lockedLevels[5]);
     applyLockState(menuBtn1, lockedLevels[1]);
     applyLockState(menuBtn2, lockedLevels[2]);
     applyLockState(menuBtn3, lockedLevels[3]);
     applyLockState(menuBtn4, lockedLevels[4]);
+    applyLockState(menuBtn5, lockedLevels[5]);
     resetTitleCopy();
     updateMenuCopy(_selectedLevel);
   }
@@ -788,6 +802,7 @@ export function createUI(uiRoot, options = {}) {
     btn2.classList.toggle('active', id === 2);
     btn3.classList.toggle('active', id === 3);
     btn4.classList.toggle('active', id === 4);
+    btn5.classList.toggle('active', id === 5);
     resetTitleCopy();
     const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
     history.replaceState(null, '', url);
@@ -802,6 +817,7 @@ export function createUI(uiRoot, options = {}) {
   btn2?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(2); });
   btn3?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(3); });
   btn4?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(4); });
+  btn5?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(5); });
 
   const menuEl = document.createElement('div');
   menuEl.className = 'dada-overlay dada-menu-bg hidden';
@@ -819,6 +835,7 @@ export function createUI(uiRoot, options = {}) {
         <a class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="menuLevelBtn2" href="${window.location.pathname}?level=2">Level 2</a>
         <a class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="menuLevelBtn3" href="${window.location.pathname}?level=3">Level 3</a>
         <a class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="menuLevelBtn4" href="${window.location.pathname}?level=4">Level 4</a>
+        <a class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="menuLevelBtn5" href="${window.location.pathname}?level=5">Level 5</a>
       </div>
       <div class="dada-level-lock" id="menuLevelLock"></div>
       <div class="dada-btn-row dada-menu-actions">
@@ -844,6 +861,7 @@ export function createUI(uiRoot, options = {}) {
   menuBtn2 = menuEl.querySelector('#menuLevelBtn2');
   menuBtn3 = menuEl.querySelector('#menuLevelBtn3');
   menuBtn4 = menuEl.querySelector('#menuLevelBtn4');
+  menuBtn5 = menuEl.querySelector('#menuLevelBtn5');
   menuLockEl = menuEl.querySelector('#menuLevelLock');
   const menuResumeBtn = menuEl.querySelector('#menuResumeBtn');
   const menuRestartBtn = menuEl.querySelector('#menuRestartBtn');
@@ -872,6 +890,13 @@ export function createUI(uiRoot, options = {}) {
     ev.currentTarget.blur();
     if (lockedLevels[4]) return;
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(4);
+  });
+  menuBtn5?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[5]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(5);
   });
   menuResumeBtn?.addEventListener('click', (ev) => {
     ev.preventDefault();
@@ -960,17 +985,29 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-buff-note">Locked. Collect all binkies in Level 1 to unlock</div>
         </div>
       </div>
+      <div class="dada-buff-card" data-buff="shield">
+        <div class="dada-buff-icon shield">BUB</div>
+        <div class="dada-buff-copy">
+          <div class="dada-buff-label">Bubble Shield <span class="dada-buff-state">LOCKED</span></div>
+          <div class="dada-buff-track"><div class="dada-buff-fill shield" style="width:0%"></div></div>
+          <div class="dada-buff-note">Locked. Beat Level 5 to unlock</div>
+        </div>
+      </div>
     </div>
   `;
   uiRoot.appendChild(buffEl);
   const onesieCard = buffEl.querySelector('[data-buff="onesie"]');
   const capeCard = buffEl.querySelector('[data-buff="cape"]');
+  const shieldCard = buffEl.querySelector('[data-buff="shield"]');
   const buffFill = onesieCard.querySelector('.dada-buff-fill.onesie');
   const buffCue = onesieCard.querySelector('.dada-buff-cue');
   const onesieState = onesieCard.querySelector('.dada-buff-state');
   const capeFill = capeCard.querySelector('.dada-buff-fill.cape');
   const capeState = capeCard.querySelector('.dada-buff-state');
   const capeNote = capeCard.querySelector('.dada-buff-note');
+  const shieldFill = shieldCard.querySelector('.dada-buff-fill.shield');
+  const shieldState = shieldCard.querySelector('.dada-buff-state');
+  const shieldNote = shieldCard.querySelector('.dada-buff-note');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -1123,6 +1160,8 @@ export function createUI(uiRoot, options = {}) {
     toastTimers.set(id, hideTimer);
   }
 
+  refreshLockState();
+
   return {
     showTitle() {
       if (!titleVisible) {
@@ -1165,10 +1204,14 @@ export function createUI(uiRoot, options = {}) {
     setResetBabyHandler(cb) {
       resetBabyHandler = cb;
     },
-    setLockedLevels(nextLockedLevels = {}) {
+    setLockedLevels(nextLockedLevels = {}, nextLockMessages = {}) {
       lockedLevels = {
         ...lockedLevels,
         ...nextLockedLevels,
+      };
+      lockMessages = {
+        ...lockMessages,
+        ...nextLockMessages,
       };
       refreshLockState();
     },
@@ -1339,6 +1382,21 @@ export function createUI(uiRoot, options = {}) {
         if (capeNote) capeNote.textContent = 'Press F while airborne to float';
       }
     },
+    updateBubbleShieldBuff({ unlocked = false, used = false } = {}) {
+      buffEl.style.display = 'block';
+      shieldCard.classList.toggle('active', !!unlocked && !used);
+      shieldFill.style.width = unlocked && !used ? '100%' : '0%';
+      if (!unlocked) {
+        shieldState.textContent = 'LOCKED';
+        if (shieldNote) shieldNote.textContent = 'Locked. Beat Level 5 to unlock';
+      } else if (used) {
+        shieldState.textContent = 'USED';
+        if (shieldNote) shieldNote.textContent = 'Popped. Restart level to restore shield';
+      } else {
+        shieldState.textContent = 'READY';
+        if (shieldNote) shieldNote.textContent = 'Auto-pops on the first hazard hit each run';
+      }
+    },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
       if (!visible) {
         abilityEl.style.display = 'none';
@@ -1363,6 +1421,7 @@ export function createUI(uiRoot, options = {}) {
       this.resetControlHints();
       this.updateBuff(0, 1);
       this.updateCapeBuff({ unlocked: false, active: false, remainingMs: 0, used: false });
+      this.updateBubbleShieldBuff({ unlocked: false, used: false });
       this.updateFlourPuff({ visible: false, remainingMs: 0, totalMs: 6000 });
     },
     showBanner,
