@@ -507,3 +507,25 @@ test('runtime: level 3 loads without runtime errors after grandma relocation', a
   const sceneKey = await page.evaluate(() => window.__DADA_DEBUG__?.sceneKey ?? null);
   expect(sceneKey).toBe('CribScene');
 });
+
+test('runtime: level 4 bread rain system spawns objects during gameplay', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  await page.goto('http://127.0.0.1:4173/?level=4&debug=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
+
+  await page.evaluate(() => {
+    const state = structuredClone(window.__DADA_DEBUG__?.progressState || {});
+    state.sourdoughUnlocked = true;
+    state.unlocksShown = { ...(state.unlocksShown || {}) };
+    window.__DADA_DEBUG__?.setProgressState?.(state);
+  });
+
+  await startDebugLevel(page, 4);
+
+  // Let the rain update loop run for 2 seconds
+  await page.waitForTimeout(2_000);
+
+  const rainCount = await page.evaluate(() => window.__DADA_DEBUG__?.l4RainActiveCount ?? -1);
+  expect(rainCount).toBeGreaterThan(0);
+});

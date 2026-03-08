@@ -3639,6 +3639,7 @@ export async function boot(options = {}) {
         }
         if (world.level4) {
           world.level4.update(dt, { pos: player.mesh.position, triggerReset, player });
+          if (debugMode) window.__DADA_DEBUG__.l4RainActiveCount = world.level4.rainCount;
         }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;

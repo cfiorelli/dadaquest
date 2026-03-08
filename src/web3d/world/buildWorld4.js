@@ -114,9 +114,9 @@ function makeInvisibleCollider(scene, name, def) {
  *   Toaster: BODY  #5A8090  TRIM #2E4A58  KNOB #D4B86A  SLOT #111826
  *
  * Three depth layers (all Z behind gameplay lane Z ≈ 0):
- *   FAR  Z -26…-30  scale 0.58×  speed ×0.72  brightness 0.50  48 objects
- *   MID  Z -21…-25  scale 0.90×  speed ×1.00  brightness 0.75  48 objects
- *   NEAR Z -17…-20  scale 1.22×  speed ×1.28  brightness 1.00  24 objects
+ *   FAR  Z +15…+20  scale 0.58×  speed ×0.72  brightness 0.50  48 objects
+ *   MID  Z  +8…+13  scale 0.90×  speed ×1.00  brightness 0.75  48 objects
+ *   NEAR Z  +3…+ 7  scale 1.22×  speed ×1.28  brightness 1.00  24 objects
  *
  * Pool: 120 objects (60 loaves + 60 toasters), allocated once at startup,
  * recycled by resetting Y when an object drops below RAIN_BOT_Y.
@@ -134,9 +134,9 @@ const RAIN_RC = {
 };
 
 const RAIN_LAYERS = [
-  { zNear: -26, zFar: -30, scaleBase: 0.58, speedMul: 0.72, bri: 0.50, count: 48 },
-  { zNear: -21, zFar: -25, scaleBase: 0.90, speedMul: 1.00, bri: 0.75, count: 48 },
-  { zNear: -17, zFar: -20, scaleBase: 1.22, speedMul: 1.28, bri: 1.00, count: 24 },
+  { zNear: 15, zFar: 20, scaleBase: 0.58, speedMul: 0.72, bri: 0.50, count: 48 },
+  { zNear:  8, zFar: 13, scaleBase: 0.90, speedMul: 1.00, bri: 0.75, count: 48 },
+  { zNear:  3, zFar:  7, scaleBase: 1.22, speedMul: 1.28, bri: 1.00, count: 24 },
 ];
 const RAIN_TOP_Y  =  32;
 const RAIN_BOT_Y  = -10;
@@ -258,7 +258,7 @@ function createBreadRainSystem(scene) {
       // Deterministic but irregular X distribution.
       const initX = RAIN_X_MIN + ((oi * 9.1 + li * 17.3) % xSpan);
       // Z varies continuously within the layer band.
-      const initZ = layer.zNear - ((oi * 0.73 + 0.1) % zSpan);
+      const initZ = layer.zNear + ((oi * 0.73 + 0.1) % zSpan);
 
       node.position.set(initX, initY, initZ);
       node.rotation.set(
@@ -313,7 +313,7 @@ function createBreadRainSystem(scene) {
           const node = pool[gi];
           node.position.y = RAIN_BOT_Y + (oi / layer.count) * ySpan;
           node.position.x = RAIN_X_MIN + ((oi * 9.1 + li * 17.3) % xSpan);
-          node.position.z = layer.zNear - ((oi * 0.73 + 0.1) % zSpan);
+          node.position.z = layer.zNear + ((oi * 0.73 + 0.1) % zSpan);
           node.rotation.set(
             (oi * 1.31) % (Math.PI * 2),
             (oi * 2.71) % (Math.PI * 2),
@@ -323,6 +323,7 @@ function createBreadRainSystem(scene) {
         }
       }
     },
+    getCount() { return pool.length; },
     dispose() {
       for (const node of pool) {
         for (const m of node.getChildMeshes(false)) m.dispose();
@@ -341,7 +342,7 @@ function createBackdrop(scene, shadowGen) {
     width: 160,
     height: 52,
   }, scene);
-  sky.position.set(30, 13, -31);
+  sky.position.set(30, 13, 31);
   const skyTex = new BABYLON.DynamicTexture('L4_skyTex', { width: 2048, height: 768 }, scene, true);
   const ctx = skyTex.getContext();
   const grad = ctx.createLinearGradient(0, 0, 0, 768);
@@ -373,7 +374,7 @@ function createBackdrop(scene, shadowGen) {
       diameter: 4.2 + (i % 3),
       segments: 20,
     }, scene);
-    jar.position.set(-8 + (i * 13.5), 10.5 + ((i % 4) * 2.1), -22 - ((i % 3) * 4.0));
+    jar.position.set(-8 + (i * 13.5), 10.5 + ((i % 4) * 2.1), 22 + ((i % 3) * 4.0));
     jar.scaling.y = 1.28;
     jar.material = makeSourdoughMaterial(scene, `L4_starterJarMat${i}`, i % 2 === 0 ? P4.teal : P4.glaze, 0.16);
     jar.parent = root;
@@ -395,7 +396,7 @@ function createBackdrop(scene, shadowGen) {
       width: 4.0 + ((i % 3) * 1.4),
       height: 2.0 + ((i % 4) * 0.7),
     }, scene);
-    storm.position.set(-18 + (i * 9.2), 10 + ((i % 3) * 2.3), -15 - ((i % 2) * 6));
+    storm.position.set(-18 + (i * 9.2), 10 + ((i % 3) * 2.3), 15 + ((i % 2) * 6));
     storm.rotation.y = Math.PI;
     const stormMat = new BABYLON.StandardMaterial(`L4_flourStormMat${i}`, scene);
     stormMat.diffuseColor = new BABYLON.Color3(1.0, 0.94, 0.78);
@@ -650,6 +651,7 @@ export function buildWorld4(scene, options = {}) {
   }
 
   const level4 = {
+    rainCount: 0,
     update(dt, { pos, triggerReset }) {
       updateConveyors(dt);
       updateHeatGates(dt, { pos, triggerReset });
@@ -658,6 +660,7 @@ export function buildWorld4(scene, options = {}) {
         if (storm.position.x > 90) storm.position.x = -20;
       }
       breadRain.update(dt);
+      this.rainCount = breadRain.getCount();
     },
     reset() {
       for (const conveyor of conveyorDefs) {
