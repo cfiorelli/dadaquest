@@ -289,6 +289,7 @@ export class GameAudio {
     if (levelId === 2) return 0.56;
     if (levelId === 3) return 0.62;
     if (levelId === 4) return 0.52;
+    if (levelId === 5) return 0.48;
     return 0.7;
   }
 
@@ -316,16 +317,22 @@ export class GameAudio {
     if (role === 'lead') {
       if (spec.levelId === 2) return beatSec * 0.72;
       if (spec.levelId === 4) return beatSec * 0.55;
+      if (spec.levelId === 5) return beatSec * 1.05;
       return beatSec * 0.78;
     }
     if (role === 'counter') {
       if (spec.levelId === 2) return beatSec * 0.92;
       if (spec.levelId === 4) return beatSec * 0.42;
+      if (spec.levelId === 5) return beatSec * 1.18;
       return beatSec * 0.88;
     }
-    if (role === 'accent') return beatSec * 0.34;
+    if (role === 'accent') {
+      if (spec.levelId === 5) return beatSec * 0.52;
+      return beatSec * 0.34;
+    }
     if (role === 'bass') {
       if (spec.levelId === 4) return beatSec * 0.80;
+      if (spec.levelId === 5) return beatSec * 1.10;
       return beatSec * 0.95;
     }
     return beatSec * 0.9;
@@ -347,6 +354,10 @@ export class GameAudio {
     }
     if (spec.levelId === 4) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 4.0, 0.038);
+      return;
+    }
+    if (spec.levelId === 5) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 4.4, 0.042);
       return;
     }
     this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.0, 0.05);
@@ -374,6 +385,12 @@ export class GameAudio {
     if (levelId === 4) {
       for (let i = 0; i < freqs.length; i++) {
         this._playNeonPadTone(freqs[i], start + (i * 0.015), duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 5) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playAbyssPadTone(freqs[i], start + (i * 0.018), duration, scaledGain / freqs.length);
       }
       return;
     }
@@ -421,6 +438,19 @@ export class GameAudio {
         this._playSubBass4(freq, start, duration, scaledGain);
       } else if (role === 'accent') {
         this._playSparkle4(freq, start, duration * 0.6, scaledGain * 0.6);
+      }
+      return;
+    }
+
+    if (levelId === 5) {
+      if (role === 'lead') {
+        this._playGlassBell5(freq, start, duration, scaledGain * 0.92, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playSonarPing5(freq, start, duration, scaledGain * 0.72, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playAbyssSubBass5(freq, start, duration, scaledGain * 0.94);
+      } else if (role === 'accent') {
+        this._playShimmer5(freq, start, duration, scaledGain * 0.78);
       }
       return;
     }
@@ -575,6 +605,34 @@ export class GameAudio {
     this._playOscVoice({ freq: freq * 1.002, start: start + 0.006, duration: duration * 0.92, peak: gain * 0.22, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
   }
 
+  // Level 5 — deep sea exploration voices
+
+  _playAbyssPadTone(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.36, duration), peak: gain * 0.58, type: 'triangle', attack: 0.18, filterType: 'lowpass', filterFreq: 520, q: 0.78 });
+    this._playOscVoice({ freq: freq * 0.5, start, duration: Math.max(0.32, duration * 0.96), peak: gain * 0.16, type: 'sine', attack: 0.22, filterType: 'lowpass', filterFreq: 180, q: 0.72 });
+    this._playOscVoice({ freq: freq * 1.004, start: start + 0.035, duration: Math.max(0.28, duration * 0.88), peak: gain * 0.11, type: 'sawtooth', attack: 0.16, filterType: 'lowpass', filterFreq: 440, q: 0.52 });
+  }
+
+  _playGlassBell5(freq, start, duration, gain, glideTo = 0) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.18, duration * 0.9), peak: gain * 0.66, type: 'sine', attack: 0.01, filterType: 'bandpass', filterFreq: 1650, q: 0.82, endFreq: glideTo || null });
+    this._playOscVoice({ freq: freq * 1.5, start: start + 0.015, duration: Math.max(0.12, duration * 0.55), peak: gain * 0.16, type: 'triangle', attack: 0.008, filterType: 'highpass', filterFreq: 980, q: 0.62 });
+  }
+
+  _playSonarPing5(freq, start, duration, gain, glideTo = 0) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.22, duration), peak: gain * 0.58, type: 'sine', attack: 0.02, filterType: 'bandpass', filterFreq: 980, q: 1.05, endFreq: glideTo || null });
+    this._playOscVoice({ freq: freq * 0.5, start: start + 0.03, duration: Math.max(0.18, duration * 1.08), peak: gain * 0.14, type: 'triangle', attack: 0.035, filterType: 'lowpass', filterFreq: 420, q: 0.78 });
+  }
+
+  _playAbyssSubBass5(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.24, duration * 1.05), peak: gain * 0.92, type: 'sine', attack: 0.03, filterType: 'lowpass', filterFreq: 135, q: 0.82 });
+    this._playOscVoice({ freq: freq * 0.5, start, duration: Math.max(0.24, duration * 0.9), peak: gain * 0.16, type: 'sine', attack: 0.05, filterType: 'lowpass', filterFreq: 92, q: 0.72 });
+  }
+
+  _playShimmer5(freq, start, duration, gain) {
+    this._playOscVoice({ freq, start, duration: Math.max(0.12, duration * 0.82), peak: gain * 0.46, type: 'sine', attack: 0.008, filterType: 'bandpass', filterFreq: 2550, q: 0.7 });
+    this._playOscVoice({ freq: freq * 2, start: start + 0.018, duration: Math.max(0.08, duration * 0.44), peak: gain * 0.12, type: 'triangle', attack: 0.005, filterType: 'highpass', filterFreq: 1650, q: 0.58 });
+  }
+
   // Level 4 — "slow bubbly tron" synth voices
 
   _playNeonPadTone(freq, start, duration, gain) {
@@ -653,6 +711,23 @@ export class GameAudio {
         this._osc(82, 'sine', start, 0.18, 0.042 * drumGain, 38, this.musicGain);
       } else if (drum === 'hat') {
         this._playNoiseBurst(start, 0.022, 0.003 * drumGain, { type: 'highpass', frequency: 5000, q: 0.5 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 5) {
+      if (drum === 'kick') {
+        this._osc(58, 'sine', start, 0.24, 0.026 * drumGain, 31, this.musicGain);
+        this._playNoiseBurst(start, 0.03, 0.0025 * drumGain, { type: 'lowpass', frequency: 240, q: 0.45 }, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.07, 0.005 * drumGain, { type: 'bandpass', frequency: 1350, q: 0.55 }, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.05, 0.0022 * drumGain, { type: 'highpass', frequency: 2800, q: 0.45 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.045, 0.0038 * drumGain, { type: 'bandpass', frequency: 1600, q: 0.6 }, this.musicGain);
+        this._osc(320, 'sine', start, 0.05, 0.0014 * drumGain, 220, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.042, 0.002 * drumGain, { type: 'highpass', frequency: 2300, q: 0.4 }, this.musicGain);
       }
       return;
     }

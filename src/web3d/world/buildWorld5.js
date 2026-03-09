@@ -70,10 +70,13 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   }, scene);
   slab.parent = root;
   slab.position.y = 0.02;
-  slab.material = makeGlowMaterial(scene, `${name}_slabMat`, [31, 117, 144], {
-    emissive: 0.16,
-    roughness: 0.32,
+  slab.material = makeGlowMaterial(scene, `${name}_slabMat`, [64, 176, 204], {
+    emissive: 0.34,
+    roughness: 0.22,
   });
+  slab.enableEdgesRendering();
+  slab.edgesWidth = 1.8;
+  slab.edgesColor = new BABYLON.Color4(0.84, 0.98, 1.0, 0.68);
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
 
@@ -84,9 +87,9 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   }, scene);
   rim.parent = root;
   rim.position.y = -(def.h * 0.32);
-  rim.material = makeGlowMaterial(scene, `${name}_rimMat`, [12, 48, 66], {
-    emissive: 0.05,
-    roughness: 0.62,
+  rim.material = makeGlowMaterial(scene, `${name}_rimMat`, [14, 56, 84], {
+    emissive: 0.16,
+    roughness: 0.48,
   });
 
   const topGlass = BABYLON.MeshBuilder.CreatePlane(`${name}_glass`, {
@@ -97,14 +100,49 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   topGlass.rotation.x = Math.PI / 2;
   topGlass.position.y = (def.h * 0.5) + 0.012;
   const glassMat = new BABYLON.StandardMaterial(`${name}_glassMat`, scene);
-  glassMat.diffuseColor = new BABYLON.Color3(0.16, 0.58, 0.68);
-  glassMat.emissiveColor = new BABYLON.Color3(0.06, 0.18, 0.22);
-  glassMat.alpha = 0.32;
+  glassMat.diffuseColor = new BABYLON.Color3(0.34, 0.82, 0.90);
+  glassMat.emissiveColor = new BABYLON.Color3(0.14, 0.34, 0.42);
+  glassMat.alpha = 0.56;
   glassMat.specularColor = new BABYLON.Color3(0.72, 0.94, 1.0);
   glassMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   glassMat.backFaceCulling = false;
+  glassMat.needDepthPrePass = true;
   topGlass.material = glassMat;
   markDecor(topGlass);
+
+  const faceGlow = BABYLON.MeshBuilder.CreatePlane(`${name}_faceGlow`, {
+    width: Math.max(0.54, def.w - 0.14),
+    height: Math.max(0.18, def.h * 0.44),
+  }, scene);
+  faceGlow.parent = root;
+  faceGlow.position.set(0, def.h * 0.08, (def.d * 0.5) + 0.06);
+  const faceGlowMat = new BABYLON.StandardMaterial(`${name}_faceGlowMat`, scene);
+  faceGlowMat.diffuseColor = new BABYLON.Color3(0.68, 0.98, 1.0);
+  faceGlowMat.emissiveColor = new BABYLON.Color3(0.24, 0.52, 0.58);
+  faceGlowMat.alpha = 0.36;
+  faceGlowMat.specularColor = BABYLON.Color3.Black();
+  faceGlowMat.disableLighting = true;
+  faceGlowMat.backFaceCulling = false;
+  faceGlowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  faceGlow.material = faceGlowMat;
+  markDecor(faceGlow);
+
+  const topLip = BABYLON.MeshBuilder.CreatePlane(`${name}_topLip`, {
+    width: Math.max(0.52, def.w - 0.18),
+    height: 0.11,
+  }, scene);
+  topLip.parent = root;
+  topLip.position.set(0, (def.h * 0.5) - 0.02, (def.d * 0.5) + 0.065);
+  const topLipMat = new BABYLON.StandardMaterial(`${name}_topLipMat`, scene);
+  topLipMat.diffuseColor = new BABYLON.Color3(0.84, 1.0, 1.0);
+  topLipMat.emissiveColor = new BABYLON.Color3(0.32, 0.66, 0.72);
+  topLipMat.alpha = 0.82;
+  topLipMat.specularColor = BABYLON.Color3.Black();
+  topLipMat.disableLighting = true;
+  topLipMat.backFaceCulling = false;
+  topLipMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  topLip.material = topLipMat;
+  markDecor(topLip);
 
   const underside = BABYLON.MeshBuilder.CreatePlane(`${name}_undershadow`, {
     width: Math.max(0.5, def.w * 0.86),
@@ -121,6 +159,31 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   underMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   underside.material = underMat;
   markDecor(underside);
+
+  const beaconOffsets = [
+    [-1, 1],
+    [1, 1],
+    [-1, -1],
+    [1, -1],
+  ];
+  for (let i = 0; i < beaconOffsets.length; i++) {
+    const beacon = BABYLON.MeshBuilder.CreateSphere(`${name}_beacon_${i}`, {
+      diameter: 0.10,
+      segments: 6,
+    }, scene);
+    beacon.parent = root;
+    beacon.position.set(
+      beaconOffsets[i][0] * Math.max(0.2, (def.w * 0.5) - 0.16),
+      (def.h * 0.5) - 0.015,
+      beaconOffsets[i][1] * Math.max(0.14, (def.d * 0.5) - 0.12),
+    );
+    const beaconMat = new BABYLON.StandardMaterial(`${name}_beaconMat_${i}`, scene);
+    beaconMat.diffuseColor = new BABYLON.Color3(0.84, 0.98, 1.0);
+    beaconMat.emissiveColor = new BABYLON.Color3(0.26, 0.54, 0.62);
+    beaconMat.alpha = 0.88;
+    beacon.material = beaconMat;
+    markDecor(beacon);
+  }
 
   return root;
 }
@@ -584,6 +647,7 @@ export function buildWorld5(scene, options = {}) {
   rim.diffuse = new BABYLON.Color3(0.28, 0.94, 0.98);
 
   const groundVisual = createAquariumPlatform(scene, 'ground', LEVEL5.ground, shadowGen);
+  setRenderingGroup(groundVisual, 2);
   const groundCollider = makeInvisibleCollider(scene, 'L5_groundCollider', LEVEL5.ground);
   const allPlatforms = [groundCollider];
   const platformVisuals = [];
