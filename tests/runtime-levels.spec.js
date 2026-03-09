@@ -304,7 +304,7 @@ test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanl
   }
 });
 
-test('runtime: level 5 ArrowUp moves the player forward and ArrowRight does not rotate the camera', async ({ page }) => {
+test('runtime: level 5 movement follows camera basis, facing follows velocity, and movement input does not rotate the camera', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -315,36 +315,91 @@ test('runtime: level 5 ArrowUp moves the player forward and ArrowRight does not 
   const beforeForward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    cameraForward: window.__DADA_DEBUG__?.cameraForward ?? null,
   }));
   expect(beforeForward.playerPos).not.toBeNull();
+  expect(beforeForward.cameraForward).not.toBeNull();
 
   await page.keyboard.down('ArrowUp');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(450);
+  const duringForward = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerVelocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
+    playerFacingYaw: window.__DADA_DEBUG__?.playerFacingYaw ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    cameraForward: window.__DADA_DEBUG__?.cameraForward ?? null,
+  }));
   await page.keyboard.up('ArrowUp');
-
   const afterForward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
   }));
-  expect(afterForward.playerPos).not.toBeNull();
-  expect(afterForward.playerPos.x - beforeForward.playerPos.x).toBeGreaterThan(0.45);
+  expect(duringForward.playerPos).not.toBeNull();
+  expect(duringForward.playerVelocity).not.toBeNull();
+  expect(duringForward.cameraForward).not.toBeNull();
+  const forwardDeltaX = duringForward.playerPos.x - beforeForward.playerPos.x;
+  const forwardDeltaZ = duringForward.playerPos.z - beforeForward.playerPos.z;
+  const forwardDot = (forwardDeltaX * beforeForward.cameraForward.x) + (forwardDeltaZ * beforeForward.cameraForward.z);
+  expect(forwardDot).toBeGreaterThan(0.34);
   expect(Math.abs((afterForward.cameraYaw ?? 0) - (beforeForward.cameraYaw ?? 0))).toBeLessThan(0.01);
+  expect(Math.hypot(duringForward.playerVelocity.x, duringForward.playerVelocity.z)).toBeGreaterThan(0.25);
+  const expectedYaw = Math.atan2(duringForward.playerVelocity.x, duringForward.playerVelocity.z);
+  const yawDelta = Math.atan2(
+    Math.sin((duringForward.playerFacingYaw ?? 0) - expectedYaw),
+    Math.cos((duringForward.playerFacingYaw ?? 0) - expectedYaw),
+  );
+  expect(Math.abs(yawDelta)).toBeLessThan(0.35);
 
   const beforeRight = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    cameraRight: window.__DADA_DEBUG__?.cameraRight ?? null,
   }));
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(450);
+  const duringRight = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
   await page.keyboard.up('ArrowRight');
 
   const afterRight = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
   }));
+  expect(beforeRight.playerPos).not.toBeNull();
+  expect(beforeRight.cameraRight).not.toBeNull();
+  expect(duringRight.playerPos).not.toBeNull();
   expect(afterRight.playerPos).not.toBeNull();
-  expect(Math.abs(afterRight.playerPos.z - beforeRight.playerPos.z)).toBeGreaterThan(0.2);
+  const rightDeltaX = duringRight.playerPos.x - beforeRight.playerPos.x;
+  const rightDeltaZ = duringRight.playerPos.z - beforeRight.playerPos.z;
+  const rightDot = (rightDeltaX * beforeRight.cameraRight.x) + (rightDeltaZ * beforeRight.cameraRight.z);
+  expect(rightDot).toBeGreaterThan(0.22);
   expect(Math.abs((afterRight.cameraYaw ?? 0) - (beforeRight.cameraYaw ?? 0))).toBeLessThan(0.01);
+});
+
+test('runtime: level 5 bracket keys rotate the camera in the expected directions', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  const startYaw = await page.evaluate(() => window.__DADA_DEBUG__?.cameraYaw ?? null);
+  await page.keyboard.down('BracketLeft');
+  await page.waitForTimeout(320);
+  await page.keyboard.up('BracketLeft');
+  const afterLeftYaw = await page.evaluate(() => window.__DADA_DEBUG__?.cameraYaw ?? null);
+  expect(afterLeftYaw).not.toBeNull();
+  expect(afterLeftYaw).toBeLessThan(startYaw - 0.05);
+
+  await page.keyboard.down('BracketRight');
+  await page.waitForTimeout(320);
+  await page.keyboard.up('BracketRight');
+  const afterRightYaw = await page.evaluate(() => window.__DADA_DEBUG__?.cameraYaw ?? null);
+  expect(afterRightYaw).not.toBeNull();
+  expect(afterRightYaw).toBeGreaterThan(afterLeftYaw + 0.05);
 });
 
 test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with Enter, and music is running', async ({ page }) => {
@@ -371,7 +426,8 @@ test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires wi
   ).toBeGreaterThan(projectileCountBefore);
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1, z: 0 });
+    const forward = window.__DADA_DEBUG__?.cameraForward ?? { x: 1, z: 0 };
+    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
   });
   await page.waitForTimeout(150);
   await page.keyboard.press('Enter');
@@ -386,6 +442,35 @@ test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires wi
     () => page.evaluate(() => window.__DADA_DEBUG__?.musicLevelId ?? null),
     { timeout: 5_000 },
   ).toBe(5);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.musicRunning ?? false),
+    { timeout: 5_000 },
+  ).toBe(true);
+});
+
+test('runtime: level 5 binky magnet collects on a near miss instead of requiring exact overlap', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  const targetCoin = await page.evaluate(() => {
+    const candidates = window.__DADA_DEBUG__?.collectibles?.() ?? [];
+    return candidates.find((coin) => !coin.collected) ?? null;
+  });
+  expect(targetCoin).not.toBeNull();
+
+  const coinsBefore = await page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0);
+  await page.evaluate((coin) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(coin.x + 0.72, coin.y + 0.55, coin.z + 0.04);
+  }, targetCoin);
+
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0),
+    { timeout: 5_000 },
+  ).toBe(coinsBefore + 1);
 });
 
 test('runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
