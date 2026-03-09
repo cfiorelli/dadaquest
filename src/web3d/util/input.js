@@ -22,6 +22,18 @@ export class InputManager {
       const code = e.code;
       this.held[code] = false;
     });
+    document.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      const code = 'PointerMain';
+      if (!this.held[code]) {
+        this.held[code] = true;
+        this.pressId[code] = this._nextPressId++;
+      }
+    });
+    document.addEventListener('pointerup', (e) => {
+      if (e.button !== 0) return;
+      this.held.PointerMain = false;
+    });
     // Clear all held keys when the window loses focus so keys don't get stuck.
     window.addEventListener('blur', () => {
       this.held = {};
@@ -40,6 +52,20 @@ export class InputManager {
     let y = 0;
     if (this.held['KeyW'] || this.held['ArrowUp']) y += 1;
     if (this.held['KeyS'] || this.held['ArrowDown']) y -= 1;
+    return y;
+  }
+
+  getEra5MoveX() {
+    let x = 0;
+    if (this.held.ArrowLeft) x -= 1;
+    if (this.held.ArrowRight) x += 1;
+    return x;
+  }
+
+  getEra5MoveY() {
+    let y = 0;
+    if (this.held.ArrowUp) y += 1;
+    if (this.held.ArrowDown) y -= 1;
     return y;
   }
 
@@ -77,6 +103,13 @@ export class InputManager {
     return !!this.held['Enter'];
   }
 
+  getCameraYawInput() {
+    let x = 0;
+    if (this.held.BracketLeft) x -= 1;
+    if (this.held.BracketRight) x += 1;
+    return x;
+  }
+
   /** True only once per M press. */
   consumeMuteToggle() {
     return !!this.held['KeyM'];
@@ -87,12 +120,22 @@ export class InputManager {
   }
 
   consumeAbilityPress(code = 'KeyE') {
-    const isHeld = !!this.held[code];
     const pressId = this.pressId[code] || 0;
     const alreadyConsumed = this.consumedPressId[code] === pressId;
-    const isNewPress = isHeld && pressId > 0 && !alreadyConsumed;
+    const isNewPress = pressId > 0 && !alreadyConsumed;
     if (isNewPress) this.consumedPressId[code] = pressId;
     return isNewPress;
+  }
+
+  consumeAttackPress() {
+    return this.consumeAbilityPress('Enter')
+      || this.consumeAbilityPress('NumpadEnter')
+      || this.consumeAbilityPress('KeyA')
+      || this.consumeAbilityPress('PointerMain');
+  }
+
+  consumeCameraRecenter() {
+    return this.consumeAbilityPress('Backslash');
   }
 
   consumeAll() {

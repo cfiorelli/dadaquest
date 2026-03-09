@@ -51,8 +51,19 @@ const GOAL_CELEBRATION_SEC = 0.96;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
-const ERA5_CAMERA_DISTANCE = 6.6;
-const ERA5_CAMERA_HEIGHT = 3.8;
+const ERA5_CAMERA_DISTANCE = 10.2;
+const ERA5_CAMERA_HEIGHT = 5.4;
+const ERA5_CAMERA_FOCUS_HEIGHT = 1.18;
+const ERA5_CAMERA_LOOK_AHEAD = 3.6;
+const ERA5_CAMERA_FOV = 0.94;
+const ERA5_CAMERA_YAW_SPEED = 1.95;
+const ERA5_CAMERA_DAMP = 4.8;
+const ERA5_CAMERA_OCCLUDED_DAMP = 10.5;
+const ERA5_JUMP_MULTIPLIER = 1.12;
+const ERA5_GRAVITY_SCALE = 0.92;
+const ERA5_AIR_ACCEL_MULTIPLIER = 0.86;
+const ERA5_COYOTE_MS = 120;
+const ERA5_JUMP_BUFFER_MS = 120;
 const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
 const CAPE_FLOAT_DURATION_MS = 4000;
 const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
@@ -2232,7 +2243,11 @@ export async function boot(options = {}) {
     ? new BABYLON.Vector3((spawnPoint.x || -12) - 10.0, (spawnPoint.y || 2) + 10.0, -18.0)
     : new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
   const cameraStartTarget = isEra5Level
-    ? new BABYLON.Vector3((spawnPoint.x || -12) + 0.8, (spawnPoint.y || 2) + 1.3, spawnPoint.z || 0)
+    ? new BABYLON.Vector3(
+      (spawnPoint.x || -12) + ERA5_CAMERA_LOOK_AHEAD,
+      (spawnPoint.y || 2) + ERA5_CAMERA_FOCUS_HEIGHT,
+      spawnPoint.z || 0,
+    )
     : levelId === 2
     ? new BABYLON.Vector3((spawnPoint.x || -12), (spawnPoint.y || 2) + 1.0, 0)
     : new BABYLON.Vector3(-12, 2, 0);
@@ -2240,6 +2255,9 @@ export async function boot(options = {}) {
   camera.setTarget(cameraStartTarget.clone());
   camera.minZ = 0.5;
   camera.maxZ = 100;
+  if (isEra5Level) {
+    camera.fov = ERA5_CAMERA_FOV;
+  }
   // Do NOT attach controls — camera is game-controlled, not user-controlled
 
   const playerRimLight = new BABYLON.PointLight('playerRimLight', new BABYLON.Vector3(-14, 4.5, -7), scene);
@@ -2251,8 +2269,10 @@ export async function boot(options = {}) {
   const useLevel2CameraOcclusionGuard = levelId === 2;
   const useGenericCameraOcclusionGuard = levelId === 3;
   const useEra5DecorOcclusion = isEra5Level;
-  let era5CameraYaw = 0;
-  let era5CameraDesiredYaw = 0;
+  let era5CameraYaw = isEra5Level
+    ? Math.atan2(cameraStartTarget.z - cameraStartPos.z, cameraStartTarget.x - cameraStartPos.x)
+    : 0;
+  let era5CameraDesiredYaw = era5CameraYaw;
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
 
@@ -2356,6 +2376,13 @@ export async function boot(options = {}) {
     minBottomY: goalMinBottomY,
   };
   window.__DADA_DEBUG__.menuVisible = false;
+  window.__DADA_DEBUG__.playerPos = {
+    x: Number(player.mesh.position.x.toFixed(3)),
+    y: Number(player.mesh.position.y.toFixed(3)),
+    z: Number(player.mesh.position.z.toFixed(3)),
+  };
+  window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;
+  window.__DADA_DEBUG__.l5ProjectileCount = 0;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
     const LANE_Z = 0;
@@ -2707,6 +2734,20 @@ export async function boot(options = {}) {
     syncEra5Ui();
   }
 
+  function getEra5CameraForward() {
+    let forward = camera.getTarget().subtract(camera.position);
+    forward.y = 0;
+    if (forward.lengthSquared() <= 0.0001) {
+      forward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
+    }
+    return forward.normalize();
+  }
+
+  function getEra5CameraRight() {
+    const forward = getEra5CameraForward();
+    return new BABYLON.Vector3(-forward.z, 0, forward.x).normalize();
+  }
+
   function spawnEra5Projectile(position, direction) {
     const projectile = BABYLON.MeshBuilder.CreateSphere(`era5Bubble_${performance.now().toFixed(0)}`, {
       diameter: 0.24,
@@ -2735,7 +2776,7 @@ export async function boot(options = {}) {
     const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
     const weaponDef = getItemDef(weaponInstance?.defId);
     if (!weaponDef || weaponDef.defId !== 'bubble_wand') return false;
-    const forward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
+    const forward = getEra5CameraForward();
     const spawnPos = player.mesh.position.add(new BABYLON.Vector3(forward.x * 0.8, 0.7, forward.z * 0.8));
     spawnEra5Projectile(spawnPos, forward);
     era5WeaponCooldownMs = Math.max(100, (era5State.stats.weaponCooldown ?? 0.35) * 1000);
@@ -3232,6 +3273,11 @@ export async function boot(options = {}) {
 
     camera.position.copyFrom(cameraStartPos);
     camera.setTarget(cameraStartTarget.clone());
+    if (isEra5Level) {
+      era5CameraYaw = Math.atan2(cameraStartTarget.z - cameraStartPos.z, cameraStartTarget.x - cameraStartPos.x);
+      era5CameraDesiredYaw = era5CameraYaw;
+      camera.fov = ERA5_CAMERA_FOV;
+    }
     updateActorDebug();
   }
 
@@ -3370,7 +3416,7 @@ export async function boot(options = {}) {
     if (code === 'KeyI') {
       return toggleEra5Inventory();
     }
-    if (code === 'KeyK') {
+    if (code === 'KeyK' || code === 'Enter' || code === 'NumpadEnter' || code === 'KeyA' || code === 'PointerMain') {
       return fireEra5Weapon();
     }
     return false;
@@ -3626,6 +3672,18 @@ export async function boot(options = {}) {
       }
     }
     if (state === 'gameplay') {
+      if (
+        isEra5Level
+        && (ev.code === 'Enter'
+          || ev.code === 'NumpadEnter'
+          || ev.code === 'KeyA'
+          || ev.code === 'BracketLeft'
+          || ev.code === 'BracketRight'
+          || ev.code === 'Backslash')
+      ) {
+        ev.preventDefault();
+        return;
+      }
       if ((ev.code === 'KeyR' || ev.key === 'r' || ev.key === 'R') && !ev.repeat && !ev.metaKey && !ev.ctrlKey) {
         ev.preventDefault();
         triggerGameplayHotkey('KeyR');
@@ -3981,10 +4039,14 @@ export async function boot(options = {}) {
     }
 
     player.setMovementModifiers({
-      jumpVelocityMultiplier: onesieJumpBoost,
+      jumpVelocityMultiplier: onesieJumpBoost * (isEra5Level ? ERA5_JUMP_MULTIPLIER : 1),
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
       speedMultiplier,
       accelBonusMultiplier,
+      airAccelMultiplier: isEra5Level ? ERA5_AIR_ACCEL_MULTIPLIER : 1,
+      gravityScale: isEra5Level ? ERA5_GRAVITY_SCALE : 1,
+      coyoteTimeMs: isEra5Level ? ERA5_COYOTE_MS : 100,
+      jumpBufferWindowMs: isEra5Level ? ERA5_JUMP_BUFFER_MS : 100,
     });
 
     window.__DADA_DEBUG__.onesieBuffMs = Math.round(onesieBuffTimerMs);
@@ -4244,32 +4306,42 @@ export async function boot(options = {}) {
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);
         // Player update
-        const rawMoveX = idleSuppressed ? 0 : input.getMoveX();
-        const rawMoveY = idleSuppressed ? 0 : input.getMoveY();
+        const rawMoveX = idleSuppressed
+          ? 0
+          : isEra5Level
+            ? input.getEra5MoveX()
+            : input.getMoveX();
+        const rawMoveY = idleSuppressed
+          ? 0
+          : isEra5Level
+            ? input.getEra5MoveY()
+            : input.getMoveY();
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpJustPressed = jumpPress.edge;
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
+        const attackPressed = !idleSuppressed && isEra5Level ? input.consumeAttackPress() : false;
+        const cameraYawInput = !idleSuppressed && isEra5Level ? input.getCameraYawInput() : 0;
+        const cameraRecenter = !idleSuppressed && isEra5Level ? input.consumeCameraRecenter() : false;
         let moveX = rawMoveX;
         let moveZ = 0;
         if (isEra5Level) {
-          const camForwardX = Math.cos(era5CameraYaw);
-          const camForwardZ = Math.sin(era5CameraYaw);
-          const camRightX = -Math.sin(era5CameraYaw);
-          const camRightZ = Math.cos(era5CameraYaw);
-          moveX = (camForwardX * rawMoveY) + (camRightX * rawMoveX);
-          moveZ = (camForwardZ * rawMoveY) + (camRightZ * rawMoveX);
+          const cameraForward = getEra5CameraForward();
+          const cameraRight = getEra5CameraRight();
+          moveX = (cameraForward.x * rawMoveY) + (cameraRight.x * rawMoveX);
+          moveZ = (cameraForward.z * rawMoveY) + (cameraRight.z * rawMoveX);
           const moveLen = Math.hypot(moveX, moveZ);
           if (moveLen > 1) {
             moveX /= moveLen;
             moveZ /= moveLen;
           }
-          if (moveLen > 0.16) {
-            era5CameraDesiredYaw = Math.atan2(moveZ, moveX);
-          } else {
-            const planarSpeed = Math.hypot(player.vx, player.vz);
-            if (planarSpeed > 0.32) {
-              era5CameraDesiredYaw = Math.atan2(player.vz, player.vx);
-            }
+          if (cameraYawInput !== 0) {
+            era5CameraDesiredYaw = wrapToPi(era5CameraDesiredYaw + (cameraYawInput * ERA5_CAMERA_YAW_SPEED * dt));
+          }
+          if (cameraRecenter) {
+            const recenterYaw = moveLen > 0.08
+              ? Math.atan2(moveZ, moveX)
+              : player.visual.rotation.y;
+            era5CameraDesiredYaw = wrapToPi(recenterYaw);
           }
         }
         const { halfH } = player.getCollisionHalfExtents();
@@ -4279,6 +4351,9 @@ export async function boot(options = {}) {
           moveZ,
           movementMode: isEra5Level ? 'free' : 'lane',
         });
+        if (attackPressed) {
+          fireEra5Weapon();
+        }
         if (world.level5) {
           world.level5.update(dt, {
             pos: player.mesh.position,
@@ -4430,13 +4505,13 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (isEra5Level) {
-        era5CameraYaw += wrapToPi(era5CameraDesiredYaw - era5CameraYaw) * Math.min(1, dt * 3.6);
+        era5CameraYaw += wrapToPi(era5CameraDesiredYaw - era5CameraYaw) * Math.min(1, dt * 4.1);
         const cameraForward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
-        const focusPos = new BABYLON.Vector3(px, py + 1.1, player.mesh.position.z);
+        const focusPos = new BABYLON.Vector3(px, py + ERA5_CAMERA_FOCUS_HEIGHT, player.mesh.position.z);
         const desiredTarget = new BABYLON.Vector3(
-          px + (cameraForward.x * 1.2),
-          py + 1.0,
-          player.mesh.position.z + (cameraForward.z * 1.2),
+          px + (cameraForward.x * ERA5_CAMERA_LOOK_AHEAD),
+          py + ERA5_CAMERA_FOCUS_HEIGHT,
+          player.mesh.position.z + (cameraForward.z * ERA5_CAMERA_LOOK_AHEAD),
         );
         const desiredCameraPos = new BABYLON.Vector3(
           px - (cameraForward.x * ERA5_CAMERA_DISTANCE),
@@ -4444,14 +4519,14 @@ export async function boot(options = {}) {
           player.mesh.position.z - (cameraForward.z * ERA5_CAMERA_DISTANCE),
         );
         const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
-        const cameraDamp = occlusion.hit ? 12 : 5.5;
+        const cameraDamp = occlusion.hit ? ERA5_CAMERA_OCCLUDED_DAMP : ERA5_CAMERA_DAMP;
         camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
         camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
         camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
         camera.setTarget(new BABYLON.Vector3(
-          damp(camera.getTarget().x, desiredTarget.x, 5.2, dt),
-          damp(camera.getTarget().y, desiredTarget.y, 5.2, dt),
-          damp(camera.getTarget().z, desiredTarget.z, 5.2, dt),
+          damp(camera.getTarget().x, desiredTarget.x, 4.9, dt),
+          damp(camera.getTarget().y, desiredTarget.y, 4.9, dt),
+          damp(camera.getTarget().z, desiredTarget.z, 4.9, dt),
         ));
         updateEra5DecorOcclusion(dt, focusPos, camera.position);
       } else if (levelId === 2) {
@@ -4546,6 +4621,13 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.playerX = player.mesh.position.x;
     window.__DADA_DEBUG__.playerY = player.mesh.position.y;
     window.__DADA_DEBUG__.playerZ = player.mesh.position.z;
+    window.__DADA_DEBUG__.playerPos = {
+      x: Number(player.mesh.position.x.toFixed(3)),
+      y: Number(player.mesh.position.y.toFixed(3)),
+      z: Number(player.mesh.position.z.toFixed(3)),
+    };
+    window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;
+    window.__DADA_DEBUG__.l5ProjectileCount = era5Projectiles.length;
 
     // Debug HUD (dev only)
     if (debugHud) {
