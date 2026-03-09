@@ -1,3 +1,5 @@
+import { getLevelSubtitle as getMetaLevelSubtitle } from '../world/levelMeta.js';
+
 const CSS = `
 .dada-overlay {
   position: absolute;
@@ -988,10 +990,10 @@ export function createUI(uiRoot, options = {}) {
   let lockMessages = {
     4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
     5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
-    6: 'Locked. Beat Neon Night Aquarium (Level 5) to unlock. Coming soon.',
-    7: 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock. Coming soon.',
-    8: 'Locked. Beat Stormy Kite Park (Level 7) to unlock. Coming soon.',
-    9: 'Locked. Beat Haunted Library (Level 8) to unlock. Coming soon.',
+    6: 'Locked. Beat Neon Night Aquarium (Level 5) to unlock.',
+    7: 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock.',
+    8: 'Locked. Beat Stormy Kite Park (Level 7) to unlock.',
+    9: 'Locked. Beat Haunted Library (Level 8) to unlock.',
   };
 
   // Title overlay
@@ -1067,23 +1069,7 @@ export function createUI(uiRoot, options = {}) {
   let resetBabyHandler = null;
 
   function getLevelSubtitle(id) {
-    return id === 5
-      ? 'Level 5 — Neon Night Aquarium'
-      : id === 9
-      ? 'Level 9 — ???'
-      : id === 8
-      ? 'Level 8 — Haunted Library'
-      : id === 7
-      ? 'Level 7 — Stormy Kite Park'
-      : id === 6
-      ? 'Level 6 — Clockwork Toy Factory'
-      : id === 4
-      ? 'Level 4 — Super Sourdough'
-      : id === 3
-      ? 'Level 3 — Grandma\'s House'
-      : id === 2
-        ? 'Level 2 — Condo Garden'
-        : 'Level 1 — Petting Zoo';
+    return getMetaLevelSubtitle(id);
   }
 
   function getLevelLockMessage(id) {
@@ -1095,18 +1081,35 @@ export function createUI(uiRoot, options = {}) {
     return Number(levelId) >= 5;
   }
 
+  function getEra5WeaponHelp(levelId) {
+    if (levelId === 9) return 'Fire Paper Fan: Enter / A / Click';
+    if (levelId === 8) return 'Throw Bookmark Boomerang: Enter / A / Click';
+    if (levelId === 7) return 'Crack Kite String Whip: Enter / A / Click';
+    if (levelId === 6) return 'Fire Foam Blaster: Enter / A / Click';
+    return 'Fire Bubble Wand: Enter / A / Click';
+  }
+
+  function getEra5ToolHelp(levelId) {
+    if (levelId === 9) return 'Camp Lantern safe glow: E';
+    if (levelId === 8) return 'Lantern beam toggle / boost: E';
+    if (levelId === 7) return 'Kite Rig glide: hold Jump in air';
+    if (levelId === 6) return 'Conveyor Boots traction: passive';
+    return 'Scuba Tank oxygen: avoid deep pockets';
+  }
+
   function getGameplayLegendMarkup(levelId) {
     if (isEra5UiLevel(levelId)) {
       return `
         <div><span>↑ ↓ ← →</span> Move</div>
         <div><span>Space</span> Jump</div>
         <div><span>Shift</span> Run</div>
-        <div>Fire Bubble Wand: Enter / A / Click</div>
+        <div>${getEra5WeaponHelp(levelId)}</div>
+        <div>${getEra5ToolHelp(levelId)}</div>
         <div><span>[</span> / <span>]</span> Camera yaw</div>
         <div><span>\\</span> Recenter camera</div>
         <div><span>I</span> Inventory</div>
         <div><span>R</span> Reset checkpoint</div>
-        <div><span>F</span> Flip / cape float</div>
+        <div><span>F</span> Wind Glide save (when unlocked)</div>
         <div><span>M</span> Mute</div>
         <div><span>ESC</span> Menu</div>
       `;
@@ -1123,9 +1126,9 @@ export function createUI(uiRoot, options = {}) {
     `;
   }
 
-  function getControlHintMarkup(era5 = false) {
+  function getControlHintMarkup(era5 = false, levelId = 1) {
     if (era5) {
-      return `<span>↑ ↓ ← →</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Enter</span>/<span>A</span> Fire`;
+      return `<span>↑ ↓ ← →</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Enter</span>/<span>A</span> Fire &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
@@ -1208,7 +1211,7 @@ export function createUI(uiRoot, options = {}) {
     btn8.classList.toggle('active', id === 8);
     btn9.classList.toggle('active', id === 9);
     resetTitleCopy();
-    if (id <= 5) {
+    if (id <= 9) {
       const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
       history.replaceState(null, '', url);
     }
@@ -1433,6 +1436,14 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-buff-note">Locked. Beat Level 5 to unlock</div>
         </div>
       </div>
+      <div class="dada-buff-card" data-buff="wind">
+        <div class="dada-buff-icon cape">WND</div>
+        <div class="dada-buff-copy">
+          <div class="dada-buff-label">Wind Glide <span class="dada-buff-state">LOCKED</span></div>
+          <div class="dada-buff-track"><div class="dada-buff-fill cape" style="width:0%"></div></div>
+          <div class="dada-buff-note">Locked. Beat Level 7 to unlock</div>
+        </div>
+      </div>
     </div>
   `;
   uiRoot.appendChild(buffEl);
@@ -1448,6 +1459,10 @@ export function createUI(uiRoot, options = {}) {
   const shieldFill = shieldCard.querySelector('.dada-buff-fill.shield');
   const shieldState = shieldCard.querySelector('.dada-buff-state');
   const shieldNote = shieldCard.querySelector('.dada-buff-note');
+  const windCard = buffEl.querySelector('[data-buff="wind"]');
+  const windFill = windCard.querySelector('.dada-buff-fill.cape');
+  const windState = windCard.querySelector('.dada-buff-state');
+  const windNote = windCard.querySelector('.dada-buff-note');
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -1504,6 +1519,7 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-weapon-track" data-era5-weapon><div class="dada-era5-weapon-fill" data-era5-weapon-fill></div></div>
           <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
           <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: Enter / A / Click</div>
+          <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank oxygen: avoid deep pockets</div>
         </div>
         <div class="dada-era5-hint" data-era5-hint>I Inventory</div>
       </div>
@@ -1519,6 +1535,7 @@ export function createUI(uiRoot, options = {}) {
   const era5WeaponLabelEl = era5HudEl.querySelector('[data-era5-weapon-label]');
   const era5WeaponCopyEl = era5HudEl.querySelector('[data-era5-weapon-copy]');
   const era5WeaponHelpEl = era5HudEl.querySelector('[data-era5-weapon-help]');
+  const era5ToolHelpEl = era5HudEl.querySelector('[data-era5-tool-help]');
   const era5HintEl = era5HudEl.querySelector('[data-era5-hint]');
 
   const era5ReticleEl = document.createElement('div');
@@ -1915,15 +1932,15 @@ export function createUI(uiRoot, options = {}) {
     // ── Gameplay HUD methods ─────────────────────────────────────
 
     /** Show gameplay HUD elements (coin counter, objective, control hints). */
-    showGameplayHud(total, { era5 = false } = {}) {
+    showGameplayHud(total, { era5 = false, levelId = _selectedLevel } = {}) {
       coinTotal = total;
       setCoinCount(0);
       coinsEl.style.display = 'block';
       objectiveEl.style.display = 'block';
-      buffEl.style.display = era5 ? 'none' : 'block';
+      buffEl.style.display = 'block';
       abilityEl.style.display = era5 ? 'none' : 'none';
       era5HudEl.style.display = era5 ? 'block' : 'none';
-      ctrlHintEl.innerHTML = getControlHintMarkup(era5);
+      ctrlHintEl.innerHTML = getControlHintMarkup(era5, levelId);
       setEra5ReticleVisible(era5);
       // Show control hints; auto-fade after 5 s
       if (!ctrlHintFaded) {
@@ -2034,6 +2051,25 @@ export function createUI(uiRoot, options = {}) {
         if (shieldNote) shieldNote.textContent = 'Auto-pops on the first hazard hit each run';
       }
     },
+    updateWindGlideBuff({ unlocked = false, used = false, active = false, remainingMs = 0, totalMs = 3000 } = {}) {
+      buffEl.style.display = 'block';
+      const pct = totalMs > 0 ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
+      windCard.classList.toggle('active', !!unlocked && (!used || active));
+      windFill.style.width = active ? `${pct}%` : unlocked && !used ? '100%' : '0%';
+      if (!unlocked) {
+        windState.textContent = 'LOCKED';
+        if (windNote) windNote.textContent = 'Locked. Beat Level 7 to unlock';
+      } else if (active) {
+        windState.textContent = `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
+        if (windNote) windNote.textContent = 'Stable glide active';
+      } else if (used) {
+        windState.textContent = 'USED';
+        if (windNote) windNote.textContent = 'Restart level to restore Wind Glide';
+      } else {
+        windState.textContent = 'READY';
+        if (windNote) windNote.textContent = 'Press F in air for a 3s emergency glide';
+      }
+    },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
       if (!visible) {
         abilityEl.style.display = 'none';
@@ -2072,6 +2108,7 @@ export function createUI(uiRoot, options = {}) {
       weaponCooldownMaxMs = 350,
       inventoryHint = 'I Inventory',
       weaponHelp = 'Fire Bubble Wand: Enter / A / Click',
+      toolHelp = 'Scuba Tank oxygen: avoid deep pockets',
     } = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
@@ -2091,6 +2128,7 @@ export function createUI(uiRoot, options = {}) {
         ? `${(weaponCooldownMs / 1000).toFixed(2)}s`
         : 'READY';
       if (era5WeaponHelpEl) era5WeaponHelpEl.textContent = weaponHelp;
+      if (era5ToolHelpEl) era5ToolHelpEl.textContent = toolHelp;
       era5HintEl.textContent = inventoryHint;
     },
     setEra5InventoryHandlers({
@@ -2147,6 +2185,7 @@ export function createUI(uiRoot, options = {}) {
       this.updateBuff(0, 1);
       this.updateCapeBuff({ unlocked: false, active: false, remainingMs: 0, used: false });
       this.updateBubbleShieldBuff({ unlocked: false, used: false });
+      this.updateWindGlideBuff({ unlocked: false, used: false, active: false, remainingMs: 0 });
       this.updateFlourPuff({ visible: false, remainingMs: 0, totalMs: 6000 });
       this.hideEra5Hud();
       this.hideEra5Inventory();

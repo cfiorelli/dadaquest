@@ -4,6 +4,10 @@ import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
 import { buildWorld4 } from './world/buildWorld4.js';
 import { buildWorld5 } from './world/buildWorld5.js';
+import { buildWorld6 } from './world/buildWorld6.js';
+import { buildWorld7 } from './world/buildWorld7.js';
+import { buildWorld8 } from './world/buildWorld8.js';
+import { buildWorld9 } from './world/buildWorld9.js';
 import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
@@ -28,7 +32,16 @@ import { LEVEL2 } from './world/level2.js';
 import { LEVEL3 } from './world/level3.js';
 import { LEVEL4 } from './world/level4.js';
 import { LEVEL5 } from './world/level5.js';
-import { deriveEra5Stats, getItemDef, getItemSlots } from '../game/items/items.js';
+import { LEVEL6 } from './world/level6.js';
+import { LEVEL7 } from './world/level7.js';
+import { LEVEL8 } from './world/level8.js';
+import { LEVEL9 } from './world/level9.js';
+import {
+  addItemToEra5State,
+  deriveEra5Stats,
+  getItemDef,
+  getItemSlots,
+} from '../game/items/items.js';
 import {
   clearProgress,
   ensureProgressTotals,
@@ -68,9 +81,10 @@ const ERA5_COYOTE_MS = 120;
 const ERA5_JUMP_BUFFER_MS = 120;
 const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
 const CAPE_FLOAT_DURATION_MS = 4000;
+const WIND_GLIDE_DURATION_MS = 3000;
 const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
 const BUBBLE_SHIELD_GRACE_MS = 900;
-const PLAYABLE_LEVEL_IDS = new Set([1, 2, 3, 4, 5]);
+const PLAYABLE_LEVEL_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -897,6 +911,10 @@ export async function boot(options = {}) {
     3: getLevelCollectibleTotal(LEVEL3),
     4: getLevelCollectibleTotal(LEVEL4),
     5: getLevelCollectibleTotal(LEVEL5),
+    6: getLevelCollectibleTotal(LEVEL6),
+    7: getLevelCollectibleTotal(LEVEL7),
+    8: getLevelCollectibleTotal(LEVEL8),
+    9: getLevelCollectibleTotal(LEVEL9),
   };
   const isEra5Level = levelId >= 5;
   const getLockedMessage = (targetLevelId, state = progression) => {
@@ -906,18 +924,17 @@ export async function boot(options = {}) {
     if (targetLevelId === 5) {
       return 'Locked. Beat Super Sourdough (Level 4) to unlock.';
     }
-    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
-      const previousTitle = targetLevelId === 6
-        ? 'Neon Night Aquarium (Level 5)'
-        : targetLevelId === 7
-          ? 'Clockwork Toy Factory (Level 6)'
-          : targetLevelId === 8
-            ? 'Stormy Kite Park (Level 7)'
-            : 'Haunted Library (Level 8)';
-      if (isLevelUnlocked(state, targetLevelId)) {
-        return 'Coming soon. This level is not playable yet.';
-      }
-      return `Locked. Beat ${previousTitle} to unlock. Coming soon.`;
+    if (targetLevelId === 6) {
+      return 'Locked. Beat Neon Night Aquarium (Level 5) to unlock.';
+    }
+    if (targetLevelId === 7) {
+      return 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock.';
+    }
+    if (targetLevelId === 8) {
+      return 'Locked. Beat Stormy Kite Park (Level 7) to unlock.';
+    }
+    if (targetLevelId === 9) {
+      return 'Locked. Beat Haunted Library (Level 8) to unlock.';
     }
     return `Level ${targetLevelId} is locked.`;
   };
@@ -927,10 +944,10 @@ export async function boot(options = {}) {
     ui.setLockedLevels({
       4: !isLevelUnlocked(progression, 4),
       5: !isLevelUnlocked(progression, 5),
-      6: true,
-      7: true,
-      8: true,
-      9: true,
+      6: !isLevelUnlocked(progression, 6),
+      7: !isLevelUnlocked(progression, 7),
+      8: !isLevelUnlocked(progression, 8),
+      9: !isLevelUnlocked(progression, 9),
     }, {
       4: getLockedMessage(4, progression),
       5: getLockedMessage(5, progression),
@@ -984,8 +1001,9 @@ export async function boot(options = {}) {
     const stats = era5State.stats || {};
     const statsLines = [
       `HP ${stats.hpMax ?? 3} · Shield ${stats.shieldMax ?? 1}`,
-      `Oxygen ${stats.oxygenMax ?? 0}s · Refill ${(stats.oxygenRefillRate ?? 0).toFixed(1)}/s`,
-      `Move x${(stats.moveSpeed ?? 1).toFixed(2)} · Water x${(stats.waterMoveSpeed ?? 1).toFixed(2)}`,
+      `Tool meter ${(stats.toolMeterMax ?? 0).toFixed(1)} · Oxygen ${(stats.oxygenMax ?? 0).toFixed(1)}s`,
+      `Move x${(stats.moveSpeed ?? 1).toFixed(2)} · Jump x${(stats.jumpMultiplier ?? 1).toFixed(2)} · Water x${(stats.waterMoveSpeed ?? 1).toFixed(2)}`,
+      `Resists W ${(100 * (stats.waterResist ?? 0)).toFixed(0)}% · E ${(100 * (stats.electricResist ?? 0)).toFixed(0)}% · Wind ${(100 * (stats.windResist ?? 0)).toFixed(0)}% · Ink ${(100 * (stats.inkResist ?? 0)).toFixed(0)}% · Fire ${(100 * (stats.fireResist ?? 0)).toFixed(0)}%`,
       `Weapon cooldown ${(stats.weaponCooldown ?? 0.35).toFixed(2)}s · Stun ${(stats.weaponStunSec ?? 1.5).toFixed(1)}s`,
     ];
     return { slots, items, statsLines };
@@ -1048,7 +1066,15 @@ export async function boot(options = {}) {
   // Build the diorama world (route by level)
   let world;
   try {
-    world = levelId === 5
+    world = levelId === 9
+      ? buildWorld9(scene, { animateGoal: !shotMode })
+      : levelId === 8
+      ? buildWorld8(scene, { animateGoal: !shotMode })
+      : levelId === 7
+      ? buildWorld7(scene, { animateGoal: !shotMode })
+      : levelId === 6
+      ? buildWorld6(scene, { animateGoal: !shotMode })
+      : levelId === 5
       ? buildWorld5(scene, { animateGoal: !shotMode })
       : levelId === 4
       ? buildWorld4(scene, { animateGoal: !shotMode })
@@ -2161,6 +2187,12 @@ export async function boot(options = {}) {
     ...(world.checkpoints || []),
   ];
   const pickups = world.pickups || [];
+  for (const pickup of pickups) {
+    if (pickup.type !== 'item') continue;
+    const alreadyOwned = progression.era5?.inventory?.some((item) => item.defId === pickup.defId);
+    pickup.collected = !!alreadyOwned;
+    pickup.node?.setEnabled(!alreadyOwned);
+  }
   const coins = world.coins || [];
   coins.forEach((coin, index) => {
     if (!coin.id) {
@@ -2326,11 +2358,14 @@ export async function boot(options = {}) {
   let flourPuffCooldownMs = 0;
   let era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
   let era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
-  let era5Oxygen = Math.max(0, era5State.stats.oxygenMax ?? 0);
+  let era5Oxygen = Math.max(0, era5State.stats.toolMeterMax || era5State.stats.oxygenMax || 0);
   let era5OxygenDamageTimer = 0;
   let era5WeaponCooldownMs = 0;
+  let era5ToolActive = false;
   let era5InventoryOpen = false;
   let era5Projectiles = [];
+  let windGlideUsedThisRun = false;
+  let windGlideActiveMs = 0;
   let goalCarryStartPos = null;
   let goalCarryEndPos = null;
   let goalCarryStartScale = null;
@@ -2373,6 +2408,11 @@ export async function boot(options = {}) {
     usedThisRun: false,
     graceMs: 0,
   };
+  window.__DADA_DEBUG__.windGlide = {
+    unlocked: !!progression.windGlideUnlocked,
+    usedThisRun: false,
+    activeMs: 0,
+  };
   window.__DADA_DEBUG__.floorTopY = currentFloorTopY;
   window.__DADA_DEBUG__.goalGate = {
     minX: goalGuardMinX,
@@ -2390,6 +2430,8 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.cameraForward = { x: 1, z: 0 };
   window.__DADA_DEBUG__.cameraRight = { x: 0, z: -1 };
   window.__DADA_DEBUG__.l5ProjectileCount = 0;
+  window.__DADA_DEBUG__.era5ProjectileCount = 0;
+  window.__DADA_DEBUG__.era5LevelState = null;
   window.__DADA_DEBUG__.musicRunning = false;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
@@ -2597,6 +2639,40 @@ export async function boot(options = {}) {
     player.setCapeVisible(!!progression.capeUnlocked && !capeSuppressedThisRun);
   }
 
+  function getEquippedEra5ToolDef() {
+    const toolInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.tool);
+    return getItemDef(toolInstance?.defId);
+  }
+
+  function getEquippedEra5WeaponDef() {
+    const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
+    return getItemDef(weaponInstance?.defId);
+  }
+
+  function getEra5MeterMax(toolDef = getEquippedEra5ToolDef()) {
+    if (!toolDef) return 0;
+    if (toolDef.defId === 'scuba_tank') return Math.max(0, era5State.stats.oxygenMax ?? 0);
+    return Math.max(0, era5State.stats.toolMeterMax ?? 0);
+  }
+
+  function getEra5ToolHelpText(toolDef = getEquippedEra5ToolDef()) {
+    const toolId = toolDef?.defId || '';
+    if (toolId === 'camp_lantern') return 'Camp Lantern boost: E';
+    if (toolId === 'lantern') return 'Lantern reveal / boost: E';
+    if (toolId === 'kite_rig') return 'Hold Jump in air to glide';
+    if (toolId === 'conveyor_boots') return 'Conveyor Boots traction: passive';
+    return 'Scuba Tank oxygen: avoid deep pockets';
+  }
+
+  function getEra5WeaponHelpText(weaponDef = getEquippedEra5WeaponDef()) {
+    const weaponId = weaponDef?.defId || '';
+    if (weaponId === 'paper_fan') return 'Fire Paper Fan: Enter / A / Click';
+    if (weaponId === 'bookmark_boomerang') return 'Throw Bookmark Boomerang: Enter / A / Click';
+    if (weaponId === 'kite_string_whip') return 'Crack Kite String Whip: Enter / A / Click';
+    if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: Enter / A / Click';
+    return 'Fire Bubble Wand: Enter / A / Click';
+  }
+
   function updateBuffHud() {
     let onesiePhase = 'IDLE';
     let onesieDisplayMs = 0;
@@ -2625,6 +2701,13 @@ export async function boot(options = {}) {
       unlocked: !!progression.bubbleShieldUnlocked,
       used: bubbleShieldUsedThisRun,
     });
+    ui.updateWindGlideBuff({
+      unlocked: !!progression.windGlideUnlocked,
+      used: windGlideUsedThisRun,
+      active: windGlideActiveMs > 0,
+      remainingMs: windGlideActiveMs,
+      totalMs: WIND_GLIDE_DURATION_MS,
+    });
     ui.updateFlourPuff({
       visible: levelId === 4,
       remainingMs: flourPuffCooldownMs,
@@ -2635,42 +2718,54 @@ export async function boot(options = {}) {
       usedThisRun: bubbleShieldUsedThisRun,
       graceMs: Math.round(bubbleShieldGraceMs),
     };
+    window.__DADA_DEBUG__.windGlide = {
+      unlocked: !!progression.windGlideUnlocked,
+      usedThisRun: windGlideUsedThisRun,
+      activeMs: Math.round(windGlideActiveMs),
+    };
   }
 
   function restoreEra5Vitals() {
     era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
     era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
-    era5Oxygen = Math.max(0, era5State.stats.oxygenMax ?? 0);
+    era5Oxygen = Math.max(0, getEra5MeterMax());
     era5OxygenDamageTimer = 0;
     era5WeaponCooldownMs = 0;
+    era5ToolActive = false;
   }
 
   function syncEra5Ui() {
     if (!isEra5Level) return;
-    const toolInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.tool);
-    const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
-    const toolDef = getItemDef(toolInstance?.defId);
-    const weaponDef = getItemDef(weaponInstance?.defId);
+    const toolDef = getEquippedEra5ToolDef();
+    const weaponDef = getEquippedEra5WeaponDef();
+    const meterMax = getEra5MeterMax(toolDef);
+    const inventoryHint = [
+      era5InventoryOpen ? 'I Close' : 'I Inventory',
+      progression.windGlideUnlocked ? 'F Wind Glide' : '',
+    ].filter(Boolean).join(' • ');
     ui.updateEra5Hud({
       hp: era5Hp,
       hpMax: Math.round(era5State.stats.hpMax ?? 3),
       shield: era5Shield,
       shieldMax: Math.round(era5State.stats.shieldMax ?? 1),
       oxygen: era5Oxygen,
-      oxygenMax: era5State.stats.oxygenMax ?? 0,
+      oxygenMax: meterMax,
       toolLabel: toolDef?.name || 'No Tool',
       weaponLabel: weaponDef?.name || 'No Weapon',
       weaponCooldownMs: era5WeaponCooldownMs,
       weaponCooldownMaxMs: Math.max(1, (era5State.stats.weaponCooldown ?? 0.35) * 1000),
-      inventoryHint: era5InventoryOpen ? 'I Close' : 'I Inventory',
+      inventoryHint,
+      weaponHelp: getEra5WeaponHelpText(weaponDef),
+      toolHelp: getEra5ToolHelpText(toolDef),
     });
     window.__DADA_DEBUG__.era5Vitals = {
       hp: era5Hp,
       shield: era5Shield,
       oxygen: Number(era5Oxygen.toFixed(2)),
-      oxygenMax: era5State.stats.oxygenMax ?? 0,
+      oxygenMax: meterMax,
       weaponCooldownMs: Math.round(era5WeaponCooldownMs),
       inventoryOpen: era5InventoryOpen,
+      toolActive: era5ToolActive,
     };
   }
 
@@ -2737,9 +2832,75 @@ export async function boot(options = {}) {
 
   function refillEra5Oxygen(amountSec) {
     if (!isEra5Level) return;
-    era5Oxygen = Math.min(era5State.stats.oxygenMax ?? 0, era5Oxygen + amountSec);
-    ui.showStatus('Air bubble!', 800);
+    era5Oxygen = Math.min(getEra5MeterMax(), era5Oxygen + amountSec);
     syncEra5Ui();
+  }
+
+  function toggleEra5Tool() {
+    if (!isEra5Level || state !== 'gameplay') return false;
+    const toolDef = getEquippedEra5ToolDef();
+    if (!toolDef) return false;
+    if (toolDef.defId === 'lantern' || toolDef.defId === 'camp_lantern') {
+      era5ToolActive = !era5ToolActive;
+      ui.showStatus(era5ToolActive ? `${toolDef.name} on` : `${toolDef.name} off`, 650);
+      syncEra5Ui();
+      return true;
+    }
+    return false;
+  }
+
+  function useWindGlide() {
+    if (!isEra5Level || state !== 'gameplay' || !progression.windGlideUnlocked || windGlideUsedThisRun) return false;
+    if (player.grounded || !player.canTriggerAirFlip()) return false;
+    windGlideUsedThisRun = true;
+    windGlideActiveMs = WIND_GLIDE_DURATION_MS;
+    player.capeFloatTimerMs = Math.max(player.capeFloatTimerMs, 140);
+    player.vy = Math.max(player.vy, -1.4);
+    ui.showStatus('Wind Glide!', 850);
+    updateBuffHud();
+    syncEra5Ui();
+    return true;
+  }
+
+  function prepareEra5ToolMotion(dt, { jumpHeld = false } = {}) {
+    if (!isEra5Level) return;
+    const toolDef = getEquippedEra5ToolDef();
+    const meterMax = getEra5MeterMax(toolDef);
+    const toolId = toolDef?.defId || '';
+    if (windGlideActiveMs > 0) {
+      windGlideActiveMs = Math.max(0, windGlideActiveMs - (dt * 1000));
+      player.capeFloatTimerMs = Math.max(player.capeFloatTimerMs, 140);
+      player.vy = Math.max(player.vy, -1.2);
+    }
+    if (meterMax <= 0) {
+      era5Oxygen = 0;
+      era5ToolActive = false;
+      return;
+    }
+    if (toolId === 'kite_rig') {
+      if (player.grounded) {
+        era5Oxygen = Math.min(meterMax, era5Oxygen + ((era5State.stats.toolMeterRefillRate ?? 0) * dt));
+      } else if (jumpHeld && era5Oxygen > 0.001) {
+        player.capeFloatTimerMs = Math.max(player.capeFloatTimerMs, 110);
+        player.vy = Math.max(player.vy, -2.0 * Math.max(0.3, era5State.stats.glideFallSpeed ?? 0.34));
+        era5Oxygen = Math.max(0, era5Oxygen - ((era5State.stats.toolMeterDrainRate ?? 1) * dt));
+      }
+      return;
+    }
+    if (toolId === 'lantern' || toolId === 'camp_lantern') {
+      if (era5ToolActive && era5Oxygen > 0.001) {
+        era5Oxygen = Math.max(0, era5Oxygen - ((era5State.stats.toolMeterDrainRate ?? 1) * dt));
+        if (era5Oxygen <= 0.001) {
+          era5ToolActive = false;
+        }
+      } else {
+        era5Oxygen = Math.min(meterMax, era5Oxygen + ((era5State.stats.toolMeterRefillRate ?? 0) * dt));
+      }
+      return;
+    }
+    if (toolId !== 'scuba_tank') {
+      era5Oxygen = meterMax;
+    }
   }
 
   function getEra5CameraForward() {
@@ -2780,26 +2941,62 @@ export async function boot(options = {}) {
       radius: 0.26,
       lifeMs: Math.max(400, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000),
       stunMs: Math.max(200, (era5State.stats.weaponStunSec ?? 1.5) * 1000),
+      mode: 'projectile',
+      weaponId: getEquippedEra5WeaponDef()?.defId || 'bubble_wand',
+      returning: false,
+      returnSpeed: Math.max(0, era5State.stats.weaponReturnSpeed ?? 0),
+      origin: position.clone(),
     });
   }
 
   function fireEra5Weapon() {
     if (!isEra5Level || state !== 'gameplay' || era5WeaponCooldownMs > 0) return false;
-    const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
-    const weaponDef = getItemDef(weaponInstance?.defId);
-    if (!weaponDef || weaponDef.defId !== 'bubble_wand') return false;
+    const weaponDef = getEquippedEra5WeaponDef();
+    if (!weaponDef) return false;
     const forward = getEra5CameraForward();
     const spawnPos = player.mesh.position.add(new BABYLON.Vector3(forward.x * 0.8, 0.7, forward.z * 0.8));
-    spawnEra5Projectile(spawnPos, forward);
+    if (weaponDef.defId === 'kite_string_whip') {
+      const hitResult = world.era5Level?.tryHitByWeapon?.({
+        mode: 'arc',
+        position: player.mesh.position.add(new BABYLON.Vector3(forward.x * 1.1, 0.7, forward.z * 1.1)),
+        direction: forward,
+        radius: Math.max(1.8, era5State.stats.weaponArcRange ?? 2.2),
+        stunMs: Math.max(400, (era5State.stats.weaponStunSec ?? 1.0) * 1000),
+      }) ?? { hit: false };
+      if (hitResult.hit) {
+        audio.playCue(levelId, 'nearMiss');
+        ui.showStatus('Spark stunned!', 550);
+      }
+    } else {
+      spawnEra5Projectile(spawnPos, forward);
+      const projectile = era5Projectiles[era5Projectiles.length - 1];
+      if (projectile) {
+        projectile.weaponId = weaponDef.defId;
+        if (weaponDef.defId === 'foam_blaster') {
+          projectile.mesh.scaling.setAll(0.82);
+          projectile.radius = 0.32;
+        } else if (weaponDef.defId === 'bookmark_boomerang') {
+          projectile.mesh.scaling.setAll(1.08);
+          projectile.returning = true;
+          projectile.returnSpeed = Math.max(8, era5State.stats.weaponReturnSpeed ?? 10.5);
+        } else if (weaponDef.defId === 'paper_fan') {
+          projectile.mesh.scaling.setAll(0.94);
+          projectile.radius = 0.44;
+        }
+      }
+    }
     era5WeaponCooldownMs = Math.max(100, (era5State.stats.weaponCooldown ?? 0.35) * 1000);
-    ui.showStatus('Bubble wand!', 450);
+    ui.showStatus(weaponDef.name, 450);
     syncEra5Ui();
     return true;
   }
 
-  function applyEra5Damage(source, hitDirection = { x: 1, z: 0 }, invulnMs = 1000) {
+  function applyEra5Damage(source, hitDirection = { x: 1, z: 0 }, options = {}) {
     if (!isEra5Level || state !== 'gameplay' || respawnState) return false;
     if (player.isInvulnerable()) return false;
+    const invulnMs = Number.isFinite(options?.invulnMs) ? options.invulnMs : 1000;
+    const resist = clamp(options?.resist ?? 0, 0, 0.4);
+    const knockbackScale = 1 - (resist * 0.7);
     const directionX = Number.isFinite(hitDirection?.x) ? hitDirection.x : 1;
     const directionZ = Number.isFinite(hitDirection?.z) ? hitDirection.z : 0;
     if (era5Shield > 0) {
@@ -2807,8 +3004,8 @@ export async function boot(options = {}) {
       player.applyHit({
         direction: directionX,
         directionZ,
-        knockback: 3.4,
-        upward: 2.9,
+        knockback: 3.4 * knockbackScale,
+        upward: 2.9 * knockbackScale,
         invulnMs: 600,
       });
       ui.showStatus('Shield hit!', 650);
@@ -2817,8 +3014,8 @@ export async function boot(options = {}) {
       player.applyHit({
         direction: directionX,
         directionZ,
-        knockback: 4.0,
-        upward: 3.4,
+        knockback: 4.0 * knockbackScale,
+        upward: 3.4 * knockbackScale,
         invulnMs,
       });
       ui.showStatus(`${source} hit!`, 650);
@@ -2838,14 +3035,28 @@ export async function boot(options = {}) {
     for (let i = era5Projectiles.length - 1; i >= 0; i--) {
       const projectile = era5Projectiles[i];
       projectile.lifeMs = Math.max(0, projectile.lifeMs - (dt * 1000));
+      if (projectile.returning && projectile.lifeMs < Math.max(350, (era5State.stats.weaponProjectileLife ?? 1.6) * 500)) {
+        const toPlayer = player.mesh.position.add(new BABYLON.Vector3(0, 0.6, 0)).subtract(projectile.mesh.position);
+        if (toPlayer.lengthSquared() > 0.001) {
+          toPlayer.normalize();
+          projectile.velocity = BABYLON.Vector3.Lerp(projectile.velocity, toPlayer.scale(projectile.returnSpeed), Math.min(1, dt * 3.2));
+        }
+      }
       projectile.mesh.position.addInPlace(projectile.velocity.scale(dt));
       projectile.mesh.position.y += dt * 0.24;
       const scale = 0.94 + ((projectile.lifeMs / Math.max(1, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000)) * 0.16);
       projectile.mesh.scaling.set(scale, scale, scale);
-      const hitResult = world.level5?.tryHitByBubble?.(projectile) ?? { hit: false };
+      const hitResult = world.era5Level?.tryHitByWeapon?.({
+        mode: projectile.mode,
+        position: projectile.mesh.position,
+        direction: projectile.velocity.clone(),
+        radius: projectile.radius,
+        stunMs: projectile.stunMs,
+        weaponId: projectile.weaponId,
+      }) ?? world.level5?.tryHitByBubble?.(projectile) ?? { hit: false };
       if (hitResult.hit) {
         audio.playCue(levelId, 'nearMiss');
-        ui.showStatus('Jelly stunned!', 600);
+        ui.showStatus('Target stunned!', 600);
         projectile.mesh.dispose();
         era5Projectiles.splice(i, 1);
         continue;
@@ -2859,13 +3070,19 @@ export async function boot(options = {}) {
 
   function updateEra5Oxygen(dt) {
     if (!isEra5Level) return;
-    const oxygenMax = Math.max(0, era5State.stats.oxygenMax ?? 0);
+    const toolDef = getEquippedEra5ToolDef();
+    const toolId = toolDef?.defId || '';
+    const oxygenMax = Math.max(0, getEra5MeterMax(toolDef));
     if (oxygenMax <= 0) {
       era5Oxygen = 0;
       era5OxygenDamageTimer = 0;
       return;
     }
-    const inDeepWater = !!world.level5?.isInDeepWater?.(player.mesh.position);
+    if (toolId !== 'scuba_tank') {
+      era5OxygenDamageTimer = 0;
+      return;
+    }
+    const inDeepWater = !!world.level5?.isInDeepWater?.(player.mesh.position) || !!world.era5Level?.isInDeepWater?.(player.mesh.position);
     if (inDeepWater) {
       const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
       const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
@@ -2875,7 +3092,7 @@ export async function boot(options = {}) {
         const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
         if (era5OxygenDamageTimer >= interval) {
           era5OxygenDamageTimer = Math.max(0, era5OxygenDamageTimer - interval);
-          applyEra5Damage('oxygen', { x: 0, z: 0 }, 850);
+          applyEra5Damage('oxygen', { x: 0, z: 0 }, { invulnMs: 850, element: 'water', resist: era5State.stats.waterResist ?? 0 });
         }
       } else {
         era5OxygenDamageTimer = 0;
@@ -2903,6 +3120,37 @@ export async function boot(options = {}) {
     if (!progression.unlocksShown?.[key]) {
       persistProgressState(markUnlockShown(progression, key, levelTotals));
     }
+  }
+
+  function grantEra5Item(defId, {
+    autoEquip = true,
+    title = '',
+    subtitle = '',
+  } = {}) {
+    if (!isEra5Level || !defId) return false;
+    const nextSeed = 1000 + (era5State.inventory?.length || 0) + levelId;
+    const result = addItemToEra5State(era5State, defId, {
+      seed: nextSeed,
+      autoEquip,
+    });
+    if (!result.instance) return false;
+    if (result.added) {
+      persistEra5State(result.state);
+      ui.showToast({
+        id: `era5-item-${defId}`,
+        title: title || getItemDef(defId)?.name || defId,
+        bgColor: '#245c82',
+        durationMs: 2500,
+      });
+      if (subtitle) {
+        ui.showStatus(subtitle, 1400);
+      }
+    } else if (autoEquip) {
+      persistEra5State(result.state);
+    }
+    restoreEra5Vitals();
+    syncEra5Ui();
+    return true;
   }
 
   function recordPersistentBinky(coinId) {
@@ -2938,7 +3186,10 @@ export async function boot(options = {}) {
     }
     bubbleShieldUsedThisRun = false;
     bubbleShieldGraceMs = 0;
+    windGlideUsedThisRun = false;
+    windGlideActiveMs = 0;
     flourPuffCooldownMs = 0;
+    era5ToolActive = false;
     era5InventoryOpen = false;
     era5Projectiles.forEach((projectile) => projectile.mesh?.dispose?.());
     era5Projectiles = [];
@@ -2993,6 +3244,9 @@ export async function boot(options = {}) {
       capeSuppressedThisRun,
       bubbleShieldUsedThisRun,
       bubbleShieldGraceMs,
+      windGlideUsedThisRun,
+      windGlideActiveMs,
+      era5ToolActive,
       flourPuffCooldownMs,
     };
   }
@@ -3024,6 +3278,9 @@ export async function boot(options = {}) {
     capeSuppressedThisRun = snapshot.capeSuppressedThisRun;
     bubbleShieldUsedThisRun = snapshot.bubbleShieldUsedThisRun ?? false;
     bubbleShieldGraceMs = snapshot.bubbleShieldGraceMs ?? 0;
+    windGlideUsedThisRun = snapshot.windGlideUsedThisRun ?? false;
+    windGlideActiveMs = snapshot.windGlideActiveMs ?? 0;
+    era5ToolActive = snapshot.era5ToolActive ?? false;
     flourPuffCooldownMs = snapshot.flourPuffCooldownMs;
     applyCapeVisualState();
     player.spawnAt(snapshot.playerPos.x, snapshot.playerPos.y, snapshot.playerPos.z);
@@ -3159,6 +3416,9 @@ export async function boot(options = {}) {
       persistProgressState(markUnlockShown(progression, 'era5', levelTotals));
       ui.showEra5Teaser(3600);
     }
+    if (completionResult.windGlideUnlockedNow && !progression.unlocksShown?.windGlide) {
+      maybeShowUnlockBanner('WIND GLIDE INSTALLED!', 'Press F in air for one emergency glide per run.', 'windGlide', 3000);
+    }
     state = 'end';
     player.setWinAnimationActive(false);
     player.stopCapeFloat();
@@ -3261,10 +3521,13 @@ export async function boot(options = {}) {
     if (world.level3) world.level3.reset();
     if (world.level4) world.level4.reset();
     if (world.level5) world.level5.reset();
+    if (world.era5Level) world.era5Level.reset();
 
     for (const pickup of pickups) {
-      pickup.collected = false;
-      if (pickup.node) pickup.node.setEnabled(true);
+      const alreadyOwned = pickup.type === 'item'
+        && progression.era5?.inventory?.some((item) => item.defId === pickup.defId);
+      pickup.collected = !!alreadyOwned ? true : false;
+      if (pickup.node) pickup.node.setEnabled(!alreadyOwned);
     }
 
     player.spawnAt(spawnPoint.x, spawnPoint.y, spawnPoint.z || 0);
@@ -3318,7 +3581,7 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideGameplayMenu();
     ui.hideTitle();
-    ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: isEra5Level });
+    ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: isEra5Level, levelId });
     if (isEra5Level) {
       ui.showEra5Hud();
       syncEra5Ui();
@@ -3404,6 +3667,17 @@ export async function boot(options = {}) {
       return true;
     }
     if (code === 'KeyF') {
+      if (isEra5Level) {
+        if (useWindGlide()) {
+          window.__DADA_DEBUG__.backflip = player.getBackflipState();
+          updateBuffHud();
+          return true;
+        }
+        const started = player.triggerBackflip();
+        window.__DADA_DEBUG__.backflip = player.getBackflipState();
+        updateBuffHud();
+        return started;
+      }
       if (!player.canTriggerAirFlip()) return false;
       let started = false;
       if (progression.capeUnlocked && !capeUsedThisRun && !capeSuppressedThisRun) {
@@ -3419,6 +3693,9 @@ export async function boot(options = {}) {
       return started;
     }
     if (code === 'KeyE') {
+      if (isEra5Level) {
+        return toggleEra5Tool();
+      }
       if (levelId !== 4 || flourPuffCooldownMs > 0 || respawnState) return false;
       flourPuffCooldownMs = world.flourPuff?.cooldownMs ?? 6000;
       player.vy = Math.max(player.vy, world.flourPuff?.impulseY ?? 8.6);
@@ -3636,11 +3913,13 @@ export async function boot(options = {}) {
       return world.level5?.placeDebugJellyfish?.(player.mesh.position.clone(), forward) ?? false;
     };
     window.__DADA_DEBUG__.fireEra5Weapon = () => fireEra5Weapon();
+    window.__DADA_DEBUG__.toggleEra5Tool = () => toggleEra5Tool();
+    window.__DADA_DEBUG__.useWindGlide = () => useWindGlide();
     window.__DADA_DEBUG__.setEra5Vitals = ({ hp, shield, oxygen } = {}) => {
       if (!isEra5Level) return null;
       if (Number.isFinite(hp)) era5Hp = Math.max(0, Math.min(Math.round(era5State.stats.hpMax ?? 3), Math.round(hp)));
       if (Number.isFinite(shield)) era5Shield = Math.max(0, Math.min(Math.round(era5State.stats.shieldMax ?? 1), Math.round(shield)));
-      if (Number.isFinite(oxygen)) era5Oxygen = Math.max(0, Math.min(era5State.stats.oxygenMax ?? 0, oxygen));
+      if (Number.isFinite(oxygen)) era5Oxygen = Math.max(0, Math.min(getEra5MeterMax(), oxygen));
       syncEra5Ui();
       return window.__DADA_DEBUG__.era5Vitals;
     };
@@ -3999,15 +4278,23 @@ export async function boot(options = {}) {
       if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
         pickup.collected = true;
         if (pickup.node) pickup.node.setEnabled(false);
-        onesieMaxDurationMs = pickup.durationMs ?? 10000;
-        onesieStoredJumpBoost = pickup.jumpBoost ?? 1.2;
-        onesieBuffTimerMs = onesieMaxDurationMs;
-        onesieJumpBoost = onesieStoredJumpBoost;
-        onesieCollectedThisRun = true;
         audio.playPickup();
         juiceFx.spawnPickupSparkle(pickup.position);
-        ui.showOnesieBoostCard();
-        ui.showStatus('Onesie boost!', 1400);
+        if (pickup.type === 'onesie') {
+          onesieMaxDurationMs = pickup.durationMs ?? 10000;
+          onesieStoredJumpBoost = pickup.jumpBoost ?? 1.2;
+          onesieBuffTimerMs = onesieMaxDurationMs;
+          onesieJumpBoost = onesieStoredJumpBoost;
+          onesieCollectedThisRun = true;
+          ui.showOnesieBoostCard();
+          ui.showStatus('Onesie boost!', 1400);
+        } else if (pickup.type === 'item') {
+          grantEra5Item(pickup.defId, {
+            autoEquip: pickup.autoEquip !== false,
+            title: pickup.title,
+            subtitle: pickup.subtitle,
+          });
+        }
       }
     }
 
@@ -4038,7 +4325,7 @@ export async function boot(options = {}) {
     let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1) : 1;
     let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
     const sprinting = input.isSprintHeld();
-    if (isEra5Level && world.level5?.isInDeepWater?.(pos)) {
+    if (isEra5Level && (world.level5?.isInDeepWater?.(pos) || world.era5Level?.isInDeepWater?.(pos))) {
       speedMultiplier *= Math.max(0.72, era5State.stats.waterMoveSpeed ?? 1);
       accelBonusMultiplier *= 0.94;
     }
@@ -4057,12 +4344,12 @@ export async function boot(options = {}) {
     }
 
     player.setMovementModifiers({
-      jumpVelocityMultiplier: onesieJumpBoost * (isEra5Level ? ERA5_JUMP_MULTIPLIER : 1),
+      jumpVelocityMultiplier: onesieJumpBoost * (isEra5Level ? (ERA5_JUMP_MULTIPLIER * Math.max(0.9, era5State.stats.jumpMultiplier ?? 1)) : 1),
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
       speedMultiplier,
       accelBonusMultiplier,
       airAccelMultiplier: isEra5Level ? ERA5_AIR_ACCEL_MULTIPLIER : 1,
-      gravityScale: isEra5Level ? ERA5_GRAVITY_SCALE : 1,
+      gravityScale: isEra5Level ? (ERA5_GRAVITY_SCALE * Math.max(0.8, era5State.stats.gravityScale ?? 1)) : 1,
       coyoteTimeMs: isEra5Level ? ERA5_COYOTE_MS : 100,
       jumpBufferWindowMs: isEra5Level ? ERA5_JUMP_BUFFER_MS : 100,
     });
@@ -4367,6 +4654,9 @@ export async function boot(options = {}) {
             era5CameraDesiredYaw = wrapToPi(recenterYaw);
           }
         }
+        if (isEra5Level) {
+          prepareEra5ToolMotion(dt, { jumpHeld });
+        }
         const { halfH } = player.getCollisionHalfExtents();
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId, {
           floatMoveY: rawMoveY,
@@ -4377,18 +4667,27 @@ export async function boot(options = {}) {
         if (attackPressed) {
           fireEra5Weapon();
         }
-        if (world.level5) {
-          world.level5.update(dt, {
+        if (world.era5Level) {
+          world.era5Level.update(dt, {
             pos: player.mesh.position,
             player,
             triggerDamage: applyEra5Damage,
             triggerNearMissCue,
             refillOxygen: refillEra5Oxygen,
+            refillToolMeter: refillEra5Oxygen,
+            toolActive: era5ToolActive,
+            toolDef: getEquippedEra5ToolDef(),
+            weaponDef: getEquippedEra5WeaponDef(),
+            stats: era5State.stats,
+            playCue: (cueName) => audio.playCue(levelId, cueName),
           });
           updateEra5Projectiles(dt);
           updateEra5Oxygen(dt);
           if (debugMode) {
-            window.__DADA_DEBUG__.level5State = world.level5.getDebugState?.() ?? null;
+            window.__DADA_DEBUG__.era5LevelState = world.era5Level.getDebugState?.() ?? null;
+            if (levelId === 5) {
+              window.__DADA_DEBUG__.level5State = window.__DADA_DEBUG__.era5LevelState;
+            }
           }
         }
         if (isEra5Level && era5WeaponCooldownMs > 0) {
@@ -4692,6 +4991,7 @@ export async function boot(options = {}) {
       };
     }
     window.__DADA_DEBUG__.l5ProjectileCount = era5Projectiles.length;
+    window.__DADA_DEBUG__.era5ProjectileCount = era5Projectiles.length;
     window.__DADA_DEBUG__.musicRunning = !!audio._musicRunning;
 
     // Debug HUD (dev only)

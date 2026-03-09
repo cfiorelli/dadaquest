@@ -42,6 +42,7 @@ function normalize(raw, levelTotals = {}) {
     capeUnlocked: !!source.capeUnlocked,
     sourdoughUnlocked: !!source.sourdoughUnlocked,
     bubbleShieldUnlocked: !!source.bubbleShieldUnlocked,
+    windGlideUnlocked: !!source.windGlideUnlocked,
     allBinkiesCollected: !!source.allBinkiesCollected,
     era5: normalizeEra5State(source.era5, { unlocked: !!source?.era5?.unlocked || !!levelCompleted['4'] }),
     unlocksShown: {
@@ -49,6 +50,7 @@ function normalize(raw, levelTotals = {}) {
       sourdough: !!source.unlocksShown?.sourdough,
       bubbleShield: !!source.unlocksShown?.bubbleShield,
       era5: !!source.unlocksShown?.era5,
+      windGlide: !!source.unlocksShown?.windGlide,
     },
   };
   recomputeFlags(state, levelTotals);
@@ -78,6 +80,7 @@ function recomputeFlags(state, levelTotals = {}) {
   state.capeUnlocked = state.capeUnlocked || level1Complete;
   state.sourdoughUnlocked = state.sourdoughUnlocked || coreComplete;
   state.bubbleShieldUnlocked = !!state.bubbleShieldUnlocked;
+  state.windGlideUnlocked = !!state.windGlideUnlocked || !!state.levelCompleted['7'];
   state.era5 = normalizeEra5State(state.era5, {
     unlocked: !!state.era5?.unlocked || !!state.levelCompleted['4'],
   });
@@ -132,12 +135,17 @@ export function markLevelCompleted(state, levelId, levelTotals = {}) {
   const levelKey = String(levelId);
   const wasComplete = !!next.levelCompleted[levelKey];
   const prevEra5Unlocked = !!next.era5?.unlocked;
+  const prevWindGlideUnlocked = !!next.windGlideUnlocked;
   next.levelCompleted[levelKey] = true;
+  if (Number(levelId) === 7) {
+    next.windGlideUnlocked = true;
+  }
   recomputeFlags(next, levelTotals);
   return {
     state: next,
     levelCompletedNow: !wasComplete && next.levelCompleted[levelKey],
     era5UnlockedNow: !prevEra5Unlocked && !!next.era5?.unlocked,
+    windGlideUnlockedNow: !prevWindGlideUnlocked && !!next.windGlideUnlocked,
   };
 }
 

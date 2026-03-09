@@ -4,7 +4,7 @@ import { boot } from './web3d/boot.js';
 // Read ?level=N from URL (default 1)
 const _levelParam = new URLSearchParams(window.location.search).get('level');
 const requestedLevelId = Number.parseInt(_levelParam || '1', 10);
-const levelId = [1, 2, 3, 4, 5].includes(requestedLevelId) ? requestedLevelId : 1;
+const levelId = [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(requestedLevelId) ? requestedLevelId : 1;
 
 function installDevErrorSurface() {
   if (!import.meta.env.DEV) return;
