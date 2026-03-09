@@ -54,10 +54,22 @@ export const LEVEL5 = {
   ],
 
   currents: [
-    { name: 'currentA1', x: -12.0, y: 1.9, z: L, w: 5.0, h: 2.6, d: 4.2, pushX: 6.0 },
-    { name: 'currentA2', x: -1.4, y: 2.4, z: L, w: 5.6, h: 2.8, d: 4.2, pushX: -5.2 },
-    { name: 'currentD1', x: 98.8, y: 9.9, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: 6.8 },
-    { name: 'currentD2', x: 108.2, y: 10.2, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: -5.8 },
+    { name: 'currentA1', x: -12.0, y: 1.9, z: L, w: 5.0, h: 2.6, d: 4.2, pushX: 6.0, pushZ: 0.8 },
+    { name: 'currentA2', x: -1.4, y: 2.4, z: L, w: 5.6, h: 2.8, d: 4.2, pushX: -5.2, pushZ: -0.7 },
+    { name: 'currentD1', x: 98.8, y: 9.9, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: 6.8, pushZ: 1.4 },
+    { name: 'currentD2', x: 108.2, y: 10.2, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: -5.8, pushZ: -1.2 },
+  ],
+
+  deepWaterPockets: [
+    { name: 'deepPocketB', x: 35.2, y: 4.85, z: 0.0, w: 8.6, h: 3.8, d: 5.4 },
+    { name: 'deepPocketC', x: 72.0, y: 7.55, z: 0.0, w: 9.4, h: 4.8, d: 5.8 },
+    { name: 'deepPocketD', x: 109.2, y: 10.45, z: 0.0, w: 10.6, h: 4.8, d: 6.0 },
+  ],
+
+  airBubblePickups: [
+    { name: 'airBubbleB', x: 49.4, y: 5.9, z: 0.0, radius: 0.82, refill: 8 },
+    { name: 'airBubbleC', x: 86.4, y: 9.2, z: 0.0, radius: 0.82, refill: 8 },
+    { name: 'airBubbleD', x: 118.2, y: 11.1, z: 0.0, radius: 0.82, refill: 10 },
   ],
 
   eelRails: [

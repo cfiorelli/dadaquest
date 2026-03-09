@@ -31,6 +31,14 @@ function markDecor(node) {
   markDecorNode(node, { cameraBlocker: false });
 }
 
+function markGameplaySurface(node) {
+  if (!node) return;
+  node.metadata = {
+    ...(node.metadata || {}),
+    gameplaySurface: true,
+  };
+}
+
 function makeInvisibleCollider(scene, name, def) {
   const mesh = BABYLON.MeshBuilder.CreateBox(name, {
     width: def.w,
@@ -74,6 +82,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
     emissive: 0.34,
     roughness: 0.22,
   });
+  markGameplaySurface(slab);
   slab.enableEdgesRendering();
   slab.edgesWidth = 1.8;
   slab.edgesColor = new BABYLON.Color4(0.84, 0.98, 1.0, 0.68);
@@ -91,6 +100,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
     emissive: 0.16,
     roughness: 0.48,
   });
+  markGameplaySurface(rim);
 
   const topGlass = BABYLON.MeshBuilder.CreatePlane(`${name}_glass`, {
     width: Math.max(0.5, def.w - 0.18),
@@ -108,6 +118,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   glassMat.backFaceCulling = false;
   glassMat.needDepthPrePass = true;
   topGlass.material = glassMat;
+  markGameplaySurface(topGlass);
   markDecor(topGlass);
 
   const faceGlow = BABYLON.MeshBuilder.CreatePlane(`${name}_faceGlow`, {
@@ -125,6 +136,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   faceGlowMat.backFaceCulling = false;
   faceGlowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   faceGlow.material = faceGlowMat;
+  markGameplaySurface(faceGlow);
   markDecor(faceGlow);
 
   const topLip = BABYLON.MeshBuilder.CreatePlane(`${name}_topLip`, {
@@ -142,6 +154,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   topLipMat.backFaceCulling = false;
   topLipMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   topLip.material = topLipMat;
+  markGameplaySurface(topLip);
   markDecor(topLip);
 
   const underside = BABYLON.MeshBuilder.CreatePlane(`${name}_undershadow`, {
@@ -158,6 +171,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   underMat.disableLighting = true;
   underMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   underside.material = underMat;
+  markGameplaySurface(underside);
   markDecor(underside);
 
   const beaconOffsets = [
@@ -182,6 +196,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
     beaconMat.emissiveColor = new BABYLON.Color3(0.26, 0.54, 0.62);
     beaconMat.alpha = 0.88;
     beacon.material = beaconMat;
+    markGameplaySurface(beacon);
     markDecor(beacon);
   }
 
@@ -367,7 +382,115 @@ function createCurrentJet(scene, def) {
       return pos.x >= (this.x - this.w * 0.5)
         && pos.x <= (this.x + this.w * 0.5)
         && pos.y >= (this.y - this.h * 0.5)
-        && pos.y <= (this.y + this.h * 0.5);
+        && pos.y <= (this.y + this.h * 0.5)
+        && pos.z >= ((this.z ?? LANE_Z) - (this.d * 0.5))
+        && pos.z <= ((this.z ?? LANE_Z) + (this.d * 0.5));
+    },
+  };
+}
+
+function createDeepWaterPocket(scene, def) {
+  const root = new BABYLON.TransformNode(def.name, scene);
+  root.position.set(def.x, def.y, def.z ?? LANE_Z);
+
+  const volume = BABYLON.MeshBuilder.CreateBox(`${def.name}_volume`, {
+    width: def.w,
+    height: def.h,
+    depth: def.d,
+  }, scene);
+  volume.parent = root;
+  const volumeMat = new BABYLON.StandardMaterial(`${def.name}_volumeMat`, scene);
+  volumeMat.diffuseColor = new BABYLON.Color3(0.08, 0.34, 0.52);
+  volumeMat.emissiveColor = new BABYLON.Color3(0.04, 0.18, 0.28);
+  volumeMat.alpha = 0.14;
+  volumeMat.backFaceCulling = false;
+  volumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  volume.material = volumeMat;
+  markDecor(volume);
+
+  const rim = BABYLON.MeshBuilder.CreateBox(`${def.name}_rim`, {
+    width: def.w + 0.08,
+    height: 0.08,
+    depth: def.d + 0.08,
+  }, scene);
+  rim.parent = root;
+  rim.position.y = (def.h * 0.5) - 0.03;
+  const rimMat = new BABYLON.StandardMaterial(`${def.name}_rimMat`, scene);
+  rimMat.diffuseColor = new BABYLON.Color3(0.62, 0.96, 1.0);
+  rimMat.emissiveColor = new BABYLON.Color3(0.18, 0.34, 0.42);
+  rimMat.alpha = 0.52;
+  rimMat.backFaceCulling = false;
+  rimMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  rim.material = rimMat;
+  markDecor(rim);
+
+  return {
+    ...def,
+    root,
+    volume,
+    contains(pos) {
+      return pos.x >= (this.x - this.w * 0.5)
+        && pos.x <= (this.x + this.w * 0.5)
+        && pos.y >= (this.y - this.h * 0.5)
+        && pos.y <= (this.y + this.h * 0.5)
+        && pos.z >= ((this.z ?? LANE_Z) - (this.d * 0.5))
+        && pos.z <= ((this.z ?? LANE_Z) + (this.d * 0.5));
+    },
+    update(dt, time) {
+      rimMat.alpha = 0.40 + (Math.sin((time * 1.6) + this.x * 0.04) * 0.12);
+      volumeMat.alpha = 0.10 + (Math.sin((time * 0.9) + this.y) * 0.04);
+      volume.position.y = Math.sin((time * 0.7) + this.x * 0.03) * 0.06;
+    },
+  };
+}
+
+function createAirBubblePickup(scene, def) {
+  const root = new BABYLON.TransformNode(def.name, scene);
+  root.position.set(def.x, def.y, def.z ?? LANE_Z);
+  const globes = [];
+  for (let i = 0; i < 3; i++) {
+    const globe = BABYLON.MeshBuilder.CreateSphere(`${def.name}_globe_${i}`, {
+      diameter: 0.34 - (i * 0.06),
+      segments: 8,
+    }, scene);
+    globe.parent = root;
+    globe.position.set((i - 1) * 0.18, i * 0.16, ((i % 2) - 0.5) * 0.16);
+    const mat = new BABYLON.StandardMaterial(`${def.name}_mat_${i}`, scene);
+    mat.diffuseColor = new BABYLON.Color3(0.72, 0.96, 1.0);
+    mat.emissiveColor = new BABYLON.Color3(0.12, 0.26, 0.32);
+    mat.alpha = 0.48;
+    mat.specularColor = new BABYLON.Color3(0.84, 1.0, 1.0);
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    globe.material = mat;
+    globes.push(globe);
+    markDecor(globe);
+  }
+
+  return {
+    ...def,
+    root,
+    globes,
+    collected: false,
+    update(dt, time) {
+      if (this.collected) return;
+      root.position.y = this.y + (Math.sin((time * 1.8) + this.x * 0.08) * 0.16);
+      root.rotation.y += dt * 0.8;
+    },
+    contains(pos) {
+      const dx = pos.x - this.x;
+      const dy = pos.y - root.position.y;
+      const dz = pos.z - (this.z ?? LANE_Z);
+      return ((dx ** 2) + (dy ** 2) + (dz ** 2)) <= ((this.radius ?? 0.8) ** 2);
+    },
+    collect() {
+      this.collected = true;
+      root.setEnabled(false);
+    },
+    reset() {
+      this.collected = false;
+      root.position.set(this.x, this.y, this.z ?? LANE_Z);
+      root.rotation.set(0, 0, 0);
+      root.setEnabled(true);
     },
   };
 }
@@ -550,9 +673,28 @@ function createJellyfish(scene, def, shadowGen) {
     tentacles,
     mover,
     nearMissCooldownMs: 0,
+    stunnedMs: 0,
     baseY: def.y,
+    stun(durationMs = 1500) {
+      this.stunnedMs = Math.max(this.stunnedMs, durationMs);
+      bell.material.alpha = 0.16;
+      core.material.emissiveColor = new BABYLON.Color3(0.16, 0.18, 0.24);
+      return true;
+    },
+    isStunned() {
+      return this.stunnedMs > 0;
+    },
     update(dt) {
-      mover.update(dt);
+      if (this.stunnedMs > 0) {
+        this.stunnedMs = Math.max(0, this.stunnedMs - (dt * 1000));
+        bell.rotation.z = Math.sin((performance.now() * 0.004) + mover.time) * 0.05;
+        bell.material.alpha = 0.16 + (Math.sin((performance.now() * 0.01) + mover.time) * 0.04);
+        core.material.emissiveColor = new BABYLON.Color3(0.16, 0.18, 0.24);
+      } else {
+        mover.update(dt);
+        bell.material.alpha = 0.42;
+        core.material.emissiveColor = new BABYLON.Color3(0.42, 0.26, 0.40);
+      }
       for (let i = 0; i < tentacles.length; i++) {
         tentacles[i].rotation.z = Math.sin((performance.now() * 0.0024) + i + mover.time) * 0.10;
       }
@@ -563,6 +705,9 @@ function createJellyfish(scene, def, shadowGen) {
     reset() {
       mover.reset();
       this.nearMissCooldownMs = 0;
+      this.stunnedMs = 0;
+      bell.material.alpha = 0.42;
+      core.material.emissiveColor = new BABYLON.Color3(0.42, 0.26, 0.40);
     },
   };
 }
@@ -725,6 +870,8 @@ export function buildWorld5(scene, options = {}) {
   const backdrop = createBackdrop(scene);
 
   const currentJets = LEVEL5.currents.map((def) => createCurrentJet(scene, def));
+  const deepWaterPockets = (LEVEL5.deepWaterPockets || []).map((def) => createDeepWaterPocket(scene, def));
+  const airBubblePickups = (LEVEL5.airBubblePickups || []).map((def) => createAirBubblePickup(scene, def));
   const eelRails = LEVEL5.eelRails.map((def) => createEelRail(scene, def));
   const vents = LEVEL5.vents.map((def) => createVent(scene, def));
   const jellyfish = LEVEL5.jellyfish.map((def) => createJellyfish(scene, def, shadowGen));
@@ -733,6 +880,7 @@ export function buildWorld5(scene, options = {}) {
   const hazards = [];
   let currentPushTimer = 0;
   let currentPushForce = 0;
+  let currentPushZ = 0;
   let runtimeTime = 0;
 
   const eelHazards = eelRails.map((eelRail) => createTelegraphedHazard({
@@ -757,8 +905,8 @@ export function buildWorld5(scene, options = {}) {
       eelRail.halo.material.alpha = 0.05;
     },
     isPlayerHit: ({ pos }) => eelRail.lineDistanceToPoint(pos) <= 0.34,
-    onHit: ({ pos, triggerReset }) => {
-      triggerReset('eel_rail', pos.x < eelRail.root.position.x ? -1 : 1);
+    onHit: ({ pos, triggerDamage }) => {
+      triggerDamage?.('eel_rail', { x: pos.x < eelRail.root.position.x ? -1 : 1, z: 0 });
     },
   }));
 
@@ -813,8 +961,8 @@ export function buildWorld5(scene, options = {}) {
         && pos.y >= collider.minY
         && pos.y <= collider.maxY;
     },
-    onHit: ({ pos, triggerReset }) => {
-      triggerReset('shark_shadow', pos.x < sharkSweep.currentX ? -1 : 1);
+    onHit: ({ pos, triggerDamage }) => {
+      triggerDamage?.('shark_shadow', { x: pos.x < sharkSweep.currentX ? -1 : 1, z: 0 });
     },
   });
 
@@ -822,29 +970,34 @@ export function buildWorld5(scene, options = {}) {
     if (currentPushTimer > 0) {
       currentPushTimer = Math.max(0, currentPushTimer - dt);
       player.vx += currentPushForce * dt;
+      player.vz += currentPushZ * dt;
     }
     for (const jet of currentJets) {
       jet.update(dt);
       const inside = jet.contains(player.mesh.position);
       if (inside && !jet.playerInside) {
         currentPushForce = jet.pushX;
+        currentPushZ = jet.pushZ ?? 0;
         currentPushTimer = CURRENT_PUSH_DURATION_SEC;
+        player.vz += currentPushZ * dt * 10;
       }
       jet.playerInside = inside;
     }
   }
 
-  function updateJellyfish(dt, pos, triggerReset, triggerNearMissCue) {
+  function updateJellyfish(dt, pos, triggerDamage, triggerNearMissCue) {
     const playerRadius = 0.36;
     for (const jelly of jellyfish) {
       jelly.update(dt);
+      if (jelly.isStunned()) continue;
       const jellyPos = jelly.root.position;
       const dx = pos.x - jellyPos.x;
       const dy = pos.y - jellyPos.y;
       const dz = pos.z - jellyPos.z;
       const distance = Math.sqrt((dx ** 2) + (dy ** 2) + (dz ** 2));
       if (distance <= (JELLY_HIT_RADIUS + playerRadius)) {
-        triggerReset('jellyfish', dx < 0 ? -1 : 1);
+        const planarLen = Math.hypot(dx, dz) || 1;
+        triggerDamage?.('jellyfish', { x: dx / planarLen, z: dz / planarLen });
         continue;
       }
       if (distance <= (JELLY_NEAR_MISS_RADIUS + playerRadius) && jelly.nearMissCooldownMs <= 0) {
@@ -855,24 +1008,41 @@ export function buildWorld5(scene, options = {}) {
   }
 
   const level5 = {
-    update(dt, { pos, player, triggerReset, triggerNearMissCue }) {
+    update(dt, {
+      pos,
+      player,
+      triggerDamage,
+      triggerNearMissCue,
+      refillOxygen,
+    }) {
       runtimeTime += dt;
       aquariumFx.update(dt);
       backdrop.update(dt, runtimeTime);
       updateCurrentJets(dt, player);
+      for (const pocket of deepWaterPockets) {
+        pocket.update(dt, runtimeTime);
+      }
+      for (const bubble of airBubblePickups) {
+        bubble.update(dt, runtimeTime);
+        if (!bubble.collected && bubble.contains(pos)) {
+          bubble.collect();
+          refillOxygen?.(bubble.refill ?? 8);
+        }
+      }
       for (const eelHazard of eelHazards) {
-        eelHazard.update(dt, { pos, player, triggerReset });
+        eelHazard.update(dt, { pos, player, triggerDamage });
       }
       for (const ventHazard of ventHazards) {
         ventHazard.update(dt, { pos, player });
       }
-      updateJellyfish(dt, pos, triggerReset, triggerNearMissCue);
-      sharkHazard.update(dt, { pos, player, triggerReset });
+      updateJellyfish(dt, pos, triggerDamage, triggerNearMissCue);
+      sharkHazard.update(dt, { pos, player, triggerDamage });
     },
     reset() {
       runtimeTime = 0;
       currentPushTimer = 0;
       currentPushForce = 0;
+      currentPushZ = 0;
       aquariumFx.reset();
       backdrop.reset();
       for (const jet of currentJets) {
@@ -887,33 +1057,76 @@ export function buildWorld5(scene, options = {}) {
       for (const jelly of jellyfish) {
         jelly.reset();
       }
+      for (const bubble of airBubblePickups) {
+        bubble.reset();
+      }
       sharkHazard.reset();
     },
-    debugForceHazard(name, { pos, player, triggerReset } = {}) {
+    debugForceHazard(name, { pos, triggerDamage } = {}) {
       if (name === 'shark') {
-        triggerReset('shark_shadow', 1);
+        triggerDamage?.('shark_shadow', { x: 1, z: 0 });
         return true;
       }
       if (name === 'jellyfish') {
-        triggerReset('jellyfish', 1);
+        triggerDamage?.('jellyfish', { x: 1, z: 0 });
         return true;
       }
       const eelHazard = eelHazards.find((entry) => entry.name === name) || eelHazards[0];
       if (eelHazard) {
-        triggerReset('eel_rail', pos?.x < player?.mesh?.position?.x ? -1 : 1);
+        triggerDamage?.('eel_rail', { x: pos?.x < eelHazard.root.position.x ? -1 : 1, z: 0 });
         return true;
       }
       return false;
+    },
+    isInDeepWater(pos) {
+      return deepWaterPockets.some((pocket) => pocket.contains(pos));
+    },
+    tryHitByBubble(projectile) {
+      for (const jelly of jellyfish) {
+        if (jelly.isStunned()) continue;
+        const dx = projectile.position.x - jelly.root.position.x;
+        const dy = projectile.position.y - jelly.root.position.y;
+        const dz = projectile.position.z - jelly.root.position.z;
+        if (((dx ** 2) + (dy ** 2) + (dz ** 2)) <= ((projectile.radius ?? 0.28) + 0.64) ** 2) {
+          jelly.stun(projectile.stunMs ?? 1500);
+          return { hit: true, jellyName: jelly.name };
+        }
+      }
+      return { hit: false, jellyName: null };
+    },
+    placeDebugJellyfish(pos, forward = { x: 1, z: 0 }) {
+      const jelly = jellyfish[0];
+      if (!jelly) return false;
+      const dirLen = Math.hypot(forward.x || 0, forward.z || 0) || 1;
+      const targetPos = new BABYLON.Vector3(
+        pos.x + ((forward.x || 1) / dirLen) * 2.6,
+        pos.y + 0.5,
+        pos.z + ((forward.z || 0) / dirLen) * 2.0,
+      );
+      jelly.mover.basePosition = targetPos.clone();
+      jelly.mover.bounds = {
+        minX: targetPos.x - 1.2,
+        maxX: targetPos.x + 1.2,
+        minY: targetPos.y - 0.5,
+        maxY: targetPos.y + 0.8,
+        minZ: targetPos.z - 1.1,
+        maxZ: targetPos.z + 1.1,
+      };
+      jelly.root.position.copyFrom(targetPos);
+      jelly.reset();
+      return true;
     },
     getDebugState() {
       return {
         currentPushTimer,
         currentPushForce,
+        currentPushZ,
         jellyfish: jellyfish.map((jelly) => ({
           name: jelly.name,
           x: jelly.root.position.x,
           y: jelly.root.position.y,
           z: jelly.root.position.z,
+          stunnedMs: jelly.stunnedMs,
         })),
       };
     },

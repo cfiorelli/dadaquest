@@ -1,3 +1,5 @@
+import { normalizeEra5State } from '../../game/items/items.js';
+
 const STORAGE_KEY = 'dadaquest:progress:v1';
 
 function emptyLevelState(total = 0) {
@@ -7,15 +9,20 @@ function emptyLevelState(total = 0) {
   };
 }
 
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
 function normalize(raw, levelTotals = {}) {
+  const source = asObject(raw);
   const levels = {};
   for (const [levelKey, total] of Object.entries(levelTotals)) {
-    const source = raw?.levels?.[levelKey];
-    const collectedIds = Array.isArray(source?.collectedIds)
-      ? source.collectedIds.filter((value) => typeof value === 'string')
+    const levelSource = source.levels?.[levelKey];
+    const collectedIds = Array.isArray(levelSource?.collectedIds)
+      ? levelSource.collectedIds.filter((value) => typeof value === 'string')
       : [];
     levels[levelKey] = {
-      total: Number.isFinite(source?.total) ? source.total : total,
+      total: Number.isFinite(levelSource?.total) ? levelSource.total : total,
       collectedIds,
     };
   }
@@ -23,23 +30,25 @@ function normalize(raw, levelTotals = {}) {
   const levelCompleted = {};
   const completionKeys = new Set([
     ...Object.keys(levelTotals || {}),
-    ...Object.keys(raw?.levelCompleted || {}),
+    ...Object.keys(source.levelCompleted || {}),
   ]);
   for (const levelKey of completionKeys) {
-    levelCompleted[levelKey] = !!raw?.levelCompleted?.[levelKey];
+    levelCompleted[levelKey] = !!source.levelCompleted?.[levelKey];
   }
 
   const state = {
     levels,
     levelCompleted,
-    capeUnlocked: !!raw?.capeUnlocked,
-    sourdoughUnlocked: !!raw?.sourdoughUnlocked,
-    bubbleShieldUnlocked: !!raw?.bubbleShieldUnlocked,
-    allBinkiesCollected: !!raw?.allBinkiesCollected,
+    capeUnlocked: !!source.capeUnlocked,
+    sourdoughUnlocked: !!source.sourdoughUnlocked,
+    bubbleShieldUnlocked: !!source.bubbleShieldUnlocked,
+    allBinkiesCollected: !!source.allBinkiesCollected,
+    era5: normalizeEra5State(source.era5, { unlocked: !!source?.era5?.unlocked || !!levelCompleted['4'] }),
     unlocksShown: {
-      cape: !!raw?.unlocksShown?.cape,
-      sourdough: !!raw?.unlocksShown?.sourdough,
-      bubbleShield: !!raw?.unlocksShown?.bubbleShield,
+      cape: !!source.unlocksShown?.cape,
+      sourdough: !!source.unlocksShown?.sourdough,
+      bubbleShield: !!source.unlocksShown?.bubbleShield,
+      era5: !!source.unlocksShown?.era5,
     },
   };
   recomputeFlags(state, levelTotals);
@@ -68,7 +77,10 @@ function recomputeFlags(state, levelTotals = {}) {
 
   state.capeUnlocked = state.capeUnlocked || level1Complete;
   state.sourdoughUnlocked = state.sourdoughUnlocked || coreComplete;
-  state.bubbleShieldUnlocked = state.bubbleShieldUnlocked || !!state.levelCompleted['5'];
+  state.bubbleShieldUnlocked = !!state.bubbleShieldUnlocked;
+  state.era5 = normalizeEra5State(state.era5, {
+    unlocked: !!state.era5?.unlocked || !!state.levelCompleted['4'],
+  });
   state.allBinkiesCollected = allComplete;
   return state;
 }
@@ -119,13 +131,13 @@ export function markLevelCompleted(state, levelId, levelTotals = {}) {
   const next = normalize(state, levelTotals);
   const levelKey = String(levelId);
   const wasComplete = !!next.levelCompleted[levelKey];
-  const prevBubbleShield = next.bubbleShieldUnlocked;
+  const prevEra5Unlocked = !!next.era5?.unlocked;
   next.levelCompleted[levelKey] = true;
   recomputeFlags(next, levelTotals);
   return {
     state: next,
     levelCompletedNow: !wasComplete && next.levelCompleted[levelKey],
-    bubbleShieldUnlockedNow: !prevBubbleShield && next.bubbleShieldUnlocked,
+    era5UnlockedNow: !prevEra5Unlocked && !!next.era5?.unlocked,
   };
 }
 

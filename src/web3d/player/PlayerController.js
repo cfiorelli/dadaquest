@@ -36,6 +36,7 @@ const JUMP_BUFFER_MS = 100;
 const JUMP_CUT_MULT = 0.4;   // multiply vy when jump released early
 const PLAYER_HALF_W = 0.25;
 const PLAYER_HALF_H = 0.4;
+const PLAYER_HALF_D = 0.25;
 const SKIN_WIDTH = 0.005;     // separation buffer to prevent re-collision
 const VEL_DEADZONE = 0.01;    // clamp tiny velocities to zero
 const INVULN_BLINK_HZ = 20;
@@ -49,6 +50,13 @@ const CAPE_FLOAT_Y_SPEED = 4.8;
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function wrapAngle(angle) {
+  let wrapped = angle;
+  while (wrapped > Math.PI) wrapped -= Math.PI * 2;
+  while (wrapped < -Math.PI) wrapped += Math.PI * 2;
+  return wrapped;
 }
 
 export class PlayerController {
@@ -90,6 +98,7 @@ export class PlayerController {
     // Physics state
     this.vx = 0;
     this.vy = 0;
+    this.vz = 0;
     this.grounded = false;
     this.timeSinceGround = 999; // ms since last grounded
     this.jumpBufferMs = 0; // ms remaining in jump buffer window
@@ -113,6 +122,7 @@ export class PlayerController {
     this.turnResponsiveness = 1;
     this.speedMultiplier = 1;
     this.accelBonusMultiplier = 1;
+    this.movementMode = 'lane';
 
     // Feedback state
     this.invulnTimerMs = 0;
@@ -137,8 +147,19 @@ export class PlayerController {
         maxX: pos.x + ext.x,
         minY: pos.y - ext.y,
         maxY: pos.y + ext.y,
+        minZ: pos.z - ext.z,
+        maxZ: pos.z + ext.z,
       };
     });
+  }
+
+  setMovementMode(mode = 'lane') {
+    this.movementMode = mode === 'free' ? 'free' : 'lane';
+    if (this.movementMode === 'lane') {
+      this.mesh.position.z = 0;
+      this.vz = 0;
+      this.visual.rotation.y = 0;
+    }
   }
 
   setMovementModifiers({
@@ -163,6 +184,7 @@ export class PlayerController {
     this.mesh.position.set(x, y, z);
     this.vx = 0;
     this.vy = 0;
+    this.vz = 0;
     this.grounded = false;
     this.jumping = false;
     this.jumpCutApplied = false;
@@ -198,6 +220,8 @@ export class PlayerController {
     // overlapping) the player's AABB at the given X.
     const pMinX = x - PLAYER_HALF_W;
     const pMaxX = x + PLAYER_HALF_W;
+    const pMinZ = z - PLAYER_HALF_D;
+    const pMaxZ = z + PLAYER_HALF_D;
     const playerBottom = y - PLAYER_HALF_H;
     const SNAP_RANGE = 0.15; // how far below player bottom we search
 
@@ -205,6 +229,7 @@ export class PlayerController {
     for (const c of this.colliders) {
       // Must overlap horizontally
       if (pMaxX <= c.minX || pMinX >= c.maxX) continue;
+      if (this.movementMode === 'free' && (pMaxZ <= c.minZ || pMinZ >= c.maxZ)) continue;
       // Platform top must be within snap range below (or at) player bottom
       if (c.maxY > playerBottom + SKIN_WIDTH) continue; // platform top is above player bottom (would overlap)
       if (c.maxY < playerBottom - SNAP_RANGE) continue; // too far below
@@ -238,13 +263,22 @@ export class PlayerController {
     }
   }
 
-  applyHit({ direction = 1, knockback = 4.5, upward = 4.0, invulnMs = 800 } = {}) {
+  applyHit({ direction = 1, directionZ = 0, knockback = 4.5, upward = 4.0, invulnMs = 800 } = {}) {
     if (this.invulnTimerMs > 0) return false;
-    const dir = direction >= 0 ? 1 : -1;
-    this.vx = clamp(this.vx + dir * knockback, -MAX_SPEED * 1.25, MAX_SPEED * 1.25);
+    let dirX = direction >= 0 ? 1 : -1;
+    let dirZ = Number.isFinite(directionZ) ? directionZ : 0;
+    const len = Math.hypot(dirX, dirZ);
+    if (len > 0.001) {
+      dirX /= len;
+      dirZ /= len;
+    }
+    this.vx = clamp(this.vx + dirX * knockback, -MAX_SPEED * 1.25, MAX_SPEED * 1.25);
+    if (this.movementMode === 'free') {
+      this.vz = clamp(this.vz + dirZ * knockback, -MAX_SPEED * 1.25, MAX_SPEED * 1.25);
+    }
     this.vy = Math.max(this.vy, upward);
     this.invulnTimerMs = invulnMs;
-    this.emitEvent('hit', { direction: dir });
+    this.emitEvent('hit', { direction: dirX, directionZ: dirZ });
     return true;
   }
 
@@ -296,17 +330,20 @@ export class PlayerController {
   }
 
   getCollisionHalfExtents() {
-    return { halfW: PLAYER_HALF_W, halfH: PLAYER_HALF_H };
+    return { halfW: PLAYER_HALF_W, halfH: PLAYER_HALF_H, halfD: PLAYER_HALF_D };
   }
 
-  wouldOverlapAt(x, y) {
+  wouldOverlapAt(x, y, z = 0) {
     const minX = x - PLAYER_HALF_W;
     const maxX = x + PLAYER_HALF_W;
     const minY = y - PLAYER_HALF_H;
     const maxY = y + PLAYER_HALF_H;
+    const minZ = z - PLAYER_HALF_D;
+    const maxZ = z + PLAYER_HALF_D;
     for (const c of this.colliders) {
       if (maxX <= c.minX || minX >= c.maxX) continue;
       if (maxY <= c.minY || minY >= c.maxY) continue;
+      if (this.movementMode === 'free' && (maxZ <= c.minZ || minZ >= c.maxZ)) continue;
       return true;
     }
     return false;
@@ -315,8 +352,11 @@ export class PlayerController {
   update(dt, moveX, jumpPressedEdge, jumpHeld, jumpPressId = 0, options = {}) {
     dt = Math.min(dt, 1 / 30); // cap to avoid tunneling
     const pos = this.mesh.position;
+    const freeMove = options.movementMode === 'free' || this.movementMode === 'free';
     const floatMoveY = clamp(options.floatMoveY ?? 0, -1, 1);
+    let moveZ = clamp(options.moveZ ?? 0, -1, 1);
     const floatActive = !!options.floatActive && this.capeFloatTimerMs > 0;
+    if (!freeMove) moveZ = 0;
 
     if (this.invulnTimerMs > 0) {
       this.invulnTimerMs = Math.max(0, this.invulnTimerMs - dt * 1000);
@@ -363,6 +403,7 @@ export class PlayerController {
       && this.maxAirJumps > 0
       && this.airJumpsUsed < this.maxAirJumps;
     const canSideJump = canBuffer
+      && !freeMove
       && !this.grounded
       && this.sideJumpWindowMs > 0
       && !this.sideJumpUsed;
@@ -409,14 +450,21 @@ export class PlayerController {
     }
 
     // Horizontal movement
+    const moveLen = freeMove ? Math.hypot(moveX, moveZ) : Math.abs(moveX);
+    if (freeMove && moveLen > 1) {
+      moveX /= moveLen;
+      moveZ /= moveLen;
+    }
     let accelVal = this.grounded
-      ? (moveX !== 0 ? GROUND_ACCEL * this.surfaceAccelMultiplier : GROUND_DECEL * this.surfaceDecelMultiplier)
-      : (moveX !== 0 ? AIR_ACCEL * this.surfaceAccelMultiplier : AIR_DECEL * this.surfaceDecelMultiplier);
+      ? (moveLen > 0 ? GROUND_ACCEL * this.surfaceAccelMultiplier : GROUND_DECEL * this.surfaceDecelMultiplier)
+      : (moveLen > 0 ? AIR_ACCEL * this.surfaceAccelMultiplier : AIR_DECEL * this.surfaceDecelMultiplier);
     accelVal *= this.accelBonusMultiplier;
     const targetVx = moveX * MAX_SPEED * this.speedMultiplier;
+    const targetVz = freeMove ? moveZ * MAX_SPEED * this.speedMultiplier : 0;
     let diff = targetVx - this.vx;
     if (
-      this.grounded
+      !freeMove
+      && this.grounded
       && moveX !== 0
       && Math.abs(this.vx) > 0.2
       && Math.sign(targetVx) !== Math.sign(this.vx)
@@ -426,9 +474,18 @@ export class PlayerController {
     }
     const maxStep = accelVal * dt;
     this.vx += clamp(diff, -maxStep, maxStep);
+    if (freeMove) {
+      const diffZ = targetVz - this.vz;
+      this.vz += clamp(diffZ, -maxStep, maxStep);
+    } else {
+      this.vz = 0;
+    }
 
     if (floatActive) {
       this.vx = clamp(moveX * CAPE_FLOAT_X_SPEED, -CAPE_FLOAT_X_SPEED, CAPE_FLOAT_X_SPEED);
+      if (freeMove) {
+        this.vz = clamp(moveZ * CAPE_FLOAT_X_SPEED, -CAPE_FLOAT_X_SPEED, CAPE_FLOAT_X_SPEED);
+      }
       this.vy = clamp(floatMoveY * CAPE_FLOAT_Y_SPEED, -CAPE_FLOAT_Y_SPEED, CAPE_FLOAT_Y_SPEED * 0.85);
       this.jumping = false;
       this.jumpCutApplied = false;
@@ -440,7 +497,11 @@ export class PlayerController {
     // Integrate position
     pos.x += this.vx * dt;
     pos.y += this.vy * dt;
-    pos.z = 0; // lock to lane
+    if (freeMove) {
+      pos.z += this.vz * dt;
+    } else {
+      pos.z = 0; // lock to lane
+    }
 
     // Collision resolution (AABB vs platforms)
     this.grounded = false;
@@ -450,17 +511,24 @@ export class PlayerController {
       const pMaxX = pos.x + PLAYER_HALF_W;
       const pMinY = pos.y - PLAYER_HALF_H;
       const pMaxY = pos.y + PLAYER_HALF_H;
+      const pMinZ = pos.z - PLAYER_HALF_D;
+      const pMaxZ = pos.z + PLAYER_HALF_D;
 
       // Check AABB overlap
       if (pMaxX <= c.minX || pMinX >= c.maxX) continue;
       if (pMaxY <= c.minY || pMinY >= c.maxY) continue;
+      if (freeMove && (pMaxZ <= c.minZ || pMinZ >= c.maxZ)) continue;
 
       // Find smallest penetration axis
       const overlapLeft = pMaxX - c.minX;
       const overlapRight = c.maxX - pMinX;
       const overlapBottom = pMaxY - c.minY;
       const overlapTop = c.maxY - pMinY;
-      const minOverlap = Math.min(overlapLeft, overlapRight, overlapBottom, overlapTop);
+      const overlapBack = pMaxZ - c.minZ;
+      const overlapFront = c.maxZ - pMinZ;
+      const minOverlap = freeMove
+        ? Math.min(overlapLeft, overlapRight, overlapBottom, overlapTop, overlapBack, overlapFront)
+        : Math.min(overlapLeft, overlapRight, overlapBottom, overlapTop);
       this.lastCollisionHits++;
 
       if (minOverlap === overlapTop && this.vy <= 0) {
@@ -476,7 +544,7 @@ export class PlayerController {
       } else if (minOverlap === overlapLeft) {
         pos.x = c.minX - PLAYER_HALF_W - SKIN_WIDTH;
         this.vx = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
+        if (!freeMove && !this.grounded && this.vy < 0 && !this.sideJumpUsed) {
           this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
           this.sideJumpDir = -1;
           this.sideJumpPlatform = c;
@@ -484,11 +552,17 @@ export class PlayerController {
       } else if (minOverlap === overlapRight) {
         pos.x = c.maxX + PLAYER_HALF_W + SKIN_WIDTH;
         this.vx = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
+        if (!freeMove && !this.grounded && this.vy < 0 && !this.sideJumpUsed) {
           this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
           this.sideJumpDir = 1;
           this.sideJumpPlatform = c;
         }
+      } else if (freeMove && minOverlap === overlapBack) {
+        pos.z = c.minZ - PLAYER_HALF_D - SKIN_WIDTH;
+        this.vz = 0;
+      } else if (freeMove && minOverlap === overlapFront) {
+        pos.z = c.maxZ + PLAYER_HALF_D + SKIN_WIDTH;
+        this.vz = 0;
       }
     }
 
@@ -503,6 +577,7 @@ export class PlayerController {
     // Clamp tiny velocities to zero (prevents drift/jitter)
     if (Math.abs(this.vx) < VEL_DEADZONE) this.vx = 0;
     if (this.grounded && Math.abs(this.vy) < VEL_DEADZONE) this.vy = 0;
+    if (freeMove && Math.abs(this.vz) < VEL_DEADZONE) this.vz = 0;
 
     // Out-of-bounds event emitted once until we're restored.
     if (pos.y < -10) {
@@ -517,10 +592,21 @@ export class PlayerController {
     if (this.babyAnim) {
       this.babyAnim.update(dt, {
         vx: this.vx,
-      grounded: this.grounded,
-      capeFloatActive: floatActive,
-    });
-  }
+        grounded: this.grounded,
+        capeFloatActive: floatActive,
+      });
+    }
+
+    if (freeMove) {
+      const planarSpeed = Math.hypot(this.vx, this.vz);
+      if (planarSpeed > 0.12) {
+        const desiredYaw = Math.atan2(this.vz, this.vx);
+        const delta = wrapAngle(desiredYaw - this.visual.rotation.y);
+        this.visual.rotation.y += delta * Math.min(1, dt * 10);
+      }
+    } else if (Math.abs(this.visual.rotation.y) > 0.0001) {
+      this.visual.rotation.y *= Math.max(0, 1 - (dt * 12));
+    }
 
     if (this.backflipTimerSec > 0) {
       this.backflipTimerSec = Math.max(0, this.backflipTimerSec - dt);
@@ -639,9 +725,12 @@ export class PlayerController {
     return {
       x: pos.x.toFixed(2),
       y: pos.y.toFixed(2),
+      z: pos.z.toFixed(2),
       vx: this.vx.toFixed(2),
       vy: this.vy.toFixed(2),
+      vz: this.vz.toFixed(2),
       grounded: this.grounded,
+      movementMode: this.movementMode,
       invulnMs: this.invulnTimerMs.toFixed(0),
       coyoteMs: Math.max(0, COYOTE_MS - this.timeSinceGround).toFixed(0),
       bufferMs: this.jumpBufferMs.toFixed(0),

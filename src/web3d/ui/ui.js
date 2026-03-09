@@ -640,6 +640,301 @@ const CSS = `
   letter-spacing: 0.02em;
   margin: 0;
 }
+.dada-era5-hud {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: min(320px, calc(100vw - 36px));
+  display: none;
+  z-index: 7;
+}
+.dada-era5-panel {
+  border-radius: 18px;
+  border: 1px solid rgba(134, 233, 255, 0.24);
+  background:
+    linear-gradient(160deg, rgba(7, 23, 40, 0.88), rgba(4, 13, 26, 0.84));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(188, 245, 255, 0.08);
+  color: #ddfaff;
+  padding: 14px 16px 12px;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  backdrop-filter: blur(8px);
+}
+.dada-era5-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.dada-era5-row + .dada-era5-row {
+  margin-top: 12px;
+}
+.dada-era5-block {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dada-era5-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(200, 244, 255, 0.72);
+  margin-bottom: 5px;
+}
+.dada-era5-hearts,
+.dada-era5-shields {
+  display: flex;
+  gap: 6px;
+}
+.dada-era5-heart,
+.dada-era5-shield {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(190, 245, 255, 0.18);
+}
+.dada-era5-heart.filled {
+  color: #ff8fa6;
+  box-shadow: 0 0 18px rgba(255, 95, 140, 0.18);
+}
+.dada-era5-heart.empty,
+.dada-era5-shield.empty {
+  color: rgba(207, 236, 244, 0.38);
+}
+.dada-era5-shield.filled {
+  color: #86f4ff;
+  box-shadow: 0 0 18px rgba(104, 233, 255, 0.18);
+}
+.dada-era5-oxygen,
+.dada-era5-weapon-track {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(188, 245, 255, 0.16);
+}
+.dada-era5-oxygen-fill,
+.dada-era5-weapon-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.12s ease;
+}
+.dada-era5-oxygen-fill {
+  background: linear-gradient(90deg, #69d3ff, #86fff2);
+}
+.dada-era5-weapon-fill {
+  background: linear-gradient(90deg, #a26eff, #ff95df);
+}
+.dada-era5-meter-copy,
+.dada-era5-weapon-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 5px;
+  font-size: 12px;
+  color: rgba(227, 247, 255, 0.88);
+}
+.dada-era5-hint {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(204, 248, 255, 0.84);
+  text-align: right;
+}
+.dada-era5-inventory {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 1300;
+}
+.dada-era5-inventory.open {
+  display: flex;
+}
+.dada-era5-sheet {
+  margin: auto;
+  width: min(1100px, 94vw);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(138, 233, 255, 0.28);
+  background:
+    linear-gradient(155deg, rgba(6, 18, 34, 0.96), rgba(3, 10, 22, 0.94));
+  color: #e7fbff;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(180, 245, 255, 0.09);
+  padding: 24px;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+.dada-era5-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.dada-era5-sheet-title {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  color: #8cf0ff;
+}
+.dada-era5-sheet-sub {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: rgba(212, 245, 255, 0.7);
+}
+.dada-era5-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+}
+.dada-era5-card {
+  border-radius: 18px;
+  border: 1px solid rgba(136, 233, 255, 0.18);
+  background: rgba(12, 28, 44, 0.7);
+  padding: 16px;
+}
+.dada-era5-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(197, 243, 255, 0.82);
+  margin-bottom: 12px;
+}
+.dada-era5-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.dada-era5-slot {
+  border-radius: 14px;
+  border: 1px solid rgba(122, 219, 246, 0.16);
+  background: rgba(7, 18, 31, 0.88);
+  padding: 10px;
+}
+.dada-era5-slot-name {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(172, 229, 242, 0.64);
+}
+.dada-era5-slot-item {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.dada-era5-slot-empty {
+  color: rgba(194, 235, 244, 0.44);
+}
+.dada-era5-slot-action,
+.dada-era5-item-action,
+.dada-era5-close {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #3db1e0, #1c7dbb);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.dada-era5-close {
+  margin-top: 0;
+}
+.dada-era5-item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+.dada-era5-item {
+  border-radius: 16px;
+  border: 1px solid rgba(133, 229, 255, 0.16);
+  background: rgba(8, 18, 32, 0.9);
+  padding: 12px;
+}
+.dada-era5-item.rarity-starter {
+  box-shadow: inset 0 0 0 1px rgba(141, 235, 255, 0.12);
+}
+.dada-era5-item-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f0fbff;
+}
+.dada-era5-item-meta,
+.dada-era5-item-stats,
+.dada-era5-stats {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(210, 242, 250, 0.78);
+}
+.dada-era5-item-equipped {
+  color: #8cf0ff;
+  font-weight: 800;
+}
+.dada-era5-teaser {
+  position: absolute;
+  inset: 0;
+  display: none;
+  z-index: 1400;
+}
+.dada-era5-teaser.visible {
+  display: flex;
+}
+.dada-era5-teaser-card {
+  margin: auto;
+  width: min(760px, 92vw);
+  border-radius: 24px;
+  border: 1px solid rgba(136, 233, 255, 0.34);
+  background:
+    radial-gradient(circle at top, rgba(24, 57, 96, 0.96), rgba(6, 18, 34, 0.94));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48), 0 0 42px rgba(95, 219, 255, 0.14);
+  padding: 28px 24px 22px;
+  text-align: center;
+  color: #ebfbff;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+.dada-era5-teaser-title {
+  font-size: clamp(30px, 5vw, 60px);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #97f2ff;
+}
+.dada-era5-teaser-sub {
+  margin-top: 10px;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  color: rgba(224, 247, 255, 0.82);
+}
+.dada-era5-icon-row {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.dada-era5-icon {
+  border-radius: 16px;
+  border: 1px solid rgba(145, 234, 255, 0.2);
+  background: rgba(8, 24, 40, 0.78);
+  padding: 16px 10px;
+}
+.dada-era5-icon-glyph {
+  font-size: 20px;
+  font-weight: 900;
+  color: #97f2ff;
+}
+.dada-era5-icon-label {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
 `;
 
 export function createUI(uiRoot, options = {}) {
@@ -656,17 +951,25 @@ export function createUI(uiRoot, options = {}) {
   // Detect current level from URL (mutable — updated when user clicks level buttons)
   const levelParam = new URLSearchParams(window.location.search).get('level');
   const requestedLevel = Number.parseInt(levelParam || '1', 10);
-  let _selectedLevel = [1, 2, 3, 4, 5].includes(requestedLevel) ? requestedLevel : 1;
+  let _selectedLevel = [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(requestedLevel) ? requestedLevel : 1;
   let lockedLevels = {
     1: false,
     2: false,
     3: false,
     4: true,
     5: true,
+    6: true,
+    7: true,
+    8: true,
+    9: true,
   };
   let lockMessages = {
     4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
     5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
+    6: 'Locked. Beat Neon Night Aquarium (Level 5) to unlock. Coming soon.',
+    7: 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock. Coming soon.',
+    8: 'Locked. Beat Stormy Kite Park (Level 7) to unlock. Coming soon.',
+    9: 'Locked. Beat Haunted Library (Level 8) to unlock. Coming soon.',
   };
 
   // Title overlay
@@ -688,6 +991,12 @@ export function createUI(uiRoot, options = {}) {
         <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
         <button class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="levelBtn4" tabindex="-1">Level 4</button>
         <button class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="levelBtn5" tabindex="-1">Level 5</button>
+      </div>
+      <div class="dada-level-row">
+        <button class="dada-level-btn${_selectedLevel === 6 ? ' active' : ''}" id="levelBtn6" tabindex="-1">Level 6</button>
+        <button class="dada-level-btn${_selectedLevel === 7 ? ' active' : ''}" id="levelBtn7" tabindex="-1">Level 7</button>
+        <button class="dada-level-btn${_selectedLevel === 8 ? ' active' : ''}" id="levelBtn8" tabindex="-1">Level 8</button>
+        <button class="dada-level-btn${_selectedLevel === 9 ? ' active' : ''}" id="levelBtn9" tabindex="-1">Level 9</button>
       </div>
       <div class="dada-level-lock" id="titleLevelLock"></div>
       <div class="dada-loading-wrap" id="titleLoadingWrap">
@@ -715,12 +1024,20 @@ export function createUI(uiRoot, options = {}) {
   const btn3 = titleEl.querySelector('#levelBtn3');
   const btn4 = titleEl.querySelector('#levelBtn4');
   const btn5 = titleEl.querySelector('#levelBtn5');
+  const btn6 = titleEl.querySelector('#levelBtn6');
+  const btn7 = titleEl.querySelector('#levelBtn7');
+  const btn8 = titleEl.querySelector('#levelBtn8');
+  const btn9 = titleEl.querySelector('#levelBtn9');
   let titleErrorVisible = false;
   let menuBtn1 = null;
   let menuBtn2 = null;
   let menuBtn3 = null;
   let menuBtn4 = null;
   let menuBtn5 = null;
+  let menuBtn6 = null;
+  let menuBtn7 = null;
+  let menuBtn8 = null;
+  let menuBtn9 = null;
   let menuSubEl = null;
   let menuLockEl = null;
   let gameplayRestartHandler = null;
@@ -729,6 +1046,14 @@ export function createUI(uiRoot, options = {}) {
   function getLevelSubtitle(id) {
     return id === 5
       ? 'Level 5 — Neon Night Aquarium'
+      : id === 9
+      ? 'Level 9 — ???'
+      : id === 8
+      ? 'Level 8 — Haunted Library'
+      : id === 7
+      ? 'Level 7 — Stormy Kite Park'
+      : id === 6
+      ? 'Level 6 — Clockwork Toy Factory'
       : id === 4
       ? 'Level 4 — Super Sourdough'
       : id === 3
@@ -765,6 +1090,10 @@ export function createUI(uiRoot, options = {}) {
     menuBtn3?.classList.toggle('active', levelId === 3);
     menuBtn4?.classList.toggle('active', levelId === 4);
     menuBtn5?.classList.toggle('active', levelId === 5);
+    menuBtn6?.classList.toggle('active', levelId === 6);
+    menuBtn7?.classList.toggle('active', levelId === 7);
+    menuBtn8?.classList.toggle('active', levelId === 8);
+    menuBtn9?.classList.toggle('active', levelId === 9);
   }
 
   function applyLockState(button, locked) {
@@ -779,11 +1108,19 @@ export function createUI(uiRoot, options = {}) {
     applyLockState(btn3, lockedLevels[3]);
     applyLockState(btn4, lockedLevels[4]);
     applyLockState(btn5, lockedLevels[5]);
+    applyLockState(btn6, lockedLevels[6]);
+    applyLockState(btn7, lockedLevels[7]);
+    applyLockState(btn8, lockedLevels[8]);
+    applyLockState(btn9, lockedLevels[9]);
     applyLockState(menuBtn1, lockedLevels[1]);
     applyLockState(menuBtn2, lockedLevels[2]);
     applyLockState(menuBtn3, lockedLevels[3]);
     applyLockState(menuBtn4, lockedLevels[4]);
     applyLockState(menuBtn5, lockedLevels[5]);
+    applyLockState(menuBtn6, lockedLevels[6]);
+    applyLockState(menuBtn7, lockedLevels[7]);
+    applyLockState(menuBtn8, lockedLevels[8]);
+    applyLockState(menuBtn9, lockedLevels[9]);
     resetTitleCopy();
     updateMenuCopy(_selectedLevel);
   }
@@ -803,9 +1140,15 @@ export function createUI(uiRoot, options = {}) {
     btn3.classList.toggle('active', id === 3);
     btn4.classList.toggle('active', id === 4);
     btn5.classList.toggle('active', id === 5);
+    btn6.classList.toggle('active', id === 6);
+    btn7.classList.toggle('active', id === 7);
+    btn8.classList.toggle('active', id === 8);
+    btn9.classList.toggle('active', id === 9);
     resetTitleCopy();
-    const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
-    history.replaceState(null, '', url);
+    if (id <= 5) {
+      const url = id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`;
+      history.replaceState(null, '', url);
+    }
     updateMenuCopy(id);
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
   }
@@ -818,6 +1161,10 @@ export function createUI(uiRoot, options = {}) {
   btn3?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(3); });
   btn4?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(4); });
   btn5?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(5); });
+  btn6?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(6); });
+  btn7?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(7); });
+  btn8?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(8); });
+  btn9?.addEventListener('click', (ev) => { ev.preventDefault(); ev.stopPropagation(); ev.currentTarget.blur(); selectLevel(9); });
 
   const menuEl = document.createElement('div');
   menuEl.className = 'dada-overlay dada-menu-bg hidden';
@@ -836,6 +1183,12 @@ export function createUI(uiRoot, options = {}) {
         <a class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="menuLevelBtn3" href="${window.location.pathname}?level=3">Level 3</a>
         <a class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="menuLevelBtn4" href="${window.location.pathname}?level=4">Level 4</a>
         <a class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="menuLevelBtn5" href="${window.location.pathname}?level=5">Level 5</a>
+      </div>
+      <div class="dada-level-row">
+        <a class="dada-level-btn${_selectedLevel === 6 ? ' active' : ''}" id="menuLevelBtn6" href="${window.location.pathname}?level=6">Level 6</a>
+        <a class="dada-level-btn${_selectedLevel === 7 ? ' active' : ''}" id="menuLevelBtn7" href="${window.location.pathname}?level=7">Level 7</a>
+        <a class="dada-level-btn${_selectedLevel === 8 ? ' active' : ''}" id="menuLevelBtn8" href="${window.location.pathname}?level=8">Level 8</a>
+        <a class="dada-level-btn${_selectedLevel === 9 ? ' active' : ''}" id="menuLevelBtn9" href="${window.location.pathname}?level=9">Level 9</a>
       </div>
       <div class="dada-level-lock" id="menuLevelLock"></div>
       <div class="dada-btn-row dada-menu-actions">
@@ -862,6 +1215,10 @@ export function createUI(uiRoot, options = {}) {
   menuBtn3 = menuEl.querySelector('#menuLevelBtn3');
   menuBtn4 = menuEl.querySelector('#menuLevelBtn4');
   menuBtn5 = menuEl.querySelector('#menuLevelBtn5');
+  menuBtn6 = menuEl.querySelector('#menuLevelBtn6');
+  menuBtn7 = menuEl.querySelector('#menuLevelBtn7');
+  menuBtn8 = menuEl.querySelector('#menuLevelBtn8');
+  menuBtn9 = menuEl.querySelector('#menuLevelBtn9');
   menuLockEl = menuEl.querySelector('#menuLevelLock');
   const menuResumeBtn = menuEl.querySelector('#menuResumeBtn');
   const menuRestartBtn = menuEl.querySelector('#menuRestartBtn');
@@ -897,6 +1254,34 @@ export function createUI(uiRoot, options = {}) {
     ev.currentTarget.blur();
     if (lockedLevels[5]) return;
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(5);
+  });
+  menuBtn6?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[6]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(6);
+  });
+  menuBtn7?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[7]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(7);
+  });
+  menuBtn8?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[8]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(8);
+  });
+  menuBtn9?.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.blur();
+    if (lockedLevels[9]) return;
+    if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(9);
   });
   menuResumeBtn?.addEventListener('click', (ev) => {
     ev.preventDefault();
@@ -1037,8 +1422,139 @@ export function createUI(uiRoot, options = {}) {
   const bannerTitleEl = bannerEl.querySelector('#bannerTitle');
   const bannerSubEl = bannerEl.querySelector('#bannerSub');
 
+  const era5HudEl = document.createElement('div');
+  era5HudEl.className = 'dada-era5-hud';
+  era5HudEl.innerHTML = `
+    <div class="dada-era5-panel" data-era5-hud>
+      <div class="dada-era5-row">
+        <div class="dada-era5-block">
+          <div class="dada-era5-label">HP</div>
+          <div class="dada-era5-hearts" data-era5-hearts></div>
+        </div>
+        <div class="dada-era5-block">
+          <div class="dada-era5-label">Shield</div>
+          <div class="dada-era5-shields" data-era5-shields></div>
+        </div>
+      </div>
+      <div class="dada-era5-row">
+        <div class="dada-era5-block">
+          <div class="dada-era5-label">Oxygen</div>
+          <div class="dada-era5-oxygen" data-era5-oxygen><div class="dada-era5-oxygen-fill" data-era5-oxygen-fill></div></div>
+          <div class="dada-era5-meter-copy"><span data-era5-tool-label>Scuba Tank</span><span data-era5-oxygen-copy>0 / 0</span></div>
+        </div>
+      </div>
+      <div class="dada-era5-row">
+        <div class="dada-era5-block">
+          <div class="dada-era5-label">Weapon</div>
+          <div class="dada-era5-weapon-track" data-era5-weapon><div class="dada-era5-weapon-fill" data-era5-weapon-fill></div></div>
+          <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
+        </div>
+        <div class="dada-era5-hint" data-era5-hint>I Inventory</div>
+      </div>
+    </div>
+  `;
+  uiRoot.appendChild(era5HudEl);
+  const era5HeartsEl = era5HudEl.querySelector('[data-era5-hearts]');
+  const era5ShieldsEl = era5HudEl.querySelector('[data-era5-shields]');
+  const era5OxygenFillEl = era5HudEl.querySelector('[data-era5-oxygen-fill]');
+  const era5OxygenCopyEl = era5HudEl.querySelector('[data-era5-oxygen-copy]');
+  const era5ToolLabelEl = era5HudEl.querySelector('[data-era5-tool-label]');
+  const era5WeaponFillEl = era5HudEl.querySelector('[data-era5-weapon-fill]');
+  const era5WeaponLabelEl = era5HudEl.querySelector('[data-era5-weapon-label]');
+  const era5WeaponCopyEl = era5HudEl.querySelector('[data-era5-weapon-copy]');
+  const era5HintEl = era5HudEl.querySelector('[data-era5-hint]');
+
+  const era5InventoryEl = document.createElement('div');
+  era5InventoryEl.className = 'dada-era5-inventory';
+  era5InventoryEl.innerHTML = `
+    <div class="dada-era5-sheet" data-era5-inventory>
+      <div class="dada-era5-sheet-head">
+        <div>
+          <div class="dada-era5-sheet-title">Inventory</div>
+          <div class="dada-era5-sheet-sub">Equip gear for Era 5 runs.</div>
+        </div>
+        <button class="dada-era5-close" data-era5-close>Close</button>
+      </div>
+      <div class="dada-era5-grid">
+        <div class="dada-era5-card">
+          <div class="dada-era5-section-title">Equipment</div>
+          <div class="dada-era5-slots" data-era5-slots></div>
+          <div class="dada-era5-section-title" style="margin-top:16px">Derived Stats</div>
+          <div class="dada-era5-stats" data-era5-stats></div>
+        </div>
+        <div class="dada-era5-card">
+          <div class="dada-era5-section-title">Items</div>
+          <div class="dada-era5-item-grid" data-era5-items></div>
+        </div>
+      </div>
+    </div>
+  `;
+  uiRoot.appendChild(era5InventoryEl);
+  const era5SlotsEl = era5InventoryEl.querySelector('[data-era5-slots]');
+  const era5ItemsEl = era5InventoryEl.querySelector('[data-era5-items]');
+  const era5StatsEl = era5InventoryEl.querySelector('[data-era5-stats]');
+
+  const era5TeaserEl = document.createElement('div');
+  era5TeaserEl.className = 'dada-era5-teaser';
+  era5TeaserEl.innerHTML = `
+    <div class="dada-era5-teaser-card" data-era5-teaser>
+      <div class="dada-era5-teaser-title">NEW ERA UNLOCKED</div>
+      <div class="dada-era5-teaser-sub">Vehicles, Inventory, Gear, Shields, Tools</div>
+      <div class="dada-era5-icon-row">
+        <div class="dada-era5-icon"><div class="dada-era5-icon-glyph">V</div><div class="dada-era5-icon-label">Vehicles</div></div>
+        <div class="dada-era5-icon"><div class="dada-era5-icon-glyph">I</div><div class="dada-era5-icon-label">Inventory</div></div>
+        <div class="dada-era5-icon"><div class="dada-era5-icon-glyph">G</div><div class="dada-era5-icon-label">Gear</div></div>
+        <div class="dada-era5-icon"><div class="dada-era5-icon-glyph">S</div><div class="dada-era5-icon-label">Shields</div></div>
+        <div class="dada-era5-icon"><div class="dada-era5-icon-glyph">T</div><div class="dada-era5-icon-label">Tools</div></div>
+      </div>
+      <div class="dada-era5-teaser-sub" style="margin-top:18px">COMING SOON</div>
+      <button class="dada-era5-close" data-era5-teaser-close style="margin-top:18px">Close</button>
+    </div>
+  `;
+  uiRoot.appendChild(era5TeaserEl);
+
   let boostCardTimer1 = null, boostCardTimer2 = null;
   let bannerTimer = null;
+  let era5TeaserTimer = null;
+  let era5EquipHandler = null;
+  let era5UnequipHandler = null;
+  let era5InventoryCloseHandler = null;
+  let era5InventoryState = {
+    slots: [],
+    items: [],
+    statsLines: [],
+  };
+
+  function renderPips(targetEl, count, maxCount, filledClass, filledText) {
+    if (!targetEl) return;
+    targetEl.innerHTML = '';
+    for (let i = 0; i < maxCount; i++) {
+      const pip = document.createElement('span');
+      pip.className = `${filledClass} ${i < count ? 'filled' : 'empty'}`;
+      pip.textContent = filledText;
+      targetEl.appendChild(pip);
+    }
+  }
+
+  function renderEra5Inventory() {
+    if (!era5SlotsEl || !era5ItemsEl || !era5StatsEl) return;
+    era5SlotsEl.innerHTML = era5InventoryState.slots.map((slot) => `
+      <div class="dada-era5-slot">
+        <div class="dada-era5-slot-name">${slot.label}</div>
+        <div class="dada-era5-slot-item${slot.itemName ? '' : ' dada-era5-slot-empty'}">${slot.itemName || 'Empty'}</div>
+        ${slot.instanceId ? `<button class="dada-era5-slot-action" data-era5-unequip="${slot.slotId}">Unequip</button>` : ''}
+      </div>
+    `).join('');
+    era5ItemsEl.innerHTML = era5InventoryState.items.map((item) => `
+      <div class="dada-era5-item rarity-${item.rarity || 'common'}">
+        <div class="dada-era5-item-name">${item.name}</div>
+        <div class="dada-era5-item-meta">${item.slotLabel || item.slot || item.type || ''}</div>
+        <div class="dada-era5-item-stats">${item.statsText || ''}</div>
+        ${item.equipped ? '<div class="dada-era5-item-equipped">Equipped</div>' : `<button class="dada-era5-item-action" data-era5-equip="${item.instanceId}">Equip</button>`}
+      </div>
+    `).join('');
+    era5StatsEl.innerHTML = era5InventoryState.statsLines.join('<br>');
+  }
 
   const canvasEl = document.getElementById('renderCanvas');
 
@@ -1047,6 +1563,39 @@ export function createUI(uiRoot, options = {}) {
     canvasEl.style.pointerEvents = enabled ? 'auto' : 'none';
   }
   setCanvasInputEnabled(true);
+
+  era5InventoryEl.addEventListener('click', (ev) => {
+    const closeBtn = ev.target.closest('[data-era5-close]');
+    if (closeBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof era5InventoryCloseHandler === 'function') era5InventoryCloseHandler();
+      return;
+    }
+    const equipBtn = ev.target.closest('[data-era5-equip]');
+    if (equipBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      era5EquipHandler?.(equipBtn.getAttribute('data-era5-equip'));
+      return;
+    }
+    const unequipBtn = ev.target.closest('[data-era5-unequip]');
+    if (unequipBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      era5UnequipHandler?.(unequipBtn.getAttribute('data-era5-unequip'));
+    }
+  });
+  era5TeaserEl.addEventListener('click', (ev) => {
+    if (!ev.target.closest('[data-era5-teaser-close]')) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (era5TeaserTimer) clearTimeout(era5TeaserTimer);
+    era5TeaserEl.classList.remove('visible');
+    if (endEl.classList.contains('hidden') && menuEl.classList.contains('hidden') && !era5InventoryEl.classList.contains('open')) {
+      setCanvasInputEnabled(true);
+    }
+  });
 
   let playAgainHandler = null;
   const playAgainBtn = endEl.querySelector('#playAgainBtn');
@@ -1284,13 +1833,14 @@ export function createUI(uiRoot, options = {}) {
     // ── Gameplay HUD methods ─────────────────────────────────────
 
     /** Show gameplay HUD elements (coin counter, objective, control hints). */
-    showGameplayHud(total) {
+    showGameplayHud(total, { era5 = false } = {}) {
       coinTotal = total;
       setCoinCount(0);
       coinsEl.style.display = 'block';
       objectiveEl.style.display = 'block';
-      buffEl.style.display = 'block';
-      abilityEl.style.display = 'none';
+      buffEl.style.display = era5 ? 'none' : 'block';
+      abilityEl.style.display = era5 ? 'none' : 'none';
+      era5HudEl.style.display = era5 ? 'block' : 'none';
       // Show control hints; auto-fade after 5 s
       if (!ctrlHintFaded) {
         ctrlHintEl.style.display = 'block';
@@ -1306,6 +1856,8 @@ export function createUI(uiRoot, options = {}) {
       buffEl.style.display = 'none';
       abilityEl.style.display = 'none';
       ctrlHintEl.style.display = 'none';
+      era5HudEl.style.display = 'none';
+      era5InventoryEl.classList.remove('open');
     },
 
     /** Update coin counter; provide collected count. */
@@ -1414,6 +1966,86 @@ export function createUI(uiRoot, options = {}) {
       abilityFill.style.width = `${pct}%`;
       abilityState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
     },
+    showEra5Hud() {
+      era5HudEl.style.display = 'block';
+    },
+    hideEra5Hud() {
+      era5HudEl.style.display = 'none';
+    },
+    updateEra5Hud({
+      hp = 3,
+      hpMax = 3,
+      shield = 1,
+      shieldMax = 1,
+      oxygen = 0,
+      oxygenMax = 0,
+      toolLabel = 'Scuba Tank',
+      weaponLabel = 'Bubble Wand',
+      weaponCooldownMs = 0,
+      weaponCooldownMaxMs = 350,
+      inventoryHint = 'I Inventory',
+    } = {}) {
+      era5HudEl.style.display = 'block';
+      renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
+      renderPips(era5ShieldsEl, shield, shieldMax, 'dada-era5-shield', '◈');
+      const oxygenPct = oxygenMax > 0 ? Math.max(0, Math.min(100, (oxygen / oxygenMax) * 100)) : 0;
+      era5OxygenFillEl.style.width = `${oxygenPct}%`;
+      era5OxygenCopyEl.textContent = oxygenMax > 0
+        ? `${oxygen.toFixed(1)} / ${oxygenMax.toFixed(1)}s`
+        : 'No tool equipped';
+      era5ToolLabelEl.textContent = toolLabel;
+      const weaponPct = weaponCooldownMaxMs > 0
+        ? Math.max(0, Math.min(100, 100 - ((weaponCooldownMs / weaponCooldownMaxMs) * 100)))
+        : 100;
+      era5WeaponFillEl.style.width = `${weaponPct}%`;
+      era5WeaponLabelEl.textContent = weaponLabel;
+      era5WeaponCopyEl.textContent = weaponCooldownMs > 0
+        ? `${(weaponCooldownMs / 1000).toFixed(2)}s`
+        : 'READY';
+      era5HintEl.textContent = inventoryHint;
+    },
+    setEra5InventoryHandlers({
+      onEquip = null,
+      onUnequip = null,
+      onClose = null,
+    } = {}) {
+      era5EquipHandler = onEquip;
+      era5UnequipHandler = onUnequip;
+      era5InventoryCloseHandler = onClose;
+    },
+    setEra5InventoryData({
+      slots = [],
+      items = [],
+      statsLines = [],
+    } = {}) {
+      era5InventoryState = { slots, items, statsLines };
+      renderEra5Inventory();
+    },
+    showEra5Inventory() {
+      era5InventoryEl.classList.add('open');
+      setCanvasInputEnabled(false);
+      renderEra5Inventory();
+    },
+    hideEra5Inventory() {
+      era5InventoryEl.classList.remove('open');
+      if (endEl.classList.contains('hidden') && menuEl.classList.contains('hidden') && !era5TeaserEl.classList.contains('visible')) {
+        setCanvasInputEnabled(true);
+      }
+    },
+    isEra5InventoryVisible() {
+      return era5InventoryEl.classList.contains('open');
+    },
+    showEra5Teaser(durationMs = 3200) {
+      if (era5TeaserTimer) clearTimeout(era5TeaserTimer);
+      era5TeaserEl.classList.add('visible');
+      setCanvasInputEnabled(false);
+      era5TeaserTimer = setTimeout(() => {
+        era5TeaserEl.classList.remove('visible');
+        if (endEl.classList.contains('hidden') && menuEl.classList.contains('hidden') && !era5InventoryEl.classList.contains('open')) {
+          setCanvasInputEnabled(true);
+        }
+      }, durationMs);
+    },
 
     /** Reset all gameplay HUD to initial state for restart. */
     resetGameplayHud() {
@@ -1423,6 +2055,9 @@ export function createUI(uiRoot, options = {}) {
       this.updateCapeBuff({ unlocked: false, active: false, remainingMs: 0, used: false });
       this.updateBubbleShieldBuff({ unlocked: false, used: false });
       this.updateFlourPuff({ visible: false, remainingMs: 0, totalMs: 6000 });
+      this.hideEra5Hud();
+      this.hideEra5Inventory();
+      this.setEra5InventoryData({ slots: [], items: [], statsLines: [] });
     },
     showBanner,
     showToast,

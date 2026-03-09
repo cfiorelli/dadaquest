@@ -28,6 +28,7 @@ import { LEVEL2 } from './world/level2.js';
 import { LEVEL3 } from './world/level3.js';
 import { LEVEL4 } from './world/level4.js';
 import { LEVEL5 } from './world/level5.js';
+import { deriveEra5Stats, getItemDef, getItemSlots } from '../game/items/items.js';
 import {
   clearProgress,
   ensureProgressTotals,
@@ -50,10 +51,13 @@ const GOAL_CELEBRATION_SEC = 0.96;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
+const ERA5_CAMERA_DISTANCE = 6.6;
+const ERA5_CAMERA_HEIGHT = 3.8;
 const LOADING_INTENT_KEY = 'dadaquest:loading-intent';
 const CAPE_FLOAT_DURATION_MS = 4000;
 const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
 const BUBBLE_SHIELD_GRACE_MS = 900;
+const PLAYABLE_LEVEL_IDS = new Set([1, 2, 3, 4, 5]);
 
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
@@ -881,19 +885,104 @@ export async function boot(options = {}) {
     4: getLevelCollectibleTotal(LEVEL4),
     5: getLevelCollectibleTotal(LEVEL5),
   };
+  const isEra5Level = levelId >= 5;
+  const getLockedMessage = (targetLevelId, state = progression) => {
+    if (targetLevelId === 4) {
+      return 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.';
+    }
+    if (targetLevelId === 5) {
+      return 'Locked. Beat Super Sourdough (Level 4) to unlock.';
+    }
+    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
+      const previousTitle = targetLevelId === 6
+        ? 'Neon Night Aquarium (Level 5)'
+        : targetLevelId === 7
+          ? 'Clockwork Toy Factory (Level 6)'
+          : targetLevelId === 8
+            ? 'Stormy Kite Park (Level 7)'
+            : 'Haunted Library (Level 8)';
+      if (isLevelUnlocked(state, targetLevelId)) {
+        return 'Coming soon. This level is not playable yet.';
+      }
+      return `Locked. Beat ${previousTitle} to unlock. Coming soon.`;
+    }
+    return `Level ${targetLevelId} is locked.`;
+  };
   let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
   const syncProgressState = (nextProgress) => {
     progression = ensureProgressTotals(nextProgress, levelTotals);
     ui.setLockedLevels({
       4: !isLevelUnlocked(progression, 4),
       5: !isLevelUnlocked(progression, 5),
+      6: true,
+      7: true,
+      8: true,
+      9: true,
     }, {
-      4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
-      5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
+      4: getLockedMessage(4, progression),
+      5: getLockedMessage(5, progression),
+      6: getLockedMessage(6, progression),
+      7: getLockedMessage(7, progression),
+      8: getLockedMessage(8, progression),
+      9: getLockedMessage(9, progression),
     });
     window.__DADA_DEBUG__.progressState = progression;
   };
   syncProgressState(progression);
+  const formatSlotLabel = (slotId) => slotId
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (char) => char.toUpperCase());
+  const cloneEra5State = (source = progression.era5) => ({
+    unlocked: !!source?.unlocked,
+    currency: Number.isFinite(source?.currency) ? source.currency : 0,
+    inventory: Array.isArray(source?.inventory) ? source.inventory.map((item) => ({ ...item })) : [],
+    equipped: { ...(source?.equipped || {}) },
+    stats: { ...(source?.stats || {}) },
+  });
+  let era5State = cloneEra5State(progression.era5);
+  const buildEra5InventoryUiState = () => {
+    const slots = getItemSlots().map((slotId) => {
+      const instanceId = era5State.equipped?.[slotId] || null;
+      const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
+      const def = getItemDef(instance?.defId);
+      return {
+        slotId,
+        label: formatSlotLabel(slotId),
+        instanceId,
+        itemName: def?.name || '',
+      };
+    });
+    const items = era5State.inventory.map((instance) => {
+      const def = getItemDef(instance.defId);
+      const statsText = Object.entries(def?.stats || {})
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(' · ');
+      return {
+        instanceId: instance.instanceId,
+        name: def?.name || instance.defId,
+        slot: def?.slot || '',
+        slotLabel: formatSlotLabel(def?.slot || 'item'),
+        rarity: def?.rarity || 'common',
+        type: def?.type || 'item',
+        statsText,
+        equipped: Object.values(era5State.equipped || {}).includes(instance.instanceId),
+      };
+    });
+    const stats = era5State.stats || {};
+    const statsLines = [
+      `HP ${stats.hpMax ?? 3} · Shield ${stats.shieldMax ?? 1}`,
+      `Oxygen ${stats.oxygenMax ?? 0}s · Refill ${(stats.oxygenRefillRate ?? 0).toFixed(1)}/s`,
+      `Move x${(stats.moveSpeed ?? 1).toFixed(2)} · Water x${(stats.waterMoveSpeed ?? 1).toFixed(2)}`,
+      `Weapon cooldown ${(stats.weaponCooldown ?? 0.35).toFixed(2)}s · Stun ${(stats.weaponStunSec ?? 1.5).toFixed(1)}s`,
+    ];
+    return { slots, items, statsLines };
+  };
+  const syncEra5RuntimeState = () => {
+    era5State = cloneEra5State(progression.era5);
+    ui.setEra5InventoryData(buildEra5InventoryUiState());
+    window.__DADA_DEBUG__.era5 = era5State;
+  };
+  syncEra5RuntimeState();
   const loadingIntent = !shotMode ? readLoadingIntent() : null;
   const autoStartFromQuery = !shotMode && hasAutoStartQuery();
   const autoStartAfterLoad = (!!loadingIntent && loadingIntent.levelId === levelId) || autoStartFromQuery;
@@ -1100,6 +1189,7 @@ export async function boot(options = {}) {
     animationsEnabled,
   });
   player.setColliders(world.platforms);
+  player.setMovementMode(isEra5Level ? 'free' : 'lane');
   // Register player child meshes as shadow casters (mesh is now a TransformNode)
   for (const m of player._meshes) {
     world.shadowGen.addShadowCaster(m);
@@ -2114,12 +2204,36 @@ export async function boot(options = {}) {
       });
     }
   }
+  const era5DecorOcclusionState = new Map();
+  if (isEra5Level) {
+    for (const mesh of scene.meshes) {
+      if (!(mesh instanceof BABYLON.Mesh)) continue;
+      if (!mesh.metadata?.decor || mesh.metadata?.gameplaySurface) continue;
+      const material = mesh.material;
+      if (!material) continue;
+      prepareFadeMaterial(material);
+      era5DecorOcclusionState.set(mesh.uniqueId, {
+        mesh,
+        baseAlpha: material._dadaBaseAlpha ?? material.alpha ?? 1,
+        current: 1,
+        target: 1,
+      });
+    }
+  }
 
   // Camera — fixed angle, smooth follow
-  const cameraStartPos = levelId === 2
+  const cameraStartPos = isEra5Level
+    ? new BABYLON.Vector3(
+      (spawnPoint.x || -12) - ERA5_CAMERA_DISTANCE,
+      (spawnPoint.y || 2) + ERA5_CAMERA_HEIGHT,
+      spawnPoint.z || 0,
+    )
+    : levelId === 2
     ? new BABYLON.Vector3((spawnPoint.x || -12) - 10.0, (spawnPoint.y || 2) + 10.0, -18.0)
     : new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
-  const cameraStartTarget = levelId === 2
+  const cameraStartTarget = isEra5Level
+    ? new BABYLON.Vector3((spawnPoint.x || -12) + 0.8, (spawnPoint.y || 2) + 1.3, spawnPoint.z || 0)
+    : levelId === 2
     ? new BABYLON.Vector3((spawnPoint.x || -12), (spawnPoint.y || 2) + 1.0, 0)
     : new BABYLON.Vector3(-12, 2, 0);
   const camera = new BABYLON.FreeCamera('cam', cameraStartPos.clone(), scene);
@@ -2136,6 +2250,9 @@ export async function boot(options = {}) {
   const cameraIgnoredMeshes = new Set([player.blobShadow]);
   const useLevel2CameraOcclusionGuard = levelId === 2;
   const useGenericCameraOcclusionGuard = levelId === 3;
+  const useEra5DecorOcclusion = isEra5Level;
+  let era5CameraYaw = 0;
+  let era5CameraDesiredYaw = 0;
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
 
@@ -2184,6 +2301,13 @@ export async function boot(options = {}) {
   let bubbleShieldUsedThisRun = false;
   let bubbleShieldGraceMs = 0;
   let flourPuffCooldownMs = 0;
+  let era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
+  let era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
+  let era5Oxygen = Math.max(0, era5State.stats.oxygenMax ?? 0);
+  let era5OxygenDamageTimer = 0;
+  let era5WeaponCooldownMs = 0;
+  let era5InventoryOpen = false;
+  let era5Projectiles = [];
   let goalCarryStartPos = null;
   let goalCarryEndPos = null;
   let goalCarryStartScale = null;
@@ -2408,6 +2532,32 @@ export async function boot(options = {}) {
     }));
   }
 
+  function updateEra5DecorOcclusion(dt, focusPos, cameraPos) {
+    if (!useEra5DecorOcclusion || !debugFlags.occlusionFade) return;
+    const toCamera = cameraPos.subtract(focusPos);
+    const rayLen = toCamera.length();
+    if (rayLen <= 0.001) return;
+
+    const rayDir = toCamera.scale(1 / rayLen);
+    const ray = new BABYLON.Ray(focusPos, rayDir, rayLen);
+    const activeIds = new Set();
+
+    for (const stateInfo of era5DecorOcclusionState.values()) {
+      const hit = ray.intersectsMesh(stateInfo.mesh, true);
+      if (hit?.hit && hit.distance > 0.0001 && hit.distance < rayLen - 0.2) {
+        activeIds.add(stateInfo.mesh.uniqueId);
+      }
+    }
+
+    for (const stateInfo of era5DecorOcclusionState.values()) {
+      const material = stateInfo.mesh.material;
+      if (!material) continue;
+      stateInfo.target = activeIds.has(stateInfo.mesh.uniqueId) ? 0.14 : 1;
+      stateInfo.current = damp(stateInfo.current, stateInfo.target, 11, dt);
+      material.alpha = stateInfo.baseAlpha * stateInfo.current;
+    }
+  }
+
   function applyCapeVisualState() {
     player.setCapeVisible(!!progression.capeUnlocked && !capeSuppressedThisRun);
   }
@@ -2452,8 +2602,246 @@ export async function boot(options = {}) {
     };
   }
 
+  function restoreEra5Vitals() {
+    era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
+    era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
+    era5Oxygen = Math.max(0, era5State.stats.oxygenMax ?? 0);
+    era5OxygenDamageTimer = 0;
+    era5WeaponCooldownMs = 0;
+  }
+
+  function syncEra5Ui() {
+    if (!isEra5Level) return;
+    const toolInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.tool);
+    const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
+    const toolDef = getItemDef(toolInstance?.defId);
+    const weaponDef = getItemDef(weaponInstance?.defId);
+    ui.updateEra5Hud({
+      hp: era5Hp,
+      hpMax: Math.round(era5State.stats.hpMax ?? 3),
+      shield: era5Shield,
+      shieldMax: Math.round(era5State.stats.shieldMax ?? 1),
+      oxygen: era5Oxygen,
+      oxygenMax: era5State.stats.oxygenMax ?? 0,
+      toolLabel: toolDef?.name || 'No Tool',
+      weaponLabel: weaponDef?.name || 'No Weapon',
+      weaponCooldownMs: era5WeaponCooldownMs,
+      weaponCooldownMaxMs: Math.max(1, (era5State.stats.weaponCooldown ?? 0.35) * 1000),
+      inventoryHint: era5InventoryOpen ? 'I Close' : 'I Inventory',
+    });
+    window.__DADA_DEBUG__.era5Vitals = {
+      hp: era5Hp,
+      shield: era5Shield,
+      oxygen: Number(era5Oxygen.toFixed(2)),
+      oxygenMax: era5State.stats.oxygenMax ?? 0,
+      weaponCooldownMs: Math.round(era5WeaponCooldownMs),
+      inventoryOpen: era5InventoryOpen,
+    };
+  }
+
+  function persistEra5State(nextEra5State) {
+    const updated = {
+      ...progression,
+      era5: {
+        ...nextEra5State,
+        stats: deriveEra5Stats(nextEra5State),
+      },
+    };
+    persistProgressState(updated);
+  }
+
+  function equipEra5Item(instanceId) {
+    const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
+    const def = getItemDef(instance?.defId);
+    if (!instance || !def?.slot) return false;
+    const nextEra5 = cloneEra5State();
+    nextEra5.equipped[def.slot] = instanceId;
+    nextEra5.stats = deriveEra5Stats(nextEra5);
+    persistEra5State(nextEra5);
+    restoreEra5Vitals();
+    syncEra5Ui();
+    return true;
+  }
+
+  function unequipEra5Slot(slotId) {
+    if (!slotId || !era5State.equipped?.[slotId]) return false;
+    const nextEra5 = cloneEra5State();
+    nextEra5.equipped[slotId] = null;
+    nextEra5.stats = deriveEra5Stats(nextEra5);
+    persistEra5State(nextEra5);
+    restoreEra5Vitals();
+    syncEra5Ui();
+    return true;
+  }
+
+  function openEra5Inventory() {
+    if (!isEra5Level || state !== 'gameplay') return false;
+    era5InventoryOpen = true;
+    state = 'inventory';
+    input.consumeAll();
+    ui.showEra5Inventory();
+    syncEra5Ui();
+    return true;
+  }
+
+  function closeEra5Inventory() {
+    if (!isEra5Level || state !== 'inventory') return false;
+    era5InventoryOpen = false;
+    state = 'gameplay';
+    input.consumeAll();
+    ui.hideEra5Inventory();
+    syncEra5Ui();
+    return true;
+  }
+
+  function toggleEra5Inventory() {
+    if (!isEra5Level) return false;
+    if (state === 'inventory') return closeEra5Inventory();
+    return openEra5Inventory();
+  }
+
+  function refillEra5Oxygen(amountSec) {
+    if (!isEra5Level) return;
+    era5Oxygen = Math.min(era5State.stats.oxygenMax ?? 0, era5Oxygen + amountSec);
+    ui.showStatus('Air bubble!', 800);
+    syncEra5Ui();
+  }
+
+  function spawnEra5Projectile(position, direction) {
+    const projectile = BABYLON.MeshBuilder.CreateSphere(`era5Bubble_${performance.now().toFixed(0)}`, {
+      diameter: 0.24,
+      segments: 6,
+    }, scene);
+    projectile.position.copyFrom(position);
+    const mat = new BABYLON.StandardMaterial(`${projectile.name}_mat`, scene);
+    mat.diffuseColor = new BABYLON.Color3(0.76, 0.98, 1.0);
+    mat.emissiveColor = new BABYLON.Color3(0.12, 0.24, 0.30);
+    mat.alpha = 0.58;
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    projectile.material = mat;
+    projectile.metadata = { cameraIgnore: true, decor: true };
+    era5Projectiles.push({
+      mesh: projectile,
+      position: projectile.position,
+      velocity: direction.scale(era5State.stats.weaponProjectileSpeed ?? 11.5),
+      radius: 0.26,
+      lifeMs: Math.max(400, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000),
+      stunMs: Math.max(200, (era5State.stats.weaponStunSec ?? 1.5) * 1000),
+    });
+  }
+
+  function fireEra5Weapon() {
+    if (!isEra5Level || state !== 'gameplay' || era5WeaponCooldownMs > 0) return false;
+    const weaponInstance = era5State.inventory.find((item) => item.instanceId === era5State.equipped?.weaponPrimary);
+    const weaponDef = getItemDef(weaponInstance?.defId);
+    if (!weaponDef || weaponDef.defId !== 'bubble_wand') return false;
+    const forward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
+    const spawnPos = player.mesh.position.add(new BABYLON.Vector3(forward.x * 0.8, 0.7, forward.z * 0.8));
+    spawnEra5Projectile(spawnPos, forward);
+    era5WeaponCooldownMs = Math.max(100, (era5State.stats.weaponCooldown ?? 0.35) * 1000);
+    ui.showStatus('Bubble wand!', 450);
+    syncEra5Ui();
+    return true;
+  }
+
+  function applyEra5Damage(source, hitDirection = { x: 1, z: 0 }, invulnMs = 1000) {
+    if (!isEra5Level || state !== 'gameplay' || respawnState) return false;
+    if (player.isInvulnerable()) return false;
+    const directionX = Number.isFinite(hitDirection?.x) ? hitDirection.x : 1;
+    const directionZ = Number.isFinite(hitDirection?.z) ? hitDirection.z : 0;
+    if (era5Shield > 0) {
+      era5Shield = Math.max(0, era5Shield - 1);
+      player.applyHit({
+        direction: directionX,
+        directionZ,
+        knockback: 3.4,
+        upward: 2.9,
+        invulnMs: 600,
+      });
+      ui.showStatus('Shield hit!', 650);
+    } else {
+      era5Hp = Math.max(0, era5Hp - 1);
+      player.applyHit({
+        direction: directionX,
+        directionZ,
+        knockback: 4.0,
+        upward: 3.4,
+        invulnMs,
+      });
+      ui.showStatus(`${source} hit!`, 650);
+      if (era5Hp <= 0) {
+        restoreEra5Vitals();
+        triggerReset(`${source}_defeat`, directionX >= 0 ? 1 : -1);
+        return true;
+      }
+    }
+    audio.playCue(levelId, 'collision');
+    syncEra5Ui();
+    return true;
+  }
+
+  function updateEra5Projectiles(dt) {
+    if (!isEra5Level || !era5Projectiles.length) return;
+    for (let i = era5Projectiles.length - 1; i >= 0; i--) {
+      const projectile = era5Projectiles[i];
+      projectile.lifeMs = Math.max(0, projectile.lifeMs - (dt * 1000));
+      projectile.mesh.position.addInPlace(projectile.velocity.scale(dt));
+      projectile.mesh.position.y += dt * 0.24;
+      const scale = 0.94 + ((projectile.lifeMs / Math.max(1, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000)) * 0.16);
+      projectile.mesh.scaling.set(scale, scale, scale);
+      const hitResult = world.level5?.tryHitByBubble?.(projectile) ?? { hit: false };
+      if (hitResult.hit) {
+        audio.playCue(levelId, 'nearMiss');
+        ui.showStatus('Jelly stunned!', 600);
+        projectile.mesh.dispose();
+        era5Projectiles.splice(i, 1);
+        continue;
+      }
+      if (projectile.lifeMs <= 0) {
+        projectile.mesh.dispose();
+        era5Projectiles.splice(i, 1);
+      }
+    }
+  }
+
+  function updateEra5Oxygen(dt) {
+    if (!isEra5Level) return;
+    const oxygenMax = Math.max(0, era5State.stats.oxygenMax ?? 0);
+    if (oxygenMax <= 0) {
+      era5Oxygen = 0;
+      era5OxygenDamageTimer = 0;
+      return;
+    }
+    const inDeepWater = !!world.level5?.isInDeepWater?.(player.mesh.position);
+    if (inDeepWater) {
+      const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
+      const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
+      era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
+      if (era5Oxygen <= 0.001) {
+        era5OxygenDamageTimer += dt;
+        const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
+        if (era5OxygenDamageTimer >= interval) {
+          era5OxygenDamageTimer = Math.max(0, era5OxygenDamageTimer - interval);
+          applyEra5Damage('oxygen', { x: 0, z: 0 }, 850);
+        }
+      } else {
+        era5OxygenDamageTimer = 0;
+      }
+      return;
+    }
+    const refillPerSec = Math.max(0, era5State.stats.oxygenRefillRate ?? 0);
+    era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
+    era5OxygenDamageTimer = 0;
+  }
+  ui.setEra5InventoryHandlers({
+    onEquip: (instanceId) => equipEra5Item(instanceId),
+    onUnequip: (slotId) => unequipEra5Slot(slotId),
+    onClose: () => closeEra5Inventory(),
+  });
+
   function persistProgressState(nextState) {
     syncProgressState(nextState);
+    syncEra5RuntimeState();
     saveProgress(progression, levelTotals);
   }
 
@@ -2498,8 +2886,13 @@ export async function boot(options = {}) {
     bubbleShieldUsedThisRun = false;
     bubbleShieldGraceMs = 0;
     flourPuffCooldownMs = 0;
+    era5InventoryOpen = false;
+    era5Projectiles.forEach((projectile) => projectile.mesh?.dispose?.());
+    era5Projectiles = [];
+    restoreEra5Vitals();
     applyCapeVisualState();
     updateBuffHud();
+    syncEra5Ui();
   }
 
   function restoreOnesieOnCheckpointReset() {
@@ -2514,6 +2907,8 @@ export async function boot(options = {}) {
     // Wipe all saved progression so unlocks and sequential level gates reset immediately.
     const cleared = clearProgress(levelTotals);
     syncProgressState(cleared);
+    syncEra5RuntimeState();
+    restoreEra5Vitals();
     applyCapeVisualState();
     // Also reset to spawn point for a fully clean slate
     activeCheckpointIndex = 0;
@@ -2707,8 +3102,9 @@ export async function boot(options = {}) {
   function finishRun() {
     const completionResult = markLevelCompleted(progression, levelId, levelTotals);
     persistProgressState(completionResult.state);
-    if (completionResult.bubbleShieldUnlockedNow && !progression.unlocksShown?.bubbleShield) {
-      maybeShowUnlockBanner('BUBBLE SHIELD UNLOCKED!', 'Absorbs one hazard reset per run before it pops.', 'bubbleShield', 3200);
+    if (completionResult.era5UnlockedNow && !progression.unlocksShown?.era5) {
+      persistProgressState(markUnlockShown(progression, 'era5', levelTotals));
+      ui.showEra5Teaser(3600);
     }
     state = 'end';
     player.setWinAnimationActive(false);
@@ -2727,6 +3123,7 @@ export async function boot(options = {}) {
 
     ui.setFade(0);
     ui.hideGameplayMenu();
+    ui.hideEra5Inventory();
     ui.hideEnd();
     ui.showTitle();
     ui.clearLoading();
@@ -2790,6 +3187,13 @@ export async function boot(options = {}) {
       stateInfo.target = stateInfo.baseVisibility;
       stateInfo.current = stateInfo.baseVisibility;
       stateInfo.mesh.visibility = stateInfo.baseVisibility;
+    }
+    for (const stateInfo of era5DecorOcclusionState.values()) {
+      stateInfo.target = 1;
+      stateInfo.current = 1;
+      if (stateInfo.mesh.material) {
+        stateInfo.mesh.material.alpha = stateInfo.baseAlpha;
+      }
     }
 
     for (const coin of coins) {
@@ -2855,7 +3259,11 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideGameplayMenu();
     ui.hideTitle();
-    ui.showGameplayHud(levelTotals[levelId] ?? coins.length);
+    ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: isEra5Level });
+    if (isEra5Level) {
+      ui.showEra5Hud();
+      syncEra5Ui();
+    }
     applyCapeVisualState();
     updateBuffHud();
     ui.updateTitleDebug({ selectedLevel: levelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
@@ -2885,19 +3293,17 @@ export async function boot(options = {}) {
   }
 
   function getLockedLevelMessage(targetLevelId) {
-    if (targetLevelId === 4) {
-      return 'Collect all binkies in Levels 1–3 to unlock Super Sourdough';
-    }
-    if (targetLevelId === 5) {
-      return 'Locked. Beat Super Sourdough (Level 4) to unlock.';
-    }
-    return `Level ${targetLevelId} is locked`;
+    return getLockedMessage(targetLevelId, progression);
   }
 
   function requestStart(targetLevelId) {
     if (state !== 'title') return; // already loading or playing
     if (!isLevelUnlocked(progression, targetLevelId)) {
       ui.showStartError(getLockedLevelMessage(targetLevelId));
+      return;
+    }
+    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
+      ui.showStartError('Coming soon. This level is not playable yet.');
       return;
     }
     if (targetLevelId !== levelId) {
@@ -2961,12 +3367,22 @@ export async function boot(options = {}) {
       updateBuffHud();
       return true;
     }
+    if (code === 'KeyI') {
+      return toggleEra5Inventory();
+    }
+    if (code === 'KeyK') {
+      return fireEra5Weapon();
+    }
     return false;
   }
 
   function switchLevelFromGameplayMenu(targetLevelId) {
     if (!isLevelUnlocked(progression, targetLevelId)) {
       ui.showStatus(getLockedLevelMessage(targetLevelId), 1600);
+      return false;
+    }
+    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
+      ui.showStatus('Coming soon. This level is not playable yet.', 1600);
       return false;
     }
     selectedLevelId = targetLevelId;
@@ -3109,6 +3525,14 @@ export async function boot(options = {}) {
         ...(progression.unlocksShown || {}),
         ...(patch.unlocksShown || {}),
       },
+      era5: {
+        ...(progression.era5 || {}),
+        ...(patch.era5 || {}),
+        equipped: {
+          ...(progression.era5?.equipped || {}),
+          ...(patch.era5?.equipped || {}),
+        },
+      },
     });
     window.__DADA_DEBUG__.setProgressState = (nextState) => {
       persistProgressState(nextState);
@@ -3145,9 +3569,30 @@ export async function boot(options = {}) {
       return world.level5?.debugForceHazard?.(name, {
         pos: player.mesh.position,
         player,
-        triggerReset,
+        triggerDamage: applyEra5Damage,
       }) ?? false;
     };
+    window.__DADA_DEBUG__.placeLevel5DebugJellyfish = (forward = { x: 1, z: 0 }) => {
+      if (levelId !== 5) return false;
+      return world.level5?.placeDebugJellyfish?.(player.mesh.position.clone(), forward) ?? false;
+    };
+    window.__DADA_DEBUG__.fireEra5Weapon = () => fireEra5Weapon();
+    window.__DADA_DEBUG__.setEra5Vitals = ({ hp, shield, oxygen } = {}) => {
+      if (!isEra5Level) return null;
+      if (Number.isFinite(hp)) era5Hp = Math.max(0, Math.min(Math.round(era5State.stats.hpMax ?? 3), Math.round(hp)));
+      if (Number.isFinite(shield)) era5Shield = Math.max(0, Math.min(Math.round(era5State.stats.shieldMax ?? 1), Math.round(shield)));
+      if (Number.isFinite(oxygen)) era5Oxygen = Math.max(0, Math.min(era5State.stats.oxygenMax ?? 0, oxygen));
+      syncEra5Ui();
+      return window.__DADA_DEBUG__.era5Vitals;
+    };
+    window.__DADA_DEBUG__.getMenuLockState = () => ({
+      6: document.getElementById('levelBtn6')?.hasAttribute('aria-disabled') ?? false,
+      7: document.getElementById('levelBtn7')?.hasAttribute('aria-disabled') ?? false,
+      8: document.getElementById('levelBtn8')?.hasAttribute('aria-disabled') ?? false,
+      9: document.getElementById('levelBtn9')?.hasAttribute('aria-disabled') ?? false,
+      titleLock: document.getElementById('titleLevelLock')?.textContent ?? '',
+      titleHint: document.getElementById('titleHint')?.textContent ?? '',
+    });
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -3174,6 +3619,11 @@ export async function boot(options = {}) {
         closeGameplayMenu();
         return;
       }
+      if (state === 'inventory') {
+        ev.preventDefault();
+        closeEra5Inventory();
+        return;
+      }
     }
     if (state === 'gameplay') {
       if ((ev.code === 'KeyR' || ev.key === 'r' || ev.key === 'R') && !ev.repeat && !ev.metaKey && !ev.ctrlKey) {
@@ -3189,6 +3639,23 @@ export async function boot(options = {}) {
       if ((ev.code === 'KeyE' || ev.key === 'e' || ev.key === 'E') && !ev.repeat) {
         ev.preventDefault();
         triggerGameplayHotkey('KeyE');
+        return;
+      }
+      if ((ev.code === 'KeyI' || ev.key === 'i' || ev.key === 'I') && !ev.repeat) {
+        ev.preventDefault();
+        triggerGameplayHotkey('KeyI');
+        return;
+      }
+      if ((ev.code === 'KeyK' || ev.key === 'k' || ev.key === 'K') && !ev.repeat) {
+        ev.preventDefault();
+        triggerGameplayHotkey('KeyK');
+        return;
+      }
+    }
+    if (state === 'inventory') {
+      if ((ev.code === 'KeyI' || ev.key === 'i' || ev.key === 'I') && !ev.repeat) {
+        ev.preventDefault();
+        closeEra5Inventory();
         return;
       }
     }
@@ -3259,10 +3726,10 @@ export async function boot(options = {}) {
 
   function triggerReset(reason, direction = -1, overrideSpawn = null) {
     if (respawnState) return;
-    if (bubbleShieldGraceMs > 0 && isBubbleShieldEligibleReason(reason)) {
+    if (!isEra5Level && bubbleShieldGraceMs > 0 && isBubbleShieldEligibleReason(reason)) {
       return false;
     }
-    if (progression.bubbleShieldUnlocked && !bubbleShieldUsedThisRun && isBubbleShieldEligibleReason(reason)) {
+    if (!isEra5Level && progression.bubbleShieldUnlocked && !bubbleShieldUsedThisRun && isBubbleShieldEligibleReason(reason)) {
       bubbleShieldUsedThisRun = true;
       bubbleShieldGraceMs = BUBBLE_SHIELD_GRACE_MS;
       player.invulnTimerMs = Math.max(player.invulnTimerMs, BUBBLE_SHIELD_GRACE_MS);
@@ -3294,12 +3761,14 @@ export async function boot(options = {}) {
   }
 
   function resolveRespawnPosition(baseSpawn) {
-    const { halfW, halfH } = player.getCollisionHalfExtents();
+    const { halfW, halfH, halfD } = player.getCollisionHalfExtents();
+    const baseZ = Number.isFinite(baseSpawn.z) ? baseSpawn.z : 0;
 
-    const placeOnSurface = (x, fallbackY) => {
+    const placeOnSurface = (x, z, fallbackY) => {
       let highest = null;
       for (const c of player.colliders) {
         if ((x + halfW) <= c.minX || (x - halfW) >= c.maxX) continue;
+        if (isEra5Level && ((z + halfD) <= c.minZ || (z - halfD) >= c.maxZ)) continue;
         if (highest === null || c.maxY > highest) highest = c.maxY;
       }
       return highest === null ? fallbackY : (highest + halfH + 0.02);
@@ -3312,10 +3781,10 @@ export async function boot(options = {}) {
       const lateralSign = i % 2 === 0 ? 1 : -1;
       const offsetX = i === 0 ? 0 : lateralSign * lateralIndex * 0.28;
       const x = clamp(baseSpawn.x + offsetX, minX, maxX);
-      const yBase = placeOnSurface(x, baseSpawn.y + Math.floor(i / 6) * 0.24);
+      const yBase = placeOnSurface(x, baseZ, baseSpawn.y + Math.floor(i / 6) * 0.24);
       const y = yBase + Math.floor(i / 8) * 0.2;
-      if (!player.wouldOverlapAt(x, y)) {
-        return { x, y, z: baseSpawn.z || 0 };
+      if (!player.wouldOverlapAt(x, y, baseZ)) {
+        return { x, y, z: baseZ };
       }
     }
 
@@ -3323,7 +3792,7 @@ export async function boot(options = {}) {
     return {
       x: clamp(baseSpawn.x, minX, maxX),
       y: baseSpawn.y + 2.4,
-      z: baseSpawn.z || 0,
+      z: baseZ,
     };
   }
 
@@ -3413,8 +3882,9 @@ export async function boot(options = {}) {
       if (checkpoint.index <= activeCheckpointIndex) continue;
       const dx = pos.x - checkpoint.spawn.x;
       const dy = pos.y - checkpoint.spawn.y;
+      const dz = isEra5Level ? (pos.z - (checkpoint.spawn.z ?? 0)) : 0;
       const r = checkpoint.radius ?? 1.2;
-      if ((dx * dx + dy * dy) <= (r * r)) {
+      if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
         activateCheckpoint(checkpoint);
       }
     }
@@ -3422,24 +3892,25 @@ export async function boot(options = {}) {
     // Coin overlaps
     if (collectiblePickupCooldownMs <= 0) {
       for (const coin of coins) {
-      if (coin.collected) continue;
-      const dx = pos.x - coin.position.x;
-      const dy = pos.y - coin.position.y;
-      const r = coin.radius ?? 0.45;
-      if ((dx * dx + dy * dy) <= (r * r)) {
-        coin.collected = true;
-        if (coin.node) coin.node.setEnabled(false);
-        coinsCollected++;
-        window.__DADA_DEBUG__.coinsCollected = coinsCollected;
-        recordPersistentBinky(coin.id);
-        audio.playCoin();
-        juiceFx.spawnCoinSparkle(coin.position);
-        ui.updateCoins(coinsCollected);
-        if (coinsCollected === (levelTotals[levelId] ?? coins.length)) {
-          ui.showPopText('All pacifiers! 🍼', 900);
+        if (coin.collected) continue;
+        const dx = pos.x - coin.position.x;
+        const dy = pos.y - coin.position.y;
+        const dz = isEra5Level ? (pos.z - coin.position.z) : 0;
+        const r = coin.radius ?? 0.45;
+        if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
+          coin.collected = true;
+          if (coin.node) coin.node.setEnabled(false);
+          coinsCollected++;
+          window.__DADA_DEBUG__.coinsCollected = coinsCollected;
+          recordPersistentBinky(coin.id);
+          audio.playCoin();
+          juiceFx.spawnCoinSparkle(coin.position);
+          ui.updateCoins(coinsCollected);
+          if (coinsCollected === (levelTotals[levelId] ?? coins.length)) {
+            ui.showPopText('All pacifiers! 🍼', 900);
+          }
         }
       }
-    }
     }
 
     // Pickup overlaps
@@ -3447,8 +3918,9 @@ export async function boot(options = {}) {
       if (pickup.collected) continue;
       const dx = pos.x - pickup.position.x;
       const dy = pos.y - pickup.position.y;
+      const dz = isEra5Level ? (pos.z - pickup.position.z) : 0;
       const r = pickup.radius ?? 0.85;
-      if ((dx * dx + dy * dy) <= (r * r)) {
+      if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
         pickup.collected = true;
         if (pickup.node) pickup.node.setEnabled(false);
         onesieMaxDurationMs = pickup.durationMs ?? 10000;
@@ -3487,12 +3959,21 @@ export async function boot(options = {}) {
       }
     }
 
-    let speedMultiplier = 1;
-    let accelBonusMultiplier = 1;
+    let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1) : 1;
+    let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
     const sprinting = input.isSprintHeld();
+    if (isEra5Level && world.level5?.isInDeepWater?.(pos)) {
+      speedMultiplier *= Math.max(0.72, era5State.stats.waterMoveSpeed ?? 1);
+      accelBonusMultiplier *= 0.94;
+    }
     if (sprinting) {
-      speedMultiplier = 1.75;      // run = walk * 1.75 — clearly noticeable
-      accelBonusMultiplier = 1.40; // faster ramp-up while sprinting
+      if (isEra5Level) {
+        speedMultiplier *= 1.22;
+        accelBonusMultiplier *= 1.12;
+      } else {
+        speedMultiplier = 1.75;      // run = walk * 1.75 — clearly noticeable
+        accelBonusMultiplier = 1.40; // faster ramp-up while sprinting
+      }
     }
     const runIndicator = getRunIndicator();
     if (runIndicator) {
@@ -3759,31 +4240,62 @@ export async function boot(options = {}) {
           world.level4.update(dt, { pos: player.mesh.position, triggerReset, player });
           if (debugMode) window.__DADA_DEBUG__.l4RainActiveCount = world.level4.rainCount;
         }
-        if (world.level5) {
-          world.level5.update(dt, {
-            pos: player.mesh.position,
-            player,
-            triggerReset,
-            triggerNearMissCue,
-          });
-          if (debugMode) {
-            window.__DADA_DEBUG__.level5State = world.level5.getDebugState?.() ?? null;
-          }
-        }
         // Debug idle: suppress input for probe duration
         const idleSuppressed = debugIdleTimerMs > 0;
         if (idleSuppressed) debugIdleTimerMs = Math.max(0, debugIdleTimerMs - dt * 1000);
         // Player update
-        const moveX = idleSuppressed ? 0 : input.getMoveX();
-        const moveY = idleSuppressed ? 0 : input.getMoveY();
+        const rawMoveX = idleSuppressed ? 0 : input.getMoveX();
+        const rawMoveY = idleSuppressed ? 0 : input.getMoveY();
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpJustPressed = jumpPress.edge;
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
+        let moveX = rawMoveX;
+        let moveZ = 0;
+        if (isEra5Level) {
+          const camForwardX = Math.cos(era5CameraYaw);
+          const camForwardZ = Math.sin(era5CameraYaw);
+          const camRightX = -Math.sin(era5CameraYaw);
+          const camRightZ = Math.cos(era5CameraYaw);
+          moveX = (camForwardX * rawMoveY) + (camRightX * rawMoveX);
+          moveZ = (camForwardZ * rawMoveY) + (camRightZ * rawMoveX);
+          const moveLen = Math.hypot(moveX, moveZ);
+          if (moveLen > 1) {
+            moveX /= moveLen;
+            moveZ /= moveLen;
+          }
+          if (moveLen > 0.16) {
+            era5CameraDesiredYaw = Math.atan2(moveZ, moveX);
+          } else {
+            const planarSpeed = Math.hypot(player.vx, player.vz);
+            if (planarSpeed > 0.32) {
+              era5CameraDesiredYaw = Math.atan2(player.vz, player.vx);
+            }
+          }
+        }
         const { halfH } = player.getCollisionHalfExtents();
         player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId, {
-          floatMoveY: moveY,
+          floatMoveY: rawMoveY,
           floatActive: player.isCapeFloating(),
+          moveZ,
+          movementMode: isEra5Level ? 'free' : 'lane',
         });
+        if (world.level5) {
+          world.level5.update(dt, {
+            pos: player.mesh.position,
+            player,
+            triggerDamage: applyEra5Damage,
+            triggerNearMissCue,
+            refillOxygen: refillEra5Oxygen,
+          });
+          updateEra5Projectiles(dt);
+          updateEra5Oxygen(dt);
+          if (debugMode) {
+            window.__DADA_DEBUG__.level5State = world.level5.getDebugState?.() ?? null;
+          }
+        }
+        if (isEra5Level && era5WeaponCooldownMs > 0) {
+          era5WeaponCooldownMs = Math.max(0, era5WeaponCooldownMs - (dt * 1000));
+        }
         if (player.grounded && player.isCapeFloating()) {
           player.stopCapeFloat();
         }
@@ -3837,7 +4349,7 @@ export async function boot(options = {}) {
           }
         }
 
-        if (currentFloorTopY !== null) {
+        if (!isEra5Level && currentFloorTopY !== null) {
           const afterBottomY = player.mesh.position.y - halfH;
           if (prevGrounded && !player.grounded) {
             level1MaxAirborneBottomY = Math.max(prevPlayerBottomY, afterBottomY);
@@ -3880,6 +4392,7 @@ export async function boot(options = {}) {
         // HUD updates each frame
         ui.updateObjectiveDir(player.mesh.position.x, goalX);
         updateBuffHud();
+        syncEra5Ui();
       }
 
       // Update blob shadow position (follows player X, stays near ground)
@@ -3893,7 +4406,9 @@ export async function boot(options = {}) {
       const goalInside = pPos.x >= goalBounds.minimumWorld.x
         && pPos.x <= goalBounds.maximumWorld.x
         && pPos.y >= goalBounds.minimumWorld.y
-        && pPos.y <= goalBounds.maximumWorld.y;
+        && pPos.y <= goalBounds.maximumWorld.y
+        && pPos.z >= goalBounds.minimumWorld.z
+        && pPos.z <= goalBounds.maximumWorld.z;
       if (goalInside && !goalReached) {
         if (goalGuardMinX !== null && pPos.x < goalGuardMinX) {
           if (import.meta.env.DEV && !warnedEarlyGoal) {
@@ -3914,7 +4429,32 @@ export async function boot(options = {}) {
       // Camera follow.
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
-      if (levelId === 2) {
+      if (isEra5Level) {
+        era5CameraYaw += wrapToPi(era5CameraDesiredYaw - era5CameraYaw) * Math.min(1, dt * 3.6);
+        const cameraForward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
+        const focusPos = new BABYLON.Vector3(px, py + 1.1, player.mesh.position.z);
+        const desiredTarget = new BABYLON.Vector3(
+          px + (cameraForward.x * 1.2),
+          py + 1.0,
+          player.mesh.position.z + (cameraForward.z * 1.2),
+        );
+        const desiredCameraPos = new BABYLON.Vector3(
+          px - (cameraForward.x * ERA5_CAMERA_DISTANCE),
+          py + ERA5_CAMERA_HEIGHT,
+          player.mesh.position.z - (cameraForward.z * ERA5_CAMERA_DISTANCE),
+        );
+        const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
+        const cameraDamp = occlusion.hit ? 12 : 5.5;
+        camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
+        camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
+        camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
+        camera.setTarget(new BABYLON.Vector3(
+          damp(camera.getTarget().x, desiredTarget.x, 5.2, dt),
+          damp(camera.getTarget().y, desiredTarget.y, 5.2, dt),
+          damp(camera.getTarget().z, desiredTarget.z, 5.2, dt),
+        ));
+        updateEra5DecorOcclusion(dt, focusPos, camera.position);
+      } else if (levelId === 2) {
         const desiredCameraPos = new BABYLON.Vector3(px - 10.0, py + 10.0, -18.0);
         camera.position.x = damp(camera.position.x, desiredCameraPos.x, 4.5, dt);
         camera.position.y = damp(camera.position.y, desiredCameraPos.y, 4.5, dt);
@@ -3947,6 +4487,9 @@ export async function boot(options = {}) {
         ));
       }
     } else if (state === 'menu') {
+      updatePlayerShadow(player);
+      updatePlayerReadabilityLight();
+    } else if (state === 'inventory') {
       updatePlayerShadow(player);
       updatePlayerReadabilityLight();
     } else if (state === 'minigame') {
@@ -4002,6 +4545,7 @@ export async function boot(options = {}) {
     updateActorDebug();
     window.__DADA_DEBUG__.playerX = player.mesh.position.x;
     window.__DADA_DEBUG__.playerY = player.mesh.position.y;
+    window.__DADA_DEBUG__.playerZ = player.mesh.position.z;
 
     // Debug HUD (dev only)
     if (debugHud) {
