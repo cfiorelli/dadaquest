@@ -4,15 +4,23 @@
   "description": "DaDaQuest - crafted 3D diorama platformer with deterministic smoke and screenshot modes",
   "scripts": {
     "dev": "vite",
+    "dev:test": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "build": "npm run check:asset-manifest && vite build && npm run check:dist-nozip",
     "preview": "vite preview",
+    "preview:test": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "check:asset-manifest": "node scripts/validate-assets-manifest.js",
     "check:dist-nozip": "node -e \"const fs=require('fs');const p='dist';const bad=[];const walk=(d)=>{if(!fs.existsSync(d))return;for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=d+'/'+e.name;if(e.isDirectory())walk(f);else if(/\\.zip$/i.test(e.name))bad.push(f)}};walk(p);if(bad.length){console.error('Zip artifacts found in dist:');for(const f of bad)console.error(' - '+f);process.exit(1)}console.log('No zip artifacts in dist.');\"",
     "pw:install": "playwright install --with-deps chromium",
-    "test:smoke": "playwright test -g smoke --project=chromium",
-    "test": "npm run build && npm run test:smoke",
-    "screenshot": "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 & sleep 3 && playwright test --config playwright.screenshot.config.js; kill %1",
-    "shots": "npm run build && playwright test --config playwright.screenshot.config.js"
+    "test": "npm run test:fast",
+    "test:smoke": "playwright test --config playwright.dev.config.mjs tests/smoke.spec.js --project=chromium",
+    "test:fast": "playwright test --config playwright.dev.config.mjs --project=chromium -g @fast",
+    "test:level5": "playwright test --config playwright.dev.config.mjs --project=chromium -g @level5",
+    "test:era5": "playwright test --config playwright.dev.config.mjs --project=chromium -g @era5",
+    "test:full": "playwright test --config playwright.config.mjs --project=chromium",
+    "test:headed": "playwright test --config playwright.dev.config.mjs --project=chromium --headed",
+    "test:screenshot": "playwright test --config playwright.screenshot.config.mjs --project=chromium",
+    "screenshot": "npm run test:screenshot",
+    "shots": "npm run test:screenshot"
   },
   "dependencies": {
     "@babylonjs/core": "^6.28.0",

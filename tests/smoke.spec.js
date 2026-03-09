@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
-test('full run reaches EndScene in test mode without console errors', async ({ page }) => {
+test('@fast full run reaches EndScene in test mode without console errors', async ({ page }) => {
   const consoleErrors = [];
   const pageErrors = [];
 

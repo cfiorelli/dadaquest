@@ -259,7 +259,7 @@ test('runtime: level 4 stays locked until progress unlocks it, then starts and f
   ).toBe('EndScene');
 });
 
-test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanly for 10 seconds', async ({ page }) => {
+test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is completed, then runs cleanly for 10 seconds', async ({ page }) => {
   test.setTimeout(120_000);
   const consoleErrors = [];
   const pageErrors = [];
@@ -310,7 +310,7 @@ test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanl
   }
 });
 
-test('runtime: level 5 uses Doom-style yaw turning, forward movement, and strafe without yaw drift', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward movement, and strafe without yaw drift', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -408,7 +408,7 @@ test('runtime: level 5 uses Doom-style yaw turning, forward movement, and strafe
   expect(strafeDelta).toBeGreaterThan(0.18);
 });
 
-test('runtime: level 5 bracket keys rotate the camera in the expected directions', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 bracket keys rotate the camera in the expected directions', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -440,7 +440,7 @@ test('runtime: level 5 bracket keys rotate the camera in the expected directions
   expect(duringLeft.cameraYaw).toBeLessThan(duringRight.cameraYaw - 0.04);
 });
 
-test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with Enter, and music is running', async ({ page }) => {
+test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with Enter, and music is running', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -490,7 +490,7 @@ test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires wi
   ).toBe(true);
 });
 
-test('runtime: level 5 gameplay geometry stays visible and camera yaw stays smooth while turning', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 gameplay geometry stays visible and camera yaw stays smooth while turning', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -540,7 +540,7 @@ test('runtime: level 5 gameplay geometry stays visible and camera yaw stays smoo
   expect(Math.min(...deltas)).toBeGreaterThan(-0.08);
 });
 
-test('runtime: level 5 binky magnet collects on a near miss instead of requiring exact overlap', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 binky magnet collects on a near miss instead of requiring exact overlap', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -565,7 +565,7 @@ test('runtime: level 5 binky magnet collects on a near miss instead of requiring
   ).toBe(coinsBefore + 1);
 });
 
-test('runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
+test('@fast @era5 @progression runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 1);
 
@@ -582,7 +582,7 @@ test('runtime: levels 6 through 9 appear as locked placeholders in the title men
   await expect(page.locator('#titleHint')).toContainText('Beat Haunted Library');
 });
 
-test('runtime: levels 6 through 9 unlock sequentially from completed-level progress', async ({ page }) => {
+test('@era5 @progression runtime: levels 6 through 9 unlock sequentially from completed-level progress', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 1);
   await page.waitForTimeout(300);
@@ -646,7 +646,7 @@ test('runtime: levels 6 through 9 unlock sequentially from completed-level progr
 });
 
 for (const levelId of [6, 7, 8, 9]) {
-  test(`runtime: level ${levelId} starts, keeps Era 5 HUD active, and runs cleanly for 10 seconds`, async ({ page }) => {
+  test(`@era5 runtime: level ${levelId} starts, keeps Era 5 HUD active, and runs cleanly for 10 seconds`, async ({ page }) => {
     test.setTimeout(120_000);
     const consoleErrors = [];
     const pageErrors = [];
@@ -687,7 +687,7 @@ for (const levelId of [6, 7, 8, 9]) {
   });
 }
 
-test('runtime: level 6 conveyor zones push the player and expose conveyor debug state', async ({ page }) => {
+test('@era5 runtime: level 6 conveyor zones push the player and expose conveyor debug state', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 6);
   await unlockThroughLevel(page, 5);
@@ -714,7 +714,7 @@ test('runtime: level 6 conveyor zones push the player and expose conveyor debug 
   )).toBeGreaterThan(0.01);
 });
 
-test('runtime: level 7 lightning hazards visibly cycle from warn to active', async ({ page }) => {
+test('@era5 runtime: level 7 lightning hazards visibly cycle from warn to active', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 7);
   await unlockThroughLevel(page, 6);
@@ -737,7 +737,7 @@ test('runtime: level 7 lightning hazards visibly cycle from warn to active', asy
   ).toBe(true);
 });
 
-test('runtime: level 8 lantern tool reveals a hidden bridge', async ({ page }) => {
+test('@era5 runtime: level 8 lantern tool reveals a hidden bridge', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 8);
   await unlockThroughLevel(page, 7);
@@ -768,7 +768,7 @@ test('runtime: level 8 lantern tool reveals a hidden bridge', async ({ page }) =
   ).toBe(true);
 });
 
-test('runtime: level 9 puppet sweep exposes a moving warning band during its active window', async ({ page }) => {
+test('@era5 runtime: level 9 puppet sweep exposes a moving warning band during its active window', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 9);
   await unlockThroughLevel(page, 8);

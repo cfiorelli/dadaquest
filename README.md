@@ -37,10 +37,14 @@ Path beats:
 ## Test Commands
 
 ```bash
-npm test
-npx playwright test -g smoke --project=chromium
-npx playwright test -g screenshot --project=chromium
+npm run test:fast
+npm run test:level5
+npm run test:era5
+npm run test:full
+npm run test:screenshot
 ```
+
+Testing workflow details live in [TESTING.md](./TESTING.md).
 
 ## Deterministic Modes
 
