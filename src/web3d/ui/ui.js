@@ -1100,9 +1100,13 @@ export function createUI(uiRoot, options = {}) {
   function getGameplayLegendMarkup(levelId) {
     if (isEra5UiLevel(levelId)) {
       return `
-        <div><span>W A S D</span> Move / strafe</div>
-        <div><span>← →</span> Turn</div>
-        <div><span>Space</span> Jump</div>
+        <div><span>↑ / ↓</span> Move forward / back</div>
+        <div><span>← / →</span> Turn left / right</div>
+        <div><span>Alt + ← / →</span> Strafe left / right</div>
+        <div><span>, / .</span> Strafe left / right</div>
+        <div><span>W / S</span> Forward / back alias</div>
+        <div><span>A / D</span> Strafe alias</div>
+        <div><span>Space</span> Jump / use</div>
         <div><span>Shift</span> Run</div>
         <div>${getEra5WeaponHelp(levelId)}</div>
         <div>${getEra5ToolHelp(levelId)}</div>
@@ -1129,7 +1133,7 @@ export function createUI(uiRoot, options = {}) {
 
   function getControlHintMarkup(era5 = false, levelId = 1) {
     if (era5) {
-      return `<span>W A S D</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>E</span> Tool`;
+      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }

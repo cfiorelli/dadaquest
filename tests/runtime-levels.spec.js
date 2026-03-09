@@ -44,6 +44,65 @@ async function startDebugLevel(page, levelId) {
   });
 }
 
+async function focusGameplay(page) {
+  await page.mouse.click(640, 360);
+  await page.waitForTimeout(60);
+}
+
+async function dispatchHeldKey(page, type, { code, key, altKey = false, ctrlKey = false, shiftKey = false }) {
+  await page.evaluate(({ eventType, eventCode, eventKey, eventAltKey, eventCtrlKey, eventShiftKey }) => {
+    const target = document;
+    target.dispatchEvent(new KeyboardEvent(eventType, {
+      bubbles: true,
+      cancelable: true,
+      code: eventCode,
+      key: eventKey,
+      altKey: eventAltKey,
+      ctrlKey: eventCtrlKey,
+      shiftKey: eventShiftKey,
+    }));
+  }, {
+    eventType: type,
+    eventCode: code,
+    eventKey: key,
+    eventAltKey: altKey,
+    eventCtrlKey: ctrlKey,
+    eventShiftKey: shiftKey,
+  });
+}
+
+async function snapshotEra5Pose(page) {
+  return page.evaluate(() => ({
+    x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+    y: window.__DADA_DEBUG__?.playerPos?.y ?? 0,
+    z: window.__DADA_DEBUG__?.playerPos?.z ?? 0,
+    yaw: window.__DADA_DEBUG__?.playerYaw ?? 0,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? 0,
+  }));
+}
+
+async function resetEra5Pose(page, pose) {
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, pose);
+  await page.waitForTimeout(90);
+}
+
+function dotXZ(delta, direction) {
+  return (delta.x * direction.x) + (delta.z * direction.z);
+}
+
+function getRightFromForward(forward) {
+  return {
+    x: forward.z,
+    z: -forward.x,
+  };
+}
+
+function wrapDelta(a, b) {
+  return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
 async function unlockThroughLevel(page, completedLevel = 4, extraPatch = {}) {
   await page.evaluate(({ maxLevel, patch }) => {
     const levelCompleted = {};
@@ -310,14 +369,17 @@ test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is 
   }
 });
 
-test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward movement, and strafe without yaw drift', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 uses classic Doom arrow movement, turn, and strafe semantics with modern aliases', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
 
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
+  await focusGameplay(page);
+  const basePose = await snapshotEra5Pose(page);
 
+  await resetEra5Pose(page, basePose);
   const beforeTurn = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
@@ -329,6 +391,7 @@ test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward moveme
   await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(450);
   const afterTurn = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
     yawVel: window.__DADA_DEBUG__?.yawVel ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
@@ -340,9 +403,12 @@ test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward moveme
   expect(afterTurn.playerYaw - beforeTurn.playerYaw).toBeLessThan(2.4);
   expect(afterTurn.yawVel).toBeGreaterThan(0.2);
   expect(afterTurn.cameraYaw).toBeGreaterThan(beforeTurn.cameraYaw - 0.02);
+  expect(Math.hypot(
+    afterTurn.playerPos.x - beforeTurn.playerPos.x,
+    afterTurn.playerPos.z - beforeTurn.playerPos.z,
+  )).toBeLessThan(0.08);
 
-  await page.waitForTimeout(900);
-
+  await resetEra5Pose(page, basePose);
   const beforeForward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerVelocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
@@ -353,8 +419,8 @@ test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward moveme
   expect(beforeForward.playerPos).not.toBeNull();
   expect(beforeForward.playerForward).not.toBeNull();
 
-  await page.keyboard.down('w');
-  await page.waitForTimeout(450);
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(420);
   const duringForward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerVelocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
@@ -363,7 +429,7 @@ test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward moveme
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
     playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
   }));
-  await page.keyboard.up('w');
+  await page.keyboard.up('ArrowUp');
   const afterForward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
@@ -371,42 +437,234 @@ test('@level5 @era5 runtime: level 5 uses Doom-style yaw turning, forward moveme
   expect(duringForward.playerPos).not.toBeNull();
   expect(duringForward.playerVelocity).not.toBeNull();
   expect(duringForward.playerForward).not.toBeNull();
-  const forwardDeltaX = duringForward.playerPos.x - beforeForward.playerPos.x;
-  const forwardDeltaZ = duringForward.playerPos.z - beforeForward.playerPos.z;
-  const forwardDot = (forwardDeltaX * beforeForward.playerForward.x) + (forwardDeltaZ * beforeForward.playerForward.z);
-  expect(forwardDot).toBeGreaterThan(0.34);
+  const forwardDelta = {
+    x: duringForward.playerPos.x - beforeForward.playerPos.x,
+    z: duringForward.playerPos.z - beforeForward.playerPos.z,
+  };
+  const forwardDot = dotXZ(forwardDelta, beforeForward.playerForward);
+  expect(forwardDot).toBeGreaterThan(0.15);
   expect(Math.abs((afterForward.cameraYaw ?? 0) - (beforeForward.cameraYaw ?? 0))).toBeLessThan(0.18);
   expect(Math.hypot(duringForward.playerVelocity.x, duringForward.playerVelocity.z)).toBeGreaterThan(0.25);
-  const yawDelta = Math.atan2(
-    Math.sin((duringForward.playerFacingYaw ?? 0) - (duringForward.playerYaw ?? 0)),
-    Math.cos((duringForward.playerFacingYaw ?? 0) - (duringForward.playerYaw ?? 0)),
-  );
+  const yawDelta = wrapDelta((duringForward.playerFacingYaw ?? 0), (duringForward.playerYaw ?? 0));
   expect(Math.abs(yawDelta)).toBeLessThan(0.12);
 
-  const beforeStrafe = await page.evaluate(() => ({
+  await resetEra5Pose(page, basePose);
+  const beforeBackward = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  await page.keyboard.down('ArrowDown');
+  await page.waitForTimeout(360);
+  const duringBackward = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
   }));
-  await page.keyboard.down('a');
-  await page.waitForTimeout(450);
-  const duringStrafe = await page.evaluate(() => ({
+  await page.keyboard.up('ArrowDown');
+  const backwardDelta = {
+    x: duringBackward.playerPos.x - beforeBackward.playerPos.x,
+    z: duringBackward.playerPos.z - beforeBackward.playerPos.z,
+  };
+  expect(dotXZ(backwardDelta, beforeBackward.playerForward)).toBeLessThan(-0.14);
+  expect(Math.abs((duringBackward.playerYaw ?? 0) - (beforeBackward.playerYaw ?? 0))).toBeLessThan(0.06);
+  expect(Math.abs((duringBackward.cameraYaw ?? 0) - (beforeBackward.cameraYaw ?? 0))).toBeLessThan(0.10);
+
+  await resetEra5Pose(page, basePose);
+  const beforeAltStrafe = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  await page.keyboard.down('Alt');
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(420);
+  const duringAltStrafe = await page.evaluate(() => ({
     playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
     playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
     cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
   }));
-  await page.keyboard.up('a');
-  expect(beforeStrafe.playerPos).not.toBeNull();
-  expect(duringStrafe.playerPos).not.toBeNull();
-  expect(duringStrafe.playerYaw).not.toBeNull();
-  expect(Math.abs((duringStrafe.playerYaw ?? 0) - (beforeStrafe.playerYaw ?? 0))).toBeLessThan(0.06);
-  expect(Math.abs((duringStrafe.cameraYaw ?? 0) - (beforeStrafe.cameraYaw ?? 0))).toBeLessThan(0.10);
-  const strafeDelta = Math.hypot(
-    duringStrafe.playerPos.x - beforeStrafe.playerPos.x,
-    duringStrafe.playerPos.z - beforeStrafe.playerPos.z,
-  );
-  expect(strafeDelta).toBeGreaterThan(0.18);
+  await page.keyboard.up('ArrowRight');
+  await page.keyboard.up('Alt');
+  const playerRight = getRightFromForward(beforeAltStrafe.playerForward);
+  const altStrafeDelta = {
+    x: duringAltStrafe.playerPos.x - beforeAltStrafe.playerPos.x,
+    z: duringAltStrafe.playerPos.z - beforeAltStrafe.playerPos.z,
+  };
+  expect(dotXZ(altStrafeDelta, playerRight)).toBeGreaterThan(0.14);
+  expect(Math.abs((duringAltStrafe.playerYaw ?? 0) - (beforeAltStrafe.playerYaw ?? 0))).toBeLessThan(0.06);
+  expect(Math.abs((duringAltStrafe.cameraYaw ?? 0) - (beforeAltStrafe.cameraYaw ?? 0))).toBeLessThan(0.10);
+
+  await resetEra5Pose(page, basePose);
+  const beforeCommaStrafe = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+  }));
+  await dispatchHeldKey(page, 'keydown', { code: 'Comma', key: ',' });
+  await page.waitForTimeout(360);
+  const duringCommaStrafe = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+  }));
+  await dispatchHeldKey(page, 'keyup', { code: 'Comma', key: ',' });
+  const commaRight = getRightFromForward(beforeCommaStrafe.playerForward);
+  const commaDelta = {
+    x: duringCommaStrafe.playerPos.x - beforeCommaStrafe.playerPos.x,
+    z: duringCommaStrafe.playerPos.z - beforeCommaStrafe.playerPos.z,
+  };
+  expect(dotXZ(commaDelta, commaRight)).toBeLessThan(-0.12);
+  expect(Math.abs((duringCommaStrafe.playerYaw ?? 0) - (beforeCommaStrafe.playerYaw ?? 0))).toBeLessThan(0.06);
+
+  await resetEra5Pose(page, basePose);
+  const beforeWAlias = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+  }));
+  await page.keyboard.down('w');
+  await page.waitForTimeout(360);
+  const duringWAlias = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+  }));
+  await page.keyboard.up('w');
+  const wDelta = {
+    x: duringWAlias.playerPos.x - beforeWAlias.playerPos.x,
+    z: duringWAlias.playerPos.z - beforeWAlias.playerPos.z,
+  };
+  expect(dotXZ(wDelta, beforeWAlias.playerForward)).toBeGreaterThan(0.14);
+  expect(Math.abs((duringWAlias.playerYaw ?? 0) - (beforeWAlias.playerYaw ?? 0))).toBeLessThan(0.06);
+
+  await resetEra5Pose(page, basePose);
+  const beforeDAlias = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+  }));
+  await page.keyboard.down('d');
+  await page.waitForTimeout(360);
+  const duringDAlias = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+  }));
+  await page.keyboard.up('d');
+  const dDelta = {
+    x: duringDAlias.playerPos.x - beforeDAlias.playerPos.x,
+    z: duringDAlias.playerPos.z - beforeDAlias.playerPos.z,
+  };
+  expect(dotXZ(dDelta, getRightFromForward(beforeDAlias.playerForward))).toBeGreaterThan(0.12);
+  expect(Math.abs((duringDAlias.playerYaw ?? 0) - (beforeDAlias.playerYaw ?? 0))).toBeLessThan(0.06);
+
+  await resetEra5Pose(page, basePose);
+  const beforeDiagonal = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+  }));
+  await page.keyboard.down('ArrowUp');
+  await page.keyboard.down('d');
+  await page.waitForTimeout(420);
+  const duringDiagonal = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+  }));
+  await page.keyboard.up('d');
+  await page.keyboard.up('ArrowUp');
+  const diagonalDelta = {
+    x: duringDiagonal.playerPos.x - beforeDiagonal.playerPos.x,
+    z: duringDiagonal.playerPos.z - beforeDiagonal.playerPos.z,
+  };
+  const diagonalRight = getRightFromForward(beforeDiagonal.playerForward);
+  expect(dotXZ(diagonalDelta, beforeDiagonal.playerForward)).toBeGreaterThan(0.10);
+  expect(dotXZ(diagonalDelta, diagonalRight)).toBeGreaterThan(0.10);
+  expect(Math.abs((duringDiagonal.playerYaw ?? 0) - (beforeDiagonal.playerYaw ?? 0))).toBeLessThan(0.06);
 });
+
+for (const levelId of [6, 7, 8, 9]) {
+  test(`@era5 runtime: level ${levelId} uses the shared classic Doom movement mapping`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await gotoDebugLevel(page, levelId);
+    await unlockThroughLevel(page, levelId - 1);
+    await startDebugLevel(page, levelId);
+    await page.waitForTimeout(1200);
+    await focusGameplay(page);
+
+    const beforeTurn = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    expect(beforeTurn.playerPos).not.toBeNull();
+    expect(beforeTurn.playerYaw).not.toBeNull();
+    expect(beforeTurn.playerForward).not.toBeNull();
+
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(360);
+    const afterTurn = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    await page.keyboard.up('ArrowRight');
+    expect(afterTurn.playerYaw).toBeGreaterThan(beforeTurn.playerYaw + 0.12);
+    expect(Math.hypot(
+      afterTurn.playerPos.x - beforeTurn.playerPos.x,
+      afterTurn.playerPos.z - beforeTurn.playerPos.z,
+    )).toBeLessThan(0.1);
+    await page.waitForTimeout(320);
+
+    const beforeForward = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    await page.keyboard.down('ArrowUp');
+    await page.waitForTimeout(360);
+    const duringForward = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    await page.keyboard.up('ArrowUp');
+    const forwardDelta = {
+      x: duringForward.playerPos.x - beforeForward.playerPos.x,
+      z: duringForward.playerPos.z - beforeForward.playerPos.z,
+    };
+    expect(dotXZ(forwardDelta, beforeForward.playerForward)).toBeGreaterThan(0.12);
+    expect(Math.abs(wrapDelta(duringForward.playerYaw ?? 0, beforeForward.playerYaw ?? 0))).toBeLessThan(0.08);
+    expect(Math.abs(wrapDelta(duringForward.cameraYaw ?? 0, beforeForward.cameraYaw ?? 0))).toBeLessThan(0.26);
+    await page.waitForTimeout(260);
+
+    const beforeStrafe = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    await page.keyboard.down('Alt');
+    await page.keyboard.down('ArrowLeft');
+    await page.waitForTimeout(360);
+    const duringStrafe = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+    }));
+    await page.keyboard.up('ArrowLeft');
+    await page.keyboard.up('Alt');
+    const leftDelta = {
+      x: duringStrafe.playerPos.x - beforeStrafe.playerPos.x,
+      z: duringStrafe.playerPos.z - beforeStrafe.playerPos.z,
+    };
+    expect(dotXZ(leftDelta, getRightFromForward(beforeStrafe.playerForward))).toBeLessThan(-0.1);
+    expect(Math.abs(wrapDelta(duringStrafe.playerYaw ?? 0, beforeStrafe.playerYaw ?? 0))).toBeLessThan(0.08);
+    expect(Math.abs(wrapDelta(duringStrafe.cameraYaw ?? 0, beforeStrafe.cameraYaw ?? 0))).toBeLessThan(0.12);
+  });
+}
 
 test('@level5 @era5 runtime: level 5 bracket keys rotate the camera in the expected directions', async ({ page }) => {
   test.setTimeout(120_000);

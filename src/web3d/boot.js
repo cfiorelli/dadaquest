@@ -3942,8 +3942,39 @@ export async function boot(options = {}) {
       applyEra5FacingState();
       player.vx = 0;
       player.vy = 0;
+      player.vz = 0;
       updatePlayerShadow(player);
       return { x, y, z };
+    };
+    window.__DADA_DEBUG__.setEra5Pose = ({ x, y, z, yaw, cameraYaw } = {}) => {
+      if (!isEra5Level) return null;
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        player.spawnAt(x, y, Number.isFinite(z) ? z : player.mesh.position.z);
+      }
+      if (Number.isFinite(yaw)) {
+        era5PlayerYaw = wrapToPi(yaw);
+        era5PlayerYawVel = 0;
+      }
+      const nextCameraYaw = Number.isFinite(cameraYaw)
+        ? wrapToPi(cameraYaw)
+        : Number.isFinite(yaw)
+          ? wrapToPi(yaw)
+          : era5CameraYaw;
+      era5CameraYaw = nextCameraYaw;
+      era5CameraDesiredYaw = nextCameraYaw;
+      era5CameraYawVel = 0;
+      applyEra5FacingState();
+      player.vx = 0;
+      player.vy = 0;
+      player.vz = 0;
+      updatePlayerShadow(player);
+      return {
+        x: player.mesh.position.x,
+        y: player.mesh.position.y,
+        z: player.mesh.position.z,
+        yaw: era5PlayerYaw,
+        cameraYaw: era5CameraYaw,
+      };
     };
     window.__DADA_DEBUG__.toggleGameplayMenu = () => {
       if (state === 'menu') {
@@ -4110,12 +4141,22 @@ export async function boot(options = {}) {
     if (state === 'gameplay') {
       if (
         isEra5Level
-        && (ev.code === 'KeyW'
+        && (ev.code === 'ArrowUp'
+          || ev.code === 'ArrowDown'
+          || ev.code === 'ArrowLeft'
+          || ev.code === 'ArrowRight'
+          || ev.code === 'AltLeft'
+          || ev.code === 'AltRight'
+          || ev.code === 'Comma'
+          || ev.code === 'Period'
+          || ev.code === 'KeyW'
           || ev.code === 'KeyA'
           || ev.code === 'KeyS'
           || ev.code === 'KeyD'
-          || ev.code === 'ArrowLeft'
-          || ev.code === 'ArrowRight'
+          || ev.code === 'Space'
+          || ev.code === 'ShiftLeft'
+          || ev.code === 'ShiftRight'
+          || ev.code === 'Tab'
           || ev.code === 'Enter'
           || ev.code === 'NumpadEnter'
           || ev.code === 'ControlLeft'

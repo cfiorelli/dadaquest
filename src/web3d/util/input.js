@@ -1,5 +1,11 @@
 import { isDebugMode } from '../../utils/modes.js';
 
+function clampAxis(value) {
+  if (value > 0) return 1;
+  if (value < 0) return -1;
+  return 0;
+}
+
 export class InputManager {
   constructor() {
     this.held = {};
@@ -57,23 +63,34 @@ export class InputManager {
 
   getEra5ForwardAxis() {
     let y = 0;
-    if (this.held.KeyW) y += 1;
-    if (this.held.KeyS) y -= 1;
-    return y;
+    if (this.held.KeyW || this.held.ArrowUp) y += 1;
+    if (this.held.KeyS || this.held.ArrowDown) y -= 1;
+    return clampAxis(y);
+  }
+
+  isEra5StrafeModifierHeld() {
+    return !!this.held.AltLeft || !!this.held.AltRight;
   }
 
   getEra5StrafeAxis() {
     let x = 0;
     if (this.held.KeyA) x -= 1;
     if (this.held.KeyD) x += 1;
-    return x;
+    if (this.held.Comma) x -= 1;
+    if (this.held.Period) x += 1;
+    if (this.isEra5StrafeModifierHeld()) {
+      if (this.held.ArrowLeft) x -= 1;
+      if (this.held.ArrowRight) x += 1;
+    }
+    return clampAxis(x);
   }
 
   getEra5TurnAxis() {
+    if (this.isEra5StrafeModifierHeld()) return 0;
     let x = 0;
     if (this.held.ArrowLeft) x -= 1;
     if (this.held.ArrowRight) x += 1;
-    return x;
+    return clampAxis(x);
   }
 
   /** True while Space is held down. */
