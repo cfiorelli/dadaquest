@@ -1,12 +1,13 @@
 export const LANE_Z5 = 0;
 
 const L = LANE_Z5;
+const COIN_HOVER_Y = 1.02;
 
-export const LEVEL5 = {
+const BASE_LEVEL5 = {
   totalCollectibles: 18,
   extents: { minX: -28, maxX: 132 },
   spawn: { x: -22.0, y: 1.2, z: L },
-  goal: { x: 126.2, y: 11.1, z: L },
+  goal: { x: 126.2, y: 2.15, z: L },
 
   acts: [
     { id: 'A', label: 'Entry Tunnel', range: [-28, 18], jellyfishCount: 1 },
@@ -16,94 +17,162 @@ export const LEVEL5 = {
   ],
 
   checkpoints: [
-    { x: 14.5, y: 2.9, z: L, label: 'Current Gate' },
-    { x: 52.5, y: 4.85, z: L, label: 'Kelp Heart' },
-    { x: 87.8, y: 8.95, z: L, label: 'Pressure Ring' },
+    { x: 16.0, y: 1.2, z: L, label: 'Current Gate' },
+    { x: 54.0, y: 1.35, z: L, label: 'Kelp Heart' },
+    { x: 91.5, y: 1.7, z: L, label: 'Pressure Ring' },
   ],
 
-  ground: { x: 52, y: -0.75, z: L, w: 172, h: 1.5, d: 14 },
+  ground: { x: 52, y: -0.75, z: L, w: 176, h: 1.5, d: 22 },
 
   platforms: [
-    { name: 'entryStart', x: -21.0, y: 0.45, z: L, w: 8.0, h: 0.8, d: 5.2 },
-    { name: 'entryJet1', x: -13.4, y: 1.45, z: L, w: 4.8, h: 0.72, d: 4.4 },
-    { name: 'entryJet2', x: -6.4, y: 2.05, z: L, w: 4.6, h: 0.72, d: 4.2 },
-    { name: 'entryJet3', x: 1.4, y: 2.55, z: L, w: 5.0, h: 0.74, d: 4.4 },
-    { name: 'entryExit', x: 10.8, y: 2.95, z: L, w: 6.4, h: 0.8, d: 4.8 },
-
-    { name: 'kelpStep1', x: 21.8, y: 3.55, z: L, w: 5.4, h: 0.78, d: 4.6 },
-    { name: 'kelpStep2', x: 30.8, y: 4.15, z: L, w: 5.0, h: 0.78, d: 4.4 },
-    { name: 'kelpStep3', x: 39.6, y: 4.55, z: L, w: 5.0, h: 0.78, d: 4.4 },
-    { name: 'kelpStep4', x: 48.8, y: 4.95, z: L, w: 5.8, h: 0.8, d: 4.8 },
-
-    { name: 'cylinderBase', x: 60.8, y: 5.65, z: L, w: 5.6, h: 0.8, d: 4.6 },
-    { name: 'cylinderLift1', x: 69.6, y: 6.75, z: L, w: 4.8, h: 0.76, d: 4.2 },
-    { name: 'cylinderLift2', x: 77.4, y: 7.95, z: L, w: 4.8, h: 0.76, d: 4.2 },
-    { name: 'cylinderLift3', x: 85.0, y: 8.95, z: L, w: 5.0, h: 0.78, d: 4.4 },
-
-    { name: 'finalRun1', x: 96.5, y: 9.45, z: L, w: 5.8, h: 0.8, d: 4.8 },
-    { name: 'finalRun2', x: 105.8, y: 9.85, z: L, w: 5.2, h: 0.78, d: 4.6 },
-    { name: 'finalRun3', x: 114.8, y: 10.35, z: L, w: 5.2, h: 0.78, d: 4.6 },
-    { name: 'goalDeck', x: 124.2, y: 10.75, z: L, w: 8.4, h: 0.86, d: 5.4 },
+    { name: 'entryFloorA', x: -18.0, y: 0.35, z: -0.2, w: 18.0, h: 0.70, d: 9.0 },
+    { name: 'entryBridgeA', x: -1.5, y: 0.62, z: 0.4, w: 21.0, h: 0.72, d: 10.0 },
+    { name: 'kelpFloorB1', x: 26.0, y: 0.95, z: -0.8, w: 18.0, h: 0.74, d: 10.0 },
+    { name: 'kelpFloorB2', x: 46.5, y: 1.12, z: 0.7, w: 20.0, h: 0.74, d: 11.0 },
+    { name: 'cylinderPlazaC1', x: 66.5, y: 1.45, z: -0.4, w: 18.0, h: 0.76, d: 10.0 },
+    { name: 'cylinderBridgeC2', x: 84.0, y: 1.78, z: 0.5, w: 16.0, h: 0.76, d: 9.0 },
+    { name: 'finaleFloorD1', x: 104.5, y: 2.0, z: -0.3, w: 22.0, h: 0.78, d: 11.0 },
+    { name: 'goalDeck', x: 124.2, y: 2.22, z: L, w: 12.0, h: 0.82, d: 10.0 },
   ],
 
   coins: [
-    { x: -21.6, y: 1.95, z: L }, { x: -13.4, y: 2.85, z: L }, { x: -6.2, y: 3.45, z: L }, { x: 3.0, y: 3.95, z: L },
-    { x: 20.8, y: 4.65, z: L }, { x: 29.6, y: 5.25, z: L }, { x: 37.8, y: 5.55, z: L }, { x: 46.2, y: 5.85, z: L }, { x: 54.0, y: 6.15, z: L },
-    { x: 60.5, y: 6.85, z: L }, { x: 64.4, y: 7.35, z: L }, { x: 69.4, y: 8.05, z: L }, { x: 74.0, y: 8.75, z: L },
-    { x: 95.8, y: 10.25, z: L }, { x: 103.6, y: 10.55, z: L }, { x: 111.4, y: 10.95, z: L }, { x: 118.8, y: 11.15, z: L }, { x: 124.6, y: 11.55, z: L },
+    { x: -20.0, y: 0, z: -2.8 }, { x: -11.2, y: 0, z: 2.5 }, { x: -2.5, y: 0, z: -1.4 }, { x: 9.5, y: 0, z: 1.8 },
+    { x: 22.5, y: 0, z: 3.0 }, { x: 31.0, y: 0, z: -2.6 }, { x: 42.0, y: 0, z: 2.2 }, { x: 51.2, y: 0, z: -1.7 }, { x: 58.2, y: 0, z: 0.4 },
+    { x: 63.0, y: 0, z: -0.9 }, { x: 68.2, y: 0, z: 2.6 }, { x: 76.0, y: 0, z: -2.2 }, { x: 86.2, y: 0, z: 1.4 },
+    { x: 96.5, y: 0, z: -3.0 }, { x: 104.0, y: 0, z: 2.5 }, { x: 112.0, y: 0, z: -2.0 }, { x: 119.4, y: 0, z: 1.2 }, { x: 125.2, y: 0, z: 0.0 },
   ],
 
   currents: [
-    { name: 'currentA1', x: -12.0, y: 1.9, z: L, w: 5.0, h: 2.6, d: 4.2, pushX: 6.0, pushZ: 0.8 },
-    { name: 'currentA2', x: -1.4, y: 2.4, z: L, w: 5.6, h: 2.8, d: 4.2, pushX: -5.2, pushZ: -0.7 },
-    { name: 'currentD1', x: 98.8, y: 9.9, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: 6.8, pushZ: 1.4 },
-    { name: 'currentD2', x: 108.2, y: 10.2, z: L, w: 5.4, h: 3.1, d: 4.4, pushX: -5.8, pushZ: -1.2 },
+    { name: 'currentA1', x: -12.0, y: 1.35, z: -0.8, w: 8.0, h: 3.1, d: 6.0, pushX: 4.8, pushZ: -2.0 },
+    { name: 'currentA2', x: 0.8, y: 1.55, z: 1.0, w: 8.2, h: 3.2, d: 6.0, pushX: -4.2, pushZ: 1.8 },
+    { name: 'currentD1', x: 98.5, y: 2.25, z: -0.8, w: 7.4, h: 3.6, d: 6.0, pushX: 4.9, pushZ: -2.1 },
+    { name: 'currentD2', x: 110.5, y: 2.45, z: 0.8, w: 7.4, h: 3.6, d: 6.0, pushX: -4.4, pushZ: 1.9 },
   ],
 
   deepWaterPockets: [
-    { name: 'deepPocketB', x: 35.2, y: 4.85, z: 0.0, w: 8.6, h: 3.8, d: 5.4 },
-    { name: 'deepPocketC', x: 72.0, y: 7.55, z: 0.0, w: 9.4, h: 4.8, d: 5.8 },
-    { name: 'deepPocketD', x: 109.2, y: 10.45, z: 0.0, w: 10.6, h: 4.8, d: 6.0 },
+    { name: 'deepPocketB', x: 36.0, y: 1.85, z: 0.0, w: 10.2, h: 3.2, d: 7.2 },
+    { name: 'deepPocketC', x: 72.5, y: 2.2, z: 0.0, w: 11.4, h: 3.6, d: 7.6 },
+    { name: 'deepPocketD', x: 109.0, y: 2.45, z: 0.0, w: 12.8, h: 3.8, d: 8.2 },
   ],
 
   airBubblePickups: [
-    { name: 'airBubbleB', x: 49.4, y: 5.9, z: 0.0, radius: 0.82, refill: 8 },
-    { name: 'airBubbleC', x: 86.4, y: 9.2, z: 0.0, radius: 0.82, refill: 8 },
-    { name: 'airBubbleD', x: 118.2, y: 11.1, z: 0.0, radius: 0.82, refill: 10 },
+    { name: 'airBubbleB', x: 50.0, y: 1.95, z: 1.0, radius: 0.82, refill: 8 },
+    { name: 'airBubbleC', x: 86.2, y: 2.2, z: -0.8, radius: 0.82, refill: 8 },
+    { name: 'airBubbleD', x: 118.6, y: 2.45, z: 0.8, radius: 0.82, refill: 10 },
   ],
 
   eelRails: [
-    { name: 'eelRailB', x1: 34.2, y1: 3.9, x2: 37.8, y2: 6.1, z: L, phaseOffset: 0.0 },
-    { name: 'eelRailC1', x1: 66.0, y1: 5.7, x2: 69.0, y2: 8.1, z: L, phaseOffset: 0.35 },
-    { name: 'eelRailC2', x1: 80.2, y1: 6.9, x2: 83.8, y2: 9.6, z: L, phaseOffset: 0.7 },
+    { name: 'eelRailB', x1: 34.0, y1: 0.35, x2: 39.4, y2: 2.15, z: -0.4, phaseOffset: 0.0 },
+    { name: 'eelRailC1', x1: 66.0, y1: 0.55, x2: 71.0, y2: 2.45, z: 0.5, phaseOffset: 0.35 },
+    { name: 'eelRailC2', x1: 80.0, y1: 0.75, x2: 85.6, y2: 2.65, z: -0.6, phaseOffset: 0.7 },
   ],
 
   vents: [
-    { name: 'ventC1', x: 64.6, y: 6.15, z: L, w: 1.8, h: 3.4, liftVy: 16.5, phaseOffset: 0.0 },
-    { name: 'ventC2', x: 76.6, y: 7.45, z: L, w: 1.8, h: 3.8, liftVy: 17.2, phaseOffset: 0.45 },
-    { name: 'ventD1', x: 101.8, y: 10.0, z: L, w: 2.0, h: 3.8, liftVy: 16.4, phaseOffset: 0.2 },
+    { name: 'ventC1', x: 64.8, y: 0.58, z: -1.6, w: 2.0, h: 3.2, liftVy: 16.5, phaseOffset: 0.0 },
+    { name: 'ventC2', x: 76.4, y: 0.78, z: 1.6, w: 2.0, h: 3.4, liftVy: 17.2, phaseOffset: 0.45 },
+    { name: 'ventD1', x: 102.0, y: 0.92, z: 0.0, w: 2.2, h: 3.4, liftVy: 16.4, phaseOffset: 0.2 },
   ],
 
   jellyfish: [
-    { name: 'jellyA1', x: 8.4, y: 2.8, z: 0.2, bounds: { minX: 5.8, maxX: 11.0, minY: 2.0, maxY: 4.1, minZ: -0.3, maxZ: 0.5 }, speed: 0.8, turnSpeed: 2.2, act: 'A' },
-    { name: 'jellyB1', x: 24.6, y: 4.2, z: 0.3, bounds: { minX: 21.2, maxX: 27.8, minY: 3.2, maxY: 5.6, minZ: -0.5, maxZ: 0.6 }, speed: 1.05, turnSpeed: 2.4, act: 'B' },
-    { name: 'jellyB2', x: 34.8, y: 4.8, z: -0.2, bounds: { minX: 31.6, maxX: 38.4, minY: 3.6, maxY: 6.1, minZ: -0.6, maxZ: 0.5 }, speed: 1.0, turnSpeed: 2.2, act: 'B' },
-    { name: 'jellyB3', x: 45.6, y: 5.2, z: 0.4, bounds: { minX: 42.8, maxX: 49.8, minY: 4.0, maxY: 6.6, minZ: -0.4, maxZ: 0.7 }, speed: 1.1, turnSpeed: 2.4, act: 'B' },
-    { name: 'jellyC1', x: 71.0, y: 7.1, z: 0.2, bounds: { minX: 67.4, maxX: 74.4, minY: 6.0, maxY: 8.9, minZ: -0.5, maxZ: 0.6 }, speed: 1.15, turnSpeed: 2.6, act: 'C' },
-    { name: 'jellyC2', x: 84.4, y: 8.4, z: -0.2, bounds: { minX: 80.6, maxX: 87.8, minY: 7.0, maxY: 9.7, minZ: -0.6, maxZ: 0.4 }, speed: 1.15, turnSpeed: 2.6, act: 'C' },
-    { name: 'jellyD1', x: 98.8, y: 10.2, z: 0.4, bounds: { minX: 95.8, maxX: 102.0, minY: 9.0, maxY: 11.8, minZ: -0.4, maxZ: 0.8 }, speed: 1.15, turnSpeed: 2.6, act: 'D' },
-    { name: 'jellyD2', x: 110.4, y: 10.5, z: -0.2, bounds: { minX: 106.8, maxX: 113.8, minY: 9.2, maxY: 12.0, minZ: -0.7, maxZ: 0.4 }, speed: 1.2, turnSpeed: 2.7, act: 'D' },
-    { name: 'jellyD3', x: 119.0, y: 10.9, z: 0.3, bounds: { minX: 116.0, maxX: 122.4, minY: 9.8, maxY: 12.4, minZ: -0.3, maxZ: 0.7 }, speed: 1.12, turnSpeed: 2.5, act: 'D' },
+    { name: 'jellyA1', x: 8.5, y: 1.55, z: 0.8, bounds: { minX: 5.5, maxX: 12.0, minY: 0.8, maxY: 2.6, minZ: -1.2, maxZ: 2.0 }, speed: 0.8, turnSpeed: 2.2, act: 'A' },
+    { name: 'jellyB1', x: 24.5, y: 1.8, z: 2.0, bounds: { minX: 20.8, maxX: 28.0, minY: 0.9, maxY: 2.9, minZ: 0.4, maxZ: 3.6 }, speed: 1.0, turnSpeed: 2.4, act: 'B' },
+    { name: 'jellyB2', x: 35.2, y: 1.95, z: -1.8, bounds: { minX: 31.2, maxX: 39.2, minY: 1.0, maxY: 3.1, minZ: -3.2, maxZ: -0.4 }, speed: 1.0, turnSpeed: 2.2, act: 'B' },
+    { name: 'jellyB3', x: 47.0, y: 2.05, z: 1.6, bounds: { minX: 43.0, maxX: 50.8, minY: 1.1, maxY: 3.2, minZ: 0.2, maxZ: 3.2 }, speed: 1.08, turnSpeed: 2.4, act: 'B' },
+    { name: 'jellyC1', x: 70.8, y: 2.25, z: -1.6, bounds: { minX: 67.0, maxX: 74.8, minY: 1.2, maxY: 3.4, minZ: -3.2, maxZ: -0.2 }, speed: 1.12, turnSpeed: 2.6, act: 'C' },
+    { name: 'jellyC2', x: 84.0, y: 2.45, z: 1.8, bounds: { minX: 80.0, maxX: 88.0, minY: 1.3, maxY: 3.6, minZ: 0.4, maxZ: 3.2 }, speed: 1.14, turnSpeed: 2.6, act: 'C' },
+    { name: 'jellyD1', x: 98.0, y: 2.5, z: -1.8, bounds: { minX: 94.0, maxX: 101.8, minY: 1.4, maxY: 3.8, minZ: -3.4, maxZ: -0.4 }, speed: 1.14, turnSpeed: 2.6, act: 'D' },
+    { name: 'jellyD2', x: 110.0, y: 2.65, z: 1.8, bounds: { minX: 106.0, maxX: 114.0, minY: 1.5, maxY: 3.9, minZ: 0.2, maxZ: 3.4 }, speed: 1.18, turnSpeed: 2.7, act: 'D' },
+    { name: 'jellyD3', x: 119.0, y: 2.8, z: -0.8, bounds: { minX: 115.4, maxX: 122.8, minY: 1.6, maxY: 4.0, minZ: -2.0, maxZ: 1.0 }, speed: 1.12, turnSpeed: 2.5, act: 'D' },
   ],
 
   sharkSweep: {
     name: 'sharkSweepFinale',
     xMin: 103.0,
     xMax: 121.6,
-    y: 10.6,
+    y: 2.55,
     z: L,
-    width: 3.2,
-    height: 2.4,
+    width: 3.8,
+    height: 2.6,
     phaseOffset: 0.25,
   },
+
+  routeMarkers: [
+    { x: -10.0, z: -0.4, scale: 1.0 },
+    { x: 14.0, z: 0.2, scale: 1.0 },
+    { x: 40.0, z: 0.1, scale: 1.05 },
+    { x: 67.0, z: -0.2, scale: 1.08 },
+    { x: 94.0, z: 0.2, scale: 1.08 },
+    { x: 118.0, z: 0.0, scale: 1.1 },
+  ],
+
+  gateArches: [
+    { x: -4.0, y: 2.4, z: 0.0, width: 10.0, height: 5.4 },
+    { x: 30.0, y: 2.8, z: 0.0, width: 10.5, height: 5.8 },
+    { x: 64.0, y: 3.2, z: 0.0, width: 10.2, height: 6.0 },
+    { x: 100.0, y: 3.5, z: 0.0, width: 11.0, height: 6.2 },
+  ],
+
+  signage: [
+    { x: 8.0, y: 4.2, z: 6.6, text: 'AQUARIUM DEPTHS →', width: 8.2, height: 2.0 },
+    { x: 74.0, y: 4.5, z: 6.8, text: 'PRESSURE RING', width: 6.4, height: 1.8 },
+  ],
+
+  coralPillars: [
+    { x: 12.0, y: 0.8, z: 5.0, radius: 1.0, height: 3.4 },
+    { x: 44.0, y: 1.0, z: -5.4, radius: 1.2, height: 4.0 },
+    { x: 79.0, y: 1.3, z: 5.2, radius: 1.1, height: 4.6 },
+    { x: 110.0, y: 1.5, z: -5.0, radius: 1.3, height: 5.2 },
+  ],
+
+  glassTubes: [
+    { x: 20.0, y: 4.6, z: 6.4, diameter: 4.0, length: 12.0 },
+    { x: 72.0, y: 5.2, z: 6.6, diameter: 4.8, length: 14.0 },
+    { x: 108.0, y: 5.8, z: 6.8, diameter: 4.6, length: 12.0 },
+  ],
+
+  kelpCurtains: [
+    { x: 26.0, y: 2.8, z: 7.2, width: 8.0, height: 8.0 },
+    { x: 54.0, y: 3.0, z: -7.2, width: 9.0, height: 8.4 },
+    { x: 92.0, y: 3.4, z: 7.4, width: 9.6, height: 8.8 },
+  ],
+};
+
+function pointInsideSurface(surface, x, z = L) {
+  return x >= (surface.x - (surface.w * 0.5))
+    && x <= (surface.x + (surface.w * 0.5))
+    && z >= ((surface.z ?? L) - (surface.d * 0.5))
+    && z <= ((surface.z ?? L) + (surface.d * 0.5));
+}
+
+function surfaceTop(surface) {
+  return surface.y + (surface.h * 0.5);
+}
+
+function getNearestSurfaceTopY(layout, x, z = L) {
+  const surfaces = [layout.ground, ...(layout.platforms || [])];
+  let bestTop = null;
+  for (const surface of surfaces) {
+    if (!pointInsideSurface(surface, x, z)) continue;
+    const top = surfaceTop(surface);
+    if (bestTop === null || top > bestTop) {
+      bestTop = top;
+    }
+  }
+  return bestTop;
+}
+
+function normalizeCoins(layout) {
+  return layout.coins.map((coin) => {
+    const top = getNearestSurfaceTopY(layout, coin.x, coin.z ?? L);
+    if (top === null) return { ...coin };
+    return {
+      ...coin,
+      y: Number((top + COIN_HOVER_Y).toFixed(3)),
+    };
+  });
+}
+
+export const LEVEL5 = {
+  ...BASE_LEVEL5,
+  coins: normalizeCoins(BASE_LEVEL5),
 };

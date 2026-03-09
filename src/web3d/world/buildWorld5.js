@@ -27,6 +27,19 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function getLevel5SurfaceTopY(x, z = LANE_Z) {
+  let best = LEVEL5.ground.y + (LEVEL5.ground.h * 0.5);
+  for (const surface of LEVEL5.platforms || []) {
+    const contains = x >= (surface.x - (surface.w * 0.5))
+      && x <= (surface.x + (surface.w * 0.5))
+      && z >= ((surface.z ?? LANE_Z) - (surface.d * 0.5))
+      && z <= ((surface.z ?? LANE_Z) + (surface.d * 0.5));
+    if (!contains) continue;
+    best = Math.max(best, surface.y + (surface.h * 0.5));
+  }
+  return best;
+}
+
 function markDecor(node) {
   markDecorNode(node, { cameraBlocker: false });
 }
@@ -203,8 +216,315 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   return root;
 }
 
+function createRouteTexture(scene, name) {
+  const texture = new BABYLON.DynamicTexture(name, { width: 768, height: 256 }, scene, true);
+  const ctx = texture.getContext();
+  ctx.clearRect(0, 0, 768, 256);
+
+  const glow = ctx.createLinearGradient(0, 0, 768, 0);
+  glow.addColorStop(0, 'rgba(32, 168, 198, 0.0)');
+  glow.addColorStop(0.18, 'rgba(72, 238, 255, 0.65)');
+  glow.addColorStop(0.82, 'rgba(72, 238, 255, 0.65)');
+  glow.addColorStop(1, 'rgba(32, 168, 198, 0.0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 112, 768, 32);
+
+  ctx.strokeStyle = 'rgba(188, 255, 250, 0.88)';
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const offsetX = 126 + (i * 176);
+    ctx.beginPath();
+    ctx.moveTo(offsetX, 62);
+    ctx.lineTo(offsetX + 66, 128);
+    ctx.lineTo(offsetX, 194);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = 'rgba(46, 104, 132, 0.64)';
+  ctx.lineWidth = 6;
+  for (let i = 0; i < 3; i++) {
+    const offsetX = 126 + (i * 176);
+    ctx.beginPath();
+    ctx.moveTo(offsetX - 16, 62);
+    ctx.lineTo(offsetX + 52, 128);
+    ctx.lineTo(offsetX - 16, 194);
+    ctx.stroke();
+  }
+
+  texture.update();
+  texture.hasAlpha = true;
+  return texture;
+}
+
+function createSignTexture(scene, name, text) {
+  const texture = new BABYLON.DynamicTexture(name, { width: 768, height: 256 }, scene, true);
+  const ctx = texture.getContext();
+  ctx.clearRect(0, 0, 768, 256);
+
+  const bg = ctx.createLinearGradient(0, 0, 768, 256);
+  bg.addColorStop(0, 'rgba(6, 20, 34, 0.92)');
+  bg.addColorStop(1, 'rgba(10, 42, 60, 0.92)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(18, 18, 732, 220);
+
+  ctx.strokeStyle = 'rgba(118, 255, 246, 0.92)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(22, 22, 724, 212);
+
+  ctx.strokeStyle = 'rgba(18, 80, 98, 0.8)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(38, 38, 692, 180);
+
+  ctx.fillStyle = 'rgba(206, 255, 248, 0.96)';
+  ctx.font = '700 74px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 384, 132);
+
+  texture.update();
+  texture.hasAlpha = true;
+  return texture;
+}
+
+function createFloorRouteMarker(scene, name, def, groundTopY) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, groundTopY + 0.08, def.z ?? LANE_Z);
+
+  const glow = BABYLON.MeshBuilder.CreatePlane(`${name}_glow`, {
+    width: 8.4 * (def.scale ?? 1),
+    height: 2.5 * (def.scale ?? 1),
+  }, scene);
+  glow.parent = root;
+  glow.rotation.x = Math.PI / 2;
+  const glowMat = new BABYLON.StandardMaterial(`${name}_glowMat`, scene);
+  glowMat.diffuseColor = new BABYLON.Color3(0.12, 0.44, 0.52);
+  glowMat.emissiveColor = new BABYLON.Color3(0.08, 0.24, 0.30);
+  glowMat.alpha = 0.22;
+  glowMat.specularColor = BABYLON.Color3.Black();
+  glowMat.disableLighting = true;
+  glowMat.backFaceCulling = false;
+  glowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  glow.material = glowMat;
+  markDecor(glow);
+
+  const marker = BABYLON.MeshBuilder.CreatePlane(`${name}_marker`, {
+    width: 6.8 * (def.scale ?? 1),
+    height: 2.0 * (def.scale ?? 1),
+  }, scene);
+  marker.parent = root;
+  marker.rotation.x = Math.PI / 2;
+  marker.position.y = 0.01;
+  const markerMat = new BABYLON.StandardMaterial(`${name}_markerMat`, scene);
+  const markerTex = createRouteTexture(scene, `${name}_tex`);
+  markerMat.diffuseTexture = markerTex;
+  markerMat.emissiveTexture = markerTex;
+  markerMat.opacityTexture = markerTex;
+  markerMat.specularColor = BABYLON.Color3.Black();
+  markerMat.emissiveColor = new BABYLON.Color3(0.76, 1.0, 0.98);
+  markerMat.disableLighting = true;
+  markerMat.backFaceCulling = false;
+  markerMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  marker.material = markerMat;
+  markDecor(marker);
+
+  return {
+    root,
+    glowMat,
+    markerMat,
+  };
+}
+
+function createGateArch(scene, name, def) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? LANE_Z);
+
+  const arch = BABYLON.MeshBuilder.CreateTorus(`${name}_arch`, {
+    diameter: def.width,
+    thickness: 0.24,
+    tessellation: 56,
+  }, scene);
+  arch.parent = root;
+  arch.rotation.y = Math.PI / 2;
+  arch.scaling.y = def.height / def.width;
+  arch.material = makeGlowMaterial(scene, `${name}_archMat`, [72, 232, 246], {
+    emissive: 0.42,
+    alpha: 0.34,
+    roughness: 0.14,
+  });
+  markDecor(arch);
+
+  const postHeight = Math.max(2.4, def.height * 0.68);
+  for (const dir of [-1, 1]) {
+    const post = BABYLON.MeshBuilder.CreateCylinder(`${name}_post_${dir}`, {
+      diameter: 0.28,
+      height: postHeight,
+      tessellation: 16,
+    }, scene);
+    post.parent = root;
+    post.position.set(dir * ((def.width * 0.5) - 0.18), -(def.height * 0.18), 0);
+    post.material = makeGlowMaterial(scene, `${name}_postMat_${dir}`, [24, 72, 92], {
+      emissive: 0.10,
+      roughness: 0.56,
+    });
+    markDecor(post);
+  }
+
+  return arch;
+}
+
+function createAquariumSign(scene, name, def) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+
+  const board = BABYLON.MeshBuilder.CreatePlane(`${name}_board`, {
+    width: def.width,
+    height: def.height,
+  }, scene);
+  board.parent = root;
+  const boardMat = new BABYLON.StandardMaterial(`${name}_boardMat`, scene);
+  const boardTex = createSignTexture(scene, `${name}_tex`, def.text);
+  boardMat.diffuseTexture = boardTex;
+  boardMat.emissiveTexture = boardTex;
+  boardMat.opacityTexture = boardTex;
+  boardMat.specularColor = BABYLON.Color3.Black();
+  boardMat.emissiveColor = new BABYLON.Color3(0.68, 0.96, 0.98);
+  boardMat.disableLighting = true;
+  boardMat.backFaceCulling = false;
+  boardMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  board.material = boardMat;
+  markDecor(board);
+
+  const frame = BABYLON.MeshBuilder.CreateBox(`${name}_frame`, {
+    width: def.width + 0.28,
+    height: def.height + 0.22,
+    depth: 0.18,
+  }, scene);
+  frame.parent = root;
+  frame.position.z = 0.05;
+  frame.material = makeGlowMaterial(scene, `${name}_frameMat`, [16, 56, 78], {
+    emissive: 0.10,
+    roughness: 0.62,
+  });
+  markDecor(frame);
+
+  return {
+    root,
+    boardMat,
+  };
+}
+
+function createCoralPillar(scene, name, def) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+
+  const trunk = BABYLON.MeshBuilder.CreateCylinder(`${name}_trunk`, {
+    diameterTop: def.radius * 1.2,
+    diameterBottom: def.radius * 1.55,
+    height: def.height,
+    tessellation: 14,
+  }, scene);
+  trunk.parent = root;
+  trunk.position.y = def.height * 0.5;
+  trunk.material = makeGlowMaterial(scene, `${name}_trunkMat`, [24, 84, 94], {
+    emissive: 0.10,
+    roughness: 0.58,
+  });
+  markDecor(trunk);
+
+  for (let i = 0; i < 3; i++) {
+    const bulb = BABYLON.MeshBuilder.CreateSphere(`${name}_bulb_${i}`, {
+      diameter: def.radius * (1.0 + (i * 0.18)),
+      segments: 10,
+    }, scene);
+    bulb.parent = root;
+    bulb.position.set(
+      ((i % 2) === 0 ? -1 : 1) * def.radius * 0.65,
+      (def.height * 0.35) + (i * 0.72),
+      ((i - 1) * 0.34),
+    );
+    bulb.material = makeGlowMaterial(scene, `${name}_bulbMat_${i}`, [82, 230, 204], {
+      emissive: 0.22,
+      alpha: 0.78,
+      roughness: 0.28,
+    });
+    markDecor(bulb);
+  }
+
+  return root;
+}
+
+function createGlassTube(scene, name, def) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+
+  const tube = BABYLON.MeshBuilder.CreateCylinder(`${name}_tube`, {
+    diameter: def.diameter,
+    height: def.length,
+    tessellation: 36,
+  }, scene);
+  tube.parent = root;
+  tube.rotation.z = Math.PI / 2;
+  const tubeMat = new BABYLON.StandardMaterial(`${name}_tubeMat`, scene);
+  tubeMat.diffuseColor = new BABYLON.Color3(0.10, 0.36, 0.46);
+  tubeMat.emissiveColor = new BABYLON.Color3(0.04, 0.14, 0.18);
+  tubeMat.alpha = 0.18;
+  tubeMat.specularColor = new BABYLON.Color3(0.48, 0.78, 0.86);
+  tubeMat.backFaceCulling = false;
+  tubeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  tube.material = tubeMat;
+  markDecor(tube);
+
+  for (let i = -2; i <= 2; i++) {
+    const ring = BABYLON.MeshBuilder.CreateTorus(`${name}_ring_${i}`, {
+      diameter: def.diameter + 0.16,
+      thickness: 0.12,
+      tessellation: 24,
+    }, scene);
+    ring.parent = root;
+    ring.rotation.y = Math.PI / 2;
+    ring.position.x = i * (def.length * 0.18);
+    ring.material = makeGlowMaterial(scene, `${name}_ringMat_${i}`, [68, 210, 228], {
+      emissive: 0.24,
+      alpha: 0.32,
+      roughness: 0.26,
+    });
+    markDecor(ring);
+  }
+
+  return tube;
+}
+
+function createKelpCurtain(scene, name, def) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+
+  const fronds = [];
+  for (let i = 0; i < 7; i++) {
+    const frond = BABYLON.MeshBuilder.CreatePlane(`${name}_frond_${i}`, {
+      width: (def.width / 7) + 0.38,
+      height: def.height,
+    }, scene);
+    frond.parent = root;
+    frond.position.set((-def.width * 0.46) + (i * (def.width / 6)), 0, ((i % 2) - 0.5) * 0.28);
+    const mat = new BABYLON.StandardMaterial(`${name}_frondMat_${i}`, scene);
+    mat.diffuseColor = new BABYLON.Color3(0.05, 0.34 + ((i % 3) * 0.04), 0.18);
+    mat.emissiveColor = new BABYLON.Color3(0.02, 0.12, 0.06);
+    mat.alpha = 0.44;
+    mat.backFaceCulling = false;
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    frond.material = mat;
+    markDecor(frond);
+    fronds.push(frond);
+  }
+
+  return { root, fronds };
+}
+
 function createBackdrop(scene) {
   const root = new BABYLON.TransformNode('L5_backdrop', scene);
+  const groundTopY = LEVEL5.ground.y + (LEVEL5.ground.h * 0.5);
+
   const shell = BABYLON.MeshBuilder.CreatePlane('L5_shell', {
     width: 190,
     height: 42,
@@ -219,73 +539,95 @@ function createBackdrop(scene) {
   shell.material = shellMat;
   markDecor(shell);
 
-  const arches = [];
-  for (let i = 0; i < 7; i++) {
-    const arch = BABYLON.MeshBuilder.CreateTorus(`L5_arch_${i}`, {
-      diameter: 8.2 + ((i % 2) * 1.2),
-      thickness: 0.14,
-      tessellation: 48,
-    }, scene);
-    arch.rotation.y = Math.PI / 2;
-    arch.position.set(-12 + (i * 23), 7.5 + ((i % 3) * 1.4), 10.5 + (i % 2));
-    arch.material = makeGlowMaterial(scene, `L5_archMat_${i}`, [54, 188, 212], {
-      emissive: 0.34,
-      alpha: 0.42,
-      roughness: 0.18,
-    });
-    arches.push(arch);
-    markDecor(arch);
+  const laneStrips = [];
+  const span = LEVEL5.extents.maxX - LEVEL5.extents.minX;
+  const stripSegments = Math.ceil(span / 20);
+  for (let i = 0; i < stripSegments; i++) {
+    const x = LEVEL5.extents.minX + 10 + (i * 20);
+    for (const z of [-3.4, 0, 3.4]) {
+      const strip = BABYLON.MeshBuilder.CreatePlane(`L5_laneStrip_${i}_${z}`, {
+        width: 16.8,
+        height: z === 0 ? 0.28 : 0.16,
+      }, scene);
+      strip.parent = root;
+      strip.rotation.x = Math.PI / 2;
+      strip.position.set(x, groundTopY + 0.03, z);
+      const stripMat = new BABYLON.StandardMaterial(`L5_laneStripMat_${i}_${z}`, scene);
+      stripMat.diffuseColor = new BABYLON.Color3(0.22, 0.72, 0.82);
+      stripMat.emissiveColor = new BABYLON.Color3(0.10, 0.32, 0.38);
+      stripMat.alpha = z === 0 ? 0.52 : 0.36;
+      stripMat.disableLighting = true;
+      stripMat.specularColor = BABYLON.Color3.Black();
+      stripMat.backFaceCulling = false;
+      stripMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      strip.material = stripMat;
+      laneStrips.push(stripMat);
+      markDecor(strip);
+    }
   }
 
-  const kelpFronds = [];
-  for (let i = 0; i < 14; i++) {
-    const frond = BABYLON.MeshBuilder.CreatePlane(`L5_kelp_${i}`, {
-      width: 1.6 + ((i % 3) * 0.4),
-      height: 6.5 + ((i % 4) * 1.2),
-    }, scene);
-    frond.parent = root;
-    frond.position.set(14 + (i * 5.3), 2.4 + ((i % 3) * 0.6), 7.2 + ((i % 2) * 0.8));
-    const mat = new BABYLON.StandardMaterial(`L5_kelpMat_${i}`, scene);
-    mat.diffuseColor = new BABYLON.Color3(0.06, 0.38 + ((i % 3) * 0.04), 0.22);
-    mat.emissiveColor = new BABYLON.Color3(0.03, 0.14, 0.08);
-    mat.alpha = 0.50;
-    mat.backFaceCulling = false;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    frond.material = mat;
-    kelpFronds.push(frond);
-    markDecor(frond);
-  }
+  const routeMarkers = LEVEL5.routeMarkers.map((def, index) => createFloorRouteMarker(
+    scene,
+    `L5_routeMarker_${index}`,
+    def,
+    getLevel5SurfaceTopY(def.x, def.z ?? LANE_Z),
+  ));
+  routeMarkers.forEach((entry) => entry.root.parent = root);
 
-  const glassCylinder = BABYLON.MeshBuilder.CreateCylinder('L5_glassCylinder', {
-    diameter: 18,
-    height: 14,
-    tessellation: 48,
-  }, scene);
-  glassCylinder.position.set(74, 6.8, 9.8);
-  const glassMat = new BABYLON.StandardMaterial('L5_glassCylinderMat', scene);
-  glassMat.diffuseColor = new BABYLON.Color3(0.10, 0.34, 0.44);
-  glassMat.emissiveColor = new BABYLON.Color3(0.04, 0.12, 0.18);
-  glassMat.alpha = 0.18;
-  glassMat.backFaceCulling = false;
-  glassMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-  glassCylinder.material = glassMat;
-  markDecor(glassCylinder);
+  const arches = LEVEL5.gateArches.map((def, index) => createGateArch(scene, `L5_gateArch_${index}`, def));
+  arches.forEach((arch) => arch.parent = root);
+
+  const signBoards = LEVEL5.signage.map((def, index) => createAquariumSign(scene, `L5_sign_${index}`, def));
+  signBoards.forEach((sign) => sign.root.parent = root);
+
+  const coralPillars = LEVEL5.coralPillars.map((def, index) => createCoralPillar(scene, `L5_coral_${index}`, def));
+  coralPillars.forEach((pillar) => pillar.parent = root);
+
+  const glassTubes = LEVEL5.glassTubes.map((def, index) => createGlassTube(scene, `L5_glassTube_${index}`, def));
+  glassTubes.forEach((tube) => tube.parent = root);
+
+  const kelpCurtains = LEVEL5.kelpCurtains.map((def, index) => createKelpCurtain(scene, `L5_kelpCurtain_${index}`, def));
+  kelpCurtains.forEach((curtain) => curtain.root.parent = root);
 
   return {
     root,
-    kelpFronds,
     arches,
+    routeMarkers,
+    signBoards,
+    kelpCurtains,
     update(dt, time) {
-      for (let i = 0; i < kelpFronds.length; i++) {
-        kelpFronds[i].rotation.z = Math.sin((time * 0.7) + i) * 0.12;
+      for (let i = 0; i < laneStrips.length; i++) {
+        laneStrips[i].alpha = 0.34 + (Math.sin((time * 0.85) + i) * 0.06) + (i % 3 === 1 ? 0.08 : 0);
       }
       for (let i = 0; i < arches.length; i++) {
         arches[i].rotation.z += dt * (0.04 + (i * 0.002));
+      }
+      for (let i = 0; i < routeMarkers.length; i++) {
+        routeMarkers[i].markerMat.alpha = 0.82 + (Math.sin((time * 1.4) + i) * 0.10);
+        routeMarkers[i].glowMat.alpha = 0.18 + (Math.sin((time * 0.9) + i) * 0.05);
+      }
+      for (let i = 0; i < signBoards.length; i++) {
+        signBoards[i].boardMat.alpha = 0.96;
+      }
+      for (let i = 0; i < kelpCurtains.length; i++) {
+        const curtain = kelpCurtains[i];
+        for (let j = 0; j < curtain.fronds.length; j++) {
+          curtain.fronds[j].rotation.z = Math.sin((time * 0.7) + i + (j * 0.45)) * 0.14;
+        }
       }
     },
     reset() {
       for (const arch of arches) {
         arch.rotation.z = 0;
+      }
+      for (let i = 0; i < routeMarkers.length; i++) {
+        routeMarkers[i].markerMat.alpha = 0.82;
+        routeMarkers[i].glowMat.alpha = 0.18;
+      }
+      for (const curtain of kelpCurtains) {
+        for (const frond of curtain.fronds) {
+          frond.rotation.z = 0;
+        }
       }
     },
   };
@@ -823,16 +1165,16 @@ export function buildWorld5(scene, options = {}) {
     {
       type: 'onesie',
       x: 48.8,
-      y: 5.95,
+      y: 2.38,
       z: LANE_Z,
       radius: 0.95,
       durationMs: 10000,
       jumpBoost: 1.24,
       collected: false,
-      position: new BABYLON.Vector3(48.8, 5.95, LANE_Z),
+      position: new BABYLON.Vector3(48.8, 2.38, LANE_Z),
       node: createOnesiePickup(scene, 'L5_pickup_onesie', {
         x: 48.8,
-        y: 5.95,
+        y: 2.38,
         z: 1.0,
         shadowGen,
       }).root,
