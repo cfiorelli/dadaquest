@@ -69,6 +69,8 @@ export class GameAudio {
     this.ctx = null;
     this.master = null;
     this.musicGain = null;
+    this.musicPumpGain = null;
+    this.musicCompressor = null;
     this.sfxGain = null;
     this.cooldowns = new Map();
     this._unlockBound = null;
@@ -93,13 +95,34 @@ export class GameAudio {
 
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = 0;
-    this.musicGain.connect(this.master);
+    this.musicPumpGain = this.ctx.createGain();
+    this.musicPumpGain.gain.value = 1;
+    this.musicCompressor = this.ctx.createDynamicsCompressor();
+    this.musicCompressor.threshold.value = -18;
+    this.musicCompressor.knee.value = 18;
+    this.musicCompressor.ratio.value = 2.1;
+    this.musicCompressor.attack.value = 0.02;
+    this.musicCompressor.release.value = 0.22;
+    this.musicGain.connect(this.musicPumpGain);
+    this._configureMusicRouting(0);
 
     this.sfxGain = this.ctx.createGain();
     this.sfxGain.gain.value = 1;
     this.sfxGain.connect(this.master);
 
     this._noiseBuffer = this._createNoiseBuffer();
+  }
+
+  _configureMusicRouting(levelId) {
+    if (!this.musicPumpGain || !this.master) return;
+    try { this.musicPumpGain.disconnect(); } catch {}
+    try { this.musicCompressor?.disconnect(); } catch {}
+    if (levelId >= 6 && this.musicCompressor) {
+      this.musicPumpGain.connect(this.musicCompressor);
+      this.musicCompressor.connect(this.master);
+    } else {
+      this.musicPumpGain.connect(this.master);
+    }
   }
 
   armOnFirstGesture() {
@@ -147,6 +170,7 @@ export class GameAudio {
       if (this._musicRunning && this._musicLevelId === levelId) return true;
 
       this.stopLevelMusic(0.05);
+      this._configureMusicRouting(levelId);
       this._musicRunning = true;
       this._musicLevelId = levelId;
       if (typeof window !== 'undefined' && window.__DADA_DEBUG__) {
@@ -178,6 +202,11 @@ export class GameAudio {
     this._musicSchedulerId = null;
     if (!this.ctx || !this.musicGain) return;
     const t = this.ctx.currentTime;
+    if (this.musicPumpGain) {
+      this.musicPumpGain.gain.cancelScheduledValues(t);
+      this.musicPumpGain.gain.setValueAtTime(this.musicPumpGain.gain.value, t);
+      this.musicPumpGain.gain.linearRampToValueAtTime(1, t + 0.04);
+    }
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
     this.musicGain.gain.linearRampToValueAtTime(0, t + Math.max(0.02, fadeSec));
@@ -267,6 +296,14 @@ export class GameAudio {
       }
       if (spec.levelId === 5) {
         this._playAbyssTexture5(start, beatSec * 4);
+      } else if (spec.levelId === 6) {
+        this._playFactoryTexture6(start, beatSec * 4);
+      } else if (spec.levelId === 7) {
+        this._playStormTexture7(start, beatSec * 4);
+      } else if (spec.levelId === 8) {
+        this._playLibraryTexture8(start, beatSec * 4);
+      } else if (spec.levelId === 9) {
+        this._playCampTexture9(start, beatSec * 4);
       }
     } else if (spec.levelId === 1 && stepInBar === 4) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 1.6, 0.032);
@@ -298,6 +335,10 @@ export class GameAudio {
     if (levelId === 3) return 0.62;
     if (levelId === 4) return 0.52;
     if (levelId === 5) return 0.46;
+    if (levelId === 6) return 0.5;
+    if (levelId === 7) return 0.52;
+    if (levelId === 8) return 0.48;
+    if (levelId === 9) return 0.46;
     return 0.7;
   }
 
@@ -326,21 +367,37 @@ export class GameAudio {
       if (spec.levelId === 2) return beatSec * 0.72;
       if (spec.levelId === 4) return beatSec * 0.55;
       if (spec.levelId === 5) return beatSec * 0.92;
+      if (spec.levelId === 6) return beatSec * 0.62;
+      if (spec.levelId === 7) return beatSec * 0.68;
+      if (spec.levelId === 8) return beatSec * 0.86;
+      if (spec.levelId === 9) return beatSec * 0.98;
       return beatSec * 0.78;
     }
     if (role === 'counter') {
       if (spec.levelId === 2) return beatSec * 0.92;
       if (spec.levelId === 4) return beatSec * 0.42;
       if (spec.levelId === 5) return beatSec * 0.48;
+      if (spec.levelId === 6) return beatSec * 0.44;
+      if (spec.levelId === 7) return beatSec * 0.52;
+      if (spec.levelId === 8) return beatSec * 0.46;
+      if (spec.levelId === 9) return beatSec * 0.58;
       return beatSec * 0.88;
     }
     if (role === 'accent') {
       if (spec.levelId === 5) return beatSec * 0.92;
+      if (spec.levelId === 6) return beatSec * 0.52;
+      if (spec.levelId === 7) return beatSec * 0.48;
+      if (spec.levelId === 8) return beatSec * 0.72;
+      if (spec.levelId === 9) return beatSec * 0.84;
       return beatSec * 0.34;
     }
     if (role === 'bass') {
       if (spec.levelId === 4) return beatSec * 0.80;
       if (spec.levelId === 5) return beatSec * 1.18;
+      if (spec.levelId === 6) return beatSec * 0.92;
+      if (spec.levelId === 7) return beatSec * 0.88;
+      if (spec.levelId === 8) return beatSec * 1.08;
+      if (spec.levelId === 9) return beatSec * 1.18;
       return beatSec * 0.95;
     }
     return beatSec * 0.9;
@@ -366,6 +423,22 @@ export class GameAudio {
     }
     if (spec.levelId === 5) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 6.6, 0.06);
+      return;
+    }
+    if (spec.levelId === 6) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 4.8, 0.052);
+      return;
+    }
+    if (spec.levelId === 7) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 5.2, 0.052);
+      return;
+    }
+    if (spec.levelId === 8) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 5.6, 0.048);
+      return;
+    }
+    if (spec.levelId === 9) {
+      this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 6.8, 0.046);
       return;
     }
     this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 3.0, 0.05);
@@ -399,6 +472,30 @@ export class GameAudio {
     if (levelId === 5) {
       for (let i = 0; i < freqs.length; i++) {
         this._playAbyssPadTone(freqs[i], start + (i * 0.018), duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 6) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playFactoryPadTone6(freqs[i], start + (i * 0.016), duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 7) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playStormPadTone7(freqs[i], start + (i * 0.014), duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 8) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playLibraryPadTone8(freqs[i], start + (i * 0.012), duration, scaledGain / freqs.length);
+      }
+      return;
+    }
+    if (levelId === 9) {
+      for (let i = 0; i < freqs.length; i++) {
+        this._playCampPadTone9(freqs[i], start + (i * 0.02), duration, scaledGain / freqs.length);
       }
       return;
     }
@@ -463,6 +560,58 @@ export class GameAudio {
       return;
     }
 
+    if (levelId === 6) {
+      if (role === 'lead') {
+        this._playMetalLead6(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playClockPulse6(freq, start, duration, scaledGain * 0.92, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playFactorySubBass6(freq, start, duration, scaledGain);
+      } else if (role === 'accent') {
+        this._playGearAccent6(freq, start, duration, scaledGain * 0.82);
+      }
+      return;
+    }
+
+    if (levelId === 7) {
+      if (role === 'lead') {
+        this._playStormLead7(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playStormPulse7(freq, start, duration, scaledGain * 0.9, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playStormBass7(freq, start, duration, scaledGain);
+      } else if (role === 'accent') {
+        this._playLightningAccent7(freq, start, duration, scaledGain * 0.8, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      }
+      return;
+    }
+
+    if (levelId === 8) {
+      if (role === 'lead') {
+        this._playLibraryLead8(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playStoryPluck8(freq, start, duration, scaledGain * 0.88, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playLibraryBass8(freq, start, duration, scaledGain);
+      } else if (role === 'accent') {
+        this._playLibraryAccent8(freq, start, duration, scaledGain * 0.82);
+      }
+      return;
+    }
+
+    if (levelId === 9) {
+      if (role === 'lead') {
+        this._playCampLead9(freq, start, duration, scaledGain, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'counter') {
+        this._playCampPluck9(freq, start, duration, scaledGain * 0.88, extras.glideTo ? noteToFrequency(extras.glideTo) : 0);
+      } else if (role === 'bass') {
+        this._playCampBass9(freq, start, duration, scaledGain);
+      } else if (role === 'accent') {
+        this._playCampAccent9(freq, start, duration, scaledGain * 0.76);
+      }
+      return;
+    }
+
     if (role === 'lead') {
       this._playHomeLead(freq, start, duration, scaledGain);
     } else if (role === 'counter') {
@@ -516,6 +665,32 @@ export class GameAudio {
     gain.connect(destination || this.musicGain || this.master);
     osc.start(start);
     osc.stop(start + duration + 0.02);
+  }
+
+  _playEchoedVoice(baseConfig, echoes = []) {
+    this._playOscVoice(baseConfig);
+    for (const echo of echoes) {
+      this._playOscVoice({
+        ...baseConfig,
+        start: baseConfig.start + (echo.delay ?? 0.16),
+        duration: Math.max(0.08, (baseConfig.duration ?? 0.2) * (echo.durationScale ?? 0.82)),
+        peak: (baseConfig.peak ?? 0.05) * (echo.gainScale ?? 0.25),
+        type: echo.type || baseConfig.type,
+        filterType: echo.filterType || baseConfig.filterType,
+        filterFreq: echo.filterFreq ?? baseConfig.filterFreq,
+        q: echo.q ?? baseConfig.q,
+        freq: echo.freq ?? baseConfig.freq,
+        endFreq: echo.endFreq ?? baseConfig.endFreq,
+      });
+    }
+  }
+
+  _applyMusicPump(levelId, start) {
+    if (!this.ctx || !this.musicPumpGain || levelId < 6 || this._musicLevelId !== levelId) return;
+    const dip = levelId === 9 ? 0.95 : levelId === 8 ? 0.94 : 0.92;
+    this.musicPumpGain.gain.setValueAtTime(1, start);
+    this.musicPumpGain.gain.linearRampToValueAtTime(dip, start + 0.012);
+    this.musicPumpGain.gain.linearRampToValueAtTime(1, start + 0.12);
   }
 
   _playToyLead(freq, start, duration, gain) {
@@ -611,6 +786,538 @@ export class GameAudio {
   _playHomeChordTone(freq, start, duration, gain) {
     this._playOscVoice({ freq, start, duration, peak: gain * 0.82, type: 'triangle', attack: 0.018, filterType: 'lowpass', filterFreq: 1500 });
     this._playOscVoice({ freq: freq * 1.002, start: start + 0.006, duration: duration * 0.92, peak: gain * 0.22, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
+  }
+
+  // Level 6 — mechanical factory groove voices
+
+  _playFactoryPadTone6(freq, start, duration, gain) {
+    const voiceDuration = Math.max(0.9, duration * 0.98);
+    this._playOscVoice({
+      freq,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.34,
+      type: 'sawtooth',
+      attack: 0.12,
+      filterType: 'lowpass',
+      filterFreq: 720,
+      q: 0.62,
+    });
+    this._playOscVoice({
+      freq: freq * 1.004,
+      start: start + 0.03,
+      duration: voiceDuration * 0.9,
+      peak: gain * 0.16,
+      type: 'triangle',
+      attack: 0.14,
+      filterType: 'lowpass',
+      filterFreq: 940,
+      q: 0.56,
+    });
+  }
+
+  _playMetalLead6(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.12, duration * 0.9),
+      peak: gain * 0.46,
+      type: 'triangle',
+      attack: 0.008,
+      filterType: 'bandpass',
+      filterFreq: 1600,
+      q: 1.1,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.12, gainScale: 0.28, durationScale: 0.74, filterFreq: 1220, q: 0.8 },
+    ]);
+    this._playOscVoice({
+      freq: freq * 2,
+      start: start + 0.01,
+      duration: Math.max(0.08, duration * 0.48),
+      peak: gain * 0.12,
+      type: 'square',
+      attack: 0.004,
+      filterType: 'highpass',
+      filterFreq: 980,
+      q: 0.6,
+    });
+  }
+
+  _playClockPulse6(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.08, duration * 0.72),
+      peak: gain * 0.36,
+      type: 'square',
+      attack: 0.006,
+      filterType: 'lowpass',
+      filterFreq: 980,
+      q: 0.84,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.09, gainScale: 0.22, durationScale: 0.5, filterFreq: 760 },
+    ]);
+  }
+
+  _playFactorySubBass6(freq, start, duration, gain) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.24, duration * 1.02),
+      peak: gain * 0.74,
+      type: 'sine',
+      attack: 0.02,
+      filterType: 'lowpass',
+      filterFreq: 130,
+      q: 0.84,
+    });
+    this._playOscVoice({
+      freq: freq * 2,
+      start: start + 0.02,
+      duration: Math.max(0.18, duration * 0.68),
+      peak: gain * 0.08,
+      type: 'sawtooth',
+      attack: 0.016,
+      filterType: 'lowpass',
+      filterFreq: 260,
+      q: 0.7,
+    });
+  }
+
+  _playGearAccent6(freq, start, duration, gain) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.16, duration * 0.8),
+      peak: gain * 0.34,
+      type: 'sine',
+      attack: 0.01,
+      filterType: 'bandpass',
+      filterFreq: 2400,
+      q: 0.68,
+    }, [
+      { delay: 0.18, gainScale: 0.22, durationScale: 0.8, filterFreq: 1800 },
+    ]);
+  }
+
+  _playFactoryTexture6(start, duration) {
+    if (!this.ctx || !this._noiseBuffer || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const hp = this.ctx.createBiquadFilter();
+    const lp = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(420, start);
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(2100, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.0014 * (this._stemLevels.texture ?? 1), start + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    src.connect(hp);
+    hp.connect(lp);
+    lp.connect(gain);
+    gain.connect(this.musicGain);
+    src.start(start);
+    src.stop(start + duration + 0.02);
+  }
+
+  // Level 7 — storm chase score voices
+
+  _playStormPadTone7(freq, start, duration, gain) {
+    const voiceDuration = Math.max(1.0, duration * 1.02);
+    this._playOscVoice({
+      freq,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.34,
+      type: 'sawtooth',
+      attack: 0.16,
+      filterType: 'lowpass',
+      filterFreq: 680,
+      q: 0.58,
+    });
+    this._playOscVoice({
+      freq: freq * 0.5,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.12,
+      type: 'triangle',
+      attack: 0.18,
+      filterType: 'lowpass',
+      filterFreq: 240,
+      q: 0.72,
+    });
+  }
+
+  _playStormLead7(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.16, duration * 0.92),
+      peak: gain * 0.40,
+      type: 'triangle',
+      attack: 0.01,
+      filterType: 'bandpass',
+      filterFreq: 1240,
+      q: 0.96,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.16, gainScale: 0.26, durationScale: 0.7, filterFreq: 920 },
+    ]);
+    this._playOscVoice({
+      freq: freq * 2,
+      start: start + 0.03,
+      duration: Math.max(0.10, duration * 0.46),
+      peak: gain * 0.08,
+      type: 'sine',
+      attack: 0.01,
+      filterType: 'highpass',
+      filterFreq: 1100,
+      q: 0.58,
+    });
+  }
+
+  _playStormPulse7(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.08, duration * 0.7),
+      peak: gain * 0.34,
+      type: 'square',
+      attack: 0.004,
+      filterType: 'lowpass',
+      filterFreq: 860,
+      q: 0.76,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.08, gainScale: 0.20, durationScale: 0.56, filterFreq: 680 },
+    ]);
+  }
+
+  _playStormBass7(freq, start, duration, gain) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.2, duration * 0.96),
+      peak: gain * 0.78,
+      type: 'sine',
+      attack: 0.015,
+      filterType: 'lowpass',
+      filterFreq: 144,
+      q: 0.82,
+    });
+    this._playOscVoice({
+      freq: freq * 1.99,
+      start: start + 0.015,
+      duration: Math.max(0.14, duration * 0.58),
+      peak: gain * 0.08,
+      type: 'triangle',
+      attack: 0.01,
+      filterType: 'lowpass',
+      filterFreq: 240,
+      q: 0.62,
+    });
+  }
+
+  _playLightningAccent7(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.1, duration * 0.76),
+      peak: gain * 0.32,
+      type: 'sine',
+      attack: 0.004,
+      filterType: 'bandpass',
+      filterFreq: 2800,
+      q: 0.72,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.12, gainScale: 0.26, durationScale: 0.66, filterFreq: 2200 },
+    ]);
+  }
+
+  _playStormTexture7(start, duration) {
+    if (!this.ctx || !this._noiseBuffer || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const hp = this.ctx.createBiquadFilter();
+    const bp = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(680, start);
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1800, start);
+    bp.Q.setValueAtTime(0.42, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.0012 * (this._stemLevels.texture ?? 1), start + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    src.connect(hp);
+    hp.connect(bp);
+    bp.connect(gain);
+    gain.connect(this.musicGain);
+    src.start(start);
+    src.stop(start + duration + 0.02);
+  }
+
+  // Level 8 — cozy library groove voices
+
+  _playLibraryPadTone8(freq, start, duration, gain) {
+    const voiceDuration = Math.max(1.1, duration * 1.06);
+    this._playOscVoice({
+      freq,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.30,
+      type: 'triangle',
+      attack: 0.22,
+      filterType: 'lowpass',
+      filterFreq: 880,
+      q: 0.52,
+    });
+    this._playOscVoice({
+      freq: freq * 1.002,
+      start: start + 0.02,
+      duration: voiceDuration * 0.94,
+      peak: gain * 0.14,
+      type: 'sine',
+      attack: 0.18,
+      filterType: 'lowpass',
+      filterFreq: 1020,
+      q: 0.5,
+    });
+  }
+
+  _playLibraryLead8(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.2, duration),
+      peak: gain * 0.34,
+      type: 'triangle',
+      attack: 0.03,
+      filterType: 'bandpass',
+      filterFreq: 980,
+      q: 0.84,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.18, gainScale: 0.20, durationScale: 0.74, filterFreq: 760 },
+    ]);
+  }
+
+  _playStoryPluck8(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.10, duration * 0.72),
+      peak: gain * 0.38,
+      type: 'triangle',
+      attack: 0.006,
+      filterType: 'lowpass',
+      filterFreq: 1800,
+      q: 0.62,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.16, gainScale: 0.24, durationScale: 0.6, filterFreq: 1440 },
+    ]);
+    this._playOscVoice({
+      freq: freq * 2,
+      start: start + 0.01,
+      duration: Math.max(0.08, duration * 0.40),
+      peak: gain * 0.08,
+      type: 'sine',
+      attack: 0.004,
+      filterType: 'highpass',
+      filterFreq: 1200,
+      q: 0.56,
+    });
+  }
+
+  _playLibraryBass8(freq, start, duration, gain) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.24, duration * 1.06),
+      peak: gain * 0.74,
+      type: 'sine',
+      attack: 0.03,
+      filterType: 'lowpass',
+      filterFreq: 154,
+      q: 0.78,
+    });
+    this._playOscVoice({
+      freq: freq * 0.5,
+      start,
+      duration: Math.max(0.2, duration * 0.92),
+      peak: gain * 0.14,
+      type: 'triangle',
+      attack: 0.05,
+      filterType: 'lowpass',
+      filterFreq: 118,
+      q: 0.72,
+    });
+  }
+
+  _playLibraryAccent8(freq, start, duration, gain) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.16, duration * 0.8),
+      peak: gain * 0.26,
+      type: 'sine',
+      attack: 0.01,
+      filterType: 'bandpass',
+      filterFreq: 2200,
+      q: 0.64,
+    }, [
+      { delay: 0.14, gainScale: 0.18, durationScale: 0.82, filterFreq: 1760 },
+    ]);
+  }
+
+  _playLibraryTexture8(start, duration) {
+    if (!this.ctx || !this._noiseBuffer || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const bp = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1320, start);
+    bp.Q.setValueAtTime(0.28, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.0009 * (this._stemLevels.texture ?? 1), start + 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    src.connect(bp);
+    bp.connect(gain);
+    gain.connect(this.musicGain);
+    src.start(start);
+    src.stop(start + duration + 0.02);
+  }
+
+  // Level 9 — camp finale voices
+
+  _playCampPadTone9(freq, start, duration, gain) {
+    const voiceDuration = Math.max(1.3, duration * 1.08);
+    this._playOscVoice({
+      freq,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.26,
+      type: 'triangle',
+      attack: 0.26,
+      filterType: 'lowpass',
+      filterFreq: 720,
+      q: 0.5,
+    });
+    this._playOscVoice({
+      freq: freq * 0.5,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.12,
+      type: 'sine',
+      attack: 0.3,
+      filterType: 'lowpass',
+      filterFreq: 180,
+      q: 0.74,
+    });
+  }
+
+  _playCampLead9(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.24, duration),
+      peak: gain * 0.28,
+      type: 'sine',
+      attack: 0.03,
+      filterType: 'bandpass',
+      filterFreq: 860,
+      q: 0.9,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.22, gainScale: 0.18, durationScale: 0.84, filterFreq: 680 },
+    ]);
+  }
+
+  _playCampPluck9(freq, start, duration, gain, glideTo = 0) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.12, duration * 0.78),
+      peak: gain * 0.30,
+      type: 'triangle',
+      attack: 0.008,
+      filterType: 'lowpass',
+      filterFreq: 1600,
+      q: 0.58,
+      endFreq: glideTo || null,
+    }, [
+      { delay: 0.18, gainScale: 0.22, durationScale: 0.72, filterFreq: 1320 },
+    ]);
+  }
+
+  _playCampBass9(freq, start, duration, gain) {
+    this._playOscVoice({
+      freq,
+      start,
+      duration: Math.max(0.3, duration * 1.12),
+      peak: gain * 0.70,
+      type: 'sine',
+      attack: 0.05,
+      filterType: 'lowpass',
+      filterFreq: 120,
+      q: 0.82,
+    });
+    this._playOscVoice({
+      freq: freq * 2,
+      start: start + 0.02,
+      duration: Math.max(0.18, duration * 0.56),
+      peak: gain * 0.05,
+      type: 'triangle',
+      attack: 0.03,
+      filterType: 'lowpass',
+      filterFreq: 220,
+      q: 0.64,
+    });
+  }
+
+  _playCampAccent9(freq, start, duration, gain) {
+    this._playEchoedVoice({
+      freq,
+      start,
+      duration: Math.max(0.18, duration * 0.9),
+      peak: gain * 0.20,
+      type: 'sine',
+      attack: 0.02,
+      filterType: 'bandpass',
+      filterFreq: 1880,
+      q: 0.58,
+    }, [
+      { delay: 0.2, gainScale: 0.18, durationScale: 0.88, filterFreq: 1480 },
+    ]);
+  }
+
+  _playCampTexture9(start, duration) {
+    if (!this.ctx || !this._noiseBuffer || this.muted) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    const lp = this.ctx.createBiquadFilter();
+    const hp = this.ctx.createBiquadFilter();
+    const gain = this.ctx.createGain();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(1400, start);
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(240, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(0.0011 * (this._stemLevels.texture ?? 1), start + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    src.connect(lp);
+    lp.connect(hp);
+    hp.connect(gain);
+    gain.connect(this.musicGain);
+    src.start(start);
+    src.stop(start + duration + 0.02);
   }
 
   // Level 5 — cinematic aquarium synth score voices
@@ -933,6 +1640,74 @@ export class GameAudio {
         this._osc(248, 'sine', start + 0.01, 0.06, 0.0024 * drumGain, 188, this.musicGain);
       } else if (drum === 'shaker') {
         this._playNoiseBurst(start, 0.05, 0.0018 * drumGain, { type: 'highpass', frequency: 2800, q: 0.36 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 6) {
+      if (drum === 'kick') {
+        this._applyMusicPump(levelId, start);
+        this._osc(58, 'sine', start, 0.22, 0.05 * drumGain, 34, this.musicGain);
+        this._playNoiseBurst(start, 0.03, 0.003 * drumGain, { type: 'lowpass', frequency: 260, q: 0.42 }, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.09, 0.012 * drumGain, { type: 'bandpass', frequency: 1800, q: 0.66 }, this.musicGain);
+        this._osc(214, 'triangle', start + 0.008, 0.08, 0.004 * drumGain, 140, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.028, 0.004 * drumGain, { type: 'highpass', frequency: 4600, q: 0.54 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.032, 0.0046 * drumGain, { type: 'bandpass', frequency: 2200, q: 0.82 }, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.04, 0.0028 * drumGain, { type: 'highpass', frequency: 3200, q: 0.42 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 7) {
+      if (drum === 'kick') {
+        this._applyMusicPump(levelId, start);
+        this._osc(52, 'sine', start, 0.24, 0.052 * drumGain, 30, this.musicGain);
+        this._playNoiseBurst(start, 0.026, 0.0032 * drumGain, { type: 'lowpass', frequency: 240, q: 0.48 }, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.085, 0.013 * drumGain, { type: 'bandpass', frequency: 1900, q: 0.74 }, this.musicGain);
+        this._osc(236, 'triangle', start + 0.01, 0.09, 0.004 * drumGain, 154, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.03, 0.0042 * drumGain, { type: 'highpass', frequency: 5200, q: 0.52 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.028, 0.004 * drumGain, { type: 'bandpass', frequency: 2400, q: 0.84 }, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.038, 0.0026 * drumGain, { type: 'highpass', frequency: 3600, q: 0.48 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 8) {
+      if (drum === 'kick') {
+        this._applyMusicPump(levelId, start);
+        this._osc(64, 'sine', start, 0.18, 0.036 * drumGain, 38, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.075, 0.008 * drumGain, { type: 'bandpass', frequency: 1600, q: 0.68 }, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.024, 0.0028 * drumGain, { type: 'highpass', frequency: 4400, q: 0.5 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.026, 0.0042 * drumGain, { type: 'bandpass', frequency: 2100, q: 0.78 }, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.03, 0.0022 * drumGain, { type: 'highpass', frequency: 3200, q: 0.46 }, this.musicGain);
+      }
+      return;
+    }
+
+    if (levelId === 9) {
+      if (drum === 'kick') {
+        this._applyMusicPump(levelId, start);
+        this._osc(60, 'sine', start, 0.20, 0.034 * drumGain, 34, this.musicGain);
+      } else if (drum === 'snare') {
+        this._playNoiseBurst(start, 0.07, 0.006 * drumGain, { type: 'bandpass', frequency: 1500, q: 0.6 }, this.musicGain);
+      } else if (drum === 'hat') {
+        this._playNoiseBurst(start, 0.022, 0.0018 * drumGain, { type: 'highpass', frequency: 4000, q: 0.44 }, this.musicGain);
+      } else if (drum === 'rim') {
+        this._playNoiseBurst(start, 0.032, 0.0044 * drumGain, { type: 'bandpass', frequency: 1760, q: 0.72 }, this.musicGain);
+      } else if (drum === 'shaker') {
+        this._playNoiseBurst(start, 0.034, 0.0022 * drumGain, { type: 'highpass', frequency: 3000, q: 0.4 }, this.musicGain);
       }
       return;
     }
