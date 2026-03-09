@@ -9,7 +9,7 @@ export const LEVEL_SUBTITLES = {
   6: 'Level 6 — Clockwork Toy Factory',
   7: 'Level 7 — Stormy Kite Park',
   8: 'Level 8 — Haunted Library',
-  9: 'Level 9 — ???',
+  9: 'Level 9 — Lantern Camp',
 };
 
 export function getLevelSubtitle(levelId) {

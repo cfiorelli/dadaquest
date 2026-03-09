@@ -1537,6 +1537,7 @@ export function buildWorld5(scene, options = {}) {
     ],
     crumbles: [],
     level: LEVEL5,
+    era5Level: level5,
     level5,
     signs: [backdrop.root, aquariumFx.root, ...platformVisuals],
     goalGuardMinX: LEVEL5.goal.x - 4.8,
