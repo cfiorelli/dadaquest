@@ -51,14 +51,16 @@ const GOAL_CELEBRATION_SEC = 0.96;
 const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
-const ERA5_CAMERA_DISTANCE = 10.2;
-const ERA5_CAMERA_HEIGHT = 5.4;
-const ERA5_CAMERA_FOCUS_HEIGHT = 1.18;
-const ERA5_CAMERA_LOOK_AHEAD = 3.6;
-const ERA5_CAMERA_FOV = 0.94;
+const ERA5_CAMERA_DISTANCE = 11.8;
+const ERA5_CAMERA_HEIGHT = 6.1;
+const ERA5_CAMERA_FOCUS_HEIGHT = 1.28;
+const ERA5_CAMERA_LOOK_AHEAD = 4.2;
+const ERA5_CAMERA_FOV = 0.98;
 const ERA5_CAMERA_YAW_SPEED = 1.95;
 const ERA5_CAMERA_DAMP = 4.8;
 const ERA5_CAMERA_OCCLUDED_DAMP = 10.5;
+const ERA5_CAMERA_IDLE_RECENTER_SPEED = 0.8;
+const ERA5_CAMERA_IDLE_RECENTER_DELAY_MS = 650;
 const ERA5_JUMP_MULTIPLIER = 1.12;
 const ERA5_GRAVITY_SCALE = 0.92;
 const ERA5_AIR_ACCEL_MULTIPLIER = 0.86;
@@ -2273,6 +2275,7 @@ export async function boot(options = {}) {
     ? Math.atan2(cameraStartTarget.z - cameraStartPos.z, cameraStartTarget.x - cameraStartPos.x)
     : 0;
   let era5CameraDesiredYaw = era5CameraYaw;
+  let era5CameraManualLookMs = 0;
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
 
@@ -2381,8 +2384,13 @@ export async function boot(options = {}) {
     y: Number(player.mesh.position.y.toFixed(3)),
     z: Number(player.mesh.position.z.toFixed(3)),
   };
+  window.__DADA_DEBUG__.playerVelocity = { x: 0, z: 0 };
+  window.__DADA_DEBUG__.playerFacingYaw = player.visual.rotation.y;
   window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;
+  window.__DADA_DEBUG__.cameraForward = { x: 1, z: 0 };
+  window.__DADA_DEBUG__.cameraRight = { x: 0, z: -1 };
   window.__DADA_DEBUG__.l5ProjectileCount = 0;
+  window.__DADA_DEBUG__.musicRunning = false;
   window.__DADA_DEBUG__.actors = actorState;
   if (debugMode) {
     const LANE_Z = 0;
@@ -2745,7 +2753,11 @@ export async function boot(options = {}) {
 
   function getEra5CameraRight() {
     const forward = getEra5CameraForward();
-    return new BABYLON.Vector3(-forward.z, 0, forward.x).normalize();
+    const right = BABYLON.Vector3.Cross(BABYLON.Axis.Y, forward);
+    if (right.lengthSquared() <= 0.0001) {
+      return new BABYLON.Vector3(Math.sin(era5CameraYaw), 0, -Math.cos(era5CameraYaw));
+    }
+    return right.normalize();
   }
 
   function spawnEra5Projectile(position, direction) {
@@ -3276,6 +3288,7 @@ export async function boot(options = {}) {
     if (isEra5Level) {
       era5CameraYaw = Math.atan2(cameraStartTarget.z - cameraStartPos.z, cameraStartTarget.x - cameraStartPos.x);
       era5CameraDesiredYaw = era5CameraYaw;
+      era5CameraManualLookMs = 0;
       camera.fov = ERA5_CAMERA_FOV;
     }
     updateActorDebug();
@@ -3955,7 +3968,12 @@ export async function boot(options = {}) {
         const dy = pos.y - coin.position.y;
         const dz = isEra5Level ? (pos.z - coin.position.z) : 0;
         const r = coin.radius ?? 0.45;
-        if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
+        const distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
+        const distanceXZ = Math.hypot(dx, dz);
+        const magnetCollect = isEra5Level
+          ? distanceXZ < 0.95 && Math.abs(dy) < 1.2
+          : false;
+        if (distanceSq <= (r * r) || magnetCollect) {
           coin.collected = true;
           if (coin.node) coin.node.setEnabled(false);
           coinsCollected++;
@@ -4257,6 +4275,9 @@ export async function boot(options = {}) {
       if (flourPuffCooldownMs > 0) {
         flourPuffCooldownMs = Math.max(0, flourPuffCooldownMs - (dt * 1000));
       }
+      if (era5CameraManualLookMs > 0) {
+        era5CameraManualLookMs = Math.max(0, era5CameraManualLookMs - (dt * 1000));
+      }
       if (respawnState) {
         if (respawnState.phase === 'fadeOut') {
           respawnState.timer = Math.max(0, respawnState.timer - dt);
@@ -4335,9 +4356,11 @@ export async function boot(options = {}) {
             moveZ /= moveLen;
           }
           if (cameraYawInput !== 0) {
+            era5CameraManualLookMs = ERA5_CAMERA_IDLE_RECENTER_DELAY_MS;
             era5CameraDesiredYaw = wrapToPi(era5CameraDesiredYaw + (cameraYawInput * ERA5_CAMERA_YAW_SPEED * dt));
           }
           if (cameraRecenter) {
+            era5CameraManualLookMs = 0;
             const recenterYaw = moveLen > 0.08
               ? Math.atan2(moveZ, moveX)
               : player.visual.rotation.y;
@@ -4505,13 +4528,24 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (isEra5Level) {
+        const planarSpeed = Math.hypot(player.vx, player.vz);
+        if (era5CameraManualLookMs <= 0 && planarSpeed <= 0.12) {
+          era5CameraDesiredYaw += wrapToPi(player.visual.rotation.y - era5CameraDesiredYaw) * Math.min(1, dt * ERA5_CAMERA_IDLE_RECENTER_SPEED);
+        }
         era5CameraYaw += wrapToPi(era5CameraDesiredYaw - era5CameraYaw) * Math.min(1, dt * 4.1);
         const cameraForward = new BABYLON.Vector3(Math.cos(era5CameraYaw), 0, Math.sin(era5CameraYaw));
+        const movementDir = planarSpeed > 0.14
+          ? new BABYLON.Vector3(player.vx / planarSpeed, 0, player.vz / planarSpeed)
+          : new BABYLON.Vector3(
+            Math.sin(player.visual.rotation.y),
+            0,
+            Math.cos(player.visual.rotation.y),
+          );
         const focusPos = new BABYLON.Vector3(px, py + ERA5_CAMERA_FOCUS_HEIGHT, player.mesh.position.z);
         const desiredTarget = new BABYLON.Vector3(
-          px + (cameraForward.x * ERA5_CAMERA_LOOK_AHEAD),
+          px + (movementDir.x * ERA5_CAMERA_LOOK_AHEAD),
           py + ERA5_CAMERA_FOCUS_HEIGHT,
-          player.mesh.position.z + (cameraForward.z * ERA5_CAMERA_LOOK_AHEAD),
+          player.mesh.position.z + (movementDir.z * ERA5_CAMERA_LOOK_AHEAD),
         );
         const desiredCameraPos = new BABYLON.Vector3(
           px - (cameraForward.x * ERA5_CAMERA_DISTANCE),
@@ -4609,6 +4643,19 @@ export async function boot(options = {}) {
       if (state === 'gameplay' && !respawnState) {
         for (const coin of coins) {
           if (coin.node && !coin.collected) {
+            coin.node.position.copyFrom(coin.position);
+            if (isEra5Level) {
+              const dx = player.mesh.position.x - coin.position.x;
+              const dy = player.mesh.position.y - coin.position.y;
+              const dz = player.mesh.position.z - coin.position.z;
+              const distanceXZ = Math.hypot(dx, dz);
+              if (distanceXZ < 1.6 && Math.abs(dy) < 1.6) {
+                const pullStrength = (1.6 - distanceXZ) / 1.6;
+                coin.node.position.x += dx * 0.16 * pullStrength;
+                coin.node.position.y += dy * 0.10 * pullStrength;
+                coin.node.position.z += dz * 0.16 * pullStrength;
+              }
+            }
             coin.node.rotation.y += dt * 2.5;
           }
         }
@@ -4626,8 +4673,26 @@ export async function boot(options = {}) {
       y: Number(player.mesh.position.y.toFixed(3)),
       z: Number(player.mesh.position.z.toFixed(3)),
     };
+    window.__DADA_DEBUG__.playerVelocity = {
+      x: Number(player.vx.toFixed(3)),
+      z: Number(player.vz.toFixed(3)),
+    };
+    window.__DADA_DEBUG__.playerFacingYaw = Number(player.visual.rotation.y.toFixed(4));
     window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;
+    {
+      const debugForward = getEra5CameraForward();
+      const debugRight = getEra5CameraRight();
+      window.__DADA_DEBUG__.cameraForward = {
+        x: Number(debugForward.x.toFixed(4)),
+        z: Number(debugForward.z.toFixed(4)),
+      };
+      window.__DADA_DEBUG__.cameraRight = {
+        x: Number(debugRight.x.toFixed(4)),
+        z: Number(debugRight.z.toFixed(4)),
+      };
+    }
     window.__DADA_DEBUG__.l5ProjectileCount = era5Projectiles.length;
+    window.__DADA_DEBUG__.musicRunning = !!audio._musicRunning;
 
     // Debug HUD (dev only)
     if (debugHud) {

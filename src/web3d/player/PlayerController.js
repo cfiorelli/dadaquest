@@ -633,14 +633,11 @@ export class PlayerController {
     }
 
     if (freeMove) {
-      const facingMoveLen = Math.hypot(moveX, moveZ);
       const planarSpeed = Math.hypot(this.vx, this.vz);
-      if (facingMoveLen > 0.08 || planarSpeed > 0.32) {
-        const desiredYaw = facingMoveLen > 0.08
-          ? Math.atan2(moveZ, moveX)
-          : Math.atan2(this.vz, this.vx);
+      if (planarSpeed > 0.14) {
+        const desiredYaw = Math.atan2(this.vx, this.vz);
         const delta = wrapAngle(desiredYaw - this.visual.rotation.y);
-        this.visual.rotation.y += delta * Math.min(1, dt * 8.5);
+        this.visual.rotation.y += delta * Math.min(1, dt * 13.5);
       }
     } else if (Math.abs(this.visual.rotation.y) > 0.0001) {
       this.visual.rotation.y *= Math.max(0, 1 - (dt * 12));
