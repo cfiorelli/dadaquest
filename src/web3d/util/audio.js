@@ -62,6 +62,10 @@ function getSpecBar(spec, barIndex) {
   };
 }
 
+function getMusicMix(spec) {
+  return spec?.mix || null;
+}
+
 export class GameAudio {
   constructor({ enabled = true } = {}) {
     this.enabled = enabled;
@@ -117,6 +121,14 @@ export class GameAudio {
     if (!this.musicPumpGain || !this.master) return;
     try { this.musicPumpGain.disconnect(); } catch {}
     try { this.musicCompressor?.disconnect(); } catch {}
+    if (this.musicCompressor) {
+      const compressor = LEVEL_MUSIC_SPECS[levelId]?.mix?.compressor || null;
+      this.musicCompressor.threshold.value = compressor?.threshold ?? -18;
+      this.musicCompressor.knee.value = compressor?.knee ?? 18;
+      this.musicCompressor.ratio.value = compressor?.ratio ?? 2.1;
+      this.musicCompressor.attack.value = compressor?.attack ?? 0.02;
+      this.musicCompressor.release.value = compressor?.release ?? 0.22;
+    }
     if (levelId >= 5 && this.musicCompressor) {
       this.musicPumpGain.connect(this.musicCompressor);
       this.musicCompressor.connect(this.master);
@@ -284,6 +296,7 @@ export class GameAudio {
     const barIndex = Math.floor(stepIndex / 8);
     const { bar } = getSpecBar(spec, barIndex);
     const beatSec = 60 / spec.tempo;
+    const mix = getMusicMix(spec);
     const swingOffset = stepInBar > 0 && (stepInBar % 2 === 1)
       ? ((spec.swing ?? 0) * beatSec * 0.5)
       : 0;
@@ -294,32 +307,35 @@ export class GameAudio {
       if (spec.levelId === 2 && bar.vinyl) {
         this._playVinylWash(start, beatSec * 4);
       }
-      if (spec.levelId === 5) {
-        this._playAbyssTexture5(start, beatSec * 4);
-      } else if (spec.levelId === 6) {
-        this._playFactoryTexture6(start, beatSec * 4);
-      } else if (spec.levelId === 7) {
-        this._playStormTexture7(start, beatSec * 4);
-      } else if (spec.levelId === 8) {
-        this._playLibraryTexture8(start, beatSec * 4);
-      } else if (spec.levelId === 9) {
-        this._playCampTexture9(start, beatSec * 4);
+      const textureEveryBars = Math.max(1, Number(mix?.textureEveryBars) || 1);
+      if (barIndex % textureEveryBars === 0) {
+        if (spec.levelId === 5) {
+          this._playAbyssTexture5(start, beatSec * 4);
+        } else if (spec.levelId === 6) {
+          this._playFactoryTexture6(start, beatSec * 4);
+        } else if (spec.levelId === 7) {
+          this._playStormTexture7(start, beatSec * 4);
+        } else if (spec.levelId === 8) {
+          this._playLibraryTexture8(start, beatSec * 4);
+        } else if (spec.levelId === 9) {
+          this._playCampTexture9(start, beatSec * 4);
+        }
       }
     } else if (spec.levelId === 1 && stepInBar === 4) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 1.6, 0.032);
     }
 
     if (bar.lead[stepInBar]) {
-      this._playRoleNote(spec.levelId, 'lead', noteToFrequency(bar.lead[stepInBar]), stepStart, this._roleDuration(spec, 'lead'), 0.078);
+      this._playRoleNote(spec.levelId, 'lead', noteToFrequency(bar.lead[stepInBar]), stepStart, this._roleDuration(spec, 'lead'), this._stepRoleGain(spec, 'lead'));
     }
     if (bar.counter[stepInBar]) {
-      this._playRoleNote(spec.levelId, 'counter', noteToFrequency(bar.counter[stepInBar]), stepStart, this._roleDuration(spec, 'counter'), 0.055);
+      this._playRoleNote(spec.levelId, 'counter', noteToFrequency(bar.counter[stepInBar]), stepStart, this._roleDuration(spec, 'counter'), this._stepRoleGain(spec, 'counter'));
     }
     if (bar.accent[stepInBar]) {
-      this._playRoleNote(spec.levelId, 'accent', noteToFrequency(bar.accent[stepInBar]), stepStart, this._roleDuration(spec, 'accent'), 0.04);
+      this._playRoleNote(spec.levelId, 'accent', noteToFrequency(bar.accent[stepInBar]), stepStart, this._roleDuration(spec, 'accent'), this._stepRoleGain(spec, 'accent'));
     }
     if (bar.bass[stepInBar]) {
-      this._playRoleNote(spec.levelId, 'bass', noteToFrequency(bar.bass[stepInBar]), stepStart, this._roleDuration(spec, 'bass'), 0.07);
+      this._playRoleNote(spec.levelId, 'bass', noteToFrequency(bar.bass[stepInBar]), stepStart, this._roleDuration(spec, 'bass'), this._stepRoleGain(spec, 'bass'));
     }
 
     if (bar.kick.includes(stepInBar)) this._playMusicDrum(spec.levelId, 'kick', stepStart, 1);
@@ -330,6 +346,9 @@ export class GameAudio {
   }
 
   _getMusicTargetGain(levelId) {
+    const spec = LEVEL_MUSIC_SPECS[levelId];
+    const mixTarget = spec?.mix?.targetGain;
+    if (Number.isFinite(mixTarget)) return mixTarget;
     if (levelId === 1) return 0.68;
     if (levelId === 2) return 0.56;
     if (levelId === 3) return 0.62;
@@ -346,14 +365,15 @@ export class GameAudio {
     if (!this.ctx || !this.musicGain || !this._musicRunning || this._musicLevelId !== levelId) return;
     const t = this.ctx.currentTime;
     const baseGain = this._getMusicTargetGain(levelId);
-    let duckTo = baseGain * 0.82;
-    let release = 0.28;
+    const ducking = LEVEL_MUSIC_SPECS[levelId]?.mix?.ducking || null;
+    let duckTo = baseGain * (ducking?.defaultMul ?? 0.82);
+    let release = ducking?.defaultRelease ?? 0.28;
     if (cueName === 'levelComplete') {
-      duckTo = baseGain * 0.68;
-      release = 0.55;
+      duckTo = baseGain * (ducking?.levelCompleteMul ?? 0.68);
+      release = ducking?.levelCompleteRelease ?? 0.55;
     } else if (cueName === 'collision') {
-      duckTo = baseGain * 0.74;
-      release = 0.38;
+      duckTo = baseGain * (ducking?.collisionMul ?? 0.74);
+      release = ducking?.collisionRelease ?? 0.38;
     }
     this.musicGain.gain.cancelScheduledValues(t);
     this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
@@ -363,6 +383,8 @@ export class GameAudio {
 
   _roleDuration(spec, role) {
     const beatSec = 60 / spec.tempo;
+    const specDuration = spec?.mix?.roleDurations?.[role];
+    if (Number.isFinite(specDuration)) return beatSec * specDuration;
     if (role === 'lead') {
       if (spec.levelId === 2) return beatSec * 0.72;
       if (spec.levelId === 4) return beatSec * 0.55;
@@ -403,12 +425,34 @@ export class GameAudio {
     return beatSec * 0.9;
   }
 
+  _stepRoleGain(spec, role) {
+    const specGain = spec?.mix?.stepGains?.[role];
+    if (Number.isFinite(specGain)) return specGain;
+    if (role === 'lead') return 0.078;
+    if (role === 'counter') return 0.055;
+    if (role === 'accent') return 0.04;
+    if (role === 'bass') return 0.07;
+    return 0.05;
+  }
+
   _stemGain(role) {
     return this._stemLevels[role] ?? 1;
   }
 
   _playBarChord(spec, bar, start, beatSec) {
     if (!Array.isArray(bar.chord) || !bar.chord.length) return;
+    const chordMix = spec?.mix?.chord;
+    if (spec.levelId >= 5 && chordMix) {
+      this._playRoleChord(
+        spec.levelId,
+        'chord',
+        bar.chord,
+        start,
+        beatSec * (chordMix.durationBeats ?? 4.0),
+        chordMix.gain ?? 0.05,
+      );
+      return;
+    }
     if (spec.levelId === 1) {
       this._playRoleChord(spec.levelId, 'chord', bar.chord, start, beatSec * 2.2, 0.05);
       return;
@@ -685,12 +729,46 @@ export class GameAudio {
     }
   }
 
+  _playFilteredNoiseLayer({
+    start,
+    duration,
+    peak,
+    attack = 0.02,
+    primary = null,
+    secondary = null,
+    destination = null,
+  }) {
+    if (!this.ctx || !this._noiseBuffer || this.muted || peak <= 0.0001) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noiseBuffer;
+    let tail = src;
+    for (const filterDef of [primary, secondary]) {
+      if (!filterDef?.type || !Number.isFinite(filterDef.frequency)) continue;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = filterDef.type;
+      filter.frequency.setValueAtTime(filterDef.frequency, start);
+      filter.Q.setValueAtTime(filterDef.q ?? 0.7, start);
+      tail.connect(filter);
+      tail = filter;
+    }
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(peak, start + Math.min(attack, duration * 0.35));
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    tail.connect(gain);
+    gain.connect(destination || this.musicGain || this.master);
+    src.start(start);
+    src.stop(start + duration + 0.02);
+  }
+
   _applyMusicPump(levelId, start) {
     if (!this.ctx || !this.musicPumpGain || levelId < 5 || this._musicLevelId !== levelId) return;
-    const dip = levelId === 9 ? 0.95 : levelId === 8 ? 0.94 : levelId === 5 ? 0.90 : 0.92;
+    const mix = LEVEL_MUSIC_SPECS[levelId]?.mix || null;
+    const dip = mix?.pumpDip ?? (levelId === 9 ? 0.95 : levelId === 8 ? 0.94 : levelId === 5 ? 0.90 : 0.92);
+    const release = mix?.pumpRelease ?? 0.12;
     this.musicPumpGain.gain.setValueAtTime(1, start);
     this.musicPumpGain.gain.linearRampToValueAtTime(dip, start + 0.012);
-    this.musicPumpGain.gain.linearRampToValueAtTime(1, start + 0.12);
+    this.musicPumpGain.gain.linearRampToValueAtTime(1, start + release);
   }
 
   _playToyLead(freq, start, duration, gain) {
@@ -796,23 +874,34 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.34,
+      peak: gain * 0.30,
       type: 'sawtooth',
-      attack: 0.12,
+      attack: 0.10,
       filterType: 'lowpass',
-      filterFreq: 720,
-      q: 0.62,
+      filterFreq: 640,
+      q: 0.68,
     });
     this._playOscVoice({
-      freq: freq * 1.004,
-      start: start + 0.03,
-      duration: voiceDuration * 0.9,
-      peak: gain * 0.16,
-      type: 'triangle',
-      attack: 0.14,
+      freq: freq * 0.5,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.13,
+      type: 'square',
+      attack: 0.06,
       filterType: 'lowpass',
-      filterFreq: 940,
-      q: 0.56,
+      filterFreq: 190,
+      q: 0.78,
+    });
+    this._playOscVoice({
+      freq: freq * 1.01,
+      start: start + 0.02,
+      duration: voiceDuration * 0.86,
+      peak: gain * 0.12,
+      type: 'triangle',
+      attack: 0.1,
+      filterType: 'bandpass',
+      filterFreq: 1180,
+      q: 0.54,
     });
   }
 
@@ -820,27 +909,27 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.12, duration * 0.9),
-      peak: gain * 0.46,
-      type: 'triangle',
-      attack: 0.008,
+      duration: Math.max(0.11, duration * 0.76),
+      peak: gain * 0.44,
+      type: 'square',
+      attack: 0.006,
       filterType: 'bandpass',
-      filterFreq: 1600,
-      q: 1.1,
+      filterFreq: 1460,
+      q: 1.28,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.12, gainScale: 0.28, durationScale: 0.74, filterFreq: 1220, q: 0.8 },
+      { delay: 0.1, gainScale: 0.26, durationScale: 0.66, filterFreq: 1140, q: 0.9, type: 'triangle' },
     ]);
     this._playOscVoice({
       freq: freq * 2,
       start: start + 0.01,
-      duration: Math.max(0.08, duration * 0.48),
-      peak: gain * 0.12,
-      type: 'square',
+      duration: Math.max(0.06, duration * 0.34),
+      peak: gain * 0.13,
+      type: 'sawtooth',
       attack: 0.004,
       filterType: 'highpass',
-      filterFreq: 980,
-      q: 0.6,
+      filterFreq: 1340,
+      q: 0.74,
     });
   }
 
@@ -848,16 +937,16 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.08, duration * 0.72),
-      peak: gain * 0.36,
+      duration: Math.max(0.07, duration * 0.58),
+      peak: gain * 0.40,
       type: 'square',
-      attack: 0.006,
+      attack: 0.003,
       filterType: 'lowpass',
-      filterFreq: 980,
-      q: 0.84,
+      filterFreq: 880,
+      q: 0.94,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.09, gainScale: 0.22, durationScale: 0.5, filterFreq: 760 },
+      { delay: 0.07, gainScale: 0.16, durationScale: 0.4, filterFreq: 680, type: 'triangle' },
     ]);
   }
 
@@ -865,24 +954,24 @@ export class GameAudio {
     this._playOscVoice({
       freq,
       start,
-      duration: Math.max(0.24, duration * 1.02),
-      peak: gain * 0.74,
+      duration: Math.max(0.24, duration * 1.04),
+      peak: gain * 0.76,
       type: 'sine',
       attack: 0.02,
       filterType: 'lowpass',
-      filterFreq: 130,
-      q: 0.84,
+      filterFreq: 120,
+      q: 0.9,
     });
     this._playOscVoice({
       freq: freq * 2,
       start: start + 0.02,
       duration: Math.max(0.18, duration * 0.68),
-      peak: gain * 0.08,
+      peak: gain * 0.1,
       type: 'sawtooth',
-      attack: 0.016,
+      attack: 0.012,
       filterType: 'lowpass',
-      filterFreq: 260,
-      q: 0.7,
+      filterFreq: 300,
+      q: 0.72,
     });
   }
 
@@ -890,38 +979,35 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.16, duration * 0.8),
-      peak: gain * 0.34,
+      duration: Math.max(0.14, duration * 0.72),
+      peak: gain * 0.32,
       type: 'sine',
-      attack: 0.01,
+      attack: 0.008,
       filterType: 'bandpass',
-      filterFreq: 2400,
-      q: 0.68,
+      filterFreq: 2760,
+      q: 0.7,
     }, [
-      { delay: 0.18, gainScale: 0.22, durationScale: 0.8, filterFreq: 1800 },
+      { delay: 0.14, gainScale: 0.18, durationScale: 0.64, filterFreq: 2040, type: 'triangle' },
     ]);
   }
 
   _playFactoryTexture6(start, duration) {
-    if (!this.ctx || !this._noiseBuffer || this.muted) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuffer;
-    const hp = this.ctx.createBiquadFilter();
-    const lp = this.ctx.createBiquadFilter();
-    const gain = this.ctx.createGain();
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(420, start);
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(2100, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.0014 * (this._stemLevels.texture ?? 1), start + 0.06);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    src.connect(hp);
-    hp.connect(lp);
-    lp.connect(gain);
-    gain.connect(this.musicGain);
-    src.start(start);
-    src.stop(start + duration + 0.02);
+    const stem = this._stemLevels.texture ?? 1;
+    this._playFilteredNoiseLayer({
+      start,
+      duration,
+      peak: 0.0012 * stem,
+      attack: 0.05,
+      primary: { type: 'highpass', frequency: 480, q: 0.38 },
+      secondary: { type: 'lowpass', frequency: 1800, q: 0.48 },
+    });
+    this._playFilteredNoiseLayer({
+      start: start + 0.06,
+      duration: duration * 0.72,
+      peak: 0.00055 * stem,
+      attack: 0.03,
+      primary: { type: 'bandpass', frequency: 2400, q: 0.52 },
+    });
   }
 
   // Level 7 — storm chase score voices
@@ -932,23 +1018,34 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.34,
+      peak: gain * 0.28,
       type: 'sawtooth',
-      attack: 0.16,
+      attack: 0.18,
       filterType: 'lowpass',
-      filterFreq: 680,
-      q: 0.58,
+      filterFreq: 620,
+      q: 0.6,
     });
     this._playOscVoice({
       freq: freq * 0.5,
       start,
       duration: voiceDuration,
-      peak: gain * 0.12,
+      peak: gain * 0.14,
       type: 'triangle',
-      attack: 0.18,
+      attack: 0.2,
       filterType: 'lowpass',
-      filterFreq: 240,
-      q: 0.72,
+      filterFreq: 220,
+      q: 0.76,
+    });
+    this._playOscVoice({
+      freq: freq * 1.008,
+      start: start + 0.04,
+      duration: voiceDuration * 0.86,
+      peak: gain * 0.09,
+      type: 'triangle',
+      attack: 0.12,
+      filterType: 'bandpass',
+      filterFreq: 940,
+      q: 0.46,
     });
   }
 
@@ -956,27 +1053,27 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.16, duration * 0.92),
-      peak: gain * 0.40,
+      duration: Math.max(0.14, duration * 0.86),
+      peak: gain * 0.42,
       type: 'triangle',
-      attack: 0.01,
+      attack: 0.008,
       filterType: 'bandpass',
-      filterFreq: 1240,
-      q: 0.96,
+      filterFreq: 1340,
+      q: 1.0,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.16, gainScale: 0.26, durationScale: 0.7, filterFreq: 920 },
+      { delay: 0.18, gainScale: 0.24, durationScale: 0.66, filterFreq: 980, type: 'sine' },
     ]);
     this._playOscVoice({
       freq: freq * 2,
       start: start + 0.03,
-      duration: Math.max(0.10, duration * 0.46),
-      peak: gain * 0.08,
+      duration: Math.max(0.08, duration * 0.34),
+      peak: gain * 0.1,
       type: 'sine',
-      attack: 0.01,
+      attack: 0.004,
       filterType: 'highpass',
-      filterFreq: 1100,
-      q: 0.58,
+      filterFreq: 1600,
+      q: 0.56,
     });
   }
 
@@ -984,16 +1081,16 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.08, duration * 0.7),
-      peak: gain * 0.34,
-      type: 'square',
+      duration: Math.max(0.08, duration * 0.62),
+      peak: gain * 0.36,
+      type: 'triangle',
       attack: 0.004,
       filterType: 'lowpass',
-      filterFreq: 860,
-      q: 0.76,
+      filterFreq: 760,
+      q: 0.82,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.08, gainScale: 0.20, durationScale: 0.56, filterFreq: 680 },
+      { delay: 0.09, gainScale: 0.16, durationScale: 0.5, filterFreq: 620, type: 'sawtooth' },
     ]);
   }
 
@@ -1026,40 +1123,37 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.1, duration * 0.76),
-      peak: gain * 0.32,
+      duration: Math.max(0.1, duration * 0.68),
+      peak: gain * 0.34,
       type: 'sine',
       attack: 0.004,
       filterType: 'bandpass',
-      filterFreq: 2800,
-      q: 0.72,
+      filterFreq: 3200,
+      q: 0.78,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.12, gainScale: 0.26, durationScale: 0.66, filterFreq: 2200 },
+      { delay: 0.1, gainScale: 0.22, durationScale: 0.52, filterFreq: 2400, type: 'triangle' },
     ]);
   }
 
   _playStormTexture7(start, duration) {
-    if (!this.ctx || !this._noiseBuffer || this.muted) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuffer;
-    const hp = this.ctx.createBiquadFilter();
-    const bp = this.ctx.createBiquadFilter();
-    const gain = this.ctx.createGain();
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(680, start);
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(1800, start);
-    bp.Q.setValueAtTime(0.42, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.0012 * (this._stemLevels.texture ?? 1), start + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    src.connect(hp);
-    hp.connect(bp);
-    bp.connect(gain);
-    gain.connect(this.musicGain);
-    src.start(start);
-    src.stop(start + duration + 0.02);
+    const stem = this._stemLevels.texture ?? 1;
+    this._playFilteredNoiseLayer({
+      start,
+      duration,
+      peak: 0.00135 * stem,
+      attack: 0.04,
+      primary: { type: 'highpass', frequency: 720, q: 0.38 },
+      secondary: { type: 'bandpass', frequency: 1500, q: 0.34 },
+    });
+    this._playFilteredNoiseLayer({
+      start: start + 0.08,
+      duration: duration * 0.58,
+      peak: 0.00048 * stem,
+      attack: 0.02,
+      primary: { type: 'highpass', frequency: 2600, q: 0.44 },
+      secondary: { type: 'lowpass', frequency: 5200, q: 0.46 },
+    });
   }
 
   // Level 8 — cozy library groove voices
@@ -1070,23 +1164,34 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.30,
+      peak: gain * 0.26,
       type: 'triangle',
-      attack: 0.22,
+      attack: 0.24,
       filterType: 'lowpass',
-      filterFreq: 880,
-      q: 0.52,
+      filterFreq: 760,
+      q: 0.5,
     });
     this._playOscVoice({
       freq: freq * 1.002,
       start: start + 0.02,
       duration: voiceDuration * 0.94,
-      peak: gain * 0.14,
+      peak: gain * 0.12,
       type: 'sine',
-      attack: 0.18,
+      attack: 0.16,
       filterType: 'lowpass',
-      filterFreq: 1020,
-      q: 0.5,
+      filterFreq: 980,
+      q: 0.46,
+    });
+    this._playOscVoice({
+      freq: freq * 0.5,
+      start,
+      duration: voiceDuration,
+      peak: gain * 0.08,
+      type: 'triangle',
+      attack: 0.28,
+      filterType: 'lowpass',
+      filterFreq: 180,
+      q: 0.72,
     });
   }
 
@@ -1094,43 +1199,51 @@ export class GameAudio {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.2, duration),
-      peak: gain * 0.34,
+      duration: Math.max(0.24, duration),
+      peak: gain * 0.32,
       type: 'triangle',
-      attack: 0.03,
+      attack: 0.04,
       filterType: 'bandpass',
-      filterFreq: 980,
-      q: 0.84,
+      filterFreq: 880,
+      q: 0.92,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.18, gainScale: 0.20, durationScale: 0.74, filterFreq: 760 },
+      { delay: 0.2, gainScale: 0.18, durationScale: 0.78, filterFreq: 700, type: 'sine' },
     ]);
+    this._playFilteredNoiseLayer({
+      start,
+      duration: Math.max(0.12, duration * 0.44),
+      peak: gain * 0.012,
+      attack: 0.02,
+      primary: { type: 'bandpass', frequency: 1220, q: 0.8 },
+      secondary: { type: 'lowpass', frequency: 2400, q: 0.42 },
+    });
   }
 
   _playStoryPluck8(freq, start, duration, gain, glideTo = 0) {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.10, duration * 0.72),
-      peak: gain * 0.38,
+      duration: Math.max(0.10, duration * 0.68),
+      peak: gain * 0.34,
       type: 'triangle',
       attack: 0.006,
       filterType: 'lowpass',
-      filterFreq: 1800,
-      q: 0.62,
+      filterFreq: 1320,
+      q: 0.66,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.16, gainScale: 0.24, durationScale: 0.6, filterFreq: 1440 },
+      { delay: 0.18, gainScale: 0.22, durationScale: 0.62, filterFreq: 1080, type: 'sine' },
     ]);
     this._playOscVoice({
       freq: freq * 2,
       start: start + 0.01,
       duration: Math.max(0.08, duration * 0.40),
-      peak: gain * 0.08,
+      peak: gain * 0.06,
       type: 'sine',
       attack: 0.004,
       filterType: 'highpass',
-      filterFreq: 1200,
+      filterFreq: 1400,
       q: 0.56,
     });
   }
@@ -1165,34 +1278,35 @@ export class GameAudio {
       freq,
       start,
       duration: Math.max(0.16, duration * 0.8),
-      peak: gain * 0.26,
+      peak: gain * 0.22,
       type: 'sine',
       attack: 0.01,
       filterType: 'bandpass',
-      filterFreq: 2200,
-      q: 0.64,
+      filterFreq: 1800,
+      q: 0.58,
     }, [
-      { delay: 0.14, gainScale: 0.18, durationScale: 0.82, filterFreq: 1760 },
+      { delay: 0.16, gainScale: 0.16, durationScale: 0.82, filterFreq: 1460, type: 'triangle' },
     ]);
   }
 
   _playLibraryTexture8(start, duration) {
-    if (!this.ctx || !this._noiseBuffer || this.muted) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuffer;
-    const bp = this.ctx.createBiquadFilter();
-    const gain = this.ctx.createGain();
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(1320, start);
-    bp.Q.setValueAtTime(0.28, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.0009 * (this._stemLevels.texture ?? 1), start + 0.08);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    src.connect(bp);
-    bp.connect(gain);
-    gain.connect(this.musicGain);
-    src.start(start);
-    src.stop(start + duration + 0.02);
+    const stem = this._stemLevels.texture ?? 1;
+    this._playFilteredNoiseLayer({
+      start,
+      duration,
+      peak: 0.00082 * stem,
+      attack: 0.08,
+      primary: { type: 'bandpass', frequency: 1160, q: 0.24 },
+      secondary: { type: 'lowpass', frequency: 2200, q: 0.42 },
+    });
+    this._playFilteredNoiseLayer({
+      start: start + 0.12,
+      duration: duration * 0.36,
+      peak: 0.00028 * stem,
+      attack: 0.04,
+      primary: { type: 'highpass', frequency: 2400, q: 0.38 },
+      secondary: { type: 'lowpass', frequency: 4200, q: 0.34 },
+    });
   }
 
   // Level 9 — camp finale voices
@@ -1203,23 +1317,34 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.26,
+      peak: gain * 0.24,
       type: 'triangle',
-      attack: 0.26,
+      attack: 0.3,
       filterType: 'lowpass',
-      filterFreq: 720,
-      q: 0.5,
+      filterFreq: 660,
+      q: 0.48,
     });
     this._playOscVoice({
       freq: freq * 0.5,
       start,
       duration: voiceDuration,
-      peak: gain * 0.12,
+      peak: gain * 0.14,
       type: 'sine',
-      attack: 0.3,
+      attack: 0.32,
       filterType: 'lowpass',
       filterFreq: 180,
       q: 0.74,
+    });
+    this._playOscVoice({
+      freq: freq * 1.005,
+      start: start + 0.05,
+      duration: voiceDuration * 0.88,
+      peak: gain * 0.08,
+      type: 'triangle',
+      attack: 0.24,
+      filterType: 'bandpass',
+      filterFreq: 940,
+      q: 0.42,
     });
   }
 
@@ -1228,32 +1353,40 @@ export class GameAudio {
       freq,
       start,
       duration: Math.max(0.24, duration),
-      peak: gain * 0.28,
-      type: 'sine',
-      attack: 0.03,
+      peak: gain * 0.26,
+      type: 'triangle',
+      attack: 0.04,
       filterType: 'bandpass',
-      filterFreq: 860,
-      q: 0.9,
+      filterFreq: 780,
+      q: 0.94,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.22, gainScale: 0.18, durationScale: 0.84, filterFreq: 680 },
+      { delay: 0.24, gainScale: 0.16, durationScale: 0.82, filterFreq: 620, type: 'sine' },
     ]);
+    this._playFilteredNoiseLayer({
+      start,
+      duration: Math.max(0.14, duration * 0.5),
+      peak: gain * 0.010,
+      attack: 0.02,
+      primary: { type: 'bandpass', frequency: 980, q: 0.74 },
+      secondary: { type: 'lowpass', frequency: 2200, q: 0.36 },
+    });
   }
 
   _playCampPluck9(freq, start, duration, gain, glideTo = 0) {
     this._playEchoedVoice({
       freq,
       start,
-      duration: Math.max(0.12, duration * 0.78),
-      peak: gain * 0.30,
+      duration: Math.max(0.12, duration * 0.74),
+      peak: gain * 0.28,
       type: 'triangle',
       attack: 0.008,
       filterType: 'lowpass',
-      filterFreq: 1600,
-      q: 0.58,
+      filterFreq: 1280,
+      q: 0.54,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.18, gainScale: 0.22, durationScale: 0.72, filterFreq: 1320 },
+      { delay: 0.2, gainScale: 0.18, durationScale: 0.76, filterFreq: 980, type: 'sine' },
     ]);
   }
 
@@ -1287,37 +1420,35 @@ export class GameAudio {
       freq,
       start,
       duration: Math.max(0.18, duration * 0.9),
-      peak: gain * 0.20,
+      peak: gain * 0.18,
       type: 'sine',
       attack: 0.02,
       filterType: 'bandpass',
-      filterFreq: 1880,
-      q: 0.58,
+      filterFreq: 1680,
+      q: 0.54,
     }, [
-      { delay: 0.2, gainScale: 0.18, durationScale: 0.88, filterFreq: 1480 },
+      { delay: 0.22, gainScale: 0.14, durationScale: 0.9, filterFreq: 1240, type: 'triangle' },
     ]);
   }
 
   _playCampTexture9(start, duration) {
-    if (!this.ctx || !this._noiseBuffer || this.muted) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuffer;
-    const lp = this.ctx.createBiquadFilter();
-    const hp = this.ctx.createBiquadFilter();
-    const gain = this.ctx.createGain();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(1400, start);
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(240, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.0011 * (this._stemLevels.texture ?? 1), start + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    src.connect(lp);
-    lp.connect(hp);
-    hp.connect(gain);
-    gain.connect(this.musicGain);
-    src.start(start);
-    src.stop(start + duration + 0.02);
+    const stem = this._stemLevels.texture ?? 1;
+    this._playFilteredNoiseLayer({
+      start,
+      duration,
+      peak: 0.00086 * stem,
+      attack: 0.04,
+      primary: { type: 'highpass', frequency: 260, q: 0.34 },
+      secondary: { type: 'lowpass', frequency: 1400, q: 0.42 },
+    });
+    this._playFilteredNoiseLayer({
+      start: start + 0.04,
+      duration: duration * 0.42,
+      peak: 0.00036 * stem,
+      attack: 0.01,
+      primary: { type: 'highpass', frequency: 2200, q: 0.5 },
+      secondary: { type: 'lowpass', frequency: 4200, q: 0.36 },
+    });
   }
 
   // Level 5 — cinematic aquarium synth score voices
@@ -1328,31 +1459,31 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.34,
+      peak: gain * 0.28,
       type: 'sawtooth',
-      attack: 0.52,
+      attack: 0.62,
       filterType: 'lowpass',
-      filterFreq: 520,
-      q: 0.58,
+      filterFreq: 420,
+      q: 0.62,
     });
     this._playOscVoice({
       freq: freq * 1.006,
       start: start + 0.04,
       duration: voiceDuration * 0.94,
-      peak: gain * 0.22,
-      type: 'sawtooth',
-      attack: 0.48,
+      peak: gain * 0.18,
+      type: 'triangle',
+      attack: 0.56,
       filterType: 'lowpass',
-      filterFreq: 680,
-      q: 0.52,
+      filterFreq: 560,
+      q: 0.48,
     });
     this._playOscVoice({
       freq: freq * 0.5,
       start,
       duration: voiceDuration,
-      peak: gain * 0.18,
+      peak: gain * 0.20,
       type: 'triangle',
-      attack: 0.54,
+      attack: 0.58,
       filterType: 'lowpass',
       filterFreq: 180,
       q: 0.76,
@@ -1361,11 +1492,11 @@ export class GameAudio {
       freq: freq * 1.5,
       start: start + 0.24,
       duration: Math.max(0.9, voiceDuration * 0.72),
-      peak: gain * 0.05,
-      type: 'triangle',
-      attack: 0.28,
-      filterType: 'lowpass',
-      filterFreq: 920,
+      peak: gain * 0.03,
+      type: 'sine',
+      attack: 0.34,
+      filterType: 'bandpass',
+      filterFreq: 760,
       q: 0.44,
     });
   }
@@ -1376,22 +1507,22 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.40,
+      peak: gain * 0.38,
       type: 'triangle',
-      attack: 0.04,
+      attack: 0.05,
       filterType: 'bandpass',
-      filterFreq: 860,
-      q: 0.86,
+      filterFreq: 780,
+      q: 0.92,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.18, gainScale: 0.24, durationScale: 0.76, filterFreq: 720, q: 0.68 },
-      { delay: 0.34, gainScale: 0.14, durationScale: 0.58, filterFreq: 980, q: 0.54, type: 'sine' },
+      { delay: 0.22, gainScale: 0.22, durationScale: 0.8, filterFreq: 700, q: 0.66 },
+      { delay: 0.4, gainScale: 0.1, durationScale: 0.62, filterFreq: 920, q: 0.48, type: 'sine' },
     ]);
     this._playOscVoice({
       freq: freq * 0.5,
       start: start + 0.05,
       duration: voiceDuration * 0.88,
-      peak: gain * 0.12,
+      peak: gain * 0.1,
       type: 'sine',
       attack: 0.10,
       filterType: 'lowpass',
@@ -1406,27 +1537,27 @@ export class GameAudio {
       freq,
       start,
       duration: voiceDuration,
-      peak: gain * 0.30,
+      peak: gain * 0.26,
       type: 'triangle',
-      attack: 0.028,
+      attack: 0.04,
       filterType: 'lowpass',
-      filterFreq: 820,
-      q: 0.72,
+      filterFreq: 720,
+      q: 0.68,
       endFreq: glideTo || null,
     }, [
-      { delay: 0.14, gainScale: 0.24, durationScale: 0.72, filterFreq: 640, q: 0.56 },
-      { delay: 0.28, gainScale: 0.14, durationScale: 0.46, filterFreq: 980, q: 0.46, type: 'sawtooth' },
+      { delay: 0.16, gainScale: 0.22, durationScale: 0.76, filterFreq: 620, q: 0.54 },
+      { delay: 0.3, gainScale: 0.1, durationScale: 0.54, filterFreq: 860, q: 0.42, type: 'sine' },
     ]);
     this._playOscVoice({
       freq: freq * 1.002,
       start: start + 0.03,
       duration: Math.max(0.18, voiceDuration * 0.84),
-      peak: gain * 0.14,
-      type: 'sawtooth',
-      attack: 0.032,
+      peak: gain * 0.08,
+      type: 'triangle',
+      attack: 0.05,
       filterType: 'lowpass',
-      filterFreq: 700,
-      q: 0.54,
+      filterFreq: 620,
+      q: 0.46,
     });
   }
 
@@ -1483,26 +1614,23 @@ export class GameAudio {
   }
 
   _playAbyssTexture5(start, duration) {
-    if (!this.ctx || !this._noiseBuffer || this.muted) return;
-    const src = this.ctx.createBufferSource();
-    src.buffer = this._noiseBuffer;
-    const hp = this.ctx.createBiquadFilter();
-    const bp = this.ctx.createBiquadFilter();
-    const gain = this.ctx.createGain();
-    hp.type = 'highpass';
-    hp.frequency.setValueAtTime(980, start);
-    bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(1240, start);
-    bp.Q.setValueAtTime(0.32, start);
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.linearRampToValueAtTime(0.0017 * (this._stemLevels.texture ?? 1), start + 0.16);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    src.connect(hp);
-    hp.connect(bp);
-    bp.connect(gain);
-    gain.connect(this.musicGain);
-    src.start(start);
-    src.stop(start + duration + 0.02);
+    const stem = this._stemLevels.texture ?? 1;
+    this._playFilteredNoiseLayer({
+      start,
+      duration,
+      peak: 0.0014 * stem,
+      attack: 0.14,
+      primary: { type: 'highpass', frequency: 920, q: 0.3 },
+      secondary: { type: 'bandpass', frequency: 1180, q: 0.28 },
+    });
+    this._playFilteredNoiseLayer({
+      start: start + 0.1,
+      duration: duration * 0.56,
+      peak: 0.00034 * stem,
+      attack: 0.08,
+      primary: { type: 'highpass', frequency: 2400, q: 0.42 },
+      secondary: { type: 'lowpass', frequency: 5200, q: 0.34 },
+    });
   }
 
   // Level 4 — "slow bubbly tron" synth voices

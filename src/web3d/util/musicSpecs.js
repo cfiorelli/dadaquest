@@ -644,124 +644,13 @@ export const LEVEL4_MUSIC_SPEC = {
   },
 };
 
-const LEVEL5_MOTIF = ['D4', 'F4', 'G4', 'A4'];
-
-const LEVEL5_PATTERN_LIBRARY = Object.freeze({
-  Dm: {
-    lead: [
-      steps('D4', null, null, 'F4', null, null, 'A4', null),
-      steps(null, 'D4', null, null, 'F4', null, 'G4', null),
-      steps('A4', null, null, 'G4', null, 'F4', null, 'D4'),
-    ],
-    counter: [
-      steps(null, 'D5', null, 'A4', null, 'D5', null, 'F5'),
-      steps('A4', null, 'D5', null, 'F5', null, 'A4', null),
-      steps(null, 'F5', null, 'D5', null, 'A4', null, 'D5'),
-    ],
-    bass: [
-      steps('D2', null, null, null, 'A2', null, null, null),
-      steps('D2', null, null, null, 'D3', null, null, null),
-      steps('D2', null, 'A2', null, 'D3', null, null, null),
-    ],
-  },
-  Dmadd9: {
-    lead: [
-      steps('D4', null, null, 'F4', null, null, 'A4', 'E5'),
-      steps(null, 'D4', null, null, 'F4', null, 'G4', 'E5'),
-      steps('A4', null, null, 'G4', null, 'F4', null, 'E5'),
-    ],
-    counter: [
-      steps(null, 'D5', null, 'A4', null, 'E5', null, 'F5'),
-      steps('A4', null, 'D5', null, 'E5', null, 'A4', null),
-      steps(null, 'F5', null, 'E5', null, 'A4', null, 'D5'),
-    ],
-    bass: [
-      steps('D2', null, null, null, 'A2', null, null, null),
-      steps('D2', null, null, null, 'D3', null, null, null),
-      steps('D2', null, 'A2', null, 'D3', null, null, null),
-    ],
-  },
-  Bb: {
-    lead: [
-      steps('F4', null, null, 'A4', null, null, 'Bb4', null),
-      steps(null, 'F4', null, null, 'A4', null, 'G4', null),
-      steps('Bb4', null, 'A4', null, null, 'F4', null, null),
-    ],
-    counter: [
-      steps(null, 'F5', null, 'Bb4', null, 'D5', null, 'F5'),
-      steps('Bb4', null, 'D5', null, 'F5', null, 'Bb4', null),
-      steps(null, 'D5', null, 'F5', null, 'Bb4', null, 'D5'),
-    ],
-    bass: [
-      steps('Bb2', null, null, null, 'F3', null, null, null),
-      steps('Bb2', null, null, null, 'Bb3', null, null, null),
-      steps('Bb2', null, 'F3', null, 'Bb3', null, null, null),
-    ],
-  },
-  Gm: {
-    lead: [
-      steps('D4', null, null, 'G4', null, null, 'A4', null),
-      steps(null, 'D4', null, null, 'G4', null, 'Bb4', null),
-      steps('G4', null, null, 'D4', null, 'A4', null, null),
-    ],
-    counter: [
-      steps(null, 'G4', null, 'D5', null, 'G5', null, 'Bb5'),
-      steps('D5', null, 'G5', null, 'Bb5', null, 'D5', null),
-      steps(null, 'Bb5', null, 'G5', null, 'D5', null, 'G4'),
-    ],
-    bass: [
-      steps('G2', null, null, null, 'D3', null, null, null),
-      steps('G2', null, null, null, 'G3', null, null, null),
-      steps('G2', null, 'D3', null, 'G3', null, null, null),
-    ],
-  },
-  C: {
-    lead: [
-      steps('E4', null, null, 'G4', null, null, 'A4', null),
-      steps(null, 'E4', null, null, 'G4', null, 'C5', null),
-      steps('A4', null, 'G4', null, null, 'E4', null, null),
-    ],
-    counter: [
-      steps(null, 'E5', null, 'G5', null, 'C6', null, 'G5'),
-      steps('G5', null, 'C6', null, 'E6', null, 'G5', null),
-      steps(null, 'C6', null, 'G5', null, 'E5', null, 'C5'),
-    ],
-    bass: [
-      steps('C3', null, null, null, 'G2', null, null, null),
-      steps('C3', null, null, null, 'C3', null, null, null),
-      steps('C3', null, 'G2', null, 'C3', null, null, null),
-    ],
-  },
-  A7: {
-    lead: [
-      steps('A4', null, null, 'C#5', null, null, 'E5', null),
-      steps(null, 'A4', null, null, 'C#5', null, 'G4', null),
-      steps('E5', null, 'C#5', null, null, 'A4', null, null),
-    ],
-    counter: [
-      steps(null, 'A4', null, 'E5', null, 'G5', null, 'C#5'),
-      steps('E5', null, 'A5', null, 'C#6', null, 'G5', null),
-      steps(null, 'G5', null, 'E5', null, 'C#5', null, 'A4'),
-    ],
-    bass: [
-      steps('A2', null, null, null, 'E3', null, null, null),
-      steps('A2', null, null, null, 'A2', null, null, null),
-      steps('A2', null, 'E3', null, 'A2', null, null, null),
-    ],
-  },
-});
-
-function getLevel5Pattern(role, chordName, index) {
-  const chordPatterns = LEVEL5_PATTERN_LIBRARY[chordName] || LEVEL5_PATTERN_LIBRARY.Dm;
-  const patterns = chordPatterns[role] || [steps()];
-  return patterns[index % patterns.length];
-}
+const LEVEL5_MOTIF = ['D4', 'A4', 'C5', 'G4'];
 
 function getLevel5PedalBass(index) {
   const patterns = [
-    steps('D2', null, null, null, 'D2', null, null, null),
+    steps('D2', null, null, null, 'D2', null, null, 'A2'),
     steps('D2', null, 'A2', null, 'D3', null, null, null),
-    steps('D2', null, null, null, 'A2', null, 'D3', null),
+    steps('D2', null, null, 'A2', 'D3', null, null, null),
   ];
   return patterns[index % patterns.length];
 }
@@ -771,20 +660,29 @@ function createLevel5Bar(chordName, index, {
   pedalD = false,
   accent = false,
 } = {}) {
-  const lead = getLevel5Pattern('lead', chordName, index);
-  const counter = getLevel5Pattern('counter', chordName, index);
-  const bass = pedalD ? getLevel5PedalBass(index) : getLevel5Pattern('bass', chordName, index);
+  const leadPatterns = [
+    steps('D4', null, null, null, 'A4', null, 'C5', null),
+    steps(null, 'A4', null, null, 'G4', null, 'D5', null),
+    steps('C5', null, null, 'A4', null, null, 'G4', null),
+    steps(null, null, 'D4', null, null, 'A4', null, 'C5'),
+  ];
+  const counterPatterns = [
+    steps(null, 'D5', null, null, 'A4', null, null, 'G4'),
+    steps(null, null, 'A4', null, null, 'D5', null, 'C5'),
+    steps('A4', null, null, 'G4', null, null, 'D5', null),
+  ];
+  const bass = pedalD ? getLevel5PedalBass(index) : buildBassPattern(chordName, index, { sync: density === 'high' });
   const accentPattern = accent
-    ? steps(null, null, null, null, null, null, LEVEL5_MOTIF[index % LEVEL5_MOTIF.length], null)
+    ? steps(null, null, null, null, null, LEVEL5_MOTIF[index % LEVEL5_MOTIF.length], null, null)
     : steps();
-  const kick = density === 'low' ? [0] : [0, 4];
+  const kick = density === 'low' ? [0] : density === 'high' ? [0, 3, 4] : [0, 4];
   const snare = density === 'high' ? [4] : [];
-  const hat = density === 'low' ? [3, 7] : [1, 3, 5, 7];
-  const rim = density === 'low' ? [] : [2, 6];
-  const shaker = density === 'high' ? [1, 3, 5, 7] : [];
+  const hat = density === 'low' ? [5] : density === 'high' ? [1, 3, 5, 7] : [3, 7];
+  const rim = density === 'high' ? [6] : [];
+  const shaker = density === 'high' ? [3, 7] : [];
   return bar(chordName, {
-    lead,
-    counter,
+    lead: leadPatterns[index % leadPatterns.length],
+    counter: counterPatterns[index % counterPatterns.length],
     accent: accentPattern,
     bass,
     kick,
@@ -805,40 +703,40 @@ function buildLevel5Section(name, progression, optionsForBar) {
 
 const LEVEL5_SECTION_A = buildLevel5Section(
   'A',
-  Array.from({ length: 24 }, (_, index) => ['Dm', 'Bb', 'Gm', 'A7'][index % 4]),
+  Array.from({ length: 24 }, (_, index) => ['Dmadd9', 'C', 'Gm', 'C'][index % 4]),
   (index) => ({
-    density: index < 8 ? 'low' : 'mid',
-    accent: index % 6 === 5,
+    density: index < 10 ? 'low' : 'mid',
+    accent: index % 8 === 7,
   }),
 );
 
 const LEVEL5_SECTION_B = buildLevel5Section(
   'B',
-  Array.from({ length: 24 }, (_, index) => ['Dm', 'C', 'Bb', 'Gm'][index % 4]),
+  Array.from({ length: 24 }, (_, index) => ['Dmadd9', 'Bb', 'C', 'Gm'][index % 4]),
   (index) => ({
-    density: index < 12 ? 'mid' : 'high',
+    density: index < 8 ? 'mid' : 'high',
     accent: index % 4 === 3,
   }),
 );
 
 const LEVEL5_SECTION_C = buildLevel5Section(
   'C',
-  Array.from({ length: 24 }, (_, index) => ['Dmadd9', 'Dm', 'Gm', 'Gm', 'Bb', 'Bb', 'A7', 'A7'][index % 8]),
+  Array.from({ length: 24 }, (_, index) => ['Dm', 'Dmadd9', 'Gm', 'C', 'Dmadd9', 'Bb', 'C', 'A7'][index % 8]),
   (index, chordName) => ({
     density: chordName === 'A7' ? 'high' : 'mid',
-    accent: index % 8 === 0 || index % 8 === 7,
+    accent: index % 8 === 0 || index % 8 === 5,
   }),
 );
 
 const LEVEL5_SECTION_D = buildLevel5Section(
   'D',
   [
-    'Dm', 'Dm', 'Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'A7',
-    'Dm', 'Dm', 'Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'A7',
-    'Dm', 'Dm', 'Bb', 'Gm', 'Dm', 'A7', 'Dm', 'Dmadd9',
+    'Dmadd9', 'Dmadd9', 'C', 'C', 'Gm', 'Gm', 'A7', 'A7',
+    'Dmadd9', 'Dmadd9', 'C', 'C', 'Gm', 'Gm', 'A7', 'A7',
+    'Dmadd9', 'C', 'Bb', 'Gm', 'Dmadd9', 'A7', 'Dmadd9', 'Dm',
   ],
   (index) => ({
-    density: index < 8 ? 'mid' : 'high',
+    density: index < 10 ? 'mid' : 'high',
     pedalD: true,
     accent: index % 2 === 1 || index >= 20,
   }),
@@ -847,31 +745,49 @@ const LEVEL5_SECTION_D = buildLevel5Section(
 /*
  * Level 5 — Neon Night Aquarium cinematic synth score
  * Tempo: 84 BPM
- * Key: D minor
+ * Key: D Dorian
  * Loop: 96 bars (A/B/C/D, 24 bars each)
  */
 export const LEVEL5_MUSIC_SPEC = {
   levelId: 5,
-  title: 'Cinematic synth aquarium score',
-  explanation: 'A slower, floor-shaking aquarium cue built around an organ-like synth bed, pedal-point sub bass, gated Tron pulse, restrained drums, and sparse sonar calls so the level reads like a serious indie exploration setpiece rather than a toy-box loop.',
+  title: 'Submerged synth odyssey',
+  explanation: 'Low-mid aquarium score built on slow tide harmony, organ-saw pad bloom, offbeat pulse gates, and sparse sonar calls so the floor-first aquarium feels submerged, curious, and expensive rather than arcade-like.',
   tempo: 84,
-  key: 'D minor',
+  key: 'D Dorian',
   motif: LEVEL5_MOTIF,
-  swing: 0.03,
+  swing: 0.02,
   roles: {
-    chord: 'organ-like analog pad with lowpass motion',
-    lead: 'sparse sonar lead with gentle pitch bend',
-    bass: 'sine-led sub bass with subtle saturation and kick dip',
-    counter: 'gated Tron pulse',
-    accent: 'shimmer accent tail',
-    percussion: 'tight kick, rim-snare, and restrained hats',
-    texture: 'quiet bubble hiss',
+    chord: 'pressure-heavy organ pad with slow lowpass motion',
+    lead: 'sonar line with pitch drift and delayed bloom',
+    bass: 'pedal-point sub with soft saturation and light kick dip',
+    counter: 'smooth offbeat gate pulse',
+    accent: 'glass shimmer tail',
+    percussion: 'half-time kick, low rim, restrained hats',
+    texture: 'bubble hiss and distant water noise',
   },
   cuePalette: {
-    checkpoint: 'swell + sonar ping',
-    nearMiss: 'short sonar ping',
-    collision: 'low whomp + pitch dip',
-    levelComplete: 'shimmer cadence',
+    checkpoint: 'rising swell and sonar bloom',
+    nearMiss: 'short sonar flick',
+    collision: 'low whomp and bending pulse',
+    levelComplete: 'shimmering ascent cadence',
+  },
+  mix: {
+    targetGain: 0.42,
+    textureEveryBars: 1,
+    pumpDip: 0.95,
+    pumpRelease: 0.18,
+    stepGains: { lead: 0.066, counter: 0.048, accent: 0.03, bass: 0.078 },
+    roleDurations: { lead: 1.18, counter: 0.72, accent: 1.32, bass: 1.52 },
+    chord: { durationBeats: 7.2, gain: 0.064 },
+    ducking: {
+      defaultMul: 0.86,
+      defaultRelease: 0.34,
+      collisionMul: 0.72,
+      collisionRelease: 0.42,
+      levelCompleteMul: 0.62,
+      levelCompleteRelease: 0.72,
+    },
+    compressor: { threshold: -20, knee: 20, ratio: 2.2, attack: 0.05, release: 0.28 },
   },
   sections: [
     LEVEL5_SECTION_A,
@@ -881,24 +797,24 @@ export const LEVEL5_MUSIC_SPEC = {
   ],
   cues: {
     checkpoint: [
-      { beat: 0, role: 'chord', notes: ['D4', 'F4', 'A4'], duration: 1.6, gain: 0.11 },
-      { beat: 0.18, role: 'lead', note: 'A4', duration: 0.42, gain: 0.11, glideTo: 'D5' },
-      { beat: 0.62, role: 'accent', note: 'F5', duration: 0.75, gain: 0.08 },
+      { beat: 0, role: 'chord', notes: ['D4', 'F4', 'A4', 'E5'], duration: 1.9, gain: 0.11 },
+      { beat: 0.16, role: 'lead', note: 'A4', duration: 0.52, gain: 0.10, glideTo: 'D5' },
+      { beat: 0.58, role: 'accent', note: 'C5', duration: 0.92, gain: 0.07 },
     ],
     nearMiss: [
-      { beat: 0, role: 'lead', note: 'A4', duration: 0.26, gain: 0.09, glideTo: 'D5' },
+      { beat: 0, role: 'lead', note: 'A4', duration: 0.28, gain: 0.08, glideTo: 'C5' },
     ],
     collision: [
-      { beat: 0, role: 'bass', note: 'D2', duration: 0.78, gain: 0.12 },
-      { beat: 0.12, role: 'lead', note: 'A4', duration: 0.46, gain: 0.07, glideTo: 'F4' },
-      { beat: 0.2, role: 'counter', note: 'D5', duration: 0.36, gain: 0.06, glideTo: 'A4' },
+      { beat: 0, role: 'bass', note: 'D2', duration: 0.86, gain: 0.12 },
+      { beat: 0.10, role: 'counter', note: 'D5', duration: 0.42, gain: 0.06, glideTo: 'A4' },
+      { beat: 0.18, role: 'lead', note: 'C5', duration: 0.42, gain: 0.06, glideTo: 'G4' },
     ],
     levelComplete: [
-      { beat: 0, role: 'chord', notes: ['D4', 'F4', 'A4'], duration: 2.4, gain: 0.12 },
-      { beat: 0.0, role: 'lead', note: 'A4', duration: 0.34, gain: 0.11 },
-      { beat: 0.55, role: 'lead', note: 'D5', duration: 0.44, gain: 0.12 },
-      { beat: 1.1, role: 'lead', note: 'F5', duration: 0.50, gain: 0.12 },
-      { beat: 1.8, role: 'accent', note: 'A5', duration: 1.0, gain: 0.09 },
+      { beat: 0, role: 'chord', notes: ['D4', 'F4', 'A4', 'E5'], duration: 2.6, gain: 0.12 },
+      { beat: 0.0, role: 'lead', note: 'A4', duration: 0.36, gain: 0.10 },
+      { beat: 0.5, role: 'lead', note: 'C5', duration: 0.44, gain: 0.11 },
+      { beat: 1.0, role: 'lead', note: 'D5', duration: 0.56, gain: 0.11 },
+      { beat: 1.7, role: 'accent', note: 'A5', duration: 1.1, gain: 0.08 },
     ],
   },
 };
@@ -929,36 +845,36 @@ function buildBassPattern(chordName, index, {
   return patterns[index % patterns.length];
 }
 
-const LEVEL6_MOTIF = ['E4', 'G4', 'A4', 'B4'];
-const LEVEL7_MOTIF = ['D4', 'F4', 'A4', 'G4'];
-const LEVEL8_MOTIF = ['G4', 'A4', 'B4', 'D5'];
-const LEVEL9_MOTIF = ['G4', 'A4', 'D5', 'B4'];
+const LEVEL6_MOTIF = ['E4', 'B4', 'G4', 'F#4'];
+const LEVEL7_MOTIF = ['A4', 'D5', 'F5', 'C5'];
+const LEVEL8_MOTIF = ['B4', 'A4', 'G4', 'D5'];
+const LEVEL9_MOTIF = ['D5', 'A4', 'B4', 'E5'];
 
 function createLevel6Bar(chordName, index, {
   density = 'mid',
   accent = false,
 } = {}) {
   const leadPatterns = [
-    steps('E4', null, 'G4', null, 'A4', null, 'B4', null),
-    steps(null, 'B4', null, 'A4', null, 'G4', null, 'E4'),
-    steps('E4', null, null, 'G4', null, 'A4', null, 'B4'),
-    steps(null, null, 'G4', null, 'A4', null, 'E4', null),
+    steps('E4', null, 'B4', null, 'G4', null, 'F#4', null),
+    steps(null, 'B4', null, 'G4', null, 'E4', null, 'F#4'),
+    steps('E4', null, null, 'G4', 'B4', null, null, 'F#4'),
+    steps(null, 'G4', null, null, 'F#4', null, 'E4', null),
   ];
   const counterPatterns = [
-    steps('B4', null, 'E5', null, 'B4', null, 'G4', null),
-    steps('E5', null, 'B4', null, 'E5', null, 'A4', null),
-    steps(null, 'G4', null, 'B4', null, 'E5', null, 'B4'),
+    steps(null, 'B4', null, 'B4', null, 'E5', null, 'B4'),
+    steps('E5', null, 'B4', null, 'G4', null, 'B4', null),
+    steps(null, 'G4', null, 'B4', null, 'E5', null, 'G4'),
   ];
   return bar(chordName, {
     lead: leadPatterns[index % leadPatterns.length],
     counter: counterPatterns[index % counterPatterns.length],
-    accent: accent ? steps(null, null, 'B5', null, null, null, LEVEL6_MOTIF[index % LEVEL6_MOTIF.length], null) : steps(),
+    accent: accent ? steps(null, null, 'B5', null, null, LEVEL6_MOTIF[index % LEVEL6_MOTIF.length], null, null) : steps(),
     bass: buildBassPattern(chordName, index, { sync: density === 'high' }),
-    kick: density === 'low' ? [0, 4] : density === 'high' ? [0, 3, 4, 6] : [0, 4, 6],
+    kick: density === 'low' ? [0, 4] : density === 'high' ? [0, 2, 4, 6] : [0, 3, 4, 6],
     snare: [4],
-    hat: density === 'low' ? [2, 6] : [1, 2, 3, 5, 6, 7],
+    hat: density === 'low' ? [2, 6] : density === 'high' ? [1, 2, 3, 5, 6, 7] : [1, 3, 5, 7],
     rim: density === 'high' ? [2, 6] : [],
-    shaker: density === 'high' ? [1, 3, 5, 7] : [3, 7],
+    shaker: density === 'high' ? [1, 3, 5, 7] : [2, 6],
   });
 }
 
@@ -967,26 +883,26 @@ function createLevel7Bar(chordName, index, {
   accent = false,
 } = {}) {
   const leadPatterns = [
-    steps('D4', null, null, 'F4', null, null, 'A4', null),
-    steps(null, 'A4', null, 'G4', null, 'F4', null, 'D4'),
-    steps('D4', null, 'F4', null, null, 'A4', null, 'G4'),
-    steps(null, null, 'A4', null, 'F4', null, 'D4', null),
+    steps('A4', null, null, 'D5', null, null, 'F5', null),
+    steps(null, 'F5', null, null, 'D5', null, 'A4', null),
+    steps('D5', null, 'A4', null, null, 'C5', null, 'F5'),
+    steps(null, null, 'A4', null, 'D5', null, null, 'F5'),
   ];
   const counterPatterns = [
-    steps('D5', null, 'A4', null, 'D5', null, 'F5', null),
-    steps(null, 'F5', null, 'D5', null, 'A4', null, 'D5'),
-    steps('A4', null, 'D5', null, 'A4', null, 'G4', null),
+    steps(null, 'D5', null, null, 'A4', null, 'D5', null),
+    steps('A4', null, null, 'C5', null, null, 'F5', null),
+    steps(null, 'F5', null, 'D5', null, null, 'A4', null),
   ];
   return bar(chordName, {
     lead: leadPatterns[index % leadPatterns.length],
     counter: counterPatterns[index % counterPatterns.length],
-    accent: accent ? steps(null, null, null, 'A5', null, null, null, 'D6') : steps(),
+    accent: accent ? steps(null, null, null, 'A5', null, null, 'D6', null) : steps(),
     bass: buildBassPattern(chordName, index, { sync: density !== 'low' }),
-    kick: density === 'low' ? [0, 4] : density === 'high' ? [0, 2, 4, 6] : [0, 4, 6],
+    kick: density === 'low' ? [0, 5] : density === 'high' ? [0, 3, 5, 6] : [0, 3, 5],
     snare: [4],
-    hat: density === 'low' ? [3, 7] : [1, 3, 5, 7],
+    hat: density === 'low' ? [3, 7] : density === 'high' ? [1, 2, 3, 6, 7] : [1, 3, 6, 7],
     rim: density === 'high' ? [2, 6] : [6],
-    shaker: density === 'high' ? [1, 2, 3, 5, 6, 7] : [1, 5],
+    shaker: density === 'high' ? [1, 3, 5, 7] : [1, 5],
   });
 }
 
@@ -995,24 +911,24 @@ function createLevel8Bar(chordName, index, {
   accent = false,
 } = {}) {
   const leadPatterns = [
-    steps('G4', null, null, 'A4', null, null, 'B4', null),
-    steps(null, 'D5', null, 'B4', null, 'A4', null, 'G4'),
-    steps('B4', null, 'A4', null, null, 'G4', null, 'D5'),
-    steps(null, null, 'G4', null, 'B4', null, 'A4', null),
+    steps('B4', null, null, 'A4', null, null, 'G4', null),
+    steps(null, 'D5', null, null, 'B4', null, 'A4', null),
+    steps('G4', null, null, 'B4', null, null, 'D5', null),
+    steps(null, 'A4', null, 'G4', null, null, 'B4', null),
   ];
   const counterPatterns = [
-    steps('G5', null, 'D5', null, 'B4', null, 'A4', null),
-    steps(null, 'B4', null, 'D5', null, 'G5', null, 'D5'),
-    steps('D5', null, 'G4', null, 'B4', null, 'D5', null),
+    steps('G5', null, null, 'D5', null, null, 'B4', null),
+    steps(null, 'B4', null, null, 'D5', null, 'G5', null),
+    steps('D5', null, null, 'G4', null, null, 'B4', null),
   ];
   return bar(chordName, {
     lead: leadPatterns[index % leadPatterns.length],
     counter: counterPatterns[index % counterPatterns.length],
     accent: accent ? steps(null, null, null, null, LEVEL8_MOTIF[index % LEVEL8_MOTIF.length], null, null, null) : steps(),
     bass: buildBassPattern(chordName, index, { sync: false }),
-    kick: density === 'low' ? [0] : [0, 4],
+    kick: density === 'low' ? [0] : density === 'high' ? [0, 4] : [0, 5],
     snare: density === 'high' ? [4] : [],
-    hat: density === 'low' ? [3, 7] : [2, 6],
+    hat: density === 'low' ? [3, 7] : density === 'high' ? [2, 4, 6] : [2, 6],
     rim: density === 'high' ? [4] : [6],
     shaker: density === 'high' ? [1, 3, 5, 7] : [],
   });
@@ -1024,26 +940,26 @@ function createLevel9Bar(chordName, index, {
   pedal = '',
 } = {}) {
   const leadPatterns = [
-    steps('G4', null, null, 'A4', null, null, 'D5', null),
-    steps(null, 'B4', null, 'D5', null, 'A4', null, 'G4'),
-    steps('D5', null, null, 'B4', null, 'A4', null, 'G4'),
-    steps(null, null, 'G4', null, 'A4', null, 'B4', null),
+    steps('D5', null, null, null, 'A4', null, 'B4', null),
+    steps(null, 'A4', null, null, 'E5', null, null, 'D5'),
+    steps('B4', null, null, 'A4', null, null, 'D5', null),
+    steps(null, null, 'D5', null, null, 'B4', null, 'A4'),
   ];
   const counterPatterns = [
-    steps('D5', null, null, null, 'B4', null, null, null),
-    steps(null, 'G4', null, null, 'D5', null, null, null),
-    steps('B4', null, null, null, 'A4', null, null, null),
+    steps('A4', null, null, null, 'D5', null, null, null),
+    steps(null, 'B4', null, null, 'A4', null, null, null),
+    steps('E5', null, null, null, 'B4', null, null, null),
   ];
   return bar(chordName, {
     lead: leadPatterns[index % leadPatterns.length],
     counter: counterPatterns[index % counterPatterns.length],
     accent: accent ? steps(null, null, LEVEL9_MOTIF[index % LEVEL9_MOTIF.length], null, null, null, null, null) : steps(),
     bass: buildBassPattern(chordName, index, { pedal, sync: density === 'high' }),
-    kick: density === 'low' ? [0, 4] : [0, 4, 6],
+    kick: density === 'low' ? [0, 5] : [0, 5, 6],
     snare: [],
-    hat: density === 'low' ? [3, 7] : [1, 3, 5, 7],
+    hat: density === 'low' ? [3, 7] : density === 'high' ? [1, 3, 5, 7] : [3, 7],
     rim: density === 'high' ? [4] : [6],
-    shaker: density === 'high' ? [1, 3, 5, 7] : [3, 7],
+    shaker: density === 'high' ? [1, 5, 7] : [3, 7],
   });
 }
 
@@ -1057,45 +973,45 @@ function buildLevelSection(name, progression, factory, optionsForBar) {
 
 const LEVEL6_SECTION_A = buildLevelSection(
   'A',
-  repeatProgression(['Em', 'Em', 'C', 'C', 'Am7', 'Am7', 'B7', 'B7']),
+  repeatProgression(['Em', 'Em', 'C', 'B7', 'Em', 'Em', 'Am7', 'B7']),
   createLevel6Bar,
   (index) => ({ density: index < 6 ? 'low' : 'mid', accent: index % 4 === 3 }),
 );
 const LEVEL6_SECTION_B = buildLevelSection(
   'B',
-  repeatProgression(['Em', 'G', 'C', 'Am7', 'Em', 'G', 'B7', 'B7']),
+  repeatProgression(['Em', 'G', 'C', 'B7', 'Em', 'G', 'Am7', 'B7']),
   createLevel6Bar,
   (index) => ({ density: index < 8 ? 'mid' : 'high', accent: index % 4 === 1 }),
 );
 const LEVEL6_SECTION_C = buildLevelSection(
   'C',
-  repeatProgression(['Em', 'Em', 'Am7', 'Am7', 'C', 'C', 'D', 'B7']),
+  repeatProgression(['Em', 'Em', 'C', 'Am7', 'Em', 'D', 'C', 'B7']),
   createLevel6Bar,
   (index) => ({ density: index < 6 ? 'mid' : 'high', accent: index % 4 === 2 }),
 );
 const LEVEL6_SECTION_D = buildLevelSection(
   'D',
-  repeatProgression(['Em', 'C', 'Am7', 'B7', 'Em', 'G', 'C', 'B7']),
+  repeatProgression(['Em', 'C', 'Em', 'B7', 'Em', 'G', 'C', 'B7']),
   createLevel6Bar,
   (index) => ({ density: index < 4 ? 'mid' : 'high', accent: index % 2 === 1 }),
 );
 
 export const LEVEL6_MUSIC_SPEC = {
   levelId: 6,
-  title: 'Mechanical synth groove',
-  explanation: 'Warm industrial groove with a compressed pad bed, sidechained sub, clock pulse, tight drums, and short metallic hooks so the factory reads as polished mechanical motion instead of a toy jingle.',
+  title: 'Mechanical pressure groove',
+  explanation: 'Industrial conveyor score with piston-like bass, clipped metallic hooks, constant clock-gate motion, and a warmer compressor bed so the factory feels driven by pressure and machinery instead of sci-fi drift.',
   tempo: 112,
   key: 'E minor',
   motif: LEVEL6_MOTIF,
   swing: 0.02,
   roles: {
-    chord: 'warm mechanical pad bed',
-    lead: 'short metallic motif',
-    bass: 'sidechained sub bass',
-    counter: 'clock pulse gate',
-    accent: 'gear chime accent',
-    percussion: 'tight kick, snare, hat, and shaker',
-    texture: 'steam hiss and dust',
+    chord: 'compressed machine-room pad bed',
+    lead: 'short metallic callout motif',
+    bass: 'piston sub bass with stronger ducking',
+    counter: 'clockwork gate pulse',
+    accent: 'gear tooth strike accent',
+    percussion: 'tight kick, snare, hat, and shaker groove',
+    texture: 'steam hiss, dust, and servo air',
   },
   cuePalette: {
     checkpoint: 'gear chime',
@@ -1103,6 +1019,24 @@ export const LEVEL6_MUSIC_SPEC = {
     collision: 'soft thud',
     levelComplete: 'rising cadence',
     setpiece: 'press slam warn stinger',
+  },
+  mix: {
+    targetGain: 0.5,
+    textureEveryBars: 2,
+    pumpDip: 0.86,
+    pumpRelease: 0.1,
+    stepGains: { lead: 0.072, counter: 0.062, accent: 0.045, bass: 0.082 },
+    roleDurations: { lead: 0.56, counter: 0.34, accent: 0.46, bass: 0.94 },
+    chord: { durationBeats: 4.2, gain: 0.052 },
+    ducking: {
+      defaultMul: 0.8,
+      defaultRelease: 0.24,
+      collisionMul: 0.72,
+      collisionRelease: 0.32,
+      levelCompleteMul: 0.64,
+      levelCompleteRelease: 0.48,
+    },
+    compressor: { threshold: -18, knee: 18, ratio: 2.8, attack: 0.015, release: 0.18 },
   },
   sections: [LEVEL6_SECTION_A, LEVEL6_SECTION_B, LEVEL6_SECTION_C, LEVEL6_SECTION_D],
   cues: {
@@ -1136,7 +1070,7 @@ export const LEVEL6_MUSIC_SPEC = {
 
 const LEVEL7_SECTION_A = buildLevelSection(
   'A',
-  repeatProgression(['Dm', 'Dm', 'Bb', 'Bb', 'Gm', 'Gm', 'C', 'A7']),
+  repeatProgression(['Dm', 'Dm', 'Bb', 'C', 'Dm', 'Dm', 'Gm', 'A7']),
   createLevel7Bar,
   (index) => ({ density: index < 6 ? 'low' : 'mid', accent: index % 4 === 3 }),
 );
@@ -1148,13 +1082,13 @@ const LEVEL7_SECTION_B = buildLevelSection(
 );
 const LEVEL7_SECTION_C = buildLevelSection(
   'C',
-  repeatProgression(['Dm', 'Dm', 'Gm', 'Gm', 'Bb', 'C', 'A7', 'A7']),
+  repeatProgression(['Dm', 'Gm', 'Dm', 'Gm', 'Bb', 'C', 'A7', 'A7']),
   createLevel7Bar,
   (index) => ({ density: index < 4 ? 'mid' : 'high', accent: index % 2 === 0 }),
 );
 const LEVEL7_SECTION_D = buildLevelSection(
   'D',
-  repeatProgression(['Dm', 'Bb', 'Gm', 'C', 'Dm', 'Bb', 'A7', 'A7']),
+  repeatProgression(['Dm', 'Bb', 'C', 'Gm', 'Dm', 'Bb', 'A7', 'A7']),
   createLevel7Bar,
   (index) => ({ density: index < 6 ? 'mid' : 'high', accent: index % 4 === 2 }),
 );
@@ -1162,19 +1096,19 @@ const LEVEL7_SECTION_D = buildLevelSection(
 export const LEVEL7_MUSIC_SPEC = {
   levelId: 7,
   title: 'Storm chase score',
-  explanation: 'Driving dusk-storm cue with pulse bass, storm pad, clipped breakbeat drums, and a spare heroic hook that cuts through gusts and lightning without getting cute.',
+  explanation: 'Wind-lashed pursuit cue with broken-gallop drums, gusting pulse synths, a higher heroic hook, and noisy storm air so the level reads as exposed weather and momentum instead of industrial drive or dreamy drift.',
   tempo: 124,
   key: 'D minor',
   motif: LEVEL7_MOTIF,
   swing: 0.04,
   roles: {
-    chord: 'storm pad bed',
-    lead: 'sparse heroic hook',
-    bass: 'driving pulse bass',
+    chord: 'wide storm pad bed',
+    lead: 'high heroic storm hook',
+    bass: 'driving gust bass',
     counter: 'wind pulse synth',
-    accent: 'lightning accent',
-    percussion: 'breakbeat-lite kit',
-    texture: 'rain and wind wash',
+    accent: 'lightning flash accent',
+    percussion: 'broken-gallop storm kit',
+    texture: 'rain bands and wind wash',
   },
   cuePalette: {
     checkpoint: 'wind chime',
@@ -1182,6 +1116,24 @@ export const LEVEL7_MUSIC_SPEC = {
     collision: 'zap thud',
     levelComplete: 'bright resolve',
     setpiece: 'lightning warn stinger',
+  },
+  mix: {
+    targetGain: 0.51,
+    textureEveryBars: 1,
+    pumpDip: 0.88,
+    pumpRelease: 0.11,
+    stepGains: { lead: 0.074, counter: 0.057, accent: 0.048, bass: 0.081 },
+    roleDurations: { lead: 0.76, counter: 0.42, accent: 0.38, bass: 0.9 },
+    chord: { durationBeats: 5.0, gain: 0.056 },
+    ducking: {
+      defaultMul: 0.82,
+      defaultRelease: 0.26,
+      collisionMul: 0.7,
+      collisionRelease: 0.34,
+      levelCompleteMul: 0.64,
+      levelCompleteRelease: 0.5,
+    },
+    compressor: { threshold: -19, knee: 16, ratio: 2.6, attack: 0.02, release: 0.22 },
   },
   sections: [LEVEL7_SECTION_A, LEVEL7_SECTION_B, LEVEL7_SECTION_C, LEVEL7_SECTION_D],
   cues: {
@@ -1239,20 +1191,20 @@ const LEVEL8_SECTION_D = buildLevelSection(
 
 export const LEVEL8_MUSIC_SPEC = {
   levelId: 8,
-  title: 'Cozy spellbook groove',
-  explanation: 'Warm library groove with soft pad, story pluck pulse, breathy lead, gentle drums, and page-like textures so the room feels magical and lived in rather than spooky.',
+  title: 'Lamp-lit spellbook groove',
+  explanation: 'Intimate library cue with woody page-turn plucks, breathy lamp-lit lead, softer bass, and roomy air so the space feels magical, warm, and handcrafted rather than stormy or industrial.',
   tempo: 96,
   key: 'G major',
   motif: LEVEL8_MOTIF,
   swing: 0.03,
   roles: {
     chord: 'warm lamp pad',
-    lead: 'breathy clarinet-ish lead',
-    bass: 'soft round bass',
-    counter: 'storybook pluck',
+    lead: 'breathy woodwind lead',
+    bass: 'soft round library bass',
+    counter: 'storybook page pluck',
     accent: 'lantern sparkle',
-    percussion: 'light kick, rim, and hat',
-    texture: 'page flip air',
+    percussion: 'light kick, rim, and brushed hat',
+    texture: 'page flip air and room hush',
   },
   cuePalette: {
     checkpoint: 'warm ding',
@@ -1260,6 +1212,24 @@ export const LEVEL8_MUSIC_SPEC = {
     collision: 'ink slurp',
     levelComplete: 'cozy cadence',
     setpiece: 'lantern reveal shimmer',
+  },
+  mix: {
+    targetGain: 0.47,
+    textureEveryBars: 2,
+    pumpDip: 0.95,
+    pumpRelease: 0.14,
+    stepGains: { lead: 0.068, counter: 0.052, accent: 0.035, bass: 0.072 },
+    roleDurations: { lead: 1.04, counter: 0.46, accent: 0.86, bass: 1.2 },
+    chord: { durationBeats: 6.0, gain: 0.05 },
+    ducking: {
+      defaultMul: 0.86,
+      defaultRelease: 0.3,
+      collisionMul: 0.76,
+      collisionRelease: 0.36,
+      levelCompleteMul: 0.68,
+      levelCompleteRelease: 0.58,
+    },
+    compressor: { threshold: -21, knee: 20, ratio: 1.9, attack: 0.04, release: 0.3 },
   },
   sections: [LEVEL8_SECTION_A, LEVEL8_SECTION_B, LEVEL8_SECTION_C, LEVEL8_SECTION_D],
   cues: {
@@ -1291,48 +1261,48 @@ export const LEVEL8_MUSIC_SPEC = {
 
 const LEVEL9_SECTION_A = buildLevelSection(
   'A',
-  repeatProgression(['G', 'G', 'Em', 'Em', 'C', 'C', 'D', 'D'], 3),
+  repeatProgression(['D', 'D', 'Bm', 'Bm', 'G', 'G', 'A', 'A'], 3),
   createLevel9Bar,
   (index) => ({ density: index < 8 ? 'low' : 'mid', accent: index % 6 === 5 }),
 );
 const LEVEL9_SECTION_B = buildLevelSection(
   'B',
-  repeatProgression(['G', 'D', 'Em', 'C', 'G', 'D', 'Am7', 'D'], 3),
+  repeatProgression(['D', 'A', 'Bm', 'G', 'D', 'A', 'Em', 'A'], 3),
   createLevel9Bar,
   (index) => ({ density: index < 10 ? 'mid' : 'high', accent: index % 4 === 1 }),
 );
 const LEVEL9_SECTION_C = buildLevelSection(
   'C',
-  repeatProgression(['Em', 'Em', 'C', 'C', 'G', 'G', 'D', 'D'], 3),
+  repeatProgression(['Bm', 'Bm', 'G', 'G', 'D', 'D', 'A', 'A'], 3),
   createLevel9Bar,
   (index) => ({ density: index < 8 ? 'mid' : 'high', accent: index % 4 === 2 }),
 );
 const LEVEL9_SECTION_D = buildLevelSection(
   'D',
   [
-    'G', 'G', 'C', 'C', 'Em', 'D', 'G', 'D',
-    'G', 'G', 'C', 'C', 'Em', 'D', 'G', 'D',
-    'G', 'G', 'G', 'C', 'Em', 'D', 'G', 'G',
+    'D', 'D', 'G', 'G', 'Bm', 'A', 'D', 'A',
+    'D', 'D', 'G', 'G', 'Bm', 'A', 'D', 'A',
+    'D', 'D', 'D', 'G', 'Bm', 'A', 'D', 'D',
   ],
   createLevel9Bar,
-  (index) => ({ density: index < 12 ? 'mid' : 'high', accent: index % 3 === 2, pedal: index >= 16 ? 'G2' : '' }),
+  (index) => ({ density: index < 12 ? 'mid' : 'high', accent: index % 3 === 2, pedal: index >= 16 ? 'D2' : '' }),
 );
 
 export const LEVEL9_MUSIC_SPEC = {
   levelId: 9,
-  title: 'Campfire night adventure',
-  explanation: 'Long-form finale cue with warm pad bed, koto-like pluck motion, frame-drum pulse, sparse breathy lead, and faint fire crackle so the camp reads as a real closing scene instead of a loop.',
+  title: 'Campfire night finale',
+  explanation: 'Long-form closing cue with open-air harmonic motion, frame-drum ritual pulse, bamboo-like lead, fire-warm pad bloom, and ember textures so the finale feels communal and conclusive instead of just another level loop.',
   tempo: 84,
-  key: 'G major',
+  key: 'D major',
   motif: LEVEL9_MOTIF,
   swing: 0.02,
   roles: {
-    chord: 'warm camp pad bed',
-    lead: 'breathy adventure lead',
-    bass: 'soft grounded bass',
-    counter: 'koto-like pluck',
+    chord: 'warm campfire pad bed',
+    lead: 'bamboo-breathed finale lead',
+    bass: 'soft grounded finale bass',
+    counter: 'camp pluck ostinato',
     accent: 'lantern sparkle',
-    percussion: 'frame drum and shaker',
+    percussion: 'frame drum and shaker pulse',
     texture: 'fire crackle and night air',
   },
   cuePalette: {
@@ -1342,31 +1312,49 @@ export const LEVEL9_MUSIC_SPEC = {
     levelComplete: 'warm cadence and sparkle',
     setpiece: 'paper flick warn',
   },
+  mix: {
+    targetGain: 0.44,
+    textureEveryBars: 1,
+    pumpDip: 0.97,
+    pumpRelease: 0.16,
+    stepGains: { lead: 0.06, counter: 0.05, accent: 0.032, bass: 0.068 },
+    roleDurations: { lead: 1.2, counter: 0.62, accent: 0.98, bass: 1.42 },
+    chord: { durationBeats: 7.4, gain: 0.048 },
+    ducking: {
+      defaultMul: 0.88,
+      defaultRelease: 0.34,
+      collisionMul: 0.78,
+      collisionRelease: 0.4,
+      levelCompleteMul: 0.64,
+      levelCompleteRelease: 0.72,
+    },
+    compressor: { threshold: -22, knee: 22, ratio: 1.8, attack: 0.05, release: 0.34 },
+  },
   sections: [LEVEL9_SECTION_A, LEVEL9_SECTION_B, LEVEL9_SECTION_C, LEVEL9_SECTION_D],
   cues: {
     checkpoint: [
-      { beat: 0, role: 'accent', note: 'D5', duration: 0.24, gain: 0.08 },
-      { beat: 0.20, role: 'lead', note: 'G5', duration: 0.36, gain: 0.08 },
-      { beat: 0.40, role: 'chord', notes: ['G4', 'B4', 'D5'], duration: 1.2, gain: 0.08 },
+      { beat: 0, role: 'accent', note: 'A5', duration: 0.24, gain: 0.08 },
+      { beat: 0.20, role: 'lead', note: 'D5', duration: 0.36, gain: 0.08 },
+      { beat: 0.40, role: 'chord', notes: ['D4', 'F#4', 'A4'], duration: 1.2, gain: 0.08 },
     ],
     nearMiss: [
-      { beat: 0, role: 'accent', note: 'B5', duration: 0.12, gain: 0.05 },
+      { beat: 0, role: 'accent', note: 'E5', duration: 0.12, gain: 0.05 },
     ],
     collision: [
-      { beat: 0, role: 'bass', note: 'G2', duration: 0.40, gain: 0.10 },
+      { beat: 0, role: 'bass', note: 'D2', duration: 0.40, gain: 0.10 },
       { beat: 0.10, drum: 'rim', gain: 0.45 },
     ],
     levelComplete: [
-      { beat: 0, role: 'chord', notes: ['G4', 'B4', 'D5'], duration: 2.2, gain: 0.10 },
-      { beat: 0, role: 'lead', note: 'G5', duration: 0.34, gain: 0.09 },
-      { beat: 0.55, role: 'lead', note: 'B5', duration: 0.40, gain: 0.09 },
-      { beat: 1.1, role: 'lead', note: 'D6', duration: 0.55, gain: 0.10 },
-      { beat: 1.9, role: 'accent', note: 'G6', duration: 0.9, gain: 0.07 },
+      { beat: 0, role: 'chord', notes: ['D4', 'F#4', 'A4'], duration: 2.2, gain: 0.10 },
+      { beat: 0, role: 'lead', note: 'D5', duration: 0.34, gain: 0.09 },
+      { beat: 0.55, role: 'lead', note: 'F#5', duration: 0.40, gain: 0.09 },
+      { beat: 1.1, role: 'lead', note: 'A5', duration: 0.55, gain: 0.10 },
+      { beat: 1.9, role: 'accent', note: 'D6', duration: 0.9, gain: 0.07 },
     ],
     setpiece: [
-      { beat: 0, role: 'accent', note: 'D5', duration: 0.18, gain: 0.06 },
+      { beat: 0, role: 'accent', note: 'A5', duration: 0.18, gain: 0.06 },
       { beat: 0.10, role: 'counter', note: 'B4', duration: 0.22, gain: 0.05 },
-      { beat: 0.18, role: 'bass', note: 'G2', duration: 0.42, gain: 0.08 },
+      { beat: 0.18, role: 'bass', note: 'D2', duration: 0.42, gain: 0.08 },
     ],
   },
 };
