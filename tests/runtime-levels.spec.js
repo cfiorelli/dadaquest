@@ -943,6 +943,28 @@ for (const levelId of [6, 7, 8, 9]) {
       throw new Error(`Console errors on level ${levelId}: ${consoleErrors.join('\n')}`);
     }
   });
+
+  test(`@era5 runtime: level ${levelId} exposes visible gameplay surfaces and front-facing environment landmarks`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await gotoDebugLevel(page, levelId);
+    await unlockThroughLevel(page, levelId - 1);
+    await startDebugLevel(page, levelId);
+    await page.waitForTimeout(1200);
+
+    const report = await page.evaluate(() => window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 8 }) ?? null);
+    expect(report).not.toBeNull();
+    expect(report.counts.gameplayMeshes).toBeGreaterThan(10);
+    expect(report.counts.envMeshes).toBeGreaterThan(30);
+
+    const visibleLandmarks = report.largestEnvironmentMeshes.filter((mesh) => (
+      mesh.enabled !== false
+      && mesh.visible !== false
+      && (mesh.alpha ?? 1) > 0.1
+      && (mesh.viewFacing ?? 0) >= 0.9
+      && Math.max(mesh.size?.x ?? 0, mesh.size?.y ?? 0, mesh.size?.z ?? 0) >= 24
+    ));
+    expect(visibleLandmarks.length).toBeGreaterThanOrEqual(2);
+  });
 }
 
 test('@era5 runtime: level 6 conveyor zones push the player and expose conveyor debug state', async ({ page }) => {

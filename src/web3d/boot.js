@@ -133,6 +133,53 @@ function getShotToast() {
   return value === 'onesie' || value === 'slippery' ? value : '';
 }
 
+function readEra5VisionQuery() {
+  if (typeof window === 'undefined') {
+    return {
+      enabled: false,
+      disableFog: false,
+      disablePostFx: false,
+      showBounds: false,
+      hideLargePlanes: false,
+      forceEnvironmentVisible: false,
+    };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const enabled = params.get('era5vision') === '1';
+  return {
+    enabled,
+    disableFog: enabled && params.get('era5nofog') === '1',
+    disablePostFx: enabled && params.get('era5nopostfx') === '1',
+    showBounds: enabled && params.get('era5bounds') === '1',
+    hideLargePlanes: enabled && params.get('era5hideplanes') === '1',
+    forceEnvironmentVisible: enabled && params.get('era5forceenv') === '1',
+  };
+}
+
+function roundNumber(value, digits = 3) {
+  return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function vectorToArray(vec, digits = 3) {
+  if (!(vec instanceof BABYLON.Vector3)) return null;
+  return [roundNumber(vec.x, digits), roundNumber(vec.y, digits), roundNumber(vec.z, digits)];
+}
+
+function color3ToArray(color, digits = 3) {
+  if (!(color instanceof BABYLON.Color3)) return null;
+  return [roundNumber(color.r, digits), roundNumber(color.g, digits), roundNumber(color.b, digits)];
+}
+
+function color4ToArray(color, digits = 3) {
+  if (!(color instanceof BABYLON.Color4)) return null;
+  return [
+    roundNumber(color.r, digits),
+    roundNumber(color.g, digits),
+    roundNumber(color.b, digits),
+    roundNumber(color.a, digits),
+  ];
+}
+
 function createEra5DevOverlay() {
   if (typeof document === 'undefined') return null;
   const existing = document.getElementById('era5DevOverlay');
@@ -2317,7 +2364,11 @@ export async function boot(options = {}) {
       && mesh.isEnabled()
       && mesh.isVisible !== false
       && (mesh.visibility ?? 1) > 0.02
-      && (mesh.metadata?.gameplay === true || (mesh.name || '').startsWith('L5_GEO_'))
+      && (
+        mesh.metadata?.gameplay === true
+        || mesh.metadata?.gameplaySurface === true
+        || (mesh.name || '').startsWith('L5_GEO_')
+      )
     ));
   }
 
@@ -2397,6 +2448,24 @@ export async function boot(options = {}) {
   let level2LoggedOccluderId = null;
   let era5CurrentOccluderName = null;
   const era5DevOverlay = debugMode && isEra5Level ? createEra5DevOverlay() : null;
+  const era5VisionQuery = debugMode && isEra5Level ? readEra5VisionQuery() : { enabled: false };
+  const era5VisionState = {
+    disableFog: false,
+    disablePostFx: false,
+    showBounds: false,
+    hideLargePlanes: false,
+    forceEnvironmentVisible: false,
+  };
+  const era5VisionMeshState = new Map();
+  const era5VisionOriginalScene = {
+    fogMode: scene.fogMode,
+    fogStart: scene.fogStart,
+    fogEnd: scene.fogEnd,
+    fogDensity: scene.fogDensity,
+    postProcessesEnabled: scene.postProcessesEnabled,
+    imageProcessingEnabled: scene.imageProcessingConfiguration?.isEnabled ?? null,
+    imageProcessingByPostProcess: scene.imageProcessingConfiguration?.applyByPostProcess ?? null,
+  };
   if (isEra5Level) {
     applyEra5FacingState();
   }
@@ -2730,6 +2799,226 @@ export async function boot(options = {}) {
       stateInfo.target = activeIds.has(stateInfo.mesh.uniqueId) ? 0.14 : 1;
       stateInfo.current = damp(stateInfo.current, stateInfo.target, 11, dt);
       material.alpha = stateInfo.baseAlpha * stateInfo.current;
+    }
+  }
+
+  function getEra5EnvironmentMeshes() {
+    if (!isEra5Level) return [];
+    return scene.meshes.filter((mesh) => (
+      mesh instanceof BABYLON.Mesh
+      && mesh.metadata?.era5Env === true
+    ));
+  }
+
+  function getEra5MeshSize(mesh) {
+    mesh.computeWorldMatrix(true);
+    const bounds = mesh.getBoundingInfo?.()?.boundingBox;
+    if (!bounds) return null;
+    return {
+      x: bounds.extendSizeWorld.x * 2,
+      y: bounds.extendSizeWorld.y * 2,
+      z: bounds.extendSizeWorld.z * 2,
+    };
+  }
+
+  function getEra5MeshSurfaceArea(size) {
+    if (!size) return 0;
+    return Math.max(
+      size.x * size.y,
+      size.x * size.z,
+      size.y * size.z,
+    );
+  }
+
+  function isEra5LargePlaneMesh(mesh) {
+    if (!(mesh instanceof BABYLON.Mesh)) return false;
+    if (mesh.metadata?.era5EnvKind !== 'plane') return false;
+    const size = getEra5MeshSize(mesh);
+    if (!size) return false;
+    const minSize = Math.min(size.x, size.y, size.z);
+    return getEra5MeshSurfaceArea(size) >= 60 && minSize <= 1.4;
+  }
+
+  function rememberEra5VisionMeshState(mesh) {
+    const existing = era5VisionMeshState.get(mesh.uniqueId);
+    if (existing) return existing;
+    const material = mesh.material;
+    const original = {
+      enabled: mesh.isEnabled(),
+      isVisible: mesh.isVisible !== false,
+      visibility: typeof mesh.visibility === 'number' ? mesh.visibility : 1,
+      showBoundingBox: !!mesh.showBoundingBox,
+      alpha: material && typeof material.alpha === 'number' ? material.alpha : null,
+    };
+    era5VisionMeshState.set(mesh.uniqueId, original);
+    return original;
+  }
+
+  function getMeshViewFacing(mesh) {
+    if (!(mesh instanceof BABYLON.Mesh)) return null;
+    const absolutePos = mesh.getAbsolutePosition();
+    const toCamera = camera.position.subtract(absolutePos);
+    if (toCamera.lengthSquared() <= 0.0001) return 1;
+    const normal = mesh.getDirection(BABYLON.Axis.Z);
+    if (normal.lengthSquared() <= 0.0001) return null;
+    return Math.abs(BABYLON.Vector3.Dot(normal.normalize(), toCamera.normalize()));
+  }
+
+  function summarizeEra5Mesh(mesh) {
+    const size = getEra5MeshSize(mesh);
+    const material = mesh.material;
+    return {
+      name: mesh.name || mesh.id || 'mesh',
+      parentChain: describeNodeChain(mesh),
+      position: vectorToArray(mesh.getAbsolutePosition()),
+      rotation: vectorToArray(mesh.rotation),
+      size: size ? {
+        x: roundNumber(size.x),
+        y: roundNumber(size.y),
+        z: roundNumber(size.z),
+      } : null,
+      viewFacing: roundNumber(getMeshViewFacing(mesh)),
+      isEnabled: mesh.isEnabled(),
+      isVisible: mesh.isVisible !== false,
+      visibility: roundNumber(mesh.visibility ?? 1),
+      isPickable: !!mesh.isPickable,
+      renderingGroupId: mesh.renderingGroupId ?? 0,
+      cameraIgnore: mesh.metadata?.cameraIgnore === true,
+      materialAlpha: material && typeof material.alpha === 'number' ? roundNumber(material.alpha) : null,
+      materialType: material?.getClassName?.() || material?.constructor?.name || null,
+      transparencyMode: material?.transparencyMode ?? null,
+      era5EnvKind: mesh.metadata?.era5EnvKind || null,
+      gameplay: mesh.metadata?.gameplay === true,
+      hazard: mesh.metadata?.hazard === true,
+    };
+  }
+
+  function applyEra5VisionState() {
+    if (!isEra5Level) return;
+    scene.fogMode = era5VisionState.disableFog ? BABYLON.Scene.FOGMODE_NONE : era5VisionOriginalScene.fogMode;
+    scene.fogStart = era5VisionOriginalScene.fogStart;
+    scene.fogEnd = era5VisionOriginalScene.fogEnd;
+    scene.fogDensity = era5VisionOriginalScene.fogDensity;
+    scene.postProcessesEnabled = era5VisionState.disablePostFx
+      ? false
+      : era5VisionOriginalScene.postProcessesEnabled;
+    if (scene.imageProcessingConfiguration && era5VisionOriginalScene.imageProcessingEnabled !== null) {
+      scene.imageProcessingConfiguration.isEnabled = era5VisionState.disablePostFx
+        ? false
+        : era5VisionOriginalScene.imageProcessingEnabled;
+    }
+    if (scene.imageProcessingConfiguration && era5VisionOriginalScene.imageProcessingByPostProcess !== null) {
+      scene.imageProcessingConfiguration.applyByPostProcess = era5VisionState.disablePostFx
+        ? false
+        : era5VisionOriginalScene.imageProcessingByPostProcess;
+    }
+
+    for (const mesh of getEra5EnvironmentMeshes()) {
+      const original = rememberEra5VisionMeshState(mesh);
+      mesh.setEnabled(original.enabled);
+      mesh.isVisible = original.isVisible;
+      mesh.visibility = original.visibility;
+      mesh.showBoundingBox = era5VisionState.showBounds ? true : original.showBoundingBox;
+      if (mesh.material && typeof original.alpha === 'number') {
+        mesh.material.alpha = original.alpha;
+      }
+      if (era5VisionState.forceEnvironmentVisible) {
+        mesh.setEnabled(true);
+        mesh.isVisible = true;
+        mesh.visibility = 1;
+        if (mesh.material && Object.prototype.hasOwnProperty.call(mesh.material, 'alpha')) {
+          mesh.material.alpha = 1;
+        }
+      }
+      if (era5VisionState.hideLargePlanes && isEra5LargePlaneMesh(mesh)) {
+        mesh.setEnabled(false);
+      }
+    }
+  }
+
+  function era5VisionReport({ limit = 12 } = {}) {
+    if (!isEra5Level) return null;
+    const envMeshes = getEra5EnvironmentMeshes();
+    const largestEnvironmentMeshes = envMeshes
+      .map((mesh) => ({
+        mesh,
+        surfaceArea: getEra5MeshSurfaceArea(getEra5MeshSize(mesh)),
+      }))
+      .sort((a, b) => b.surfaceArea - a.surfaceArea)
+      .slice(0, Math.max(1, limit))
+      .map(({ mesh }) => summarizeEra5Mesh(mesh));
+    const largePlanes = envMeshes
+      .filter((mesh) => isEra5LargePlaneMesh(mesh))
+      .slice(0, 10)
+      .map((mesh) => summarizeEra5Mesh(mesh));
+    const report = {
+      levelId,
+      sceneKey: window.__DADA_DEBUG__?.sceneKey || null,
+      camera: {
+        position: vectorToArray(camera.position),
+        target: vectorToArray(camera.getTarget()),
+        minZ: roundNumber(camera.minZ),
+        maxZ: roundNumber(camera.maxZ),
+        fov: roundNumber(camera.fov),
+      },
+      fog: {
+        mode: scene.fogMode,
+        start: roundNumber(scene.fogStart),
+        end: roundNumber(scene.fogEnd),
+        density: roundNumber(scene.fogDensity),
+        clearColor: color4ToArray(scene.clearColor),
+        fogColor: color3ToArray(scene.fogColor),
+      },
+      counts: {
+        enabledMeshes: scene.meshes.filter((mesh) => mesh instanceof BABYLON.Mesh && mesh.isEnabled()).length,
+        gameplayMeshes: getEra5SceneStats().gameplayMeshes.length,
+        envMeshes: envMeshes.length,
+        fadedMeshes: getEra5SceneStats().fadedMeshes,
+      },
+      occluderMesh: era5CurrentOccluderName,
+      debugView: { ...era5VisionState },
+      largestEnvironmentMeshes,
+      largePlanes,
+    };
+    console.log('[Era5VisionReport]', report);
+    return report;
+  }
+
+  if (debugMode && isEra5Level) {
+    window.__DADA_DEBUG__.era5VisionReport = era5VisionReport;
+    window.__DADA_DEBUG__.era5GetDebugView = () => ({ ...era5VisionState });
+    window.__DADA_DEBUG__.era5SetDebugView = (patch = {}) => {
+      Object.assign(era5VisionState, {
+        disableFog: !!patch.disableFog,
+        disablePostFx: !!patch.disablePostFx,
+        showBounds: !!patch.showBounds,
+        hideLargePlanes: !!patch.hideLargePlanes,
+        forceEnvironmentVisible: !!patch.forceEnvironmentVisible,
+      });
+      applyEra5VisionState();
+      return era5VisionReport();
+    };
+    window.__DADA_DEBUG__.era5ResetDebugView = () => {
+      Object.assign(era5VisionState, {
+        disableFog: false,
+        disablePostFx: false,
+        showBounds: false,
+        hideLargePlanes: false,
+        forceEnvironmentVisible: false,
+      });
+      applyEra5VisionState();
+      return era5VisionReport();
+    };
+    if (era5VisionQuery.enabled) {
+      Object.assign(era5VisionState, {
+        disableFog: !!era5VisionQuery.disableFog,
+        disablePostFx: !!era5VisionQuery.disablePostFx,
+        showBounds: !!era5VisionQuery.showBounds,
+        hideLargePlanes: !!era5VisionQuery.hideLargePlanes,
+        forceEnvironmentVisible: !!era5VisionQuery.forceEnvironmentVisible,
+      });
+      applyEra5VisionState();
+      era5VisionReport();
     }
   }
 

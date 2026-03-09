@@ -22,6 +22,13 @@ export function markDecorNode(node, extraMetadata = {}) {
   }
 }
 
+function markEnvNode(node, extraMetadata = {}) {
+  markDecorNode(node, {
+    era5Env: true,
+    ...extraMetadata,
+  });
+}
+
 function createCausticTexture(scene, name) {
   const texture = new BABYLON.DynamicTexture(name, { width: 512, height: 512 }, scene, true);
   const ctx = texture.getContext();
@@ -103,7 +110,7 @@ function createBubbleNode(scene, name, position, scale = 1) {
   mat.specularColor = new BABYLON.Color3(0.45, 0.82, 0.88);
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mesh.material = mat;
-  markDecorNode(mesh);
+  markEnvNode(mesh, { era5EnvKind: 'particle' });
   return mesh;
 }
 
@@ -150,7 +157,7 @@ function createGlassFrame(scene, name, { width, height }) {
     frameMaterials.push(mat);
   }
 
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvKind: 'glassFrame' });
   return { root, panelMat, frameMaterials };
 }
 
@@ -161,7 +168,7 @@ export function createAquariumEnvironmentFx(scene, {
 } = {}) {
   const root = new BABYLON.TransformNode('aquariumEnvFx', scene);
   root.position.set(0, 0, 0);
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvTheme: 'aquarium', era5EnvKind: 'root' });
 
   const fogPlane = BABYLON.MeshBuilder.CreatePlane('aquariumFogPlane', {
     width: Math.max(120, (extents.maxX - extents.minX) + 30),
@@ -184,7 +191,7 @@ export function createAquariumEnvironmentFx(scene, {
   fogMat.backFaceCulling = false;
   fogMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   fogPlane.material = fogMat;
-  markDecorNode(fogPlane);
+  markEnvNode(fogPlane, { era5EnvKind: 'plane' });
 
   const causticPlane = BABYLON.MeshBuilder.CreatePlane('aquariumCausticPlane', {
     width: Math.max(120, (extents.maxX - extents.minX) + 24),
@@ -202,7 +209,7 @@ export function createAquariumEnvironmentFx(scene, {
   causticMat.backFaceCulling = false;
   causticMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   causticPlane.material = causticMat;
-  markDecorNode(causticPlane);
+  markEnvNode(causticPlane, { era5EnvKind: 'plane' });
 
   const columns = [];
   for (let i = 0; i < 5; i++) {
@@ -221,7 +228,7 @@ export function createAquariumEnvironmentFx(scene, {
     mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     column.material = mat;
     columns.push(column);
-    markDecorNode(column);
+    markEnvNode(column, { era5EnvKind: 'plane' });
   }
 
   const fishShadows = [];
@@ -247,7 +254,7 @@ export function createAquariumEnvironmentFx(scene, {
     shadowMat.backFaceCulling = false;
     shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     shadow.material = shadowMat;
-    markDecorNode(shadow);
+    markEnvNode(shadow, { era5EnvKind: 'plane' });
     fishShadows.push({
       mesh: shadow,
       mat: shadowMat,
@@ -382,7 +389,7 @@ function createRectPlane(scene, name, {
   mat.backFaceCulling = false;
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plane.material = mat;
-  markDecorNode(plane);
+  markEnvNode(plane, { era5EnvKind: 'plane' });
   return { plane, mat };
 }
 
@@ -405,7 +412,7 @@ function applyGradientPlaneMaterial(scene, plane, name, {
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mat.emissiveColor = new BABYLON.Color3(emissiveScale, emissiveScale, emissiveScale);
   plane.material = mat;
-  markDecorNode(plane);
+  markEnvNode(plane, { era5EnvKind: 'plane' });
   return mat;
 }
 
@@ -423,8 +430,37 @@ function createParticleSphere(scene, name, {
   mat.specularColor = BABYLON.Color3.Black();
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mesh.material = mat;
-  markDecorNode(mesh);
+  markEnvNode(mesh, { era5EnvKind: 'particle' });
   return { mesh, mat };
+}
+
+function getMeshWorldSize(mesh) {
+  mesh.computeWorldMatrix(true);
+  const bounds = mesh.getBoundingInfo?.()?.boundingBox;
+  if (!bounds) return null;
+  return {
+    x: bounds.extendSizeWorld.x * 2,
+    y: bounds.extendSizeWorld.y * 2,
+    z: bounds.extendSizeWorld.z * 2,
+  };
+}
+
+function cantLargeVerticalEnvPlanesTowardRoute(root, {
+  focusX = 0,
+  focusZ = 0,
+  minSurfaceArea = 22,
+} = {}) {
+  for (const mesh of root.getChildMeshes(false)) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    if (mesh.parent !== root) continue;
+    if (mesh.metadata?.era5EnvKind !== 'plane') continue;
+    if (Math.abs(mesh.rotation.x) > 0.4) continue;
+    const size = getMeshWorldSize(mesh);
+    if (!size) continue;
+    const surfaceArea = Math.max(size.x * size.y, size.x * size.z, size.y * size.z);
+    if (surfaceArea < minSurfaceArea) continue;
+    mesh.rotation.y = Math.atan2(focusX - mesh.position.x, focusZ - mesh.position.z);
+  }
 }
 
 function createFactoryEnvironmentFx(scene, {
@@ -433,7 +469,7 @@ function createFactoryEnvironmentFx(scene, {
   farZ = 16,
 } = {}) {
   const root = new BABYLON.TransformNode('factoryEnvFx', scene);
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvTheme: 'factory', era5EnvKind: 'root' });
   const span = Math.max(120, (extents.maxX - extents.minX) + 28);
   const cx = (extents.minX + extents.maxX) * 0.5;
 
@@ -584,6 +620,11 @@ function createFactoryEnvironmentFx(scene, {
     sparks.push({ mesh: spark.mesh, mat: spark.mat, phase: i * 0.9 });
   }
 
+  cantLargeVerticalEnvPlanesTowardRoute(root, {
+    focusX: extents.minX - 10,
+    focusZ: 0,
+  });
+
   let time = 0;
   return {
     root,
@@ -618,7 +659,7 @@ function createStormEnvironmentFx(scene, {
   farZ = 16,
 } = {}) {
   const root = new BABYLON.TransformNode('stormEnvFx', scene);
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvTheme: 'storm', era5EnvKind: 'root' });
   const span = Math.max(120, (extents.maxX - extents.minX) + 28);
   const cx = (extents.minX + extents.maxX) * 0.5;
 
@@ -802,6 +843,11 @@ function createStormEnvironmentFx(scene, {
   flash.plane.parent = root;
   flash.plane.position.set(cx, floorY + 12, farZ + 4.8);
 
+  cantLargeVerticalEnvPlanesTowardRoute(root, {
+    focusX: extents.minX - 10,
+    focusZ: 0,
+  });
+
   let time = 0;
   return {
     root,
@@ -846,7 +892,7 @@ function createLibraryEnvironmentFx(scene, {
   farZ = 16,
 } = {}) {
   const root = new BABYLON.TransformNode('libraryEnvFx', scene);
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvTheme: 'library', era5EnvKind: 'root' });
   const span = Math.max(120, (extents.maxX - extents.minX) + 26);
   const cx = (extents.minX + extents.maxX) * 0.5;
 
@@ -1043,6 +1089,11 @@ function createLibraryEnvironmentFx(scene, {
     });
   }
 
+  cantLargeVerticalEnvPlanesTowardRoute(root, {
+    focusX: extents.minX - 10,
+    focusZ: 0,
+  });
+
   let time = 0;
   return {
     root,
@@ -1082,7 +1133,7 @@ function createCampEnvironmentFx(scene, {
   farZ = 16,
 } = {}) {
   const root = new BABYLON.TransformNode('campEnvFx', scene);
-  markDecorNode(root);
+  markEnvNode(root, { era5EnvTheme: 'camp', era5EnvKind: 'root' });
 
   const cx = (extents.minX + extents.maxX) * 0.5;
   const span = Math.max(120, (extents.maxX - extents.minX) + 26);
@@ -1254,6 +1305,11 @@ function createCampEnvironmentFx(scene, {
       phase: i * 0.7,
     });
   }
+
+  cantLargeVerticalEnvPlanesTowardRoute(root, {
+    focusX: extents.minX - 10,
+    focusZ: 0,
+  });
 
   let time = 0;
   return {
