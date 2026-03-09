@@ -55,18 +55,25 @@ export class InputManager {
     return y;
   }
 
-  getEra5MoveX() {
+  getEra5ForwardAxis() {
+    let y = 0;
+    if (this.held.KeyW) y += 1;
+    if (this.held.KeyS) y -= 1;
+    return y;
+  }
+
+  getEra5StrafeAxis() {
+    let x = 0;
+    if (this.held.KeyA) x -= 1;
+    if (this.held.KeyD) x += 1;
+    return x;
+  }
+
+  getEra5TurnAxis() {
     let x = 0;
     if (this.held.ArrowLeft) x -= 1;
     if (this.held.ArrowRight) x += 1;
     return x;
-  }
-
-  getEra5MoveY() {
-    let y = 0;
-    if (this.held.ArrowUp) y += 1;
-    if (this.held.ArrowDown) y -= 1;
-    return y;
   }
 
   /** True while Space is held down. */
@@ -130,7 +137,8 @@ export class InputManager {
   consumeAttackPress() {
     return this.consumeAbilityPress('Enter')
       || this.consumeAbilityPress('NumpadEnter')
-      || this.consumeAbilityPress('KeyA')
+      || this.consumeAbilityPress('ControlLeft')
+      || this.consumeAbilityPress('ControlRight')
       || this.consumeAbilityPress('PointerMain');
   }
 

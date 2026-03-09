@@ -56,7 +56,7 @@ const BASE_LEVEL9 = {
       radius: 0.95,
       autoEquip: true,
       title: 'Paper Fan',
-      subtitle: 'Enter / A / Click to scatter origami hazards',
+      subtitle: 'Ctrl / Enter / Click to scatter origami hazards',
     },
     {
       name: 'vest',

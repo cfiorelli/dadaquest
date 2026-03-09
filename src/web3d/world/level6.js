@@ -56,7 +56,7 @@ const BASE_LEVEL6 = {
       radius: 1.0,
       autoEquip: true,
       title: 'Foam Blaster',
-      subtitle: 'Enter / A / Click to push toys away',
+      subtitle: 'Ctrl / Enter / Click to push toys away',
     },
     {
       name: 'hat',

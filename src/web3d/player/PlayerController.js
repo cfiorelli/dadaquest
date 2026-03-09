@@ -127,6 +127,8 @@ export class PlayerController {
     this.coyoteTimeMs = COYOTE_MS;
     this.jumpBufferWindowMs = JUMP_BUFFER_MS;
     this.movementMode = 'lane';
+    this.era5Yaw = 0;
+    this.era5YawVel = 0;
 
     // Feedback state
     this.invulnTimerMs = 0;
@@ -164,6 +166,8 @@ export class PlayerController {
       this.mesh.position.z = 0;
       this.vz = 0;
       this.visual.rotation.y = 0;
+      this.era5Yaw = 0;
+      this.era5YawVel = 0;
     }
   }
 
@@ -215,10 +219,24 @@ export class PlayerController {
     this.sideJumpPlatform = null;
     this.capeFloatTimerMs = 0;
     this.visual.rotation.set(0, 0, 0);
+    this.era5Yaw = 0;
+    this.era5YawVel = 0;
     if (this.babyAnim) {
       this.babyAnim.setWinActive(false);
       this.babyAnim.resetPose();
     }
+  }
+
+  setEra5YawState(yaw = 0, yawVel = 0) {
+    this.era5Yaw = wrapAngle(yaw);
+    this.era5YawVel = Number.isFinite(yawVel) ? yawVel : 0;
+  }
+
+  getEra5YawState() {
+    return {
+      yaw: this.era5Yaw,
+      yawVel: this.era5YawVel,
+    };
   }
 
   /**
@@ -371,6 +389,7 @@ export class PlayerController {
     let moveZ = clamp(options.moveZ ?? 0, -1, 1);
     const floatActive = !!options.floatActive && this.capeFloatTimerMs > 0;
     if (!freeMove) moveZ = 0;
+    const explicitFacingYaw = Number.isFinite(options.facingYaw) ? wrapAngle(options.facingYaw) : null;
 
     if (this.invulnTimerMs > 0) {
       this.invulnTimerMs = Math.max(0, this.invulnTimerMs - dt * 1000);
@@ -632,7 +651,9 @@ export class PlayerController {
       });
     }
 
-    if (freeMove) {
+    if (freeMove && explicitFacingYaw !== null) {
+      this.visual.rotation.y = explicitFacingYaw;
+    } else if (freeMove) {
       const planarSpeed = Math.hypot(this.vx, this.vz);
       if (planarSpeed > 0.14) {
         const desiredYaw = Math.atan2(this.vx, this.vz);
@@ -764,6 +785,8 @@ export class PlayerController {
       vx: this.vx.toFixed(2),
       vy: this.vy.toFixed(2),
       vz: this.vz.toFixed(2),
+      yaw: this.era5Yaw.toFixed(3),
+      yawVel: this.era5YawVel.toFixed(3),
       grounded: this.grounded,
       movementMode: this.movementMode,
       invulnMs: this.invulnTimerMs.toFixed(0),

@@ -55,7 +55,7 @@ const BASE_LEVEL7 = {
       radius: 0.95,
       autoEquip: true,
       title: 'Kite String Whip',
-      subtitle: 'Enter / A / Click for a stun sweep',
+      subtitle: 'Ctrl / Enter / Click for a stun sweep',
     },
     {
       name: 'raincoat',

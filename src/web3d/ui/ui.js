@@ -1082,11 +1082,11 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function getEra5WeaponHelp(levelId) {
-    if (levelId === 9) return 'Fire Paper Fan: Enter / A / Click';
-    if (levelId === 8) return 'Throw Bookmark Boomerang: Enter / A / Click';
-    if (levelId === 7) return 'Crack Kite String Whip: Enter / A / Click';
-    if (levelId === 6) return 'Fire Foam Blaster: Enter / A / Click';
-    return 'Fire Bubble Wand: Enter / A / Click';
+    if (levelId === 9) return 'Fire Paper Fan: Ctrl / Enter / Click';
+    if (levelId === 8) return 'Throw Bookmark Boomerang: Ctrl / Enter / Click';
+    if (levelId === 7) return 'Crack Kite String Whip: Ctrl / Enter / Click';
+    if (levelId === 6) return 'Fire Foam Blaster: Ctrl / Enter / Click';
+    return 'Fire Bubble Wand: Ctrl / Enter / Click';
   }
 
   function getEra5ToolHelp(levelId) {
@@ -1100,7 +1100,8 @@ export function createUI(uiRoot, options = {}) {
   function getGameplayLegendMarkup(levelId) {
     if (isEra5UiLevel(levelId)) {
       return `
-        <div><span>↑ ↓ ← →</span> Move</div>
+        <div><span>W A S D</span> Move / strafe</div>
+        <div><span>← →</span> Turn</div>
         <div><span>Space</span> Jump</div>
         <div><span>Shift</span> Run</div>
         <div>${getEra5WeaponHelp(levelId)}</div>
@@ -1128,7 +1129,7 @@ export function createUI(uiRoot, options = {}) {
 
   function getControlHintMarkup(era5 = false, levelId = 1) {
     if (era5) {
-      return `<span>↑ ↓ ← →</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Enter</span>/<span>A</span> Fire &nbsp; <span>E</span> Tool`;
+      return `<span>W A S D</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
@@ -1518,7 +1519,7 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-label">Weapon</div>
           <div class="dada-era5-weapon-track" data-era5-weapon><div class="dada-era5-weapon-fill" data-era5-weapon-fill></div></div>
           <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
-          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: Enter / A / Click</div>
+          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: Ctrl / Enter / Click</div>
           <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank oxygen: avoid deep pockets</div>
         </div>
         <div class="dada-era5-hint" data-era5-hint>I Inventory</div>
@@ -2107,7 +2108,7 @@ export function createUI(uiRoot, options = {}) {
       weaponCooldownMs = 0,
       weaponCooldownMaxMs = 350,
       inventoryHint = 'I Inventory',
-      weaponHelp = 'Fire Bubble Wand: Enter / A / Click',
+      weaponHelp = 'Fire Bubble Wand: Ctrl / Enter / Click',
       toolHelp = 'Scuba Tank oxygen: avoid deep pockets',
     } = {}) {
       era5HudEl.style.display = 'block';

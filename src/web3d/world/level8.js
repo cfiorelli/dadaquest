@@ -66,7 +66,7 @@ const BASE_LEVEL8 = {
       radius: 0.95,
       autoEquip: true,
       title: 'Bookmark Boomerang',
-      subtitle: 'Enter / A / Click to hit birds and switches',
+      subtitle: 'Ctrl / Enter / Click to hit birds and switches',
     },
     {
       name: 'cloak',

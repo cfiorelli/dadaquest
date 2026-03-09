@@ -44,12 +44,48 @@ function markDecor(node) {
   markDecorNode(node, { cameraBlocker: false });
 }
 
+function getLevel5GameplayName(name = 'mesh') {
+  return name.startsWith('L5_GEO_') ? name : `L5_GEO_${name}`;
+}
+
 function markGameplaySurface(node) {
   if (!node) return;
+  node.name = getLevel5GameplayName(node.name || 'geo');
   node.metadata = {
     ...(node.metadata || {}),
     gameplaySurface: true,
+    gameplay: true,
   };
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.name = getLevel5GameplayName(mesh.name || node.name || 'geo');
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      gameplaySurface: true,
+      gameplay: true,
+    };
+  }
+}
+
+function markHazard(node) {
+  if (!node) return;
+  node.metadata = {
+    ...(node.metadata || {}),
+    cameraIgnore: true,
+    hazard: true,
+  };
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      cameraIgnore: true,
+      hazard: true,
+    };
+  }
 }
 
 function makeInvisibleCollider(scene, name, def) {
@@ -81,10 +117,11 @@ function makeGlowMaterial(scene, name, rgb, {
 }
 
 function createAquariumPlatform(scene, name, def, shadowGen) {
-  const root = new BABYLON.TransformNode(`L5_${name}`, scene);
+  const root = new BABYLON.TransformNode(getLevel5GameplayName(name), scene);
   root.position.set(def.x, def.y, def.z ?? LANE_Z);
+  markGameplaySurface(root);
 
-  const slab = BABYLON.MeshBuilder.CreateBox(`${name}_slab`, {
+  const slab = BABYLON.MeshBuilder.CreateBox(getLevel5GameplayName(`${name}_slab`), {
     width: def.w,
     height: def.h * 0.82,
     depth: def.d,
@@ -102,7 +139,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
 
-  const rim = BABYLON.MeshBuilder.CreateBox(`${name}_rim`, {
+  const rim = BABYLON.MeshBuilder.CreateBox(getLevel5GameplayName(`${name}_rim`), {
     width: def.w + 0.10,
     height: def.h * 0.26,
     depth: def.d + 0.10,
@@ -115,7 +152,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   });
   markGameplaySurface(rim);
 
-  const topGlass = BABYLON.MeshBuilder.CreatePlane(`${name}_glass`, {
+  const topGlass = BABYLON.MeshBuilder.CreatePlane(getLevel5GameplayName(`${name}_glass`), {
     width: Math.max(0.5, def.w - 0.18),
     height: Math.max(0.5, def.d - 0.18),
   }, scene);
@@ -132,9 +169,8 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   glassMat.needDepthPrePass = true;
   topGlass.material = glassMat;
   markGameplaySurface(topGlass);
-  markDecor(topGlass);
 
-  const faceGlow = BABYLON.MeshBuilder.CreatePlane(`${name}_faceGlow`, {
+  const faceGlow = BABYLON.MeshBuilder.CreatePlane(getLevel5GameplayName(`${name}_faceGlow`), {
     width: Math.max(0.54, def.w - 0.14),
     height: Math.max(0.18, def.h * 0.44),
   }, scene);
@@ -150,9 +186,8 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   faceGlowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   faceGlow.material = faceGlowMat;
   markGameplaySurface(faceGlow);
-  markDecor(faceGlow);
 
-  const topLip = BABYLON.MeshBuilder.CreatePlane(`${name}_topLip`, {
+  const topLip = BABYLON.MeshBuilder.CreatePlane(getLevel5GameplayName(`${name}_topLip`), {
     width: Math.max(0.52, def.w - 0.18),
     height: 0.11,
   }, scene);
@@ -168,9 +203,8 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   topLipMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   topLip.material = topLipMat;
   markGameplaySurface(topLip);
-  markDecor(topLip);
 
-  const underside = BABYLON.MeshBuilder.CreatePlane(`${name}_undershadow`, {
+  const underside = BABYLON.MeshBuilder.CreatePlane(getLevel5GameplayName(`${name}_undershadow`), {
     width: Math.max(0.5, def.w * 0.86),
     height: Math.max(0.5, def.d * 0.72),
   }, scene);
@@ -185,7 +219,6 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
   underMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   underside.material = underMat;
   markGameplaySurface(underside);
-  markDecor(underside);
 
   const beaconOffsets = [
     [-1, 1],
@@ -194,7 +227,7 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
     [1, -1],
   ];
   for (let i = 0; i < beaconOffsets.length; i++) {
-    const beacon = BABYLON.MeshBuilder.CreateSphere(`${name}_beacon_${i}`, {
+    const beacon = BABYLON.MeshBuilder.CreateSphere(getLevel5GameplayName(`${name}_beacon_${i}`), {
       diameter: 0.10,
       segments: 6,
     }, scene);
@@ -210,7 +243,6 @@ function createAquariumPlatform(scene, name, def, shadowGen) {
     beaconMat.alpha = 0.88;
     beacon.material = beaconMat;
     markGameplaySurface(beacon);
-    markDecor(beacon);
   }
 
   return root;
@@ -281,6 +313,44 @@ function createSignTexture(scene, name, text) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, 384, 132);
+
+  texture.update();
+  texture.hasAlpha = true;
+  return texture;
+}
+
+function createBackdropWallTexture(scene, name) {
+  const texture = new BABYLON.DynamicTexture(name, { width: 1024, height: 512 }, scene, true);
+  const ctx = texture.getContext();
+  const bg = ctx.createLinearGradient(0, 0, 0, 512);
+  bg.addColorStop(0, '#071623');
+  bg.addColorStop(0.48, '#0a2a3e');
+  bg.addColorStop(1, '#031018');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, 1024, 512);
+
+  for (let i = 0; i < 14; i++) {
+    ctx.strokeStyle = `rgba(98, 246, 255, ${0.08 + ((i % 4) * 0.03)})`;
+    ctx.lineWidth = 4 + (i % 3);
+    ctx.beginPath();
+    const y = 42 + (i * 34);
+    ctx.moveTo(32, y);
+    ctx.bezierCurveTo(220, y - 30, 540, y + 28, 992, y - 8);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 6; i++) {
+    const x = 84 + (i * 168);
+    ctx.fillStyle = 'rgba(10, 26, 38, 0.82)';
+    ctx.fillRect(x, 78, 112, 332);
+    ctx.strokeStyle = 'rgba(122, 255, 244, 0.40)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(x + 6, 84, 100, 320);
+  }
+
+  ctx.strokeStyle = 'rgba(188, 255, 246, 0.26)';
+  ctx.lineWidth = 12;
+  ctx.strokeRect(18, 18, 988, 476);
 
   texture.update();
   texture.hasAlpha = true;
@@ -530,14 +600,41 @@ function createBackdrop(scene) {
     height: 42,
   }, scene);
   shell.parent = root;
-  shell.position.set(54, 12, 18);
+  shell.position.set(54, 12, 9.4);
   const shellMat = new BABYLON.StandardMaterial('L5_shellMat', scene);
-  shellMat.diffuseColor = new BABYLON.Color3(0.03, 0.12, 0.18);
-  shellMat.emissiveColor = new BABYLON.Color3(0.02, 0.08, 0.12);
-  shellMat.alpha = 0.92;
+  const shellTex = createBackdropWallTexture(scene, 'L5_shellTex');
+  shellMat.diffuseTexture = shellTex;
+  shellMat.emissiveTexture = shellTex;
+  shellMat.opacityTexture = shellTex;
+  shellMat.diffuseColor = new BABYLON.Color3(0.16, 0.40, 0.48);
+  shellMat.emissiveColor = new BABYLON.Color3(0.12, 0.22, 0.28);
+  shellMat.alpha = 0.98;
   shellMat.disableLighting = true;
+  shellMat.backFaceCulling = false;
+  shellMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   shell.material = shellMat;
   markDecor(shell);
+
+  const wallFrames = [];
+  for (let i = 0; i < 5; i++) {
+    const frame = BABYLON.MeshBuilder.CreatePlane(`L5_backFrame_${i}`, {
+      width: 16 + ((i % 2) * 2),
+      height: 10 + ((i % 3) * 1.6),
+    }, scene);
+    frame.parent = root;
+    frame.position.set(6 + (i * 26), 10.4 + ((i % 2) * 0.8), 8.4 - ((i % 2) * 0.4));
+    const frameMat = new BABYLON.StandardMaterial(`L5_backFrameMat_${i}`, scene);
+    frameMat.diffuseColor = new BABYLON.Color3(0.38, 0.92, 1.0);
+    frameMat.emissiveColor = new BABYLON.Color3(0.14, 0.38, 0.44);
+    frameMat.alpha = 0.16;
+    frameMat.disableLighting = true;
+    frameMat.specularColor = BABYLON.Color3.Black();
+    frameMat.backFaceCulling = false;
+    frameMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    frame.material = frameMat;
+    markDecor(frame);
+    wallFrames.push(frameMat);
+  }
 
   const laneStrips = [];
   const span = LEVEL5.extents.maxX - LEVEL5.extents.minX;
@@ -594,10 +691,15 @@ function createBackdrop(scene) {
     arches,
     routeMarkers,
     signBoards,
+    signRoots: signBoards.map((sign) => sign.root),
     kelpCurtains,
     update(dt, time) {
+      shellMat.alpha = 0.94 + (Math.sin(time * 0.18) * 0.02);
       for (let i = 0; i < laneStrips.length; i++) {
         laneStrips[i].alpha = 0.34 + (Math.sin((time * 0.85) + i) * 0.06) + (i % 3 === 1 ? 0.08 : 0);
+      }
+      for (let i = 0; i < wallFrames.length; i++) {
+        wallFrames[i].alpha = 0.14 + (Math.sin((time * 0.52) + i) * 0.04);
       }
       for (let i = 0; i < arches.length; i++) {
         arches[i].rotation.z += dt * (0.04 + (i * 0.002));
@@ -617,6 +719,10 @@ function createBackdrop(scene) {
       }
     },
     reset() {
+      shellMat.alpha = 0.98;
+      for (const frameMat of wallFrames) {
+        frameMat.alpha = 0.16;
+      }
       for (const arch of arches) {
         arch.rotation.z = 0;
       }
@@ -652,7 +758,7 @@ function createCurrentJet(scene, def) {
   zoneMat.backFaceCulling = false;
   zoneMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   zone.material = zoneMat;
-  markDecor(zone);
+  markHazard(zone);
 
   for (let i = 0; i < 4; i++) {
     const arrow = BABYLON.MeshBuilder.CreatePlane(`${def.name}_arrow_${i}`, {
@@ -671,7 +777,7 @@ function createCurrentJet(scene, def) {
       arrow.rotation.z = Math.PI;
     }
     arrows.push(arrow);
-    markDecor(arrow);
+    markHazard(arrow);
   }
 
   for (let i = 0; i < 8; i++) {
@@ -689,7 +795,7 @@ function createCurrentJet(scene, def) {
     bubbleMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     bubble.material = bubbleMat;
     bubbles.push(bubble);
-    markDecor(bubble);
+    markHazard(bubble);
   }
 
   return {
@@ -748,7 +854,7 @@ function createDeepWaterPocket(scene, def) {
   volumeMat.backFaceCulling = false;
   volumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   volume.material = volumeMat;
-  markDecor(volume);
+  markHazard(volume);
 
   const rim = BABYLON.MeshBuilder.CreateBox(`${def.name}_rim`, {
     width: def.w + 0.08,
@@ -764,7 +870,7 @@ function createDeepWaterPocket(scene, def) {
   rimMat.backFaceCulling = false;
   rimMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   rim.material = rimMat;
-  markDecor(rim);
+  markHazard(rim);
 
   return {
     ...def,
@@ -857,12 +963,12 @@ function createEelRail(scene, def) {
     emissive: 0.08,
     roughness: 0.6,
   });
-  markDecor(postL);
+  markHazard(postL);
 
   const postR = postL.clone(`${def.name}_postR`);
   postR.parent = root;
   postR.position.x = length * 0.5;
-  markDecor(postR);
+  markHazard(postR);
 
   const beam = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_beam`, {
     diameter: 0.14,
@@ -876,7 +982,7 @@ function createEelRail(scene, def) {
     alpha: 0.42,
     roughness: 0.18,
   });
-  markDecor(beam);
+  markHazard(beam);
 
   const halo = BABYLON.MeshBuilder.CreatePlane(`${def.name}_halo`, {
     width: length + 0.35,
@@ -891,7 +997,7 @@ function createEelRail(scene, def) {
   haloMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   halo.material = haloMat;
   halo.position.z = 0.4;
-  markDecor(halo);
+  markHazard(halo);
 
   return {
     ...def,
@@ -924,7 +1030,7 @@ function createVent(scene, def) {
     emissive: 0.08,
     roughness: 0.58,
   });
-  markDecor(grate);
+  markHazard(grate);
 
   const plume = BABYLON.MeshBuilder.CreatePlane(`${def.name}_plume`, {
     width: def.w * 1.6,
@@ -939,7 +1045,7 @@ function createVent(scene, def) {
   plumeMat.backFaceCulling = false;
   plumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plume.material = plumeMat;
-  markDecor(plume);
+  markHazard(plume);
 
   return { ...def, root, grate, plume };
 }
@@ -960,7 +1066,7 @@ function createJellyfish(scene, def, shadowGen) {
     roughness: 0.16,
   });
   shadowGen.addShadowCaster(bell);
-  markDecor(bell);
+  markHazard(bell);
 
   const core = BABYLON.MeshBuilder.CreateSphere(`${def.name}_core`, {
     diameter: 0.28,
@@ -972,7 +1078,7 @@ function createJellyfish(scene, def, shadowGen) {
     emissive: 0.42,
     roughness: 0.12,
   });
-  markDecor(core);
+  markHazard(core);
 
   const tentacles = [];
   for (let i = 0; i < 5; i++) {
@@ -993,7 +1099,7 @@ function createJellyfish(scene, def, shadowGen) {
       roughness: 0.24,
     });
     tentacles.push(tentacle);
-    markDecor(tentacle);
+    markHazard(tentacle);
   }
 
   const mover = new NoiseWanderMover({
@@ -1071,7 +1177,7 @@ function createSharkSweep(scene, def) {
   shadowMat.backFaceCulling = false;
   shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   shadow.material = shadowMat;
-  markDecor(shadow);
+  markHazard(shadow);
 
   const laneIndicator = BABYLON.MeshBuilder.CreatePlane(`${def.name}_indicator`, {
     width: def.width * 1.25,
@@ -1087,7 +1193,7 @@ function createSharkSweep(scene, def) {
   indicatorMat.backFaceCulling = false;
   indicatorMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   laneIndicator.material = indicatorMat;
-  markDecor(laneIndicator);
+  markHazard(laneIndicator);
 
   return {
     ...def,
@@ -1207,7 +1313,7 @@ export function buildWorld5(scene, options = {}) {
   const aquariumFx = createAquariumEnvironmentFx(scene, {
     extents: LEVEL5.extents,
     floorY: LEVEL5.ground.y + 0.8,
-    farZ: 16,
+    farZ: 9.5,
   });
   const backdrop = createBackdrop(scene);
 
@@ -1441,21 +1547,26 @@ export function buildWorld5(scene, options = {}) {
       if (!jelly) return false;
       const dirLen = Math.hypot(forward.x || 0, forward.z || 0) || 1;
       const targetPos = new BABYLON.Vector3(
-        pos.x + ((forward.x || 1) / dirLen) * 2.6,
-        pos.y + 0.5,
-        pos.z + ((forward.z || 0) / dirLen) * 2.0,
+        pos.x + ((forward.x || 1) / dirLen) * 1.55,
+        pos.y + 0.72,
+        pos.z + ((forward.z || 0) / dirLen) * 1.55,
       );
       jelly.mover.basePosition = targetPos.clone();
       jelly.mover.bounds = {
-        minX: targetPos.x - 1.2,
-        maxX: targetPos.x + 1.2,
-        minY: targetPos.y - 0.5,
-        maxY: targetPos.y + 0.8,
-        minZ: targetPos.z - 1.1,
-        maxZ: targetPos.z + 1.1,
+        minX: targetPos.x - 0.08,
+        maxX: targetPos.x + 0.08,
+        minY: targetPos.y - 0.05,
+        maxY: targetPos.y + 0.05,
+        minZ: targetPos.z - 0.08,
+        maxZ: targetPos.z + 0.08,
       };
-      jelly.root.position.copyFrom(targetPos);
       jelly.reset();
+      jelly.root.position.copyFrom(targetPos);
+      jelly.root.rotation.y = Math.atan2((forward.x || 1) / dirLen, (forward.z || 0) / dirLen) + (Math.PI * 0.5);
+      jelly.mover.target = targetPos.clone();
+      jelly.mover.velocity.set(0, 0, 0);
+      jelly.mover.pauseTimer = 2.4;
+      jelly.mover.retargetTimer = 2.4;
       return true;
     },
     getDebugState() {
@@ -1539,7 +1650,7 @@ export function buildWorld5(scene, options = {}) {
     level: LEVEL5,
     era5Level: level5,
     level5,
-    signs: [backdrop.root, aquariumFx.root, ...platformVisuals],
+    signs: backdrop.signRoots,
     goalGuardMinX: LEVEL5.goal.x - 4.8,
     goalMinBottomY: (LEVEL5.platforms.find((platform) => platform.name === 'goalDeck').y + (LEVEL5.platforms.find((platform) => platform.name === 'goalDeck').h * 0.5)) - 0.2,
     assetAnchors: {
