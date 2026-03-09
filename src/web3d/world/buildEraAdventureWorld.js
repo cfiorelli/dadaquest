@@ -56,56 +56,56 @@ const THEME_PALETTES = {
 
 const THEME_SCENE_LOOKS = {
   factory: {
-    clear: [34, 24, 16, 255],
-    fog: [82, 58, 34],
-    fogStart: 48,
-    fogEnd: 190,
+    clear: [68, 48, 28, 255],    // warm industrial amber — was near-black [34,24,16]
+    fog: [110, 78, 46],          // amber haze — was [82,58,34]
+    fogStart: 52,                // was 48
+    fogEnd: 195,
     keyDir: [-0.34, -1.0, 0.24],
-    keyIntensity: 1.12,
-    hemiIntensity: 0.72,
-    hemiColor: [202, 164, 118],
-    hemiGround: [0.03, 0.03, 0.05],
+    keyIntensity: 1.22,          // was 1.12
+    hemiIntensity: 0.90,         // was 0.72
+    hemiColor: [224, 184, 132],  // was [202,164,118]
+    hemiGround: [0.05, 0.04, 0.02],
     rimOffset: [-6, 18, -9],
-    rimIntensity: 0.48,
+    rimIntensity: 0.54,          // was 0.48
   },
   storm: {
-    clear: [14, 20, 38, 255],
-    fog: [30, 42, 66],
-    fogStart: 34,
-    fogEnd: 168,
+    clear: [42, 64, 108, 255],   // readable stormy blue — was near-black [14,20,38]
+    fog: [60, 92, 148],          // blue-grey haze — was [30,42,66]
+    fogStart: 46,                // was 34
+    fogEnd: 178,                 // was 168
     keyDir: [-0.18, -1.0, 0.32],
-    keyIntensity: 1.22,
-    hemiIntensity: 0.56,
-    hemiColor: [108, 144, 192],
-    hemiGround: [0.01, 0.03, 0.05],
+    keyIntensity: 1.38,          // was 1.22
+    hemiIntensity: 0.74,         // was 0.56
+    hemiColor: [124, 168, 220],  // was [108,144,192]
+    hemiGround: [0.02, 0.05, 0.08],
     rimOffset: [-18, 22, -6],
-    rimIntensity: 0.66,
+    rimIntensity: 0.80,          // was 0.66
   },
   library: {
-    clear: [20, 13, 10, 255],
-    fog: [78, 50, 28],
-    fogStart: 24,
-    fogEnd: 132,
+    clear: [58, 38, 22, 255],    // warm sepia amber — was near-black [20,13,10]
+    fog: [108, 74, 46],          // warm sepia haze — was [78,50,28]
+    fogStart: 44,                // was 24 (too aggressive — fixed)
+    fogEnd: 148,                 // was 132
     keyDir: [-0.26, -1.0, 0.20],
-    keyIntensity: 0.98,
-    hemiIntensity: 0.64,
-    hemiColor: [214, 186, 138],
-    hemiGround: [0.06, 0.04, 0.02],
+    keyIntensity: 1.14,          // was 0.98
+    hemiIntensity: 0.86,         // was 0.64
+    hemiColor: [222, 194, 148],  // was [214,186,138]
+    hemiGround: [0.08, 0.05, 0.02],
     rimOffset: [-10, 16, -8],
-    rimIntensity: 0.72,
+    rimIntensity: 0.84,          // was 0.72
   },
   camp: {
-    clear: [8, 11, 20, 255],
-    fog: [28, 22, 18],
-    fogStart: 44,
-    fogEnd: 176,
+    clear: [28, 40, 74, 255],    // deep starlit blue-purple — was near-black [8,11,20]
+    fog: [58, 50, 38],           // warm dusk haze — was [28,22,18]
+    fogStart: 52,                // was 44
+    fogEnd: 182,                 // was 176
     keyDir: [-0.20, -1.0, 0.18],
-    keyIntensity: 0.92,
-    hemiIntensity: 0.46,
-    hemiColor: [132, 126, 150],
-    hemiGround: [0.03, 0.02, 0.03],
+    keyIntensity: 1.08,          // was 0.92
+    hemiIntensity: 0.68,         // was 0.46
+    hemiColor: [154, 144, 166],  // was [132,126,150]
+    hemiGround: [0.05, 0.04, 0.05],
     rimOffset: [-12, 15, -10],
-    rimIntensity: 0.82,
+    rimIntensity: 0.96,          // was 0.82
   },
 };
 

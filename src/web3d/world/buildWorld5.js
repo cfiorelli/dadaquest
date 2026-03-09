@@ -1239,6 +1239,12 @@ export function buildWorld5(scene, options = {}) {
   rim.intensity = 0.52;
   rim.diffuse = new BABYLON.Color3(0.28, 0.94, 0.98);
 
+  scene.clearColor = new BABYLON.Color4(0.04, 0.22, 0.38, 1.0);
+  scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+  scene.fogColor = new BABYLON.Color3(0.06, 0.28, 0.44);
+  scene.fogStart = 62;
+  scene.fogEnd = 185;
+
   const groundVisual = createAquariumPlatform(scene, 'ground', LEVEL5.ground, shadowGen);
   setRenderingGroup(groundVisual, 2);
   const groundCollider = makeInvisibleCollider(scene, 'L5_groundCollider', LEVEL5.ground);
