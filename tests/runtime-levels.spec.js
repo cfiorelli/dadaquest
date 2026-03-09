@@ -44,6 +44,18 @@ async function startDebugLevel(page, levelId) {
   });
 }
 
+async function unlockEra5(page, { completed5 = false } = {}) {
+  await page.evaluate(({ done5 }) => {
+    window.__DADA_DEBUG__?.setProgress?.({
+      sourdoughUnlocked: true,
+      levelCompleted: {
+        4: true,
+        ...(done5 ? { 5: true } : {}),
+      },
+    });
+  }, { done5: completed5 });
+}
+
 test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
@@ -268,12 +280,7 @@ test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanl
   expect(blocked.sceneKey).toBe('TitleScene');
   expect(blocked.hint).toContain('Beat Super Sourdough');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setProgress?.({
-      sourdoughUnlocked: true,
-      levelCompleted: { 4: true },
-    });
-  });
+  await unlockEra5(page);
 
   await page.goto('http://127.0.0.1:4173/?level=5&debug=1');
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
@@ -297,56 +304,49 @@ test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanl
   }
 });
 
-test('runtime: bubble shield blocks the first Level 5 hazard reset and pops on use', async ({ page }) => {
+test('runtime: level 5 inventory opens, oxygen HUD renders, and Bubble Wand stuns a jellyfish', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setProgress?.({
-      sourdoughUnlocked: true,
-      bubbleShieldUnlocked: true,
-      levelCompleted: { 4: true, 5: true },
-      unlocksShown: { bubbleShield: true },
-    });
-  });
+  await unlockEra5(page);
 
   await startDebugLevel(page, 5);
+  await expect(page.locator('[data-era5-oxygen]')).toBeVisible();
+  await expect(page.locator('[data-era5-oxygen-copy]')).toContainText('/ 20.0s');
 
-  const shieldBefore = await page.evaluate(() => window.__DADA_DEBUG__?.bubbleShield ?? null);
-  expect(shieldBefore?.unlocked).toBe(true);
-  expect(shieldBefore?.usedThisRun).toBe(false);
+  await page.keyboard.press('I');
+  await expect(page.locator('.dada-era5-inventory.open')).toBeVisible();
+  await page.keyboard.press('I');
+  await expect(page.locator('.dada-era5-inventory.open')).toHaveCount(0);
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eelRailB');
+    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1, z: 0 });
   });
-  await page.waitForTimeout(250);
-
-  const afterFirstHit = await page.evaluate(() => ({
-    sceneKey: window.__DADA_DEBUG__?.sceneKey,
-    shield: window.__DADA_DEBUG__?.bubbleShield ?? null,
-    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
-  }));
-  expect(afterFirstHit.sceneKey).toBe('CribScene');
-  expect(afterFirstHit.shield?.usedThisRun).toBe(true);
-  expect(afterFirstHit.lastRespawnReason).toContain('shielded');
-
+  await page.waitForTimeout(150);
+  await page.keyboard.press('K');
   await expect.poll(
-    () => page.evaluate(() => ({
-      graceMs: window.__DADA_DEBUG__?.bubbleShield?.graceMs ?? 9999,
-      invulnMs: window.__DADA_DEBUG__?.playerController?.invulnTimerMs ?? 9999,
-    })),
-    { timeout: 8_000 },
-  ).toEqual({
-    graceMs: 0,
-    invulnMs: 0,
-  });
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eelRailB');
-  });
+    () => page.evaluate(() => {
+      const jelly = window.__DADA_DEBUG__?.level5State?.jellyfish?.[0];
+      return jelly?.stunnedMs ?? 0;
+    }),
+    { timeout: 5_000 },
+  ).toBeGreaterThan(1000);
+});
 
-  await expect
-    .poll(() => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnReason ?? ''), { timeout: 4_000 })
-    .toBe('eel_rail');
+test('runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+
+  const lockState = await page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null);
+  expect(lockState).not.toBeNull();
+  expect(lockState[6]).toBe(true);
+  expect(lockState[7]).toBe(true);
+  expect(lockState[8]).toBe(true);
+  expect(lockState[9]).toBe(true);
+
+  await page.click('#levelBtn6');
+  await expect(page.locator('#titleHint')).toContainText('Beat Neon Night Aquarium');
+  await page.click('#levelBtn9');
+  await expect(page.locator('#titleHint')).toContainText('Beat Haunted Library');
 });
 
 test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {

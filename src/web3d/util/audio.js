@@ -289,7 +289,7 @@ export class GameAudio {
     if (levelId === 2) return 0.56;
     if (levelId === 3) return 0.62;
     if (levelId === 4) return 0.52;
-    if (levelId === 5) return 0.48;
+    if (levelId === 5) return 0.5;
     return 0.7;
   }
 
@@ -317,22 +317,22 @@ export class GameAudio {
     if (role === 'lead') {
       if (spec.levelId === 2) return beatSec * 0.72;
       if (spec.levelId === 4) return beatSec * 0.55;
-      if (spec.levelId === 5) return beatSec * 1.05;
+      if (spec.levelId === 5) return beatSec * 0.86;
       return beatSec * 0.78;
     }
     if (role === 'counter') {
       if (spec.levelId === 2) return beatSec * 0.92;
       if (spec.levelId === 4) return beatSec * 0.42;
-      if (spec.levelId === 5) return beatSec * 1.18;
+      if (spec.levelId === 5) return beatSec * 0.78;
       return beatSec * 0.88;
     }
     if (role === 'accent') {
-      if (spec.levelId === 5) return beatSec * 0.52;
+      if (spec.levelId === 5) return beatSec * 0.42;
       return beatSec * 0.34;
     }
     if (role === 'bass') {
       if (spec.levelId === 4) return beatSec * 0.80;
-      if (spec.levelId === 5) return beatSec * 1.10;
+      if (spec.levelId === 5) return beatSec * 0.96;
       return beatSec * 0.95;
     }
     return beatSec * 0.9;
@@ -605,22 +605,22 @@ export class GameAudio {
     this._playOscVoice({ freq: freq * 1.002, start: start + 0.006, duration: duration * 0.92, peak: gain * 0.22, type: 'sine', attack: 0.015, filterType: 'lowpass', filterFreq: 1200 });
   }
 
-  // Level 5 — deep sea exploration voices
+  // Level 5 — post-cute neon underwater synthwave voices
 
   _playAbyssPadTone(freq, start, duration, gain) {
-    this._playOscVoice({ freq, start, duration: Math.max(0.36, duration), peak: gain * 0.58, type: 'triangle', attack: 0.18, filterType: 'lowpass', filterFreq: 520, q: 0.78 });
-    this._playOscVoice({ freq: freq * 0.5, start, duration: Math.max(0.32, duration * 0.96), peak: gain * 0.16, type: 'sine', attack: 0.22, filterType: 'lowpass', filterFreq: 180, q: 0.72 });
-    this._playOscVoice({ freq: freq * 1.004, start: start + 0.035, duration: Math.max(0.28, duration * 0.88), peak: gain * 0.11, type: 'sawtooth', attack: 0.16, filterType: 'lowpass', filterFreq: 440, q: 0.52 });
+    this._playOscVoice({ freq, start, duration: Math.max(0.34, duration), peak: gain * 0.48, type: 'sawtooth', attack: 0.12, filterType: 'lowpass', filterFreq: 760, q: 0.66 });
+    this._playOscVoice({ freq: freq * 1.005, start: start + 0.018, duration: Math.max(0.3, duration * 0.9), peak: gain * 0.24, type: 'triangle', attack: 0.14, filterType: 'lowpass', filterFreq: 520, q: 0.58 });
+    this._playOscVoice({ freq: freq * 0.5, start, duration: Math.max(0.26, duration * 0.94), peak: gain * 0.12, type: 'sine', attack: 0.16, filterType: 'lowpass', filterFreq: 200, q: 0.7 });
   }
 
   _playGlassBell5(freq, start, duration, gain, glideTo = 0) {
-    this._playOscVoice({ freq, start, duration: Math.max(0.18, duration * 0.9), peak: gain * 0.66, type: 'sine', attack: 0.01, filterType: 'bandpass', filterFreq: 1650, q: 0.82, endFreq: glideTo || null });
-    this._playOscVoice({ freq: freq * 1.5, start: start + 0.015, duration: Math.max(0.12, duration * 0.55), peak: gain * 0.16, type: 'triangle', attack: 0.008, filterType: 'highpass', filterFreq: 980, q: 0.62 });
+    this._playOscVoice({ freq, start, duration: Math.max(0.16, duration * 0.88), peak: gain * 0.58, type: 'triangle', attack: 0.008, filterType: 'bandpass', filterFreq: 1750, q: 0.76, endFreq: glideTo || null });
+    this._playOscVoice({ freq: freq * 2, start: start + 0.014, duration: Math.max(0.09, duration * 0.42), peak: gain * 0.12, type: 'sine', attack: 0.006, filterType: 'highpass', filterFreq: 1320, q: 0.62 });
   }
 
   _playSonarPing5(freq, start, duration, gain, glideTo = 0) {
-    this._playOscVoice({ freq, start, duration: Math.max(0.22, duration), peak: gain * 0.58, type: 'sine', attack: 0.02, filterType: 'bandpass', filterFreq: 980, q: 1.05, endFreq: glideTo || null });
-    this._playOscVoice({ freq: freq * 0.5, start: start + 0.03, duration: Math.max(0.18, duration * 1.08), peak: gain * 0.14, type: 'triangle', attack: 0.035, filterType: 'lowpass', filterFreq: 420, q: 0.78 });
+    this._playOscVoice({ freq, start, duration: Math.max(0.14, duration * 0.82), peak: gain * 0.46, type: 'square', attack: 0.008, filterType: 'bandpass', filterFreq: 1100, q: 0.88, endFreq: glideTo || null });
+    this._playOscVoice({ freq: freq * 0.5, start: start + 0.018, duration: Math.max(0.16, duration * 0.92), peak: gain * 0.1, type: 'triangle', attack: 0.02, filterType: 'lowpass', filterFreq: 460, q: 0.74 });
   }
 
   _playAbyssSubBass5(freq, start, duration, gain) {
@@ -717,17 +717,17 @@ export class GameAudio {
 
     if (levelId === 5) {
       if (drum === 'kick') {
-        this._osc(58, 'sine', start, 0.24, 0.026 * drumGain, 31, this.musicGain);
-        this._playNoiseBurst(start, 0.03, 0.0025 * drumGain, { type: 'lowpass', frequency: 240, q: 0.45 }, this.musicGain);
+        this._osc(58, 'sine', start, 0.24, 0.03 * drumGain, 31, this.musicGain);
+        this._playNoiseBurst(start, 0.03, 0.003 * drumGain, { type: 'lowpass', frequency: 240, q: 0.45 }, this.musicGain);
       } else if (drum === 'snare') {
-        this._playNoiseBurst(start, 0.07, 0.005 * drumGain, { type: 'bandpass', frequency: 1350, q: 0.55 }, this.musicGain);
+        this._playNoiseBurst(start, 0.07, 0.006 * drumGain, { type: 'bandpass', frequency: 1550, q: 0.55 }, this.musicGain);
       } else if (drum === 'hat') {
-        this._playNoiseBurst(start, 0.05, 0.0022 * drumGain, { type: 'highpass', frequency: 2800, q: 0.45 }, this.musicGain);
+        this._playNoiseBurst(start, 0.05, 0.0026 * drumGain, { type: 'highpass', frequency: 3400, q: 0.45 }, this.musicGain);
       } else if (drum === 'rim') {
-        this._playNoiseBurst(start, 0.045, 0.0038 * drumGain, { type: 'bandpass', frequency: 1600, q: 0.6 }, this.musicGain);
-        this._osc(320, 'sine', start, 0.05, 0.0014 * drumGain, 220, this.musicGain);
+        this._playNoiseBurst(start, 0.045, 0.0042 * drumGain, { type: 'bandpass', frequency: 1900, q: 0.6 }, this.musicGain);
+        this._osc(320, 'sine', start, 0.05, 0.0018 * drumGain, 220, this.musicGain);
       } else if (drum === 'shaker') {
-        this._playNoiseBurst(start, 0.042, 0.002 * drumGain, { type: 'highpass', frequency: 2300, q: 0.4 }, this.musicGain);
+        this._playNoiseBurst(start, 0.042, 0.0022 * drumGain, { type: 'highpass', frequency: 2600, q: 0.4 }, this.musicGain);
       }
       return;
     }

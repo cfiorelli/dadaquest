@@ -645,31 +645,31 @@ export const LEVEL4_MUSIC_SPEC = {
 };
 
 /*
- * Level 5 — Neon underwater synthwave
+ * Level 5 — Post-cute neon underwater synthwave
  * Tempo: 96 BPM
  * Key: D Dorian
  * Loop: 48 bars (A/B/C/D, 12 bars each)
  */
 export const LEVEL5_MUSIC_SPEC = {
   levelId: 5,
-  title: 'Deep sea exploration',
-  explanation: 'Slow abyssal drift with a dark pad bed, distant glass-bell beacons, restrained sub bass, brushed percussion, and sonar-like counter notes that widen across the four acts.',
+  title: 'Post-cute neon underwater synthwave',
+  explanation: 'A deep-sea glide with neon pad bloom, glass-bell beacons, gated sonar arps, soft sub pressure, and brushed percussion that grows denser across Acts A through D without sounding toy-like.',
   tempo: 96,
   key: 'D Dorian',
   motif: ['D5', 'F5', 'G5', 'A5'],
   roles: {
-    chord: 'abyss pad',
+    chord: 'neon tide pad',
     lead: 'glass beacon lead',
-    bass: 'deep sub bass',
-    counter: 'distant sonar pulse',
-    accent: 'cold shimmer',
+    bass: 'pressure sub bass',
+    counter: 'gated sonar arp',
+    accent: 'cold shimmer tail',
     percussion: 'soft rim + brushed hat',
   },
   cuePalette: {
-    checkpoint: 'Bubble chime',
-    nearMiss: 'Wide sonar ping',
-    collision: 'Muted blorp',
-    levelComplete: 'Rising shimmer cadence',
+    checkpoint: 'bubble chime',
+    nearMiss: 'sonar ping',
+    collision: 'muted blorp',
+    levelComplete: 'shimmer cadence',
   },
   sections: [
     {
