@@ -44,16 +44,22 @@ async function startDebugLevel(page, levelId) {
   });
 }
 
-async function unlockEra5(page, { completed5 = false } = {}) {
-  await page.evaluate(({ done5 }) => {
+async function unlockThroughLevel(page, completedLevel = 4, extraPatch = {}) {
+  await page.evaluate(({ maxLevel, patch }) => {
+    const levelCompleted = {};
+    for (let levelId = 4; levelId <= maxLevel; levelId += 1) {
+      levelCompleted[levelId] = true;
+    }
     window.__DADA_DEBUG__?.setProgress?.({
       sourdoughUnlocked: true,
-      levelCompleted: {
-        4: true,
-        ...(done5 ? { 5: true } : {}),
-      },
+      levelCompleted,
+      ...patch,
     });
-  }, { done5: completed5 });
+  }, { maxLevel: completedLevel, patch: extraPatch });
+}
+
+async function unlockEra5(page, { completed5 = false } = {}) {
+  await unlockThroughLevel(page, completed5 ? 5 : 4);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -488,6 +494,229 @@ test('runtime: levels 6 through 9 appear as locked placeholders in the title men
   await expect(page.locator('#titleHint')).toContainText('Beat Neon Night Aquarium');
   await page.click('#levelBtn9');
   await expect(page.locator('#titleHint')).toContainText('Beat Haunted Library');
+});
+
+test('runtime: levels 6 through 9 unlock sequentially from completed-level progress', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+  await page.waitForTimeout(300);
+
+  const initialLocks = await page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null);
+  expect(initialLocks).not.toBeNull();
+  expect(initialLocks[6]).toBe(true);
+  expect(initialLocks[7]).toBe(true);
+  expect(initialLocks[8]).toBe(true);
+  expect(initialLocks[9]).toBe(true);
+
+  await unlockThroughLevel(page, 5);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
+    { timeout: 5_000 },
+  ).toMatchObject({
+    6: false,
+    7: true,
+    8: true,
+    9: true,
+  });
+
+  await unlockThroughLevel(page, 6);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
+    { timeout: 5_000 },
+  ).toMatchObject({
+    6: false,
+    7: false,
+    8: true,
+    9: true,
+  });
+
+  await unlockThroughLevel(page, 7);
+  await expect.poll(
+    () => page.evaluate(() => ({
+      locks: window.__DADA_DEBUG__?.getMenuLockState?.() ?? null,
+      windGlideUnlocked: !!window.__DADA_DEBUG__?.progressState?.windGlideUnlocked,
+    })),
+    { timeout: 5_000 },
+  ).toMatchObject({
+    locks: {
+      6: false,
+      7: false,
+      8: false,
+      9: true,
+    },
+    windGlideUnlocked: true,
+  });
+
+  await unlockThroughLevel(page, 8);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
+    { timeout: 5_000 },
+  ).toMatchObject({
+    6: false,
+    7: false,
+    8: false,
+    9: false,
+  });
+});
+
+for (const levelId of [6, 7, 8, 9]) {
+  test(`runtime: level ${levelId} starts, keeps Era 5 HUD active, and runs cleanly for 10 seconds`, async ({ page }) => {
+    test.setTimeout(120_000);
+    const consoleErrors = [];
+    const pageErrors = [];
+
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
+    });
+
+    await gotoDebugLevel(page, levelId);
+    await unlockThroughLevel(page, levelId - 1);
+    await startDebugLevel(page, levelId);
+    await page.waitForTimeout(10_000);
+
+    await expect(page.locator('[data-era5-hud]')).toBeVisible();
+    await expect(page.locator('[data-era5-hearts]')).toBeVisible();
+    await expect(page.locator('[data-era5-shields]')).toBeVisible();
+
+    const runtimeState = await page.evaluate(() => ({
+      sceneKey: window.__DADA_DEBUG__?.sceneKey,
+      lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+      musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+      musicRunning: !!window.__DADA_DEBUG__?.musicRunning,
+    }));
+    expect(runtimeState.sceneKey).toBe('CribScene');
+    expect(runtimeState.lastRuntimeError).toBeNull();
+    expect(runtimeState.musicLevelId).toBe(levelId);
+    expect(runtimeState.musicRunning).toBe(true);
+
+    if (pageErrors.length > 0) {
+      throw new Error(`Page errors on level ${levelId}: ${pageErrors.join('\n')}`);
+    }
+    if (consoleErrors.length > 0) {
+      throw new Error(`Console errors on level ${levelId}: ${consoleErrors.join('\n')}`);
+    }
+  });
+}
+
+test('runtime: level 6 conveyor zones push the player and expose conveyor debug state', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 6);
+  await unlockThroughLevel(page, 5);
+  await startDebugLevel(page, 6);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(-8.0, 1.45, -0.4);
+  });
+  const before = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos ?? null);
+  await page.waitForTimeout(1200);
+  const after = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    velocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
+    levelState: window.__DADA_DEBUG__?.era5LevelState ?? null,
+  }));
+
+  expect(before).not.toBeNull();
+  expect(after.playerPos).not.toBeNull();
+  expect(after.velocity).not.toBeNull();
+  expect(after.levelState?.lastConveyorPush ?? 0).toBeGreaterThan(0.1);
+  expect(Math.hypot(
+    after.velocity.x ?? 0,
+    after.velocity.z ?? 0,
+  )).toBeGreaterThan(0.01);
+});
+
+test('runtime: level 7 lightning hazards visibly cycle from warn to active', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 7);
+  await unlockThroughLevel(page, 6);
+  await startDebugLevel(page, 7);
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const lightning = window.__DADA_DEBUG__?.era5LevelState?.lightning ?? [];
+      return lightning.some((hazard) => hazard.state === 'warn');
+    }),
+    { timeout: 6_000 },
+  ).toBe(true);
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const lightning = window.__DADA_DEBUG__?.era5LevelState?.lightning ?? [];
+      return lightning.some((hazard) => hazard.state === 'active');
+    }),
+    { timeout: 6_000 },
+  ).toBe(true);
+});
+
+test('runtime: level 8 lantern tool reveals a hidden bridge', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 8);
+  await unlockThroughLevel(page, 7);
+  await startDebugLevel(page, 8);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(-13.5, 1.7, 0.0);
+  });
+  await page.waitForTimeout(700);
+
+  const initiallyVisible = await page.evaluate(() => {
+    const bridges = window.__DADA_DEBUG__?.era5LevelState?.hiddenBridges ?? [];
+    return bridges.find((bridge) => bridge.name === 'hiddenA')?.visible ?? null;
+  });
+  expect(initiallyVisible).toBe(false);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(25.0, 1.7, -4.9);
+    window.__DADA_DEBUG__?.toggleEra5Tool?.();
+  });
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const bridges = window.__DADA_DEBUG__?.era5LevelState?.hiddenBridges ?? [];
+      return bridges.find((bridge) => bridge.name === 'hiddenA')?.visible ?? false;
+    }),
+    { timeout: 5_000 },
+  ).toBe(true);
+});
+
+test('runtime: level 9 puppet sweep exposes a moving warning band during its active window', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 9);
+  await unlockThroughLevel(page, 8);
+  await startDebugLevel(page, 9);
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
+      return sweeps.find((hazard) => hazard.name === 'puppetA')?.state ?? null;
+    }),
+    { timeout: 6_000 },
+  ).toBe('warn');
+
+  await expect.poll(
+    () => page.evaluate(() => {
+      const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
+      return sweeps.find((hazard) => hazard.name === 'puppetA')?.state ?? null;
+    }),
+    { timeout: 6_000 },
+  ).toBe('active');
+
+  const firstBandX = await page.evaluate(() => {
+    const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
+    return sweeps.find((hazard) => hazard.name === 'puppetA')?.bandX ?? null;
+  });
+  await page.waitForTimeout(300);
+  const secondBandX = await page.evaluate(() => {
+    const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
+    return sweeps.find((hazard) => hazard.name === 'puppetA')?.bandX ?? null;
+  });
+
+  expect(firstBandX).not.toBeNull();
+  expect(secondBandX).not.toBeNull();
+  expect(Math.abs(secondBandX - firstBandX)).toBeGreaterThan(0.2);
 });
 
 test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
