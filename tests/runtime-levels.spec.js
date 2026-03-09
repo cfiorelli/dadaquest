@@ -304,25 +304,77 @@ test('runtime: level 5 stays locked until Level 4 is completed, then runs cleanl
   }
 });
 
-test('runtime: level 5 inventory opens, oxygen HUD renders, and Bubble Wand stuns a jellyfish', async ({ page }) => {
+test('runtime: level 5 ArrowUp moves the player forward and ArrowRight does not rotate the camera', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
 
   await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  const beforeForward = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  expect(beforeForward.playerPos).not.toBeNull();
+
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('ArrowUp');
+
+  const afterForward = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  expect(afterForward.playerPos).not.toBeNull();
+  expect(afterForward.playerPos.x - beforeForward.playerPos.x).toBeGreaterThan(0.45);
+  expect(Math.abs((afterForward.cameraYaw ?? 0) - (beforeForward.cameraYaw ?? 0))).toBeLessThan(0.01);
+
+  const beforeRight = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(450);
+  await page.keyboard.up('ArrowRight');
+
+  const afterRight = await page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  }));
+  expect(afterRight.playerPos).not.toBeNull();
+  expect(Math.abs(afterRight.playerPos.z - beforeRight.playerPos.z)).toBeGreaterThan(0.2);
+  expect(Math.abs((afterRight.cameraYaw ?? 0) - (beforeRight.cameraYaw ?? 0))).toBeLessThan(0.01);
+});
+
+test('runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with Enter, and music is running', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
   await expect(page.locator('[data-era5-oxygen]')).toBeVisible();
   await expect(page.locator('[data-era5-oxygen-copy]')).toContainText('/ 20.0s');
+  await expect(page.locator('[data-era5-weapon-help]')).toContainText('Fire Bubble Wand: Enter / A / Click');
 
   await page.keyboard.press('I');
   await expect(page.locator('.dada-era5-inventory.open')).toBeVisible();
   await page.keyboard.press('I');
   await expect(page.locator('.dada-era5-inventory.open')).toHaveCount(0);
 
+  const projectileCountBefore = await page.evaluate(() => window.__DADA_DEBUG__?.l5ProjectileCount ?? 0);
+  await page.keyboard.press('Enter');
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.l5ProjectileCount ?? 0),
+    { timeout: 5_000 },
+  ).toBeGreaterThan(projectileCountBefore);
+
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1, z: 0 });
   });
   await page.waitForTimeout(150);
-  await page.keyboard.press('K');
+  await page.keyboard.press('Enter');
   await expect.poll(
     () => page.evaluate(() => {
       const jelly = window.__DADA_DEBUG__?.level5State?.jellyfish?.[0];
@@ -330,6 +382,10 @@ test('runtime: level 5 inventory opens, oxygen HUD renders, and Bubble Wand stun
     }),
     { timeout: 5_000 },
   ).toBeGreaterThan(1000);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.musicLevelId ?? null),
+    { timeout: 5_000 },
+  ).toBe(5);
 });
 
 test('runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
