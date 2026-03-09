@@ -13,7 +13,7 @@ import {
 import { createTelegraphedHazard } from './telegraphHazard.js';
 import { NoiseWanderMover } from './noiseMover.js';
 import { createThemeEnvironmentFx, markDecorNode } from './envFx.js';
-import { makePlastic, makePaper } from '../materials.js';
+import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
   factory: {
@@ -54,6 +54,61 @@ const THEME_PALETTES = {
   },
 };
 
+const THEME_SCENE_LOOKS = {
+  factory: {
+    clear: [34, 24, 16, 255],
+    fog: [82, 58, 34],
+    fogStart: 48,
+    fogEnd: 190,
+    keyDir: [-0.34, -1.0, 0.24],
+    keyIntensity: 1.12,
+    hemiIntensity: 0.72,
+    hemiColor: [202, 164, 118],
+    hemiGround: [0.03, 0.03, 0.05],
+    rimOffset: [-6, 18, -9],
+    rimIntensity: 0.48,
+  },
+  storm: {
+    clear: [14, 20, 38, 255],
+    fog: [30, 42, 66],
+    fogStart: 34,
+    fogEnd: 168,
+    keyDir: [-0.18, -1.0, 0.32],
+    keyIntensity: 1.22,
+    hemiIntensity: 0.56,
+    hemiColor: [108, 144, 192],
+    hemiGround: [0.01, 0.03, 0.05],
+    rimOffset: [-18, 22, -6],
+    rimIntensity: 0.66,
+  },
+  library: {
+    clear: [20, 13, 10, 255],
+    fog: [78, 50, 28],
+    fogStart: 24,
+    fogEnd: 132,
+    keyDir: [-0.26, -1.0, 0.20],
+    keyIntensity: 0.98,
+    hemiIntensity: 0.64,
+    hemiColor: [214, 186, 138],
+    hemiGround: [0.06, 0.04, 0.02],
+    rimOffset: [-10, 16, -8],
+    rimIntensity: 0.72,
+  },
+  camp: {
+    clear: [8, 11, 20, 255],
+    fog: [28, 22, 18],
+    fogStart: 44,
+    fogEnd: 176,
+    keyDir: [-0.20, -1.0, 0.18],
+    keyIntensity: 0.92,
+    hemiIntensity: 0.46,
+    hemiColor: [132, 126, 150],
+    hemiGround: [0.03, 0.02, 0.03],
+    rimOffset: [-12, 15, -10],
+    rimIntensity: 0.82,
+  },
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -67,6 +122,18 @@ function wrapToPi(angle) {
   while (wrapped > Math.PI) wrapped -= Math.PI * 2;
   while (wrapped < -Math.PI) wrapped += Math.PI * 2;
   return wrapped;
+}
+
+function toColor3(rgb, scale = 1) {
+  return new BABYLON.Color3(
+    (rgb[0] / 255) * scale,
+    (rgb[1] / 255) * scale,
+    (rgb[2] / 255) * scale,
+  );
+}
+
+function toColor4(rgb, alpha = 1) {
+  return new BABYLON.Color4(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, alpha);
 }
 
 function distanceToSegment2D(px, pz, ax, az, bx, bz) {
@@ -103,6 +170,7 @@ function markGameplaySurface(node) {
   node.metadata = {
     ...(node.metadata || {}),
     gameplaySurface: true,
+    gameplay: true,
   };
 }
 
@@ -122,6 +190,375 @@ function createGlowMaterial(scene, name, rgb, {
   return mat;
 }
 
+function createFlatDecorMaterial(scene, name, rgb, {
+  emissiveScale = 0.14,
+  alpha = 1,
+} = {}) {
+  const mat = new BABYLON.StandardMaterial(name, scene);
+  mat.diffuseColor = toColor3(rgb);
+  mat.emissiveColor = toColor3(rgb, emissiveScale);
+  mat.alpha = alpha;
+  mat.specularColor = BABYLON.Color3.Black();
+  mat.disableLighting = true;
+  mat.backFaceCulling = false;
+  if (alpha < 1) {
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
+  return mat;
+}
+
+function createDecorPlane(scene, name, parent, {
+  width,
+  height,
+  x = 0,
+  y = 0,
+  z = 0,
+  rotationX = Math.PI / 2,
+  rotationY = 0,
+  rotationZ = 0,
+  rgb,
+  emissiveScale = 0.14,
+  alpha = 0.18,
+} = {}) {
+  const plane = BABYLON.MeshBuilder.CreatePlane(name, { width, height }, scene);
+  plane.parent = parent;
+  plane.position.set(x, y, z);
+  plane.rotation.set(rotationX, rotationY, rotationZ);
+  plane.material = createFlatDecorMaterial(scene, `${name}_mat`, rgb, {
+    emissiveScale,
+    alpha,
+  });
+  markDecor(plane);
+  return plane;
+}
+
+function createDecorBox(scene, name, parent, {
+  width,
+  height,
+  depth,
+  x = 0,
+  y = 0,
+  z = 0,
+  rgb,
+  emissiveScale = 0.08,
+  roughness = 0.56,
+  shadowGen = null,
+  cardboard = false,
+} = {}) {
+  const box = BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
+  box.parent = parent;
+  box.position.set(x, y, z);
+  box.material = cardboard
+    ? makeCardboard(scene, `${name}_mat`, rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, { roughness })
+    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness });
+  if (shadowGen) shadowGen.addShadowCaster(box);
+  markDecor(box);
+  return box;
+}
+
+function addStormPlatformDetails(scene, root, name, def, palette, shadowGen) {
+  const topY = (def.h * 0.5) + 0.04;
+  const isGround = name.endsWith('_ground');
+  createDecorPlane(scene, `${name}_stormLane`, root, {
+    width: Math.max(2.4, def.w - 1.4),
+    height: Math.max(0.45, Math.min(0.9, def.d * 0.18)),
+    y: topY,
+    rgb: palette.line,
+    emissiveScale: 0.18,
+    alpha: isGround ? 0.12 : 0.18,
+  });
+  for (const z of [-def.d * 0.34, def.d * 0.34]) {
+    createDecorPlane(scene, `${name}_stormEdge_${z > 0 ? 'r' : 'l'}`, root, {
+      width: Math.max(1.8, def.w - 0.8),
+      height: 0.16,
+      y: topY + 0.01,
+      z,
+      rgb: palette.glow,
+      emissiveScale: 0.20,
+      alpha: 0.24,
+    });
+  }
+  if (isGround || def.w < 14) return;
+  for (const x of [-def.w * 0.36, def.w * 0.36]) {
+    createDecorBox(scene, `${name}_stormMast_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.14,
+      height: 1.8,
+      depth: 0.14,
+      x,
+      y: topY + 0.9,
+      z: -def.d * 0.38,
+      rgb: palette.rim,
+      emissiveScale: 0.10,
+      roughness: 0.48,
+      shadowGen,
+    });
+    const beacon = BABYLON.MeshBuilder.CreateSphere(`${name}_stormBeacon_${x > 0 ? 'r' : 'l'}`, {
+      diameter: 0.26,
+      segments: 8,
+    }, scene);
+    beacon.parent = root;
+    beacon.position.set(x, topY + 1.75, -def.d * 0.38);
+    beacon.material = createGlowMaterial(scene, `${name}_stormBeaconMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+      emissive: 0.34,
+      roughness: 0.18,
+    });
+    markDecor(beacon);
+  }
+}
+
+function addLibraryPlatformDetails(scene, root, name, def, palette, shadowGen) {
+  const topY = (def.h * 0.5) + 0.04;
+  const isGround = name.endsWith('_ground');
+  createDecorPlane(scene, `${name}_libraryRunner`, root, {
+    width: Math.max(2.4, def.w - 1.2),
+    height: Math.max(0.7, Math.min(1.7, def.d * 0.34)),
+    y: topY,
+    rgb: [214, 164, 94],
+    emissiveScale: 0.12,
+    alpha: isGround ? 0.10 : 0.16,
+  });
+  for (const z of [-def.d * 0.39, def.d * 0.39]) {
+    createDecorBox(scene, `${name}_libraryRail_${z > 0 ? 'r' : 'l'}`, root, {
+      width: Math.max(1.8, def.w * 0.92),
+      height: 0.18,
+      depth: 0.24,
+      y: topY + 0.09,
+      z,
+      rgb: [88, 56, 34],
+      emissiveScale: 0.04,
+      roughness: 0.84,
+      shadowGen,
+      cardboard: true,
+    });
+  }
+  if (isGround || def.w < 14) return;
+  const postOffset = def.w * 0.36;
+  for (const x of [-postOffset, postOffset]) {
+    createDecorBox(scene, `${name}_libraryPost_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.22,
+      height: 2.4,
+      depth: 0.22,
+      x,
+      y: topY + 1.2,
+      z: def.d * 0.34,
+      rgb: [112, 72, 46],
+      emissiveScale: 0.05,
+      roughness: 0.82,
+      shadowGen,
+      cardboard: true,
+    });
+    const lamp = BABYLON.MeshBuilder.CreateSphere(`${name}_libraryLamp_${x > 0 ? 'r' : 'l'}`, {
+      diameter: 0.28,
+      segments: 8,
+    }, scene);
+    lamp.parent = root;
+    lamp.position.set(x, topY + 2.34, def.d * 0.34);
+    lamp.material = createGlowMaterial(scene, `${name}_libraryLampMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+      emissive: 0.30,
+      roughness: 0.22,
+    });
+    markDecor(lamp);
+  }
+  createDecorPlane(scene, `${name}_libraryArch`, root, {
+    width: Math.max(2.4, def.w * 0.76),
+    height: 0.28,
+    y: topY + 2.02,
+    z: def.d * 0.34,
+    rotationX: 0,
+    rgb: [168, 122, 70],
+    emissiveScale: 0.08,
+    alpha: 0.92,
+  });
+}
+
+function addCampPlatformDetails(scene, root, name, def, palette, shadowGen) {
+  const topY = (def.h * 0.5) + 0.04;
+  const isGround = name.endsWith('_ground');
+  createDecorPlane(scene, `${name}_campRunner`, root, {
+    width: Math.max(2.2, def.w - 1.6),
+    height: Math.max(0.7, Math.min(1.6, def.d * 0.30)),
+    y: topY,
+    rgb: [236, 170, 104],
+    emissiveScale: 0.12,
+    alpha: isGround ? 0.09 : 0.14,
+  });
+  const seamCount = Math.max(3, Math.min(5, Math.round(def.d / 2.2)));
+  for (let i = 0; i < seamCount; i += 1) {
+    const z = -def.d * 0.36 + ((i / Math.max(1, seamCount - 1)) * def.d * 0.72);
+    createDecorPlane(scene, `${name}_campSeam_${i}`, root, {
+      width: Math.max(1.6, def.w - 0.8),
+      height: 0.12,
+      y: topY + 0.01,
+      z,
+      rgb: [88, 56, 38],
+      emissiveScale: 0.05,
+      alpha: 0.28,
+    });
+  }
+  if (isGround || def.w < 14) return;
+  for (const x of [-def.w * 0.34, def.w * 0.34]) {
+    createDecorBox(scene, `${name}_campPost_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.16,
+      height: 1.7,
+      depth: 0.16,
+      x,
+      y: topY + 0.85,
+      z: def.d * 0.34,
+      rgb: [104, 72, 48],
+      emissiveScale: 0.04,
+      roughness: 0.82,
+      shadowGen,
+      cardboard: true,
+    });
+    const lantern = BABYLON.MeshBuilder.CreateSphere(`${name}_campLantern_${x > 0 ? 'r' : 'l'}`, {
+      diameter: 0.30,
+      segments: 8,
+    }, scene);
+    lantern.parent = root;
+    lantern.position.set(x, topY + 1.62, def.d * 0.34);
+    lantern.material = createGlowMaterial(scene, `${name}_campLanternMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+      emissive: 0.34,
+      roughness: 0.18,
+    });
+    markDecor(lantern);
+  }
+  createDecorPlane(scene, `${name}_campString`, root, {
+    width: Math.max(2.2, def.w * 0.68),
+    height: 0.06,
+    y: topY + 1.36,
+    z: def.d * 0.34,
+    rotationX: 0,
+    rgb: [216, 184, 128],
+    emissiveScale: 0.08,
+    alpha: 0.92,
+  });
+}
+
+function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
+  const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(checkpoint.x, checkpoint.y - 0.06, checkpoint.z ?? 0);
+  markDecor(root);
+
+  if (theme === 'storm') {
+    for (const x of [-1.6, 1.6]) {
+      createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.18,
+        height: 3.4,
+        depth: 0.18,
+        x,
+        y: 1.7,
+        z: 0,
+        rgb: palette.rim,
+        emissiveScale: 0.08,
+        roughness: 0.48,
+        shadowGen,
+      });
+      createDecorPlane(scene, `${name}_streamer_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.28,
+        height: 1.2,
+        x: x * 0.92,
+        y: 2.7,
+        z: 0,
+        rotationX: 0.12,
+        rotationZ: x > 0 ? -0.18 : 0.18,
+        rgb: palette.glow,
+        emissiveScale: 0.18,
+        alpha: 0.28,
+      });
+    }
+    createDecorPlane(scene, `${name}_beam`, root, {
+      width: 3.6,
+      height: 0.16,
+      y: 2.96,
+      rotationX: 0,
+      rgb: palette.line,
+      emissiveScale: 0.20,
+      alpha: 0.86,
+    });
+    return root;
+  }
+
+  if (theme === 'library') {
+    for (const x of [-1.5, 1.5]) {
+      createDecorBox(scene, `${name}_bookend_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.28,
+        height: 3.1,
+        depth: 0.30,
+        x,
+        y: 1.55,
+        z: 0,
+        rgb: [104, 68, 42],
+        emissiveScale: 0.04,
+        roughness: 0.82,
+        shadowGen,
+        cardboard: true,
+      });
+      const lamp = BABYLON.MeshBuilder.CreateSphere(`${name}_globe_${x > 0 ? 'r' : 'l'}`, {
+        diameter: 0.24,
+        segments: 8,
+      }, scene);
+      lamp.parent = root;
+      lamp.position.set(x, 2.86, 0);
+      lamp.material = createGlowMaterial(scene, `${name}_globeMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+        emissive: 0.30,
+        roughness: 0.20,
+      });
+      markDecor(lamp);
+    }
+    createDecorPlane(scene, `${name}_arch`, root, {
+      width: 3.5,
+      height: 0.24,
+      y: 2.52,
+      rotationX: 0,
+      rgb: [170, 124, 72],
+      emissiveScale: 0.08,
+      alpha: 0.92,
+    });
+    return root;
+  }
+
+  if (theme === 'camp') {
+    for (const x of [-1.5, 1.5]) {
+      createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.18,
+        height: 2.9,
+        depth: 0.18,
+        x,
+        y: 1.45,
+        z: 0,
+        rgb: [104, 72, 48],
+        emissiveScale: 0.04,
+        roughness: 0.84,
+        shadowGen,
+        cardboard: true,
+      });
+      const lantern = BABYLON.MeshBuilder.CreateSphere(`${name}_lantern_${x > 0 ? 'r' : 'l'}`, {
+        diameter: 0.28,
+        segments: 8,
+      }, scene);
+      lantern.parent = root;
+      lantern.position.set(x, 2.74, 0);
+      lantern.material = createGlowMaterial(scene, `${name}_lanternMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+        emissive: 0.34,
+        roughness: 0.18,
+      });
+      markDecor(lantern);
+    }
+    createDecorPlane(scene, `${name}_string`, root, {
+      width: 3.4,
+      height: 0.06,
+      y: 2.46,
+      rotationX: 0,
+      rgb: [216, 184, 128],
+      emissiveScale: 0.08,
+      alpha: 0.92,
+    });
+  }
+
+  return root;
+}
+
 function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
@@ -134,18 +571,22 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   }, scene);
   slab.parent = root;
   slab.position.y = 0.02;
-  slab.material = createGlowMaterial(scene, `${name}_slabMat`, palette.slab, {
-    emissive: 0.28,
-    roughness: 0.26,
-  });
+  slab.material = theme === 'library' || theme === 'camp'
+    ? makeCardboard(scene, `${name}_slabMat`, palette.slab[0] / 255, palette.slab[1] / 255, palette.slab[2] / 255, {
+      roughness: theme === 'library' ? 0.88 : 0.80,
+      noiseAmt: theme === 'library' ? 14 : 18,
+      grainScale: theme === 'library' ? 4 : 3,
+    })
+    : createGlowMaterial(scene, `${name}_slabMat`, palette.slab, {
+      emissive: theme === 'storm' ? 0.18 : 0.28,
+      roughness: theme === 'storm' ? 0.42 : 0.26,
+    });
+  if (slab.material.emissiveColor) {
+    slab.material.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12);
+  }
   slab.enableEdgesRendering();
-  slab.edgesWidth = 1.6;
-  slab.edgesColor = new BABYLON.Color4(
-    palette.glow[0] / 255,
-    palette.glow[1] / 255,
-    palette.glow[2] / 255,
-    0.58,
-  );
+  slab.edgesWidth = theme === 'storm' ? 1.9 : 1.6;
+  slab.edgesColor = toColor4(palette.glow, theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58);
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
   markGameplaySurface(slab);
@@ -157,10 +598,19 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   }, scene);
   rim.parent = root;
   rim.position.y = -(def.h * 0.32);
-  rim.material = createGlowMaterial(scene, `${name}_rimMat`, palette.rim, {
-    emissive: 0.18,
-    roughness: 0.54,
-  });
+  rim.material = theme === 'library' || theme === 'camp'
+    ? makeCardboard(scene, `${name}_rimMat`, palette.rim[0] / 255, palette.rim[1] / 255, palette.rim[2] / 255, {
+      roughness: 0.88,
+      noiseAmt: 20,
+      grainScale: 4,
+    })
+    : createGlowMaterial(scene, `${name}_rimMat`, palette.rim, {
+      emissive: theme === 'storm' ? 0.14 : 0.18,
+      roughness: 0.54,
+    });
+  if (rim.material.emissiveColor) {
+    rim.material.emissiveColor = toColor3(palette.rim, theme === 'storm' ? 0.08 : 0.04);
+  }
   markGameplaySurface(rim);
 
   const top = BABYLON.MeshBuilder.CreatePlane(`${name}_top`, {
@@ -171,23 +621,33 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   top.rotation.x = Math.PI / 2;
   top.position.y = (def.h * 0.5) + 0.01;
   const topMat = new BABYLON.StandardMaterial(`${name}_topMat`, scene);
-  topMat.diffuseColor = new BABYLON.Color3(
-    Math.min(1, (palette.slab[0] + 40) / 255),
-    Math.min(1, (palette.slab[1] + 34) / 255),
-    Math.min(1, (palette.slab[2] + 28) / 255),
-  );
-  topMat.emissiveColor = new BABYLON.Color3(
-    palette.glow[0] / 255 * 0.10,
-    palette.glow[1] / 255 * 0.10,
-    palette.glow[2] / 255 * 0.10,
-  );
-  topMat.alpha = 0.52;
+  topMat.diffuseColor = theme === 'storm'
+    ? new BABYLON.Color3(0.28, 0.36, 0.46)
+    : theme === 'library'
+      ? new BABYLON.Color3(0.60, 0.44, 0.28)
+      : theme === 'camp'
+        ? new BABYLON.Color3(0.46, 0.34, 0.24)
+        : new BABYLON.Color3(
+          Math.min(1, (palette.slab[0] + 40) / 255),
+          Math.min(1, (palette.slab[1] + 34) / 255),
+          Math.min(1, (palette.slab[2] + 28) / 255),
+        );
+  topMat.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10);
+  topMat.alpha = theme === 'storm' ? 0.42 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.52;
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   top.material = topMat;
   markGameplaySurface(top);
   markDecor(top);
+
+  if (theme === 'storm') {
+    addStormPlatformDetails(scene, root, name, def, palette, shadowGen);
+  } else if (theme === 'library') {
+    addLibraryPlatformDetails(scene, root, name, def, palette, shadowGen);
+  } else if (theme === 'camp') {
+    addCampPlatformDetails(scene, root, name, def, palette, shadowGen);
+  }
 
   return root;
 }
@@ -224,6 +684,20 @@ function createSign(scene, name, def, theme) {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const root = new BABYLON.TransformNode(name, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
+  for (const x of [-((def.width * 0.5) - 0.22), (def.width * 0.5) - 0.22]) {
+    createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.14,
+      height: def.height + 0.86,
+      depth: 0.14,
+      x,
+      y: -0.18,
+      z: -0.06,
+      rgb: theme === 'library' || theme === 'camp' ? palette.rim : palette.line,
+      emissiveScale: theme === 'storm' ? 0.12 : 0.04,
+      roughness: 0.74,
+      cardboard: theme === 'library' || theme === 'camp',
+    });
+  }
   const plane = BABYLON.MeshBuilder.CreatePlane(`${name}_plane`, {
     width: def.width,
     height: def.height,
@@ -231,13 +705,26 @@ function createSign(scene, name, def, theme) {
   plane.parent = root;
   const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
   mat.diffuseTexture = createTextTexture(scene, `${name}_tex`, def.text, {
-    fg: '#fffbed',
+    bg: theme === 'storm'
+      ? 'rgba(10,18,38,0.72)'
+      : theme === 'library'
+        ? 'rgba(58,34,16,0.74)'
+        : theme === 'camp'
+          ? 'rgba(36,24,18,0.70)'
+          : 'rgba(18,20,24,0.0)',
+    fg: theme === 'storm' ? '#eef9ff' : theme === 'library' ? '#fff2d6' : '#fff6de',
     accent: `rgb(${palette.glow.join(',')})`,
   });
   mat.opacityTexture = mat.diffuseTexture;
   mat.useAlphaFromDiffuseTexture = true;
   mat.specularColor = BABYLON.Color3.Black();
-  mat.emissiveColor = new BABYLON.Color3(0.18, 0.12, 0.04);
+  mat.emissiveColor = theme === 'storm'
+    ? new BABYLON.Color3(0.10, 0.14, 0.22)
+    : theme === 'library'
+      ? new BABYLON.Color3(0.16, 0.10, 0.04)
+      : theme === 'camp'
+        ? new BABYLON.Color3(0.14, 0.10, 0.05)
+        : new BABYLON.Color3(0.18, 0.12, 0.04);
   plane.material = mat;
   markDecor(root);
   return root;
@@ -245,62 +732,220 @@ function createSign(scene, name, def, theme) {
 
 function createRouteRibbon(scene, name, def, theme) {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
+  const root = new BABYLON.TransformNode(`${name}_root`, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
   const plane = BABYLON.MeshBuilder.CreatePlane(name, {
     width: def.width,
     height: def.depth,
   }, scene);
-  plane.position.set(def.x, def.y, def.z ?? 0);
+  plane.parent = root;
   plane.rotation.x = Math.PI / 2;
   const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
-  mat.diffuseColor = new BABYLON.Color3(
-    palette.line[0] / 255,
-    palette.line[1] / 255,
-    palette.line[2] / 255,
-  );
-  mat.emissiveColor = new BABYLON.Color3(
-    palette.glow[0] / 255 * 0.16,
-    palette.glow[1] / 255 * 0.16,
-    palette.glow[2] / 255 * 0.16,
-  );
-  mat.alpha = 0.08;
+  mat.diffuseColor = toColor3(theme === 'library' ? [214, 164, 94] : palette.line);
+  mat.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.18 : 0.14);
+  mat.alpha = theme === 'storm' ? 0.10 : theme === 'library' ? 0.09 : theme === 'camp' ? 0.08 : 0.08;
   mat.specularColor = BABYLON.Color3.Black();
   mat.disableLighting = true;
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plane.material = mat;
-  markDecor(plane);
-  return { mesh: plane, mat };
+  markDecor(root);
+
+  if (theme === 'storm') {
+    for (const z of [-def.depth * 0.34, def.depth * 0.34]) {
+      createDecorPlane(scene, `${name}_gustLine_${z > 0 ? 'r' : 'l'}`, root, {
+        width: Math.max(2.4, def.width - 2.4),
+        height: 0.18,
+        y: 0.01,
+        z,
+        rgb: palette.glow,
+        emissiveScale: 0.18,
+        alpha: 0.24,
+      });
+    }
+  } else if (theme === 'library') {
+    for (const z of [-def.depth * 0.30, def.depth * 0.30]) {
+      createDecorPlane(scene, `${name}_pageEdge_${z > 0 ? 'r' : 'l'}`, root, {
+        width: Math.max(2.0, def.width - 1.6),
+        height: 0.12,
+        y: 0.01,
+        z,
+        rgb: [255, 240, 198],
+        emissiveScale: 0.10,
+        alpha: 0.26,
+      });
+    }
+  } else if (theme === 'camp') {
+    for (const z of [-def.depth * 0.24, def.depth * 0.24]) {
+      createDecorPlane(scene, `${name}_emberTrack_${z > 0 ? 'r' : 'l'}`, root, {
+        width: Math.max(2.0, def.width - 2.0),
+        height: 0.16,
+        y: 0.01,
+        z,
+        rgb: [255, 194, 116],
+        emissiveScale: 0.12,
+        alpha: 0.18,
+      });
+    }
+  }
+
+  return { mesh: plane, mat, root };
 }
 
 function createPickupNode(scene, drop, theme, shadowGen) {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const root = new BABYLON.TransformNode(`pickup_${drop.name}`, scene);
   root.position.set(drop.x, drop.y, drop.z ?? 0);
+  let core;
+  let ring;
 
-  const core = BABYLON.MeshBuilder.CreateCylinder(`pickup_${drop.name}_core`, {
-    height: 0.54,
-    diameterTop: 0.48,
-    diameterBottom: 0.62,
-    tessellation: 10,
-  }, scene);
-  core.parent = root;
-  core.material = createGlowMaterial(scene, `pickup_${drop.name}_coreMat`, palette.accent, {
-    roughness: 0.3,
-    emissive: 0.26,
-  });
-  shadowGen.addShadowCaster(core);
+  if (theme === 'storm') {
+    const topHalf = BABYLON.MeshBuilder.CreateCylinder(`pickup_${drop.name}_kiteTop`, {
+      height: 0.34,
+      diameterTop: 0.02,
+      diameterBottom: 0.48,
+      tessellation: 4,
+    }, scene);
+    topHalf.parent = root;
+    topHalf.position.y = 0.18;
+    topHalf.rotation.y = Math.PI * 0.25;
+    topHalf.material = createGlowMaterial(scene, `pickup_${drop.name}_kiteTopMat`, palette.accent, {
+      roughness: 0.22,
+      emissive: 0.26,
+    });
+    const bottomHalf = BABYLON.MeshBuilder.CreateCylinder(`pickup_${drop.name}_kiteBottom`, {
+      height: 0.34,
+      diameterTop: 0.48,
+      diameterBottom: 0.02,
+      tessellation: 4,
+    }, scene);
+    bottomHalf.parent = root;
+    bottomHalf.position.y = -0.14;
+    bottomHalf.rotation.y = Math.PI * 0.25;
+    bottomHalf.material = topHalf.material;
+    core = topHalf;
+    shadowGen.addShadowCaster(topHalf);
+    shadowGen.addShadowCaster(bottomHalf);
+    ring = BABYLON.MeshBuilder.CreateTorus(`pickup_${drop.name}_ring`, {
+      diameter: 0.94,
+      thickness: 0.05,
+      tessellation: 14,
+    }, scene);
+    ring.parent = root;
+    ring.rotation.z = Math.PI * 0.5;
+    ring.position.y = 0.08;
+    ring.material = createGlowMaterial(scene, `pickup_${drop.name}_ringMat`, palette.glow, {
+      alpha: 0.72,
+      emissive: 0.34,
+    });
+    createDecorPlane(scene, `pickup_${drop.name}_tail`, root, {
+      width: 0.14,
+      height: 0.9,
+      y: -0.48,
+      rotationX: 0.16,
+      rgb: palette.line,
+      emissiveScale: 0.18,
+      alpha: 0.32,
+    });
+  } else if (theme === 'library') {
+    core = BABYLON.MeshBuilder.CreateBox(`pickup_${drop.name}_book`, {
+      width: 0.58,
+      height: 0.42,
+      depth: 0.44,
+    }, scene);
+    core.parent = root;
+    core.position.y = 0.06;
+    core.material = makeCardboard(scene, `pickup_${drop.name}_bookMat`, 0.58, 0.40, 0.22, {
+      roughness: 0.88,
+      noiseAmt: 12,
+      grainScale: 3,
+    });
+    core.material.emissiveColor = toColor3(palette.glow, 0.06);
+    shadowGen.addShadowCaster(core);
+    ring = BABYLON.MeshBuilder.CreateTorus(`pickup_${drop.name}_ring`, {
+      diameter: 0.92,
+      thickness: 0.05,
+      tessellation: 18,
+    }, scene);
+    ring.parent = root;
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.10;
+    ring.material = createGlowMaterial(scene, `pickup_${drop.name}_ringMat`, [255, 236, 188], {
+      alpha: 0.62,
+      emissive: 0.24,
+    });
+    for (const z of [-0.12, 0.12]) {
+      createDecorPlane(scene, `pickup_${drop.name}_page_${z > 0 ? 'b' : 'f'}`, root, {
+        width: 0.56,
+        height: 0.22,
+        y: 0.22,
+        z,
+        rotationX: Math.PI / 2,
+        rotationZ: z > 0 ? -0.08 : 0.08,
+        rgb: [255, 245, 220],
+        emissiveScale: 0.08,
+        alpha: 0.86,
+      });
+    }
+  } else if (theme === 'camp') {
+    core = BABYLON.MeshBuilder.CreateSphere(`pickup_${drop.name}_lantern`, {
+      diameter: 0.46,
+      segments: 10,
+    }, scene);
+    core.parent = root;
+    core.position.y = 0.04;
+    core.material = createGlowMaterial(scene, `pickup_${drop.name}_lanternMat`, palette.accent, {
+      roughness: 0.22,
+      emissive: 0.30,
+    });
+    shadowGen.addShadowCaster(core);
+    ring = BABYLON.MeshBuilder.CreateTorus(`pickup_${drop.name}_ring`, {
+      diameter: 0.84,
+      thickness: 0.04,
+      tessellation: 20,
+    }, scene);
+    ring.parent = root;
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.12;
+    ring.material = createGlowMaterial(scene, `pickup_${drop.name}_ringMat`, [255, 218, 162], {
+      alpha: 0.58,
+      emissive: 0.26,
+    });
+    createDecorPlane(scene, `pickup_${drop.name}_handle`, root, {
+      width: 0.22,
+      height: 0.44,
+      y: 0.42,
+      rotationX: 0,
+      rgb: [210, 182, 124],
+      emissiveScale: 0.10,
+      alpha: 0.82,
+    });
+  } else {
+    core = BABYLON.MeshBuilder.CreateCylinder(`pickup_${drop.name}_core`, {
+      height: 0.54,
+      diameterTop: 0.48,
+      diameterBottom: 0.62,
+      tessellation: 10,
+    }, scene);
+    core.parent = root;
+    core.material = createGlowMaterial(scene, `pickup_${drop.name}_coreMat`, palette.accent, {
+      roughness: 0.3,
+      emissive: 0.26,
+    });
+    shadowGen.addShadowCaster(core);
 
-  const ring = BABYLON.MeshBuilder.CreateTorus(`pickup_${drop.name}_ring`, {
-    diameter: 0.86,
-    thickness: 0.06,
-    tessellation: 18,
-  }, scene);
-  ring.parent = root;
-  ring.rotation.x = Math.PI / 2;
-  ring.position.y = 0.14;
-  ring.material = createGlowMaterial(scene, `pickup_${drop.name}_ringMat`, palette.glow, {
-    alpha: 0.74,
-    emissive: 0.34,
-  });
+    ring = BABYLON.MeshBuilder.CreateTorus(`pickup_${drop.name}_ring`, {
+      diameter: 0.86,
+      thickness: 0.06,
+      tessellation: 18,
+    }, scene);
+    ring.parent = root;
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.14;
+    ring.material = createGlowMaterial(scene, `pickup_${drop.name}_ringMat`, palette.glow, {
+      alpha: 0.74,
+      emissive: 0.34,
+    });
+  }
 
   const badge = BABYLON.MeshBuilder.CreatePlane(`pickup_${drop.name}_badge`, {
     width: 1.0,
@@ -313,7 +958,14 @@ function createPickupNode(scene, drop, theme, shadowGen) {
   badgeMat.diffuseTexture = createTextTexture(scene, `pickup_${drop.name}_badgeTex`, drop.title || drop.defId, {
     width: 640,
     height: 220,
-    fg: '#fffef2',
+    bg: theme === 'storm'
+      ? 'rgba(10,20,36,0.78)'
+      : theme === 'library'
+        ? 'rgba(64,40,22,0.78)'
+        : theme === 'camp'
+          ? 'rgba(40,28,18,0.76)'
+          : 'rgba(18,20,24,0.0)',
+    fg: theme === 'storm' ? '#eef9ff' : theme === 'library' ? '#fff4dc' : '#fff6de',
     accent: `rgb(${palette.glow.join(',')})`,
   });
   badgeMat.opacityTexture = badgeMat.diffuseTexture;
@@ -354,13 +1006,15 @@ function createConveyorVisual(scene, name, def, theme, arrowText = '>>>') {
   return { mesh: plane, mat };
 }
 
-function createAreaPulse(scene, name, def, theme) {
+function createAreaPulse(scene, name, def, theme, kind = 'area') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
+  const root = new BABYLON.TransformNode(`${name}_root`, scene);
+  root.position.set(def.x, def.y - (def.h * 0.5) + 0.06, def.z ?? 0);
   const plane = BABYLON.MeshBuilder.CreatePlane(name, {
     width: def.w,
     height: def.d,
   }, scene);
-  plane.position.set(def.x, def.y - (def.h * 0.5) + 0.06, def.z ?? 0);
+  plane.parent = root;
   plane.rotation.x = Math.PI / 2;
   const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
   mat.diffuseColor = new BABYLON.Color3(
@@ -378,8 +1032,46 @@ function createAreaPulse(scene, name, def, theme) {
   mat.disableLighting = true;
   mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plane.material = mat;
-  markDecor(plane);
-  return { mesh: plane, mat };
+  markDecor(root);
+
+  if (theme === 'storm' && kind === 'lightning') {
+    createDecorPlane(scene, `${name}_boltX`, root, {
+      width: Math.max(1.2, def.w * 0.74),
+      height: 0.16,
+      rotationX: Math.PI / 2,
+      rotationZ: 0.38,
+      rgb: palette.line,
+      emissiveScale: 0.22,
+      alpha: 0.22,
+    });
+    createDecorPlane(scene, `${name}_boltY`, root, {
+      width: Math.max(1.2, def.w * 0.74),
+      height: 0.16,
+      rotationX: Math.PI / 2,
+      rotationZ: -0.38,
+      rgb: palette.line,
+      emissiveScale: 0.22,
+      alpha: 0.22,
+    });
+  } else if (theme === 'library' && kind === 'ink') {
+    createDecorPlane(scene, `${name}_inkCore`, root, {
+      width: Math.max(1.2, def.w - 1.0),
+      height: Math.max(1.2, def.d - 1.0),
+      rgb: [48, 22, 18],
+      emissiveScale: 0.04,
+      alpha: 0.20,
+    });
+  } else if (theme === 'camp' && kind === 'ember') {
+    createDecorPlane(scene, `${name}_emberCore`, root, {
+      width: Math.max(1.0, def.w - 1.1),
+      height: Math.max(1.0, def.d - 1.1),
+      rgb: [255, 150, 84],
+      emissiveScale: 0.18,
+      alpha: 0.16,
+    });
+  }
+
+  return { mesh: plane, mat, root };
 }
 
 function createOilSlick(scene, name, def) {
@@ -491,6 +1183,34 @@ function createLightZoneVisual(scene, name, def, theme) {
   fillMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   fill.material = fillMat;
 
+  if (theme === 'camp') {
+    for (const x of [-def.radius * 0.58, def.radius * 0.58]) {
+      createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.14,
+        height: 1.4,
+        depth: 0.14,
+        x,
+        y: 0.7,
+        z: 0,
+        rgb: [108, 74, 48],
+        emissiveScale: 0.04,
+        roughness: 0.82,
+        cardboard: true,
+      });
+      const lantern = BABYLON.MeshBuilder.CreateSphere(`${name}_lantern_${x > 0 ? 'r' : 'l'}`, {
+        diameter: 0.24,
+        segments: 8,
+      }, scene);
+      lantern.parent = root;
+      lantern.position.set(x, 1.28, 0);
+      lantern.material = createGlowMaterial(scene, `${name}_lanternMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+        emissive: 0.34,
+        roughness: 0.18,
+      });
+      markDecor(lantern);
+    }
+  }
+
   markDecor(root);
   return { root, ring, fill, fillMat };
 }
@@ -524,7 +1244,19 @@ function createEnemyVisual(scene, def, theme, shadowGen) {
     segments: 10,
   }, scene);
   body.parent = root;
-  body.material = makePlastic(scene, `${def.name}_bodyMat`, color.r, color.g, color.b, { roughness: 0.4 });
+  body.material = theme === 'library' || theme === 'camp'
+    ? makePaper(scene, `${def.name}_bodyMat`, color.r, color.g, color.b, {
+      roughness: theme === 'library' ? 0.92 : 0.88,
+      grainScale: theme === 'library' ? 4 : 3,
+    })
+    : makePlastic(scene, `${def.name}_bodyMat`, color.r, color.g, color.b, { roughness: 0.4 });
+  if (body.material.emissiveColor) {
+    body.material.emissiveColor = theme === 'storm'
+      ? new BABYLON.Color3(0.10, 0.14, 0.22)
+      : theme === 'camp'
+        ? new BABYLON.Color3(0.08, 0.06, 0.04)
+        : new BABYLON.Color3(0.04, 0.03, 0.02);
+  }
   shadowGen.addShadowCaster(body);
 
   const eye = BABYLON.MeshBuilder.CreatePlane(`${def.name}_eye`, {
@@ -550,6 +1282,12 @@ function createEnemyVisual(scene, def, theme, shadowGen) {
     wingR.parent = root;
     wingR.position.x = 0.32;
     wingR.rotation.z = 0.34;
+    if (theme === 'library' || theme === 'camp') {
+      wingL.scaling.set(1.2, 1.5, 1);
+      wingR.scaling.set(1.2, 1.5, 1);
+      wingL.rotation.x = 0.12;
+      wingR.rotation.x = 0.12;
+    }
   }
 
   if (def.kind === 'frog') {
@@ -560,6 +1298,58 @@ function createEnemyVisual(scene, def, theme, shadowGen) {
     const legR = legL.clone(`${def.name}_legR`);
     legR.parent = root;
     legR.position.x = 0.16;
+  }
+
+  if (def.kind === 'spark') {
+    for (let i = 0; i < 3; i += 1) {
+      createDecorPlane(scene, `${def.name}_sparkRay_${i}`, root, {
+        width: 0.92,
+        height: 0.12,
+        rotationX: 0,
+        rotationZ: i * (Math.PI / 3),
+        rgb: palette.glow,
+        emissiveScale: 0.20,
+        alpha: 0.34,
+      });
+    }
+  }
+
+  if (theme === 'camp' && def.kind === 'fox') {
+    for (const x of [-0.16, 0.16]) {
+      const ear = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ear_${x > 0 ? 'r' : 'l'}`, {
+        height: 0.24,
+        diameterTop: 0.02,
+        diameterBottom: 0.20,
+        tessellation: 3,
+      }, scene);
+      ear.parent = root;
+      ear.position.set(x, 0.34, -0.08);
+      ear.rotation.z = x > 0 ? 0.24 : -0.24;
+      ear.material = body.material;
+      markDecor(ear);
+    }
+    const tail = BABYLON.MeshBuilder.CreatePlane(`${def.name}_tail`, {
+      width: 0.34,
+      height: 0.20,
+    }, scene);
+    tail.parent = root;
+    tail.position.set(0, 0.04, 0.32);
+    tail.rotation.x = 0.22;
+    tail.material = body.material;
+    markDecor(tail);
+  }
+
+  if (theme === 'library' && def.kind === 'bird') {
+    createDecorPlane(scene, `${def.name}_bookmarkTail`, root, {
+      width: 0.18,
+      height: 0.34,
+      y: -0.06,
+      z: 0.32,
+      rotationX: 0.24,
+      rgb: [255, 236, 188],
+      emissiveScale: 0.08,
+      alpha: 0.82,
+    });
   }
 
   root.metadata = {
@@ -683,31 +1473,51 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   const { animateGoal = true } = options;
   const theme = layout.theme || 'factory';
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
+  const sceneLook = THEME_SCENE_LOOKS[theme] || THEME_SCENE_LOOKS.factory;
 
-  const shadowGen = new BABYLON.ShadowGenerator(1024, new BABYLON.DirectionalLight(
+  scene.clearColor = new BABYLON.Color4(
+    sceneLook.clear[0] / 255,
+    sceneLook.clear[1] / 255,
+    sceneLook.clear[2] / 255,
+    sceneLook.clear[3] / 255,
+  );
+  scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+  scene.fogColor = new BABYLON.Color3(
+    sceneLook.fog[0] / 255,
+    sceneLook.fog[1] / 255,
+    sceneLook.fog[2] / 255,
+  );
+  scene.fogStart = sceneLook.fogStart;
+  scene.fogEnd = sceneLook.fogEnd;
+
+  const keyLight = new BABYLON.DirectionalLight(
     `${theme}_keyLight`,
-    new BABYLON.Vector3(-0.34, -1.0, 0.24),
+    new BABYLON.Vector3(...sceneLook.keyDir),
     scene,
-  ));
+  );
+  keyLight.intensity = sceneLook.keyIntensity;
+  keyLight.diffuse = toColor3(palette.glow, theme === 'storm' ? 0.70 : theme === 'library' ? 0.50 : theme === 'camp' ? 0.42 : 0.56);
+  keyLight.specular = toColor3(palette.line, 0.12);
+  const shadowGen = new BABYLON.ShadowGenerator(1024, keyLight);
   shadowGen.useBlurExponentialShadowMap = false;
   shadowGen.bias = 0.00035;
 
   const hemi = new BABYLON.HemisphericLight(`${theme}_fill`, new BABYLON.Vector3(0, 1, 0), scene);
-  hemi.intensity = 0.72;
-  hemi.diffuse = new BABYLON.Color3(
-    Math.min(1, (palette.slab[0] + 32) / 255),
-    Math.min(1, (palette.slab[1] + 32) / 255),
-    Math.min(1, (palette.slab[2] + 32) / 255),
-  );
-  hemi.groundColor = new BABYLON.Color3(0.02, 0.03, 0.05);
+  hemi.intensity = sceneLook.hemiIntensity;
+  hemi.diffuse = toColor3(sceneLook.hemiColor);
+  hemi.groundColor = new BABYLON.Color3(...sceneLook.hemiGround);
 
-  const rim = new BABYLON.PointLight(`${theme}_rim`, new BABYLON.Vector3(layout.goal.x - 6, 18, -9), scene);
-  rim.intensity = 0.48;
-  rim.diffuse = new BABYLON.Color3(
-    palette.glow[0] / 255,
-    palette.glow[1] / 255,
-    palette.glow[2] / 255,
+  const rim = new BABYLON.PointLight(
+    `${theme}_rim`,
+    new BABYLON.Vector3(
+      layout.goal.x + sceneLook.rimOffset[0],
+      sceneLook.rimOffset[1],
+      sceneLook.rimOffset[2],
+    ),
+    scene,
   );
+  rim.intensity = sceneLook.rimIntensity;
+  rim.diffuse = toColor3(palette.glow);
 
   const groundVisual = createStyledPlatform(scene, `${theme}_ground`, layout.ground, shadowGen, theme);
   setRenderingGroup(groundVisual, 2);
@@ -753,6 +1563,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       width,
       depth: 5.2 + (index % 2),
     }, theme);
+    setRenderingGroup(ribbon.root || ribbon.mesh, 2);
     return ribbon;
   });
 
@@ -763,6 +1574,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     signs.push(sign);
   }
 
+  const checkpointFrames = [];
   const checkpoints = (layout.checkpoints || []).map((cp, index) => {
     const marker = createCheckpointMarker(scene, `${theme}_checkpoint_${index}`, {
       x: cp.x,
@@ -772,6 +1584,11 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     });
     markDecor(marker);
     setRenderingGroup(marker, 3);
+    if (theme === 'storm' || theme === 'library' || theme === 'camp') {
+      const frame = createThemeCheckpointFrame(scene, `${theme}_checkpointFrame_${index}`, cp, theme, shadowGen);
+      setRenderingGroup(frame, 2);
+      checkpointFrames.push(frame);
+    }
     return {
       index: index + 1,
       label: cp.label,
@@ -864,7 +1681,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   const areaHazards = [];
   const makeAreaHazard = (defs, kind, element) => {
     for (const def of defs || []) {
-      const pulse = createAreaPulse(scene, `${theme}_${def.name}_pulse`, def, theme);
+      const pulse = createAreaPulse(scene, `${theme}_${def.name}_pulse`, def, theme, kind);
       let currentState = 'cooldown';
       const hazard = createTelegraphedHazard({
         name: def.name,
@@ -1532,6 +2349,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       ...oilSlicks.map((slick) => slick.visual.mesh),
       ...lampPosts.map((lamp) => lamp.visual),
       ...lightZoneVisuals.map((zone) => zone.visual.root),
+      ...checkpointFrames,
       ...signs,
       ...(familySetpiece ? [familySetpiece.root] : []),
     ],
