@@ -444,6 +444,45 @@ function addLibraryPlatformDetails(scene, root, name, def, palette, shadowGen) {
     emissiveScale: 0.08,
     alpha: 0.92,
   });
+
+  // Manchester Central Library multi-level effect — upper gallery tier visible above
+  if (def.w >= 18) {
+    createDecorPlane(scene, `${name}_galleryRail`, root, {
+      width: Math.max(2.0, def.w - 0.6),
+      height: 0.18,
+      y: topY + 3.2,
+      z: def.d * 0.44,
+      rotationX: 0,
+      rgb: [44, 40, 34],
+      emissiveScale: 0.04,
+      alpha: 0.68,
+    });
+    const balusterCount = Math.min(6, Math.round(def.w / 3.8));
+    for (let i = 0; i < balusterCount; i += 1) {
+      const bx = -def.w * 0.38 + ((i / Math.max(1, balusterCount - 1)) * def.w * 0.76);
+      createDecorBox(scene, `${name}_baluster_${i}`, root, {
+        width: 0.08,
+        height: 0.94,
+        depth: 0.08,
+        x: bx,
+        y: topY + 2.75,
+        z: def.d * 0.44,
+        rgb: [54, 48, 44],
+        emissiveScale: 0.03,
+        roughness: 0.74,
+      });
+    }
+    createDecorPlane(scene, `${name}_upperShelfHint`, root, {
+      width: Math.max(2.0, def.w * 0.84),
+      height: 1.7,
+      y: topY + 4.1,
+      z: def.d * 0.46,
+      rotationX: 0,
+      rgb: [128, 90, 54],
+      emissiveScale: 0.06,
+      alpha: 0.36,
+    });
+  }
 }
 
 function addCampPlatformDetails(scene, root, name, def, palette, shadowGen) {
@@ -508,6 +547,227 @@ function addCampPlatformDetails(scene, root, name, def, palette, shadowGen) {
     alpha: 0.92,
   });
 }
+
+// ── Library set-piece factories ──────────────────────────────────────────────
+
+const BOOK_SPINE_COLORS = [
+  [168, 54, 44],   // burgundy
+  [46, 102, 148],  // ink blue
+  [54, 122, 58],   // forest green
+  [198, 164, 54],  // gold
+  [122, 56, 148],  // deep purple
+  [42, 108, 94],   // teal
+];
+
+function createLibraryBookshelf(scene, name, def, shadowGen) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+  markDecor(root);
+  const w = def.w ?? 3.6;
+  const h = def.h ?? 3.2;
+  // Back panel
+  const back = BABYLON.MeshBuilder.CreateBox(`${name}_back`, { width: w, height: h, depth: 0.22 }, scene);
+  back.parent = root;
+  back.position.set(0, h * 0.5, 0);
+  back.material = makeCardboard(scene, `${name}_backMat`, 112 / 255, 72 / 255, 46 / 255, { roughness: 0.86, noiseAmt: 18 });
+  shadowGen.addShadowCaster(back);
+  // Shelf slabs
+  const shelfCount = Math.max(3, Math.min(6, Math.round(h / 0.74)));
+  for (let s = 0; s < shelfCount; s += 1) {
+    const sy = 0.52 + (s * (h / shelfCount));
+    const slab = BABYLON.MeshBuilder.CreateBox(`${name}_shelf_${s}`, { width: w + 0.06, height: 0.08, depth: 0.26 }, scene);
+    slab.parent = root;
+    slab.position.set(0, sy, 0.01);
+    slab.material = makeCardboard(scene, `${name}_shelfMat_${s}`, 136 / 255, 90 / 255, 58 / 255, { roughness: 0.82 });
+    markDecor(slab);
+    // Book spines on this shelf
+    const spineCount = Math.max(3, Math.floor(w / 0.24));
+    for (let b = 0; b < spineCount; b += 1) {
+      const bx = -(w * 0.44) + (b / Math.max(1, spineCount - 1)) * (w * 0.88);
+      const bw = 0.08 + (((b + s) % 3) * 0.06);
+      const bh = 0.42 + ((b % 2) * 0.14);
+      const spineRgb = BOOK_SPINE_COLORS[(b + s * 2) % BOOK_SPINE_COLORS.length];
+      createDecorPlane(scene, `${name}_spine_${s}_${b}`, root, {
+        width: bw,
+        height: bh,
+        x: bx,
+        y: sy + 0.04 + (bh * 0.5),
+        z: 0.12,
+        rotationX: 0,
+        rgb: spineRgb,
+        emissiveScale: 0.12,
+        alpha: 0.90,
+      });
+    }
+  }
+  // Top ornament
+  const orb = BABYLON.MeshBuilder.CreateSphere(`${name}_orb`, { diameter: 0.20, segments: 8 }, scene);
+  orb.parent = root;
+  orb.position.set(w * 0.42, h + 0.12, 0.10);
+  orb.material = createGlowMaterial(scene, `${name}_orbMat`, [244, 214, 134], { emissive: 0.28, roughness: 0.22 });
+  markDecor(orb);
+  // Gallery railing on tall shelves
+  if (h > 3.5) {
+    createDecorPlane(scene, `${name}_shelfRail`, root, {
+      width: w + 0.12,
+      height: 0.14,
+      y: h + 0.08,
+      z: 0.12,
+      rotationX: 0,
+      rgb: [44, 38, 34],
+      emissiveScale: 0.04,
+      alpha: 0.72,
+    });
+  }
+  return root;
+}
+
+function createLibraryFireplace(scene, name, def, shadowGen) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+  markDecor(root);
+  const sc = def.scale ?? 1;
+  const stoneMat = makeCardboard(scene, `${name}_stoneMat`, 186 / 255, 172 / 255, 158 / 255, { roughness: 0.88, noiseAmt: 22 });
+  // Left and right pillar
+  for (const sx of [-1, 1]) {
+    const pillar = BABYLON.MeshBuilder.CreateBox(`${name}_pillar_${sx}`, { width: 0.24 * sc, height: 1.76 * sc, depth: 0.40 * sc }, scene);
+    pillar.parent = root;
+    pillar.position.set(sx * 1.12 * sc, 0.88 * sc, 0);
+    pillar.material = stoneMat;
+    shadowGen.addShadowCaster(pillar);
+    markDecor(pillar);
+  }
+  // Main surround body
+  const surround = BABYLON.MeshBuilder.CreateBox(`${name}_surround`, { width: 2.56 * sc, height: 0.28 * sc, depth: 0.40 * sc }, scene);
+  surround.parent = root;
+  surround.position.set(0, 1.9 * sc, 0);
+  surround.material = stoneMat;
+  shadowGen.addShadowCaster(surround);
+  markDecor(surround);
+  // Mantle shelf
+  const mantle = BABYLON.MeshBuilder.CreateBox(`${name}_mantle`, { width: 2.72 * sc, height: 0.12 * sc, depth: 0.52 * sc }, scene);
+  mantle.parent = root;
+  mantle.position.set(0, 2.12 * sc, -0.06 * sc);
+  mantle.material = stoneMat;
+  shadowGen.addShadowCaster(mantle);
+  markDecor(mantle);
+  // Firebox dark opening
+  createDecorPlane(scene, `${name}_firebox`, root, {
+    width: 1.44 * sc,
+    height: 1.06 * sc,
+    y: 0.53 * sc,
+    z: -0.19 * sc,
+    rotationX: 0,
+    rgb: [22, 16, 12],
+    emissiveScale: 0.02,
+    alpha: 0.94,
+  });
+  // Fire core cylinder
+  const fire = BABYLON.MeshBuilder.CreateCylinder(`${name}_fire`, {
+    height: 0.70 * sc,
+    diameterTop: 0.30 * sc,
+    diameterBottom: 0.62 * sc,
+    tessellation: 8,
+  }, scene);
+  fire.parent = root;
+  fire.position.set(0, 0.35 * sc, -0.08 * sc);
+  fire.material = createGlowMaterial(scene, `${name}_fireMat`, [255, 120, 40], { emissive: 0.52, roughness: 0.18 });
+  shadowGen.addShadowCaster(fire);
+  markDecor(fire);
+  // Crossed glow planes for fire volume
+  for (const ry of [0, Math.PI * 0.5]) {
+    createDecorPlane(scene, `${name}_glow_${ry.toFixed(1)}`, root, {
+      width: 1.1 * sc,
+      height: 0.9 * sc,
+      y: 0.45 * sc,
+      z: -0.10 * sc,
+      rotationX: 0,
+      rotationY: ry,
+      rgb: [255, 196, 80],
+      emissiveScale: 0.34,
+      alpha: 0.44,
+    });
+  }
+  return { root, fire, phase: (def.x ?? 0) * 0.74, type: 'fireplace' };
+}
+
+function createLibraryArmchair(scene, name, def, shadowGen) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+  root.rotation.y = def.rotY ?? 0;
+  markDecor(root);
+  const velvetMat = makeCardboard(scene, `${name}_velvetMat`, 96 / 255, 42 / 255, 84 / 255, { roughness: 0.90, noiseAmt: 8, grainScale: 2 });
+  const woodMat = makeCardboard(scene, `${name}_woodMat`, 76 / 255, 48 / 255, 30 / 255, { roughness: 0.86 });
+  // Seat
+  const seat = BABYLON.MeshBuilder.CreateBox(`${name}_seat`, { width: 0.64, height: 0.18, depth: 0.60 }, scene);
+  seat.parent = root;
+  seat.position.set(0, 0.38, 0);
+  seat.material = velvetMat;
+  shadowGen.addShadowCaster(seat);
+  markDecor(seat);
+  // Back
+  const back = BABYLON.MeshBuilder.CreateBox(`${name}_back`, { width: 0.64, height: 0.84, depth: 0.16 }, scene);
+  back.parent = root;
+  back.position.set(0, 0.77, -0.24);
+  back.material = velvetMat;
+  shadowGen.addShadowCaster(back);
+  markDecor(back);
+  // Armrests
+  for (const sx of [-0.37, 0.37]) {
+    const arm = BABYLON.MeshBuilder.CreateBox(`${name}_arm_${sx > 0 ? 'r' : 'l'}`, { width: 0.10, height: 0.16, depth: 0.56 }, scene);
+    arm.parent = root;
+    arm.position.set(sx, 0.53, -0.03);
+    arm.material = woodMat;
+    markDecor(arm);
+  }
+  // Legs
+  for (const lx of [-0.26, 0.26]) {
+    for (const lz of [-0.24, 0.24]) {
+      const leg = BABYLON.MeshBuilder.CreateCylinder(`${name}_leg_${lx}_${lz}`, { diameter: 0.08, height: 0.36, tessellation: 6 }, scene);
+      leg.parent = root;
+      leg.position.set(lx, 0.18, lz);
+      leg.material = woodMat;
+      markDecor(leg);
+    }
+  }
+  return root;
+}
+
+function createLibraryCocktailTable(scene, name, def, shadowGen) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(def.x, def.y, def.z ?? 0);
+  markDecor(root);
+  const darkWood = makeCardboard(scene, `${name}_woodMat`, 56 / 255, 36 / 255, 22 / 255, { roughness: 0.62, noiseAmt: 12 });
+  // Tabletop disc
+  const top = BABYLON.MeshBuilder.CreateCylinder(`${name}_top`, { diameter: 0.74, height: 0.06, tessellation: 16 }, scene);
+  top.parent = root;
+  top.position.set(0, 0.72, 0);
+  top.material = darkWood;
+  shadowGen.addShadowCaster(top);
+  markDecor(top);
+  // Pedestal
+  const stem = BABYLON.MeshBuilder.CreateCylinder(`${name}_stem`, { diameter: 0.10, height: 0.64, tessellation: 8 }, scene);
+  stem.parent = root;
+  stem.position.set(0, 0.40, 0);
+  stem.material = darkWood;
+  markDecor(stem);
+  // Base
+  const base = BABYLON.MeshBuilder.CreateCylinder(`${name}_base`, { diameter: 0.44, height: 0.06, tessellation: 12 }, scene);
+  base.parent = root;
+  base.position.set(0, 0.06, 0);
+  base.material = darkWood;
+  markDecor(base);
+  // Cocktail glass
+  const glass = BABYLON.MeshBuilder.CreateCylinder(`${name}_glass`, { diameterTop: 0.14, diameterBottom: 0.04, height: 0.22, tessellation: 8 }, scene);
+  glass.parent = root;
+  glass.position.set(0.12, 0.83, 0.08);
+  const glassMat = createGlowMaterial(scene, `${name}_glassMat`, [255, 186, 80], { emissive: 0.22, roughness: 0.14, alpha: 0.52 });
+  glass.material = glassMat;
+  markDecor(glass);
+  return root;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
@@ -1425,6 +1685,52 @@ function createEnemyVisual(scene, def, theme, shadowGen) {
     });
   }
 
+  if (def.kind === 'flyingBook') {
+    // Hide the default sphere body and eye — book shape replaces them
+    body.visibility = 0;
+    eye.visibility = 0;
+    // Book cover — flat box like an open hardback floating in flight
+    const cover = BABYLON.MeshBuilder.CreateBox(`${def.name}_cover`, {
+      width: 0.54,
+      height: 0.06,
+      depth: 0.72,
+    }, scene);
+    cover.parent = root;
+    cover.material = makeCardboard(scene, `${def.name}_coverMat`, 82 / 255, 52 / 255, 36 / 255, { roughness: 0.86, noiseAmt: 14 });
+    shadowGen.addShadowCaster(cover);
+    markDecor(cover);
+    // Spine stripe along cover left edge
+    createDecorPlane(scene, `${def.name}_spine`, root, {
+      width: 0.07,
+      height: 0.70,
+      x: -0.28,
+      y: 0.04,
+      rotationX: Math.PI / 2,
+      rotationY: Math.PI / 2,
+      rgb: palette.glow,
+      emissiveScale: 0.18,
+      alpha: 0.88,
+    });
+    // Page wings — two planes that flap open like pages
+    const pageMat = createFlatDecorMaterial(scene, `${def.name}_pageMat`, [255, 244, 220], { emissiveScale: 0.12, alpha: 0.86 });
+    const pageL = BABYLON.MeshBuilder.CreatePlane(`${def.name}_pageL`, { width: 0.50, height: 0.66 }, scene);
+    pageL.parent = root;
+    pageL.position.set(-0.36, 0.02, 0);
+    pageL.rotation.y = -0.52;
+    pageL.material = pageMat;
+    pageL.backFaceCulling = false;
+    markDecor(pageL);
+    const pageR = BABYLON.MeshBuilder.CreatePlane(`${def.name}_pageR`, { width: 0.50, height: 0.66 }, scene);
+    pageR.parent = root;
+    pageR.position.set(0.36, 0.02, 0);
+    pageR.rotation.y = 0.52;
+    pageR.material = pageMat;
+    pageR.backFaceCulling = false;
+    markDecor(pageR);
+    // Store wing refs for animation in the update loop
+    root.metadata = { ...(root.metadata || {}), pageWings: { left: pageL, right: pageR } };
+  }
+
   root.metadata = {
     ...(root.metadata || {}),
     role: 'enemy',
@@ -1714,6 +2020,18 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     visual: createLightZoneVisual(scene, `${theme}_lightZone_${index}`, def, theme),
   }));
 
+  // Library set-pieces — bookshelves, fireplaces, chairs, cocktail tables
+  const libraryFireplaces = [];
+  if (theme === 'library') {
+    (layout.bookshelves || []).forEach((def, i) => createLibraryBookshelf(scene, `lib_shelf_${i}`, def, shadowGen));
+    (layout.fireplaces || []).forEach((def, i) => {
+      const fp = createLibraryFireplace(scene, `lib_fire_${i}`, def, shadowGen);
+      libraryFireplaces.push(fp);
+    });
+    (layout.readingChairs || []).forEach((def, i) => createLibraryArmchair(scene, `lib_chair_${i}`, def, shadowGen));
+    (layout.cocktailTables || []).forEach((def, i) => createLibraryCocktailTable(scene, `lib_table_${i}`, def, shadowGen));
+  }
+
   let goalVisual;
   let goalRoot;
   let familySetpiece = null;
@@ -1949,7 +2267,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       speed: def.speed ?? 1.2,
       turnSpeed: def.turnSpeed ?? 2.4,
       retargetEvery: [1.4, 2.8],
-      bobAmp: def.kind === 'bird' || def.kind === 'crane' || def.kind === 'spark' ? 0.16 : 0.05,
+      bobAmp: def.kind === 'bird' || def.kind === 'crane' || def.kind === 'spark' || def.kind === 'flyingBook' ? 0.16 : 0.05,
       bobFreq: def.kind === 'frog' ? 2.4 : 1.8,
       pauseChance: 0.18,
       pauseRange: [0.24, 0.7],
@@ -2235,6 +2553,16 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
           }
         } else {
           enemy.mover.update(dt);
+          // Flying book page-flap animation
+          if (enemy.def.kind === 'flyingBook' && enemy.root.metadata?.pageWings) {
+            const t = time * 4.2 + enemy.home.x * 0.31;
+            enemy.root.metadata.pageWings.left.rotation.y = -0.52 + (Math.sin(t) * 0.28);
+            enemy.root.metadata.pageWings.right.rotation.y = 0.52 - (Math.sin(t) * 0.28);
+            enemy.root.rotation.y = wrapToPi(Math.atan2(
+              enemy.mover.velocity?.x ?? 0,
+              enemy.mover.velocity?.z ?? 0.01,
+            ) + (Math.PI * 0.5));
+          }
         }
 
         if (enemy.stunnedMs <= 0 && pos) {
@@ -2251,6 +2579,16 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
               resist: getResistance(stats, theme === 'storm' ? 'electric' : theme === 'camp' ? 'wind' : 'water'),
             });
           }
+        }
+      }
+
+      // Fireplace flicker
+      for (const fp of libraryFireplaces) {
+        if (fp.fire?.material?.emissiveColor) {
+          const flicker = 0.44 + (Math.sin((time * 6.8) + fp.phase) * 0.10);
+          fp.fire.material.emissiveColor.r = flicker;
+          fp.fire.material.emissiveColor.g = flicker * 0.44;
+          fp.fire.material.emissiveColor.b = flicker * 0.07;
         }
       }
 

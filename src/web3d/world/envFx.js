@@ -990,13 +990,39 @@ function createLibraryEnvironmentFx(scene, {
     const shelf = createRectPlane(scene, `libraryShelf_${i}`, {
       width: 8 + ((i % 2) * 4),
       height: 22 + ((i % 3) * 5),
-      color: new BABYLON.Color3(0.28, 0.16, 0.08),  // was 0.14/0.08/0.04
+      color: new BABYLON.Color3(0.28, 0.16, 0.08),
       emissive: new BABYLON.Color3(0.10, 0.05, 0.02),
-      alpha: 0.62,  // was 0.28
+      alpha: 0.62,
     });
     shelf.plane.parent = root;
     shelf.plane.position.set(extents.minX + 10 + (i * 18), floorY + 10 + ((i % 2) * 0.8), farZ + 2.2 + ((i % 3) * 0.35));
     shelves.push(shelf);
+  }
+
+  // Second gallery tier — Manchester Central Library balcony above first tier
+  for (let i = 0; i < 8; i++) {
+    const upper = createRectPlane(scene, `libraryUpperShelf_${i}`, {
+      width: 7 + ((i % 2) * 3),
+      height: 16 + ((i % 3) * 4),
+      color: new BABYLON.Color3(0.34, 0.20, 0.10),
+      emissive: new BABYLON.Color3(0.08, 0.04, 0.02),
+      alpha: 0.40,
+    });
+    upper.plane.parent = root;
+    upper.plane.position.set(extents.minX + 14 + (i * 20), floorY + 16 + ((i % 2) * 1.2), farZ + 3.4 + ((i % 3) * 0.4));
+    shelves.push(upper);
+  }
+  // Iron gallery railing at mid-height — the key Manchester Central Library silhouette
+  for (let i = 0; i < 6; i++) {
+    const rail = createRectPlane(scene, `libraryGalleryRail_${i}`, {
+      width: 20 + ((i % 2) * 6),
+      height: 0.32,
+      color: new BABYLON.Color3(0.18, 0.16, 0.14),
+      emissive: new BABYLON.Color3(0.04, 0.03, 0.02),
+      alpha: 0.58,
+    });
+    rail.plane.parent = root;
+    rail.plane.position.set(extents.minX + 16 + (i * 26), floorY + 7.2, farZ + 1.4);
   }
 
   // Gothic arches — more visible (alpha 0.28 was 0.10)
