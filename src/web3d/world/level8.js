@@ -14,6 +14,8 @@ const BASE_LEVEL8 = {
   spawn: { x: -18.5, y: 1.2, z: L },
   goal: { x: 138.0, y: 2.6, z: L },
   theme: 'library',
+  showGroundVisual: false,
+  showRouteRibbons: false,
 
   acts: [
     { id: 'A', label: 'Archive Wing',   range: [-24,  44] },
@@ -40,6 +42,22 @@ const BASE_LEVEL8 = {
     // Act C — wide stacks room (+Z) → goal gallery (centered)
     { name: 'stacksRoom',      x: 116.0, y: 2.08, z:  2.5, w: 22.0, h: 0.84, d: 13.0 },
     { name: 'goalGallery',     x: 138.0, y: 2.40, z:  0.0, w: 12.0, h: 0.88, d: 11.0 },
+    { name: 'sideStudyA',      x:   4.0, y: 0.56, z:  7.0, w: 12.0, h: 0.58, d: 6.6 },
+    { name: 'readingRotunda',  x:  64.0, y: 1.30, z: -8.0, w: 18.0, h: 0.64, d: 9.0 },
+    { name: 'balconyRingB',    x:  92.0, y: 2.06, z:  5.8, w: 14.0, h: 0.58, d: 4.8 },
+    { name: 'sideArchiveC',    x: 122.0, y: 2.10, z: -8.0, w: 14.0, h: 0.62, d: 6.4 },
+  ],
+
+  decorPlatforms: [
+    { name: 'upperGalleryA', x:  18.0, y: 4.8, z:  7.8, w: 24.0, h: 0.32, d: 2.2 },
+    { name: 'rotundaBridge', x:  66.0, y: 5.0, z:  0.0, w: 18.0, h: 0.32, d: 2.0 },
+    { name: 'goalHallArch',  x: 134.0, y: 5.6, z: -6.8, w: 16.0, h: 0.32, d: 2.0 },
+  ],
+
+  decorBlocks: [
+    { name: 'alcoveA',       x:  -8.0, y: 3.0, z:  10.6, w: 16.0, h: 5.6, d: 3.2, rgb: [92, 60, 38], cardboard: true },
+    { name: 'rotundaWall',   x:  64.0, y: 4.2, z: -11.0, w: 28.0, h: 8.0, d: 3.2, rgb: [84, 54, 32], cardboard: true },
+    { name: 'stacksAlcove',  x: 124.0, y: 4.6, z:  10.8, w: 18.0, h: 7.0, d: 3.0, rgb: [88, 58, 34], cardboard: true },
   ],
 
   hiddenBridges: [

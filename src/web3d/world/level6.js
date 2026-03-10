@@ -11,6 +11,8 @@ const BASE_LEVEL6 = {
   spawn: { x: -20, y: 1.2, z: L },
   goal: { x: 134.5, y: 2.55, z: L },
   theme: 'factory',
+  showGroundVisual: false,
+  showRouteRibbons: false,
 
   acts: [
     { id: 'A', label: 'Loading Bay', range: [-26, 32], checkpointsTo: 1 },
@@ -28,17 +30,50 @@ const BASE_LEVEL6 = {
 
   platforms: [
     // Act A — loading bay (wide) → belt bridge (narrow) (Z: -2 → +1.5)
-    { name: 'loadingBay',     x: -12.0, y: 0.35, z: -2.0, w: 20.0, h: 0.72, d: 13.0 },
+    { name: 'loadingBay',     x: -12.0, y: 0.35, z: -2.0, w: 24.0, h: 0.72, d: 14.0 },
     { name: 'beltBridgeA',    x:   4.0, y: 0.54, z:  1.5, w: 12.0, h: 0.68, d:  5.0 },
     // Act B — press bay (wide) → furnace approach (wide) → crane platform (narrow) → gear deck (narrow)
     // Z: -3 → +2 → -3.5 → +1.5
-    { name: 'pressHallB1',   x:  24.0, y: 0.92, z: -3.0, w: 20.0, h: 0.76, d: 11.0 },
-    { name: 'furnaceB2',     x:  46.0, y: 1.30, z:  2.0, w: 20.0, h: 0.80, d: 12.0 },
+    { name: 'pressHallB1',   x:  24.0, y: 0.92, z: -3.0, w: 24.0, h: 0.76, d: 12.0 },
+    { name: 'furnaceB2',     x:  46.0, y: 1.30, z:  2.0, w: 22.0, h: 0.80, d: 13.0 },
     { name: 'cranePlatform', x:  66.0, y: 1.70, z: -3.5, w: 12.0, h: 0.80, d:  8.0 },
-    { name: 'gearDeckB4',    x:  83.0, y: 2.06, z:  1.5, w: 10.0, h: 0.78, d:  7.0 },
+    { name: 'gearDeckB4',    x:  83.0, y: 2.06, z:  1.5, w: 12.0, h: 0.78, d:  7.6 },
     // Act C — assembly hall (wide) → goal deck
-    { name: 'assemblyC1',   x: 102.0, y: 2.30, z: -2.0, w: 22.0, h: 0.84, d: 12.0 },
+    { name: 'assemblyC1',   x: 102.0, y: 2.30, z: -2.0, w: 24.0, h: 0.84, d: 13.0 },
     { name: 'goalDeck',     x: 131.0, y: 2.52, z:  0.0, w: 12.0, h: 0.86, d: 10.0 },
+    { name: 'intakeSideDock',  x: -18.0, y: 0.34, z:  6.6, w: 14.0, h: 0.58, d:  5.6 },
+    { name: 'loadingWestApron', x: -16.0, y: 0.34, z: -8.6, w: 12.0, h: 0.56, d:  5.0 },
+    { name: 'pressSideBay',    x:  30.0, y: 0.94, z:  7.0, w: 16.0, h: 0.68, d:  6.8 },
+    { name: 'furnaceNorth',    x:  54.0, y: 1.30, z: -8.2, w: 18.0, h: 0.66, d:  4.8 },
+    { name: 'furnaceSouthWalk', x:  50.0, y: 1.30, z:  9.2, w: 14.0, h: 0.60, d:  4.2 },
+    { name: 'assemblySpur',    x: 110.0, y: 2.28, z:  7.2, w: 18.0, h: 0.68, d:  5.8 },
+    { name: 'assemblyBackline', x: 106.0, y: 2.28, z: -8.6, w: 18.0, h: 0.62, d:  4.8 },
+  ],
+
+  decorPlatforms: [
+    { name: 'trussWalkA',    x:  12.0, y: 4.6, z: -7.0, w: 30.0, h: 0.34, d: 2.0 },
+    { name: 'furnaceCanopy', x:  50.0, y: 5.1, z:  6.2, w: 20.0, h: 0.34, d: 2.4 },
+    { name: 'craneRail',     x:  86.0, y: 5.8, z:  7.2, w: 34.0, h: 0.34, d: 2.2 },
+    { name: 'stackBridge',   x: 124.0, y: 5.2, z: -7.6, w: 20.0, h: 0.34, d: 2.0 },
+    { name: 'overheadCraneA', x: -10.0, y: 6.2, z:  0.6, w: 26.0, h: 0.32, d: 2.0 },
+    { name: 'ductRunB',       x:  62.0, y: 6.0, z: -9.6, w: 26.0, h: 0.30, d: 1.8, rotationZ: 0.06 },
+  ],
+
+  decorBlocks: [
+    { name: 'bayWallA',     x: -18.0, y: 4.0, z: -10.2, w: 22.0, h: 8.2, d: 4.4, rgb: [54, 40, 26], emissiveScale: 0.02, roughness: 0.92 },
+    { name: 'bayWallB',     x:  18.0, y: 4.4, z:  10.0, w: 24.0, h: 8.8, d: 4.2, rgb: [64, 46, 28], emissiveScale: 0.02, roughness: 0.90 },
+    { name: 'pressMass',    x:  42.0, y: 4.2, z: -8.6, w: 20.0, h: 7.6, d: 4.8, rgb: [78, 54, 30], emissiveScale: 0.03, roughness: 0.88, rotationZ: -0.03 },
+    { name: 'furnaceMass',  x:  50.0, y: 4.6, z:  8.8, w: 20.0, h: 8.6, d: 5.4, rgb: [110, 66, 24], emissiveScale: 0.06, roughness: 0.84, rotationZ: 0.04 },
+    { name: 'craneTower',   x:  96.0, y: 5.3, z: -9.6, w: 20.0, h: 9.8, d: 4.2, rgb: [62, 44, 28], emissiveScale: 0.02, roughness: 0.90 },
+    { name: 'controlBlock', x: 126.0, y: 4.9, z:  9.6, w: 18.0, h: 8.8, d: 4.0, rgb: [66, 48, 30], emissiveScale: 0.02, roughness: 0.90 },
+  ],
+
+  decorColumns: [
+    { name: 'stackA', x: 110.0, y: 6.0, z:  10.4, diameter: 3.0, height: 12.0, rgb: [70, 54, 36], roughness: 0.88 },
+    { name: 'stackB', x: 126.0, y: 6.8, z:  11.2, diameter: 3.4, height: 13.6, rgb: [74, 58, 40], roughness: 0.88 },
+    { name: 'pylonA', x:   2.0, y: 3.4, z: -8.8, diameter: 1.4, height: 6.8, rgb: [92, 74, 56], roughness: 0.84 },
+    { name: 'pylonB', x:  72.0, y: 4.6, z:  8.8, diameter: 1.6, height: 8.4, rgb: [92, 74, 56], roughness: 0.84 },
+    { name: 'gantryPost', x: -6.0, y: 4.0, z: 8.2, diameter: 1.2, height: 8.0, rgb: [96, 74, 50], roughness: 0.84 },
   ],
 
   drops: [

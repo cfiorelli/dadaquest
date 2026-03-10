@@ -36,6 +36,25 @@ test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
 
+test('ui: title menu exposes Era 5 level names and preview details without entering a level', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await gotoDebugLevel(page, 1);
+
+  await expect(page.locator('#levelBtn5')).toContainText('Aquarium Drift');
+  await expect(page.locator('#levelBtn7')).toContainText('Storm Cliffs');
+  await expect(page.locator('#levelBtn9')).toContainText('Lantern Camp');
+
+  await page.click('#levelBtn8');
+  await expect(page.locator('#titlePreviewTitle')).toHaveText('Haunted Library');
+  await expect(page.locator('#titlePreviewTheme')).toContainText('grand nighttime library');
+  await expect(page.locator('#titlePreviewMechanic')).toContainText('Lantern reveals');
+
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#titlePreviewTitle')).toHaveText('Lantern Camp');
+  await expect(page.locator('#titlePreviewMechanic')).toContainText('branching finale navigation');
+});
+
 test('ui: play again restarts from deterministic end scene', async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 800, height: 500 });

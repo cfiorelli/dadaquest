@@ -68,6 +68,31 @@ function markGameplaySurface(node) {
   }
 }
 
+function markDecorStructure(node) {
+  if (!node) return;
+  markDecor(node);
+  node.metadata = {
+    ...(node.metadata || {}),
+    gameplaySurface: false,
+    gameplay: false,
+    decor: true,
+    cameraIgnore: true,
+  };
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      gameplaySurface: false,
+      gameplay: false,
+      decor: true,
+      cameraIgnore: true,
+    };
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+  }
+}
+
 function markHazard(node) {
   if (!node) return;
   node.metadata = {
@@ -114,6 +139,44 @@ function makeGlowMaterial(scene, name, rgb, {
   );
   material.transparencyMode = alpha < 1 ? BABYLON.Material.MATERIAL_ALPHABLEND : material.transparencyMode;
   return material;
+}
+
+function createAquariumDecorBox(scene, name, def, shadowGen) {
+  const mesh = BABYLON.MeshBuilder.CreateBox(name, {
+    width: def.w,
+    height: def.h,
+    depth: def.d,
+  }, scene);
+  mesh.position.set(def.x, def.y, def.z ?? LANE_Z);
+  mesh.material = makeGlowMaterial(scene, `${name}_mat`, def.rgb || [28, 88, 110], {
+    emissive: def.emissiveScale ?? 0.06,
+    roughness: def.roughness ?? 0.74,
+    alpha: def.alpha ?? 1,
+  });
+  if (Number.isFinite(def.rotationY)) mesh.rotation.y = def.rotationY;
+  if (Number.isFinite(def.rotationZ)) mesh.rotation.z = def.rotationZ;
+  if (shadowGen) shadowGen.addShadowCaster(mesh);
+  markDecor(mesh);
+  return mesh;
+}
+
+function createAquariumDecorColumn(scene, name, def, shadowGen) {
+  const mesh = BABYLON.MeshBuilder.CreateCylinder(name, {
+    diameterTop: def.diameterTop ?? def.diameter ?? 1.6,
+    diameterBottom: def.diameterBottom ?? def.diameter ?? 1.6,
+    height: def.height ?? 4.0,
+    tessellation: 20,
+  }, scene);
+  mesh.position.set(def.x, def.y, def.z ?? LANE_Z);
+  mesh.material = makeGlowMaterial(scene, `${name}_mat`, def.rgb || [42, 126, 148], {
+    emissive: def.emissiveScale ?? 0.08,
+    roughness: def.roughness ?? 0.54,
+    alpha: def.alpha ?? 0.92,
+  });
+  if (Number.isFinite(def.rotationY)) mesh.rotation.y = def.rotationY;
+  if (shadowGen) shadowGen.addShadowCaster(mesh);
+  markDecor(mesh);
+  return mesh;
 }
 
 function createAquariumPlatform(scene, name, def, shadowGen) {
@@ -1245,8 +1308,10 @@ export function buildWorld5(scene, options = {}) {
   scene.fogStart = 62;
   scene.fogEnd = 185;
 
-  const groundVisual = createAquariumPlatform(scene, 'ground', LEVEL5.ground, shadowGen);
-  setRenderingGroup(groundVisual, 2);
+  const groundVisual = LEVEL5.showGroundVisual === false
+    ? null
+    : createAquariumPlatform(scene, 'ground', LEVEL5.ground, shadowGen);
+  if (groundVisual) setRenderingGroup(groundVisual, 2);
   const groundCollider = makeInvisibleCollider(scene, 'L5_groundCollider', LEVEL5.ground);
   const allPlatforms = [groundCollider];
   const platformVisuals = [];
@@ -1257,6 +1322,31 @@ export function buildWorld5(scene, options = {}) {
     platformVisuals.push(visual);
     const collider = makeInvisibleCollider(scene, `L5_${def.name}_col`, def);
     allPlatforms.push(collider);
+  }
+
+  const decorPlatforms = [];
+  for (const def of LEVEL5.decorPlatforms || []) {
+    const visual = createAquariumPlatform(scene, def.name, def, shadowGen);
+    if (Number.isFinite(def.rotationX)) visual.rotation.x = def.rotationX;
+    if (Number.isFinite(def.rotationY)) visual.rotation.y = def.rotationY;
+    if (Number.isFinite(def.rotationZ)) visual.rotation.z = def.rotationZ;
+    markDecorStructure(visual);
+    setRenderingGroup(visual, 2);
+    decorPlatforms.push(visual);
+  }
+
+  const decorBlocks = [];
+  for (const [index, def] of (LEVEL5.decorBlocks || []).entries()) {
+    const block = createAquariumDecorBox(scene, `L5_decorBlock_${def.name || index}`, def, shadowGen);
+    setRenderingGroup(block, 1);
+    decorBlocks.push(block);
+  }
+
+  const decorColumns = [];
+  for (const [index, def] of (LEVEL5.decorColumns || []).entries()) {
+    const column = createAquariumDecorColumn(scene, `L5_decorColumn_${def.name || index}`, def, shadowGen);
+    setRenderingGroup(column, 1);
+    decorColumns.push(column);
   }
 
   const checkpoints = LEVEL5.checkpoints.map((cp, index) => ({

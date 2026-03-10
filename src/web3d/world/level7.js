@@ -12,6 +12,8 @@ const BASE_LEVEL7 = {
   spawn: { x: -24, y: 1.2, z: L },
   goal: { x: 139.8, y: 2.65, z: L },
   theme: 'storm',
+  showGroundVisual: false,
+  showRouteRibbons: false,
 
   acts: [
     { id: 'A', label: 'Exposed Ledge',   range: [-30,  34] },
@@ -29,17 +31,46 @@ const BASE_LEVEL7 = {
 
   platforms: [
     // Act A — cliff ledge (offset -Z) → gap crossing (+Z) → kite anchor (-Z)
-    { name: 'ridgeLedgeA1', x: -18.0, y: 0.32, z: -3.0, w: 16.0, h: 0.72, d:  7.0 },
-    { name: 'gapCrossA2',   x:  -4.0, y: 0.56, z:  1.5, w: 10.0, h: 0.66, d:  5.0 },
-    { name: 'kiteAnchorA3', x:  14.0, y: 0.80, z: -2.0, w: 18.0, h: 0.72, d:  9.0 },
+    { name: 'ridgeLedgeA1', x: -18.0, y: 0.32, z: -4.4, w: 18.0, h: 0.72, d:  7.6 },
+    { name: 'gapCrossA2',   x:  -4.0, y: 0.56, z:  3.2, w: 10.0, h: 0.66, d:  4.8 },
+    { name: 'kiteAnchorA3', x:  14.0, y: 0.80, z: -2.8, w: 18.0, h: 0.72, d:  9.0 },
     // Act B — wind span (+Z) → rock shelf (-Z wide) → storm peak (+Z) → summit approach (-Z)
     { name: 'windSpanB1',   x:  32.0, y: 1.10, z:  2.5, w: 12.0, h: 0.72, d:  6.0 },
-    { name: 'rockShelfB2',  x:  52.0, y: 1.40, z: -4.0, w: 16.0, h: 0.76, d:  8.0 },
-    { name: 'stormPeakB3',  x:  70.0, y: 1.72, z:  2.0, w: 12.0, h: 0.76, d:  7.0 },
-    { name: 'summitApprC1', x:  90.0, y: 1.98, z: -2.0, w: 18.0, h: 0.80, d:  9.0 },
+    { name: 'rockShelfB2',  x:  52.0, y: 1.40, z: -5.2, w: 18.0, h: 0.76, d:  8.6 },
+    { name: 'stormPeakB3',  x:  70.0, y: 1.72, z:  3.4, w: 12.0, h: 0.76, d:  7.0 },
+    { name: 'summitApprC1', x:  90.0, y: 1.98, z: -2.8, w: 18.0, h: 0.80, d:  9.2 },
     // Act C — WIDE summit ledge (+Z) → goal lookout (centered)
     { name: 'summitLedgeC2', x: 114.0, y: 2.24, z:  3.0, w: 22.0, h: 0.84, d: 10.0 },
     { name: 'lookoutGoal',   x: 136.5, y: 2.46, z:  0.0, w: 14.0, h: 0.88, d: 11.0 },
+    { name: 'recoveryShelfA', x: -10.0, y: 0.34, z:  7.8, w: 12.0, h: 0.56, d: 5.0 },
+    { name: 'cliffShelfWest', x: -22.0, y: 0.32, z:  8.8, w: 10.0, h: 0.54, d: 5.2 },
+    { name: 'windShelfB',     x:  42.0, y: 1.10, z:  8.6, w: 14.0, h: 0.62, d: 5.4 },
+    { name: 'stormShelfLow',  x:  60.0, y: 1.40, z: -10.2, w: 12.0, h: 0.58, d: 4.8 },
+    { name: 'cliffForkB',     x:  84.0, y: 1.92, z:  7.8, w: 16.0, h: 0.64, d: 5.6 },
+    { name: 'summitSpurC',    x: 118.0, y: 2.24, z: -8.4, w: 18.0, h: 0.68, d: 5.8 },
+  ],
+
+  decorPlatforms: [
+    { name: 'stormBridgeFrameA', x:  14.0, y: 4.6, z: -7.8, w: 20.0, h: 0.32, d: 2.0 },
+    { name: 'kiteRigFrameB',     x:  70.0, y: 5.2, z:  6.8, w: 24.0, h: 0.34, d: 2.2 },
+    { name: 'summitMastWalkC',   x: 126.0, y: 5.8, z: -6.8, w: 20.0, h: 0.34, d: 2.0 },
+    { name: 'windGateA',         x:  -6.0, y: 5.4, z:  8.6, w: 18.0, h: 0.30, d: 1.8, rotationZ: -0.10 },
+    { name: 'summitCableB',      x:  92.0, y: 6.0, z: -8.8, w: 22.0, h: 0.28, d: 1.6, rotationZ: 0.08 },
+  ],
+
+  decorBlocks: [
+    { name: 'cliffFaceA',   x: -18.0, y: 5.0, z: -9.4, w: 24.0, h: 10.0, d: 5.0, rgb: [48, 52, 58], emissiveScale: 0.02, roughness: 0.94, rotationZ: 0.05 },
+    { name: 'cliffFaceB',   x:  40.0, y: 5.4, z:  9.4, w: 32.0, h: 10.8, d: 5.2, rgb: [52, 58, 64], emissiveScale: 0.02, roughness: 0.94, rotationZ: -0.04 },
+    { name: 'canyonWall',   x:  84.0, y: 5.8, z: -9.2, w: 26.0, h: 11.6, d: 4.8, rgb: [44, 48, 56], emissiveScale: 0.02, roughness: 0.95, rotationZ: 0.06 },
+    { name: 'summitCliff',  x: 122.0, y: 6.6, z:  9.0, w: 30.0, h: 12.8, d: 5.2, rgb: [54, 60, 68], emissiveScale: 0.02, roughness: 0.94, rotationZ: -0.03 },
+    { name: 'stormWallNear', x:  10.0, y: 4.8, z: 11.6, w: 18.0, h: 9.6, d: 4.0, rgb: [56, 62, 70], emissiveScale: 0.02, roughness: 0.94, rotationZ: -0.05 },
+  ],
+
+  decorColumns: [
+    { name: 'mastA', x:  18.0, y: 5.8, z:  8.8, diameter: 1.2, height: 11.0, rgb: [96, 82, 60], roughness: 0.88, cardboard: true },
+    { name: 'mastB', x:  70.0, y: 6.4, z: -8.6, diameter: 1.4, height: 12.8, rgb: [96, 82, 60], roughness: 0.88, cardboard: true },
+    { name: 'mastC', x: 128.0, y: 7.0, z:  8.4, diameter: 1.3, height: 13.4, rgb: [96, 82, 60], roughness: 0.88, cardboard: true },
+    { name: 'mastD', x:  -6.0, y: 5.6, z: -8.8, diameter: 1.2, height: 10.8, rgb: [96, 82, 60], roughness: 0.88, cardboard: true },
   ],
 
   drops: [

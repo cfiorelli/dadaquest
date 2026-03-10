@@ -12,6 +12,7 @@ const BASE_LEVEL5 = {
   extents: { minX: -28, maxX: 132 },
   spawn: { x: -22.0, y: 1.2, z: L },
   goal: { x: 126.2, y: 2.15, z: L },
+  showGroundVisual: false,
 
   acts: [
     { id: 'A', label: 'Entry Dock', range: [-28, 18], jellyfishCount: 1 },
@@ -42,6 +43,30 @@ const BASE_LEVEL5 = {
     // Act D — wide exhibit hall → goal dock (Z: +0.5 → 0)
     { name: 'exhibitHall',    x: 103.0, y: 2.00, z:  0.5, w: 24.0, h: 0.78, d: 13.0 },
     { name: 'goalDeck',       x: 124.2, y: 2.22, z:  0.0, w: 12.0, h: 0.82, d: 10.0 },
+    { name: 'dockSideCatwalk', x: -18.0, y: 0.34, z:  5.5, w: 10.0, h: 0.58, d:  4.0 },
+    { name: 'tankServiceWing', x:  22.0, y: 0.94, z:  6.2, w: 12.0, h: 0.62, d:  4.6 },
+    { name: 'plazaSideLoop',   x:  68.0, y: 1.70, z: -6.4, w: 12.0, h: 0.60, d:  4.8 },
+    { name: 'exhibitSideDeck', x: 108.0, y: 2.02, z: -6.0, w: 14.0, h: 0.62, d:  4.8 },
+  ],
+
+  decorPlatforms: [
+    { name: 'tankBeamA',        x:  10.0, y: 4.8, z: -7.4, w: 20.0, h: 0.34, d: 2.2 },
+    { name: 'suspendedBridgeB', x:  34.0, y: 3.9, z:  6.6, w: 18.0, h: 0.32, d: 2.0 },
+    { name: 'serviceBalconyC',  x:  72.0, y: 4.5, z: -7.8, w: 20.0, h: 0.34, d: 2.4 },
+    { name: 'observationRingD', x: 108.0, y: 4.8, z:  7.2, w: 22.0, h: 0.36, d: 2.6 },
+    { name: 'entryPipeRun',     x: -10.0, y: 5.2, z:  7.8, w: 18.0, h: 0.30, d: 1.8, rotationZ: -0.06 },
+  ],
+
+  decorBlocks: [
+    { name: 'glassWallA',   x:  10.0, y: 4.8, z:  10.6, w: 30.0, h: 9.2, d: 1.6, rgb: [24, 94, 120], emissiveScale: 0.04, roughness: 0.52, alpha: 0.42 },
+    { name: 'serviceWallB', x:  62.0, y: 4.4, z: -10.2, w: 26.0, h: 8.4, d: 2.4, rgb: [14, 58, 78], emissiveScale: 0.03, roughness: 0.80 },
+    { name: 'glassWallC',   x: 108.0, y: 5.0, z:   9.8, w: 28.0, h: 9.8, d: 1.8, rgb: [24, 102, 126], emissiveScale: 0.04, roughness: 0.50, alpha: 0.38 },
+  ],
+
+  decorColumns: [
+    { name: 'tankClusterA', x:  34.0, y: 3.4, z: -8.8, diameter: 3.4, height: 6.8, rgb: [54, 168, 196], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
+    { name: 'tankClusterB', x:  70.0, y: 4.0, z:  8.8, diameter: 3.0, height: 7.6, rgb: [54, 160, 188], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
+    { name: 'tankClusterC', x: 114.0, y: 4.6, z: -8.4, diameter: 3.6, height: 8.2, rgb: [54, 168, 196], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
   ],
 
   coins: [
@@ -145,14 +170,18 @@ const BASE_LEVEL5 = {
   ],
 
   coralPillars: [
+    { x:  -6.0, y: 0.7, z:  7.4, radius: 1.2, height: 4.2 },
     { x:  12.0, y: 0.8, z:  5.5, radius: 1.0, height: 3.4 },
     { x:  40.0, y: 1.0, z: -5.8, radius: 1.2, height: 4.0 },
+    { x:  58.0, y: 1.2, z:  7.8, radius: 1.1, height: 4.4 },
     { x:  75.0, y: 1.3, z:  5.5, radius: 1.1, height: 4.6 },
     { x: 110.0, y: 1.5, z: -5.5, radius: 1.3, height: 5.2 },
   ],
 
   glassTubes: [
+    { x:  -6.0, y: 4.2, z: -7.2, diameter: 4.4, length: 14.0 },
     { x:  20.0, y: 4.6, z:  6.5, diameter: 4.0, length: 12.0 },
+    { x:  48.0, y: 4.8, z:  7.4, diameter: 4.4, length: 12.0 },
     { x:  72.0, y: 5.2, z: -6.8, diameter: 4.8, length: 14.0 },
     { x: 108.0, y: 5.8, z:  6.8, diameter: 4.6, length: 12.0 },
   ],

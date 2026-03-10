@@ -12,6 +12,8 @@ const BASE_LEVEL9 = {
   spawn: { x: -22.5, y: 1.2, z: L },
   goal: { x: 147.0, y: 2.7, z: L },
   theme: 'camp',
+  showGroundVisual: false,
+  showRouteRibbons: false,
 
   acts: [
     { id: 'A', label: 'Forest Entry',   range: [-28,  42] },
@@ -30,16 +32,46 @@ const BASE_LEVEL9 = {
 
   platforms: [
     // Act A — forest entry (-Z) → narrow lantern boardwalk (+Z) → grove (-Z)
-    { name: 'forestEntry',    x:  -8.0, y: 0.34, z: -2.0, w: 20.0, h: 0.72, d: 11.0 },
-    { name: 'lanternPath',    x:  14.0, y: 0.56, z:  3.0, w: 12.0, h: 0.68, d:  6.0 },
-    { name: 'grove',          x:  34.0, y: 0.88, z: -3.5, w: 18.0, h: 0.74, d: 12.0 },
+    { name: 'forestEntry',    x:  -8.0, y: 0.34, z: -2.6, w: 22.0, h: 0.72, d: 11.8 },
+    { name: 'lanternPath',    x:  14.0, y: 0.56, z:  3.6, w: 12.0, h: 0.68, d:  6.0 },
+    { name: 'grove',          x:  34.0, y: 0.88, z: -4.2, w: 20.0, h: 0.74, d: 12.8 },
     // Act B — bonfire approach (+Z) → WIDE bonfire clearing (-Z, LANDMARK)
-    { name: 'bonfireApproach', x:  58.0, y: 1.20, z:  2.5, w: 14.0, h: 0.76, d:  9.0 },
-    { name: 'bonfireClearing', x:  82.0, y: 1.56, z: -1.0, w: 28.0, h: 0.82, d: 16.0 },
+    { name: 'bonfireApproach', x:  58.0, y: 1.20, z:  3.0, w: 16.0, h: 0.76, d:  9.6 },
+    { name: 'bonfireClearing', x:  82.0, y: 1.56, z: -1.0, w: 30.0, h: 0.82, d: 16.8 },
     // Act C — overlook rise (+Z) → final overlook (-Z) → goal (centered)
-    { name: 'overlookRise',   x: 108.0, y: 1.92, z:  3.5, w: 13.0, h: 0.78, d:  8.0 },
-    { name: 'finalOverlook',  x: 128.0, y: 2.22, z: -1.5, w: 16.0, h: 0.84, d: 11.0 },
+    { name: 'overlookRise',   x: 108.0, y: 1.92, z:  4.0, w: 13.0, h: 0.78, d:  8.0 },
+    { name: 'finalOverlook',  x: 128.0, y: 2.22, z: -1.8, w: 18.0, h: 0.84, d: 11.6 },
     { name: 'goalPeak',       x: 147.0, y: 2.50, z:  0.0, w: 12.0, h: 0.88, d: 10.0 },
+    { name: 'lanternForkEast', x:  18.0, y: 0.58, z:  8.6, w: 12.0, h: 0.56, d: 5.0 },
+    { name: 'lanternForkWest', x:   2.0, y: 0.48, z: -9.0, w: 10.0, h: 0.54, d: 5.0 },
+    { name: 'groveBranchB',    x:  58.0, y: 1.20, z: -8.0, w: 16.0, h: 0.62, d: 5.8 },
+    { name: 'clearingRingB',   x:  82.0, y: 1.56, z:  8.4, w: 18.0, h: 0.60, d: 6.8 },
+    { name: 'campCircleWest',  x:  74.0, y: 1.56, z: -9.0, w: 14.0, h: 0.58, d: 5.4 },
+    { name: 'finalShrineSpur', x: 130.0, y: 2.22, z:  7.2, w: 16.0, h: 0.64, d: 5.4 },
+  ],
+
+  decorPlatforms: [
+    { name: 'lanternLineA',    x:  12.0, y: 4.8, z:  7.8, w: 26.0, h: 0.28, d: 1.8 },
+    { name: 'canopyBridgeB',   x:  78.0, y: 5.2, z: -8.2, w: 28.0, h: 0.30, d: 2.0 },
+    { name: 'overlookCanopyC', x: 136.0, y: 5.8, z:  6.6, w: 18.0, h: 0.30, d: 2.0 },
+    { name: 'treelineLintel',  x:  -6.0, y: 5.4, z:  8.6, w: 18.0, h: 0.28, d: 1.8, rotationZ: -0.08 },
+    { name: 'shrineBeam',      x: 132.0, y: 6.0, z: -7.8, w: 18.0, h: 0.28, d: 1.8, rotationZ: 0.05 },
+  ],
+
+  decorBlocks: [
+    { name: 'treeLineA',    x: -18.0, y: 4.4, z: -9.8, w: 22.0, h: 8.8, d: 4.6, rgb: [38, 30, 22], emissiveScale: 0.01, roughness: 0.94, cardboard: true, rotationZ: 0.04 },
+    { name: 'tentMassB',    x:  54.0, y: 3.2, z: -9.4, w: 18.0, h: 5.4, d: 7.4, rgb: [88, 54, 30], emissiveScale: 0.02, roughness: 0.88, cardboard: true, rotationZ: -0.02 },
+    { name: 'fireRingWall', x:  82.0, y: 3.8, z:  9.8, w: 28.0, h: 6.8, d: 4.0, rgb: [54, 40, 24], emissiveScale: 0.02, roughness: 0.92, cardboard: true },
+    { name: 'shrineWall',   x: 132.0, y: 5.0, z: -9.2, w: 20.0, h: 8.2, d: 3.8, rgb: [50, 38, 24], emissiveScale: 0.01, roughness: 0.92, cardboard: true },
+    { name: 'campEdge',     x:  10.0, y: 3.8, z: 10.2, w: 18.0, h: 7.0, d: 4.0, rgb: [42, 32, 24], emissiveScale: 0.01, roughness: 0.94, cardboard: true },
+  ],
+
+  decorColumns: [
+    { name: 'moonTree', x: 100.0, y: 6.0, z:  9.4, diameter: 2.8, height: 12.0, rgb: [64, 48, 30], roughness: 0.90, cardboard: true },
+    { name: 'pineA',    x:   8.0, y: 5.0, z:  9.6, diameter: 1.6, height: 10.0, rgb: [48, 36, 24], roughness: 0.92, cardboard: true },
+    { name: 'pineB',    x:  40.0, y: 5.4, z: -9.4, diameter: 1.8, height: 10.8, rgb: [48, 36, 24], roughness: 0.92, cardboard: true },
+    { name: 'pineC',    x: 124.0, y: 5.8, z:  9.6, diameter: 1.7, height: 11.2, rgb: [50, 38, 24], roughness: 0.92, cardboard: true },
+    { name: 'pineD',    x: -10.0, y: 5.2, z: -9.6, diameter: 1.6, height: 10.4, rgb: [48, 36, 24], roughness: 0.92, cardboard: true },
   ],
 
   drops: [

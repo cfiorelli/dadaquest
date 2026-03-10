@@ -26,10 +26,10 @@ const THEME_PALETTES = {
     goalOutfit: 'level1',
   },
   storm: {
-    slab: [78, 110, 148],
-    rim: [30, 44, 72],
-    glow: [164, 210, 255],
-    line: [196, 242, 255],
+    slab: [110, 108, 98],
+    rim: [56, 48, 40],
+    glow: [176, 214, 255],
+    line: [218, 222, 190],
     enemy: [128, 170, 248],
     accent: [248, 224, 122],
     goalOutfit: 'level1',
@@ -174,6 +174,31 @@ function markGameplaySurface(node) {
   };
 }
 
+function markDecorStructure(node) {
+  if (!node) return;
+  markDecor(node);
+  node.metadata = {
+    ...(node.metadata || {}),
+    gameplaySurface: false,
+    gameplay: false,
+    decor: true,
+    cameraIgnore: true,
+  };
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      gameplaySurface: false,
+      gameplay: false,
+      decor: true,
+      cameraIgnore: true,
+    };
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+  }
+}
+
 function createGlowMaterial(scene, name, rgb, {
   alpha = 1,
   roughness = 0.4,
@@ -256,6 +281,43 @@ function createDecorBox(scene, name, parent, {
   return box;
 }
 
+function createDecorColumn(scene, name, parent, {
+  diameterTop = null,
+  diameterBottom = null,
+  diameter = 1,
+  height = 4,
+  x = 0,
+  y = 0,
+  z = 0,
+  rgb,
+  emissiveScale = 0.08,
+  roughness = 0.56,
+  shadowGen = null,
+  cardboard = false,
+} = {}) {
+  const column = BABYLON.MeshBuilder.CreateCylinder(name, {
+    diameterTop: diameterTop ?? diameter,
+    diameterBottom: diameterBottom ?? diameter,
+    height,
+    tessellation: 14,
+  }, scene);
+  column.parent = parent;
+  column.position.set(x, y, z);
+  column.material = cardboard
+    ? makeCardboard(scene, `${name}_mat`, rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, { roughness })
+    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness });
+  if (shadowGen) shadowGen.addShadowCaster(column);
+  markDecor(column);
+  return column;
+}
+
+function getThemeStructureRgb(theme) {
+  if (theme === 'storm') return [56, 74, 96];
+  if (theme === 'library') return [88, 60, 38];
+  if (theme === 'camp') return [58, 42, 28];
+  return [70, 56, 40];
+}
+
 function addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen) {
   const topY = (def.h * 0.5) + 0.04;
   const isGround = name.endsWith('_ground');
@@ -334,50 +396,105 @@ function addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen) {
 function addStormPlatformDetails(scene, root, name, def, palette, shadowGen) {
   const topY = (def.h * 0.5) + 0.04;
   const isGround = name.endsWith('_ground');
-  createDecorPlane(scene, `${name}_stormLane`, root, {
-    width: Math.max(2.4, def.w - 1.4),
-    height: Math.max(0.45, Math.min(0.9, def.d * 0.18)),
+  const boardwalkLike = def.d <= 6.4 || def.w <= 12.5;
+  createDecorPlane(scene, `${name}_stormDust`, root, {
+    width: Math.max(2.4, def.w - 1.0),
+    height: Math.max(0.7, Math.min(1.9, def.d * 0.34)),
     y: topY,
-    rgb: palette.line,
-    emissiveScale: 0.18,
-    alpha: isGround ? 0.12 : 0.18,
+    rgb: boardwalkLike ? [126, 102, 76] : [128, 120, 104],
+    emissiveScale: 0.06,
+    alpha: isGround ? 0.10 : 0.16,
   });
-  for (const z of [-def.d * 0.34, def.d * 0.34]) {
+  const seamCount = Math.max(3, Math.min(7, Math.round((boardwalkLike ? def.w : def.d) / 2.4)));
+  for (let i = 0; i < seamCount; i += 1) {
+    const z = -def.d * 0.34 + ((i / Math.max(1, seamCount - 1)) * def.d * 0.68);
+    createDecorPlane(scene, `${name}_stormSeam_${i}`, root, {
+      width: Math.max(1.8, def.w - 0.9),
+      height: 0.10,
+      y: topY + 0.01,
+      z,
+      rgb: boardwalkLike ? [76, 58, 42] : [86, 82, 76],
+      emissiveScale: 0.04,
+      alpha: 0.26,
+    });
+  }
+  for (const z of [-def.d * 0.38, def.d * 0.38]) {
     createDecorPlane(scene, `${name}_stormEdge_${z > 0 ? 'r' : 'l'}`, root, {
       width: Math.max(1.8, def.w - 0.8),
       height: 0.16,
-      y: topY + 0.01,
+      y: topY + 0.02,
       z,
-      rgb: palette.glow,
-      emissiveScale: 0.20,
-      alpha: 0.24,
+      rgb: boardwalkLike ? [70, 54, 38] : [108, 118, 128],
+      emissiveScale: 0.05,
+      alpha: 0.34,
     });
   }
-  if (isGround || def.w < 14) return;
-  for (const x of [-def.w * 0.36, def.w * 0.36]) {
-    createDecorBox(scene, `${name}_stormMast_${x > 0 ? 'r' : 'l'}`, root, {
-      width: 0.14,
-      height: 1.8,
-      depth: 0.14,
+  if (isGround) return;
+  if (boardwalkLike) {
+    for (const x of [-def.w * 0.40, def.w * 0.40]) {
+      createDecorBox(scene, `${name}_ropePost_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.14,
+        height: 1.5,
+        depth: 0.14,
+        x,
+        y: topY + 0.74,
+        z: -def.d * 0.34,
+        rgb: [94, 76, 52],
+        emissiveScale: 0.02,
+        roughness: 0.88,
+        shadowGen,
+        cardboard: true,
+      });
+      createDecorBox(scene, `${name}_ropePostBack_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.14,
+        height: 1.5,
+        depth: 0.14,
+        x,
+        y: topY + 0.74,
+        z: def.d * 0.34,
+        rgb: [94, 76, 52],
+        emissiveScale: 0.02,
+        roughness: 0.88,
+        shadowGen,
+        cardboard: true,
+      });
+    }
+    createDecorPlane(scene, `${name}_ropeFront`, root, {
+      width: Math.max(1.8, def.w - 1.0),
+      height: 0.05,
+      y: topY + 1.32,
+      z: -def.d * 0.34,
+      rotationX: 0,
+      rgb: [188, 174, 142],
+      emissiveScale: 0.04,
+      alpha: 0.72,
+    });
+    createDecorPlane(scene, `${name}_ropeBack`, root, {
+      width: Math.max(1.8, def.w - 1.0),
+      height: 0.05,
+      y: topY + 1.32,
+      z: def.d * 0.34,
+      rotationX: 0,
+      rgb: [188, 174, 142],
+      emissiveScale: 0.04,
+      alpha: 0.72,
+    });
+    return;
+  }
+  if (def.w < 13.5) return;
+  for (const x of [-def.w * 0.34, def.w * 0.34]) {
+    createDecorBox(scene, `${name}_rockOutcrop_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 1.6,
+      height: 0.42,
+      depth: Math.max(1.8, def.d * 0.24),
       x,
-      y: topY + 0.9,
-      z: -def.d * 0.38,
-      rgb: palette.rim,
-      emissiveScale: 0.10,
-      roughness: 0.48,
+      y: topY + 0.18,
+      z: 0,
+      rgb: [88, 86, 80],
+      emissiveScale: 0.02,
+      roughness: 0.92,
       shadowGen,
     });
-    const beacon = BABYLON.MeshBuilder.CreateSphere(`${name}_stormBeacon_${x > 0 ? 'r' : 'l'}`, {
-      diameter: 0.26,
-      segments: 8,
-    }, scene);
-    beacon.parent = root;
-    beacon.position.set(x, topY + 1.75, -def.d * 0.38);
-    beacon.material = createGlowMaterial(scene, `${name}_stormBeaconMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
-      emissive: 0.34,
-      roughness: 0.18,
-    });
-    markDecor(beacon);
   }
 }
 
@@ -906,11 +1023,11 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   }, scene);
   slab.parent = root;
   slab.position.y = 0.02;
-  slab.material = theme === 'library' || theme === 'camp'
+  slab.material = theme === 'library' || theme === 'camp' || theme === 'storm'
     ? makeCardboard(scene, `${name}_slabMat`, palette.slab[0] / 255, palette.slab[1] / 255, palette.slab[2] / 255, {
-      roughness: theme === 'library' ? 0.88 : 0.80,
-      noiseAmt: theme === 'library' ? 14 : 18,
-      grainScale: theme === 'library' ? 4 : 3,
+      roughness: theme === 'library' ? 0.88 : theme === 'storm' ? 0.92 : 0.80,
+      noiseAmt: theme === 'library' ? 14 : theme === 'storm' ? 20 : 18,
+      grainScale: theme === 'library' ? 4 : theme === 'storm' ? 5 : 3,
     })
     : createGlowMaterial(scene, `${name}_slabMat`, palette.slab, {
       emissive: theme === 'storm' ? 0.18 : 0.28,
@@ -933,11 +1050,11 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   }, scene);
   rim.parent = root;
   rim.position.y = -(def.h * 0.32);
-  rim.material = theme === 'library' || theme === 'camp'
+  rim.material = theme === 'library' || theme === 'camp' || theme === 'storm'
     ? makeCardboard(scene, `${name}_rimMat`, palette.rim[0] / 255, palette.rim[1] / 255, palette.rim[2] / 255, {
-      roughness: 0.88,
-      noiseAmt: 20,
-      grainScale: 4,
+      roughness: theme === 'storm' ? 0.90 : 0.88,
+      noiseAmt: theme === 'storm' ? 22 : 20,
+      grainScale: theme === 'storm' ? 5 : 4,
     })
     : createGlowMaterial(scene, `${name}_rimMat`, palette.rim, {
       emissive: theme === 'storm' ? 0.14 : 0.18,
@@ -957,14 +1074,14 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   top.position.y = (def.h * 0.5) + 0.01;
   const topMat = new BABYLON.StandardMaterial(`${name}_topMat`, scene);
   topMat.diffuseColor = theme === 'storm'
-    ? new BABYLON.Color3(0.28, 0.36, 0.46)
+    ? new BABYLON.Color3(0.40, 0.38, 0.32)
     : theme === 'library'
       ? new BABYLON.Color3(0.60, 0.44, 0.28)
       : theme === 'camp'
         ? new BABYLON.Color3(0.46, 0.34, 0.24)
         : new BABYLON.Color3(0.14, 0.16, 0.18);  // factory: dark steel grey
   topMat.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10);
-  topMat.alpha = theme === 'storm' ? 0.42 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;  // factory: semi-transparent steel grate
+  topMat.alpha = theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;  // factory: semi-transparent steel grate
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -1898,17 +2015,72 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   rim.intensity = sceneLook.rimIntensity;
   rim.diffuse = toColor3(palette.glow);
 
-  const groundVisual = createStyledPlatform(scene, `${theme}_ground`, layout.ground, shadowGen, theme);
-  setRenderingGroup(groundVisual, 2);
+  const groundVisual = layout.showGroundVisual === false
+    ? null
+    : createStyledPlatform(scene, `${theme}_ground`, layout.ground, shadowGen, theme);
+  if (groundVisual) setRenderingGroup(groundVisual, 2);
   const groundCollider = makeInvisibleCollider(scene, `${theme}_groundCollider`, layout.ground);
   const allPlatforms = [groundCollider];
-  const platformVisuals = [groundVisual];
+  const platformVisuals = groundVisual ? [groundVisual] : [];
 
   for (const def of layout.platforms || []) {
     const visual = createStyledPlatform(scene, `${theme}_${def.name}`, def, shadowGen, theme);
     setRenderingGroup(visual, 2);
     platformVisuals.push(visual);
     allPlatforms.push(makeInvisibleCollider(scene, `${theme}_${def.name}_col`, def));
+  }
+
+  const decorPlatforms = [];
+  for (const def of layout.decorPlatforms || []) {
+    const visual = createStyledPlatform(scene, `${theme}_${def.name}`, def, shadowGen, theme);
+    if (Number.isFinite(def.rotationX)) visual.rotation.x = def.rotationX;
+    if (Number.isFinite(def.rotationY)) visual.rotation.y = def.rotationY;
+    if (Number.isFinite(def.rotationZ)) visual.rotation.z = def.rotationZ;
+    markDecorStructure(visual);
+    setRenderingGroup(visual, 2);
+    decorPlatforms.push(visual);
+  }
+
+  const decorBlocks = [];
+  for (const [index, def] of (layout.decorBlocks || []).entries()) {
+    const block = createDecorBox(scene, `${theme}_decorBlock_${def.name || index}`, null, {
+      width: def.w,
+      height: def.h,
+      depth: def.d,
+      x: def.x,
+      y: def.y,
+      z: def.z ?? 0,
+      rgb: def.rgb || getThemeStructureRgb(theme),
+      emissiveScale: def.emissiveScale ?? (theme === 'storm' ? 0.06 : 0.04),
+      roughness: def.roughness ?? 0.74,
+      shadowGen,
+      cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
+    });
+    if (Number.isFinite(def.rotationY)) block.rotation.y = def.rotationY;
+    if (Number.isFinite(def.rotationZ)) block.rotation.z = def.rotationZ;
+    setRenderingGroup(block, 1);
+    decorBlocks.push(block);
+  }
+
+  const decorColumns = [];
+  for (const [index, def] of (layout.decorColumns || []).entries()) {
+    const column = createDecorColumn(scene, `${theme}_decorColumn_${def.name || index}`, null, {
+      diameter: def.diameter ?? 1,
+      diameterTop: def.diameterTop ?? null,
+      diameterBottom: def.diameterBottom ?? null,
+      height: def.height ?? 4,
+      x: def.x,
+      y: def.y,
+      z: def.z ?? 0,
+      rgb: def.rgb || getThemeStructureRgb(theme),
+      emissiveScale: def.emissiveScale ?? (theme === 'storm' ? 0.08 : 0.04),
+      roughness: def.roughness ?? 0.72,
+      shadowGen,
+      cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
+    });
+    if (Number.isFinite(def.rotationY)) column.rotation.y = def.rotationY;
+    setRenderingGroup(column, 1);
+    decorColumns.push(column);
   }
 
   const optionalSurfaces = [];
@@ -1932,19 +2104,21 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     allPlatforms.push(optionalSurfaces[optionalSurfaces.length - 1].collider);
   }
 
-  const routeRibbons = (layout.acts || []).map((act, index) => {
-    const xCenter = (act.range[0] + act.range[1]) * 0.5;
-    const width = Math.max(12, act.range[1] - act.range[0] - 6);
-    const ribbon = createRouteRibbon(scene, `${theme}_route_${index}`, {
-      x: xCenter,
-      y: layout.ground.y + (layout.ground.h * 0.5) + 0.02,
-      z: 0,
-      width,
-      depth: 5.2 + (index % 2),
-    }, theme);
-    setRenderingGroup(ribbon.root || ribbon.mesh, 2);
-    return ribbon;
-  });
+  const routeRibbons = layout.showRouteRibbons === false
+    ? []
+    : (layout.acts || []).map((act, index) => {
+      const xCenter = (act.range[0] + act.range[1]) * 0.5;
+      const width = Math.max(12, act.range[1] - act.range[0] - 6);
+      const ribbon = createRouteRibbon(scene, `${theme}_route_${index}`, {
+        x: xCenter,
+        y: layout.ground.y + (layout.ground.h * 0.5) + 0.02,
+        z: 0,
+        width,
+        depth: 5.2 + (index % 2),
+      }, theme);
+      setRenderingGroup(ribbon.root || ribbon.mesh, 2);
+      return ribbon;
+    });
 
   const signs = [];
   for (const def of layout.signage || []) {

@@ -65,21 +65,17 @@ const PLAYER_MODEL_SLOT_Y = -0.44;
 const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
 const ERA5_DEFAULT_PLAYER_YAW = Math.PI * 0.5;
-const ERA5_CAMERA_DISTANCE = 14.4;
-const ERA5_CAMERA_HEIGHT = 7.6;
-const ERA5_CAMERA_FOCUS_HEIGHT = 1.34;
-const ERA5_CAMERA_LOOK_AHEAD = 5.2;
-const ERA5_CAMERA_FOV = 1.06;
+const ERA5_CAMERA_DISTANCE = 16.6;
+const ERA5_CAMERA_HEIGHT = 5.6;
+const ERA5_CAMERA_FOCUS_HEIGHT = 1.30;
+const ERA5_CAMERA_LOOK_AHEAD = 6.4;
+const ERA5_CAMERA_FOV = 0.98;
 const ERA5_CAMERA_YAW_SPEED = 1.55;
 const ERA5_CAMERA_YAW_SPRING = 8.8;
 const ERA5_CAMERA_YAW_DAMP = 6.4;
 const ERA5_CAMERA_YAW_MAX_SPEED = 2.75;
-const ERA5_CAMERA_DAMP = 4.2;
-const ERA5_CAMERA_OCCLUDED_DAMP = 9.2;
 const ERA5_CAMERA_IDLE_RECENTER_SPEED = 1.2;
 const ERA5_CAMERA_IDLE_RECENTER_DELAY_MS = 500;
-const ERA5_TURN_ACCEL = 16.8;
-const ERA5_TURN_DAMP = 8.6;
 const ERA5_TURN_MAX_SPEED = 2.55;
 const ERA5_JUMP_MULTIPLIER = 1.12;
 const ERA5_GRAVITY_SCALE = 0.92;
@@ -1016,13 +1012,13 @@ export async function boot(options = {}) {
       return 'Locked. Beat Super Sourdough (Level 4) to unlock.';
     }
     if (targetLevelId === 6) {
-      return 'Locked. Beat Neon Night Aquarium (Level 5) to unlock.';
+      return 'Locked. Beat Aquarium Drift (Level 5) to unlock.';
     }
     if (targetLevelId === 7) {
-      return 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock.';
+      return 'Locked. Beat Pressure Works (Level 6) to unlock.';
     }
     if (targetLevelId === 8) {
-      return 'Locked. Beat Stormy Kite Park (Level 7) to unlock.';
+      return 'Locked. Beat Storm Cliffs (Level 7) to unlock.';
     }
     if (targetLevelId === 9) {
       return 'Locked. Beat Haunted Library (Level 8) to unlock.';
@@ -3308,7 +3304,7 @@ export async function boot(options = {}) {
 
   function applyEra5FacingState() {
     if (!isEra5Level) return;
-    player.visual.rotation.y = era5PlayerYaw;
+    player.visual.rotation.y = era5PlayerYaw + Math.PI;
     player.setEra5YawState(era5PlayerYaw, era5PlayerYawVel);
   }
 
@@ -4083,6 +4079,12 @@ export async function boot(options = {}) {
     ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: 'playing', lastKey: _lastKey });
   }
 
+  function moveMenuSelection(delta) {
+    selectedLevelId = ui.moveSelectedLevel(delta);
+    ui.updateTitleDebug({ selectedLevel: selectedLevelId, currentLevel: levelId, titleState: state, lastKey: _lastKey });
+    return selectedLevelId;
+  }
+
   function triggerGameplayHotkey(code) {
     if (state !== 'gameplay') return false;
     if (code === 'KeyR') {
@@ -4482,6 +4484,27 @@ export async function boot(options = {}) {
       if ((ev.code === 'KeyI' || ev.key === 'i' || ev.key === 'I') && !ev.repeat) {
         ev.preventDefault();
         closeEra5Inventory();
+        return;
+      }
+    }
+    if (state === 'title' || state === 'menu') {
+      if (!ev.repeat && (ev.code === 'ArrowLeft' || ev.code === 'ArrowUp')) {
+        ev.preventDefault();
+        moveMenuSelection(-1);
+        return;
+      }
+      if (!ev.repeat && (ev.code === 'ArrowRight' || ev.code === 'ArrowDown')) {
+        ev.preventDefault();
+        moveMenuSelection(1);
+        return;
+      }
+      if (state === 'menu' && !ev.repeat && (
+        ev.code === 'Space'
+        || ev.code === 'Enter'
+        || ev.code === 'NumpadEnter'
+      )) {
+        ev.preventDefault();
+        switchLevelFromGameplayMenu(selectedLevelId);
         return;
       }
     }
@@ -5108,14 +5131,12 @@ export async function boot(options = {}) {
         const attackPressed = !idleSuppressed && isEra5Level ? input.consumeAttackPress() : false;
         const cameraYawInput = !idleSuppressed && isEra5Level ? input.getCameraYawInput() : 0;
         const cameraRecenter = !idleSuppressed && isEra5Level ? input.consumeCameraRecenter() : false;
+        const era5ControlDt = Math.min(dt, 1 / 30);
         let moveX = rawMoveX;
         let moveZ = 0;
         if (isEra5Level) {
-          era5PlayerYawVel += rawTurnAxis * ERA5_TURN_ACCEL * dt;
-          era5PlayerYawVel *= Math.exp(-ERA5_TURN_DAMP * dt);
-          era5PlayerYawVel = clamp(era5PlayerYawVel, -ERA5_TURN_MAX_SPEED, ERA5_TURN_MAX_SPEED);
-          if (Math.abs(era5PlayerYawVel) < 0.0005) era5PlayerYawVel = 0;
-          era5PlayerYaw = wrapToPi(era5PlayerYaw + (era5PlayerYawVel * dt));
+          era5PlayerYawVel = rawTurnAxis * ERA5_TURN_MAX_SPEED;
+          era5PlayerYaw = wrapToPi(era5PlayerYaw + (era5PlayerYawVel * era5ControlDt));
           player.setEra5YawState(era5PlayerYaw, era5PlayerYawVel);
 
           const playerForward = getEra5PlayerForward();
@@ -5129,7 +5150,7 @@ export async function boot(options = {}) {
           }
           if (cameraYawInput !== 0) {
             era5CameraManualLookMs = ERA5_CAMERA_IDLE_RECENTER_DELAY_MS;
-            era5CameraDesiredYaw = wrapToPi(era5CameraDesiredYaw + (cameraYawInput * ERA5_CAMERA_YAW_SPEED * dt));
+            era5CameraDesiredYaw = wrapToPi(era5CameraDesiredYaw + (cameraYawInput * ERA5_CAMERA_YAW_SPEED * era5ControlDt));
           } else if (era5CameraManualLookMs <= 0) {
             era5CameraDesiredYaw = wrapToPi(era5PlayerYaw);
           }
@@ -5333,15 +5354,8 @@ export async function boot(options = {}) {
         );
         const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
         era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
-        const cameraDamp = occlusion.hit ? ERA5_CAMERA_OCCLUDED_DAMP : ERA5_CAMERA_DAMP;
-        camera.position.x = damp(camera.position.x, occlusion.correctedPos.x, cameraDamp, dt);
-        camera.position.y = damp(camera.position.y, occlusion.correctedPos.y, cameraDamp, dt);
-        camera.position.z = damp(camera.position.z, occlusion.correctedPos.z, cameraDamp, dt);
-        camera.setTarget(new BABYLON.Vector3(
-          damp(camera.getTarget().x, desiredTarget.x, 4.2, dt),
-          damp(camera.getTarget().y, desiredTarget.y, 4.2, dt),
-          damp(camera.getTarget().z, desiredTarget.z, 4.2, dt),
-        ));
+        camera.position.copyFrom(occlusion.correctedPos);
+        camera.setTarget(desiredTarget);
         updateEra5DecorOcclusion(dt, focusPos, camera.position);
       } else if (levelId === 2) {
         const desiredCameraPos = new BABYLON.Vector3(px - 10.0, py + 10.0, -18.0);

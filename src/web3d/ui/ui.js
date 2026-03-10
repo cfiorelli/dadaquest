@@ -1,4 +1,11 @@
-import { getLevelSubtitle as getMetaLevelSubtitle } from '../world/levelMeta.js';
+import {
+  LEVEL_ORDER,
+  getLevelDescriptor as getMetaLevelDescriptor,
+  getLevelMechanic as getMetaLevelMechanic,
+  getLevelSubtitle as getMetaLevelSubtitle,
+  getLevelTheme as getMetaLevelTheme,
+  getLevelTitle as getMetaLevelTitle,
+} from '../world/levelMeta.js';
 
 const CSS = `
 .dada-overlay {
@@ -123,13 +130,23 @@ const CSS = `
   display: flex;
   gap: 10px;
   justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+.dada-level-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
   margin-top: 18px;
 }
 .dada-level-btn {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 86px;
+  padding: 10px 12px;
   font-size: clamp(12px, 1.8vw, 15px);
   font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
   background: rgba(90,68,46,0.10);
@@ -142,6 +159,7 @@ const CSS = `
   pointer-events: auto;
   transition: background 0.15s, transform 0.12s;
   text-decoration: none;
+  text-align: left;
 }
 .dada-level-btn:hover {
   background: rgba(90,68,46,0.20);
@@ -161,6 +179,89 @@ const CSS = `
 .dada-level-btn.locked:hover {
   background: rgba(72, 62, 52, 0.08);
   transform: none;
+}
+.dada-level-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8a6447;
+}
+.dada-level-title {
+  font-size: 16px;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: #4f3c2c;
+  font-weight: 800;
+}
+.dada-level-copy {
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: #6a5642;
+}
+.dada-level-btn.active .dada-level-kicker,
+.dada-level-btn.active .dada-level-title,
+.dada-level-btn.active .dada-level-copy {
+  color: #fff;
+}
+.dada-level-btn.locked .dada-level-kicker,
+.dada-level-btn.locked .dada-level-title,
+.dada-level-btn.locked .dada-level-copy {
+  color: rgba(93, 74, 54, 0.6);
+}
+.dada-level-preview {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.34), rgba(111,88,64,0.08));
+  border: 1px solid rgba(120, 88, 56, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.38);
+  text-align: left;
+}
+.dada-level-preview-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dada-level-preview-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #8a6447;
+}
+.dada-level-preview-state {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #245532;
+}
+.dada-level-preview-state.locked {
+  color: #7a5a26;
+}
+.dada-level-preview-title {
+  margin-top: 6px;
+  font-size: clamp(18px, 2.6vw, 26px);
+  font-weight: 800;
+  color: #3d2d20;
+  letter-spacing: 0.01em;
+}
+.dada-level-preview-theme,
+.dada-level-preview-mechanic {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #5c4734;
+}
+.dada-level-preview-mechanic span {
+  display: inline-block;
+  min-width: 92px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  color: #8a6447;
 }
 .dada-level-lock {
   display: block;
@@ -472,6 +573,9 @@ const CSS = `
   letter-spacing: 0.04em;
 }
 @media (max-width: 860px) {
+  .dada-level-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .dada-coins {
     left: 16px;
     top: 154px;
@@ -990,11 +1094,43 @@ export function createUI(uiRoot, options = {}) {
   let lockMessages = {
     4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
     5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
-    6: 'Locked. Beat Neon Night Aquarium (Level 5) to unlock.',
-    7: 'Locked. Beat Clockwork Toy Factory (Level 6) to unlock.',
-    8: 'Locked. Beat Stormy Kite Park (Level 7) to unlock.',
+    6: 'Locked. Beat Aquarium Drift (Level 5) to unlock.',
+    7: 'Locked. Beat Pressure Works (Level 6) to unlock.',
+    8: 'Locked. Beat Storm Cliffs (Level 7) to unlock.',
     9: 'Locked. Beat Haunted Library (Level 8) to unlock.',
   };
+
+  function getLevelSubtitle(id) {
+    return getMetaLevelSubtitle(id);
+  }
+
+  function getLevelTitle(id) {
+    return getMetaLevelTitle(id);
+  }
+
+  function getLevelDescriptor(id) {
+    return getMetaLevelDescriptor(id);
+  }
+
+  function getLevelTheme(id) {
+    return getMetaLevelTheme(id);
+  }
+
+  function getLevelMechanic(id) {
+    return getMetaLevelMechanic(id);
+  }
+
+  function getLevelCardMarkup(id, { menu = false } = {}) {
+    const tag = menu ? 'a' : 'button';
+    const href = menu ? ` href="${id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`}"` : '';
+    return `
+      <${tag} class="dada-level-btn${_selectedLevel === id ? ' active' : ''}" id="${menu ? `menuLevelBtn${id}` : `levelBtn${id}`}" tabindex="-1"${href}>
+        <span class="dada-level-kicker">Level ${id}</span>
+        <span class="dada-level-title">${getLevelTitle(id)}</span>
+        <span class="dada-level-copy">${getLevelDescriptor(id)}</span>
+      </${tag}>
+    `;
+  }
 
   // Title overlay
   const titleEl = document.createElement('div');
@@ -1009,18 +1145,17 @@ export function createUI(uiRoot, options = {}) {
         <span>M</span> Mute
       </div>
       <div class="dada-device-note">Desktop only. Not built for phones.</div>
-      <div class="dada-level-row">
-        <button class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="levelBtn1" tabindex="-1">Level 1</button>
-        <button class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="levelBtn2" tabindex="-1">Level 2</button>
-        <button class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="levelBtn3" tabindex="-1">Level 3</button>
-        <button class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="levelBtn4" tabindex="-1">Level 4</button>
-        <button class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="levelBtn5" tabindex="-1">Level 5</button>
+      <div class="dada-level-grid">
+        ${LEVEL_ORDER.map((id) => getLevelCardMarkup(id)).join('')}
       </div>
-      <div class="dada-level-row">
-        <button class="dada-level-btn${_selectedLevel === 6 ? ' active' : ''}" id="levelBtn6" tabindex="-1">Level 6</button>
-        <button class="dada-level-btn${_selectedLevel === 7 ? ' active' : ''}" id="levelBtn7" tabindex="-1">Level 7</button>
-        <button class="dada-level-btn${_selectedLevel === 8 ? ' active' : ''}" id="levelBtn8" tabindex="-1">Level 8</button>
-        <button class="dada-level-btn${_selectedLevel === 9 ? ' active' : ''}" id="levelBtn9" tabindex="-1">Level 9</button>
+      <div class="dada-level-preview">
+        <div class="dada-level-preview-head">
+          <div class="dada-level-preview-kicker" id="titlePreviewKicker"></div>
+          <div class="dada-level-preview-state" id="titlePreviewState"></div>
+        </div>
+        <div class="dada-level-preview-title" id="titlePreviewTitle"></div>
+        <div class="dada-level-preview-theme" id="titlePreviewTheme"></div>
+        <div class="dada-level-preview-mechanic"><span>Key Mechanic</span><span id="titlePreviewMechanic"></span></div>
       </div>
       <div class="dada-level-lock" id="titleLevelLock"></div>
       <div class="dada-loading-wrap" id="titleLoadingWrap">
@@ -1043,6 +1178,11 @@ export function createUI(uiRoot, options = {}) {
   const titleLoadingTextEl = titleEl.querySelector('#titleLoadingText');
   const titleLoadingFillEl = titleEl.querySelector('#titleLoadingFill');
   const titleLevelLockEl = titleEl.querySelector('#titleLevelLock');
+  const titlePreviewKickerEl = titleEl.querySelector('#titlePreviewKicker');
+  const titlePreviewStateEl = titleEl.querySelector('#titlePreviewState');
+  const titlePreviewTitleEl = titleEl.querySelector('#titlePreviewTitle');
+  const titlePreviewThemeEl = titleEl.querySelector('#titlePreviewTheme');
+  const titlePreviewMechanicEl = titleEl.querySelector('#titlePreviewMechanic');
   const btn1 = titleEl.querySelector('#levelBtn1');
   const btn2 = titleEl.querySelector('#levelBtn2');
   const btn3 = titleEl.querySelector('#levelBtn3');
@@ -1065,12 +1205,13 @@ export function createUI(uiRoot, options = {}) {
   let menuSubEl = null;
   let menuLockEl = null;
   let menuLegendEl = null;
+  let menuPreviewKickerEl = null;
+  let menuPreviewStateEl = null;
+  let menuPreviewTitleEl = null;
+  let menuPreviewThemeEl = null;
+  let menuPreviewMechanicEl = null;
   let gameplayRestartHandler = null;
   let resetBabyHandler = null;
-
-  function getLevelSubtitle(id) {
-    return getMetaLevelSubtitle(id);
-  }
 
   function getLevelLockMessage(id) {
     if (!lockedLevels[id]) return '';
@@ -1138,9 +1279,36 @@ export function createUI(uiRoot, options = {}) {
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
 
+  function updateLevelPreview({
+    levelId,
+    kickerEl,
+    stateEl,
+    titleEl: previewTitleEl,
+    themeEl,
+    mechanicEl,
+  }) {
+    if (kickerEl) kickerEl.textContent = `Level ${levelId} Preview`;
+    if (stateEl) {
+      const locked = !!lockedLevels[levelId];
+      stateEl.textContent = locked ? 'Locked' : 'Unlocked';
+      stateEl.classList.toggle('locked', locked);
+    }
+    if (previewTitleEl) previewTitleEl.textContent = getLevelTitle(levelId);
+    if (themeEl) themeEl.textContent = getLevelTheme(levelId);
+    if (mechanicEl) mechanicEl.textContent = getLevelMechanic(levelId);
+  }
+
   function resetTitleCopy() {
     if (titleSubEl) titleSubEl.textContent = getLevelSubtitle(_selectedLevel);
     if (titleLevelLockEl) titleLevelLockEl.textContent = getLevelLockMessage(_selectedLevel);
+    updateLevelPreview({
+      levelId: _selectedLevel,
+      kickerEl: titlePreviewKickerEl,
+      stateEl: titlePreviewStateEl,
+      titleEl: titlePreviewTitleEl,
+      themeEl: titlePreviewThemeEl,
+      mechanicEl: titlePreviewMechanicEl,
+    });
     if (titleHintEl && !titleErrorVisible) {
       titleHintEl.style.color = '';
       titleHintEl.style.animation = '';
@@ -1152,10 +1320,18 @@ export function createUI(uiRoot, options = {}) {
 
   function updateMenuCopy(levelId) {
     if (menuSubEl) {
-      menuSubEl.textContent = `Current level: ${getLevelSubtitle(levelId)}`;
+      menuSubEl.textContent = `Selected: ${getLevelSubtitle(levelId)}`;
     }
     if (menuLockEl) menuLockEl.textContent = getLevelLockMessage(levelId);
     if (menuLegendEl) menuLegendEl.innerHTML = getGameplayLegendMarkup(levelId);
+    updateLevelPreview({
+      levelId,
+      kickerEl: menuPreviewKickerEl,
+      stateEl: menuPreviewStateEl,
+      titleEl: menuPreviewTitleEl,
+      themeEl: menuPreviewThemeEl,
+      mechanicEl: menuPreviewMechanicEl,
+    });
     menuBtn1?.classList.toggle('active', levelId === 1);
     menuBtn2?.classList.toggle('active', levelId === 2);
     menuBtn3?.classList.toggle('active', levelId === 3);
@@ -1197,14 +1373,6 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function selectLevel(id) {
-    if (lockedLevels[id]) {
-      if (titleHintEl) {
-        titleHintEl.style.color = '#7a5a26';
-        titleHintEl.style.animation = 'none';
-        titleHintEl.textContent = getLevelLockMessage(id);
-      }
-      return;
-    }
     _selectedLevel = id;
     btn1.classList.toggle('active', id === 1);
     btn2.classList.toggle('active', id === 2);
@@ -1221,6 +1389,11 @@ export function createUI(uiRoot, options = {}) {
       history.replaceState(null, '', url);
     }
     updateMenuCopy(id);
+    if (lockedLevels[id] && titleHintEl) {
+      titleHintEl.style.color = '#7a5a26';
+      titleHintEl.style.animation = 'none';
+      titleHintEl.textContent = getLevelLockMessage(id);
+    }
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
   }
 
@@ -1248,18 +1421,17 @@ export function createUI(uiRoot, options = {}) {
         Press <span>Esc</span> to resume, or switch levels below.
       </div>
       <div class="dada-device-note">Desktop only. Not built for phones.</div>
-      <div class="dada-level-row">
-        <a class="dada-level-btn${_selectedLevel === 1 ? ' active' : ''}" id="menuLevelBtn1" href="${window.location.pathname}">Level 1</a>
-        <a class="dada-level-btn${_selectedLevel === 2 ? ' active' : ''}" id="menuLevelBtn2" href="${window.location.pathname}?level=2">Level 2</a>
-        <a class="dada-level-btn${_selectedLevel === 3 ? ' active' : ''}" id="menuLevelBtn3" href="${window.location.pathname}?level=3">Level 3</a>
-        <a class="dada-level-btn${_selectedLevel === 4 ? ' active' : ''}" id="menuLevelBtn4" href="${window.location.pathname}?level=4">Level 4</a>
-        <a class="dada-level-btn${_selectedLevel === 5 ? ' active' : ''}" id="menuLevelBtn5" href="${window.location.pathname}?level=5">Level 5</a>
+      <div class="dada-level-grid">
+        ${LEVEL_ORDER.map((id) => getLevelCardMarkup(id, { menu: true })).join('')}
       </div>
-      <div class="dada-level-row">
-        <a class="dada-level-btn${_selectedLevel === 6 ? ' active' : ''}" id="menuLevelBtn6" href="${window.location.pathname}?level=6">Level 6</a>
-        <a class="dada-level-btn${_selectedLevel === 7 ? ' active' : ''}" id="menuLevelBtn7" href="${window.location.pathname}?level=7">Level 7</a>
-        <a class="dada-level-btn${_selectedLevel === 8 ? ' active' : ''}" id="menuLevelBtn8" href="${window.location.pathname}?level=8">Level 8</a>
-        <a class="dada-level-btn${_selectedLevel === 9 ? ' active' : ''}" id="menuLevelBtn9" href="${window.location.pathname}?level=9">Level 9</a>
+      <div class="dada-level-preview">
+        <div class="dada-level-preview-head">
+          <div class="dada-level-preview-kicker" id="menuPreviewKicker"></div>
+          <div class="dada-level-preview-state" id="menuPreviewState"></div>
+        </div>
+        <div class="dada-level-preview-title" id="menuPreviewTitle"></div>
+        <div class="dada-level-preview-theme" id="menuPreviewTheme"></div>
+        <div class="dada-level-preview-mechanic"><span>Key Mechanic</span><span id="menuPreviewMechanic"></span></div>
       </div>
       <div class="dada-level-lock" id="menuLevelLock"></div>
       <div class="dada-btn-row dada-menu-actions">
@@ -1283,6 +1455,11 @@ export function createUI(uiRoot, options = {}) {
   menuBtn8 = menuEl.querySelector('#menuLevelBtn8');
   menuBtn9 = menuEl.querySelector('#menuLevelBtn9');
   menuLockEl = menuEl.querySelector('#menuLevelLock');
+  menuPreviewKickerEl = menuEl.querySelector('#menuPreviewKicker');
+  menuPreviewStateEl = menuEl.querySelector('#menuPreviewState');
+  menuPreviewTitleEl = menuEl.querySelector('#menuPreviewTitle');
+  menuPreviewThemeEl = menuEl.querySelector('#menuPreviewTheme');
+  menuPreviewMechanicEl = menuEl.querySelector('#menuPreviewMechanic');
   const menuResumeBtn = menuEl.querySelector('#menuResumeBtn');
   const menuRestartBtn = menuEl.querySelector('#menuRestartBtn');
   const menuResetBabyBtn = menuEl.querySelector('#menuResetBabyBtn');
@@ -1308,42 +1485,60 @@ export function createUI(uiRoot, options = {}) {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[4]) return;
+    if (lockedLevels[4]) {
+      selectLevel(4);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(4);
   });
   menuBtn5?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[5]) return;
+    if (lockedLevels[5]) {
+      selectLevel(5);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(5);
   });
   menuBtn6?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[6]) return;
+    if (lockedLevels[6]) {
+      selectLevel(6);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(6);
   });
   menuBtn7?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[7]) return;
+    if (lockedLevels[7]) {
+      selectLevel(7);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(7);
   });
   menuBtn8?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[8]) return;
+    if (lockedLevels[8]) {
+      selectLevel(8);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(8);
   });
   menuBtn9?.addEventListener('click', (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
     ev.currentTarget.blur();
-    if (lockedLevels[9]) return;
+    if (lockedLevels[9]) {
+      selectLevel(9);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(9);
   });
   menuResumeBtn?.addEventListener('click', (ev) => {
@@ -1849,6 +2044,19 @@ export function createUI(uiRoot, options = {}) {
     },
     setGameplayRestartHandler(cb) {
       gameplayRestartHandler = cb;
+    },
+    setSelectedLevel(levelId) {
+      selectLevel(levelId);
+      return _selectedLevel;
+    },
+    moveSelectedLevel(delta = 1) {
+      const currentIndex = LEVEL_ORDER.indexOf(_selectedLevel);
+      const nextIndex = Math.max(0, Math.min(LEVEL_ORDER.length - 1, currentIndex + delta));
+      selectLevel(LEVEL_ORDER[nextIndex]);
+      return _selectedLevel;
+    },
+    getSelectedLevel() {
+      return _selectedLevel;
     },
     setResetBabyHandler(cb) {
       resetBabyHandler = cb;

@@ -837,7 +837,7 @@ test('@fast @era5 @progression runtime: levels 6 through 9 appear as locked plac
   expect(lockState[9]).toBe(true);
 
   await page.click('#levelBtn6');
-  await expect(page.locator('#titleHint')).toContainText('Beat Neon Night Aquarium');
+  await expect(page.locator('#titleHint')).toContainText('Beat Aquarium Drift');
   await page.click('#levelBtn9');
   await expect(page.locator('#titleHint')).toContainText('Beat Haunted Library');
 });
