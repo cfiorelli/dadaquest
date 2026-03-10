@@ -652,7 +652,10 @@ export class PlayerController {
     }
 
     if (freeMove && explicitFacingYaw !== null) {
-      this.visual.rotation.y = explicitFacingYaw;
+      // +PI flips the visual 180° so the face points forward (away from camera).
+      // The baby mesh is built face-at-local-Z, which without the offset would
+      // face toward the camera instead of away from it.
+      this.visual.rotation.y = explicitFacingYaw + Math.PI;
     } else if (freeMove) {
       const planarSpeed = Math.hypot(this.vx, this.vz);
       if (planarSpeed > 0.14) {

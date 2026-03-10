@@ -3958,7 +3958,7 @@ export async function boot(options = {}) {
     player.visual.scaling.set(1, 1, 1);
     era5PlayerYaw = era5InitialPlayerYaw;
     era5PlayerYawVel = 0;
-    player.visual.rotation.set(0, isEra5Level ? era5InitialPlayerYaw : 0, 0);
+    player.visual.rotation.set(0, isEra5Level ? era5InitialPlayerYaw + Math.PI : 0, 0);
     player.setEra5YawState(era5PlayerYaw, era5PlayerYawVel);
     applyCapeVisualState();
     prevGrounded = player.grounded;
@@ -5313,14 +5313,11 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (isEra5Level) {
-        const cameraYawError = wrapToPi(era5CameraDesiredYaw - era5CameraYaw);
-        era5CameraYawVel += cameraYawError * ERA5_CAMERA_YAW_SPRING * dt;
-        era5CameraYawVel *= Math.exp(-ERA5_CAMERA_YAW_DAMP * dt);
-        era5CameraYawVel = clamp(era5CameraYawVel, -ERA5_CAMERA_YAW_MAX_SPEED, ERA5_CAMERA_YAW_MAX_SPEED);
-        if (Math.abs(era5CameraYawVel) < 0.0005 && Math.abs(cameraYawError) < 0.0005) {
-          era5CameraYawVel = 0;
-        }
-        era5CameraYaw = wrapToPi(era5CameraYaw + (era5CameraYawVel * dt));
+        // Direct camera yaw tracking — zero spring lag, no overshoot, no rebound.
+        // The desired yaw tracks player yaw when not in manual-look mode,
+        // so this gives nearly 1:1 camera-to-player rotation.
+        era5CameraYaw = era5CameraDesiredYaw;
+        era5CameraYawVel = 0;
         const cameraForward = getEra5CameraForward();
         const lookForward = getEra5PlayerForward();
         const focusPos = new BABYLON.Vector3(px, py + ERA5_CAMERA_FOCUS_HEIGHT, player.mesh.position.z);
@@ -5460,7 +5457,9 @@ export async function boot(options = {}) {
       x: Number(player.vx.toFixed(3)),
       z: Number(player.vz.toFixed(3)),
     };
-    window.__DADA_DEBUG__.playerFacingYaw = Number(player.visual.rotation.y.toFixed(4));
+    // Subtract PI: visual.rotation.y = explicitFacingYaw + PI, so this exposes the logical
+    // facing direction (where the face points in the world), which equals playerYaw when moving forward.
+    window.__DADA_DEBUG__.playerFacingYaw = Number((player.visual.rotation.y - Math.PI).toFixed(4));
     window.__DADA_DEBUG__.playerYaw = Number(era5PlayerYaw.toFixed(4));
     window.__DADA_DEBUG__.yawVel = Number(era5PlayerYawVel.toFixed(4));
     window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;

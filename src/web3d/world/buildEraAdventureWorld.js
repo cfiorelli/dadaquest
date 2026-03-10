@@ -17,12 +17,12 @@ import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
   factory: {
-    slab: [170, 126, 74],
-    rim: [82, 50, 24],
-    glow: [255, 214, 96],
-    line: [255, 212, 92],
+    slab: [72, 78, 86],       // dark steel grey
+    rim: [28, 32, 38],        // darker steel
+    glow: [255, 186, 64],     // orange glow
+    line: [255, 196, 60],     // hazard stripe amber
     enemy: [214, 146, 80],
-    accent: [240, 148, 54],
+    accent: [240, 148, 54],   // orange accent
     goalOutfit: 'level1',
   },
   storm: {
@@ -254,6 +254,81 @@ function createDecorBox(scene, name, parent, {
   if (shadowGen) shadowGen.addShadowCaster(box);
   markDecor(box);
   return box;
+}
+
+function addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen) {
+  const topY = (def.h * 0.5) + 0.04;
+  const isGround = name.endsWith('_ground');
+  // Grate bars — thin parallel lines along Z axis
+  const barCount = Math.max(3, Math.min(8, Math.round(def.w / 2.2)));
+  for (let i = 0; i < barCount; i += 1) {
+    const x = -def.w * 0.44 + ((i / Math.max(1, barCount - 1)) * def.w * 0.88);
+    createDecorPlane(scene, `${name}_grateBar_${i}`, root, {
+      width: 0.10,
+      height: Math.max(0.6, def.d * 0.86),
+      y: topY + 0.01,
+      x,
+      rotationX: Math.PI / 2,
+      rotationY: Math.PI / 2,
+      rgb: [108, 116, 124],
+      emissiveScale: 0.08,
+      alpha: isGround ? 0.14 : 0.22,
+    });
+  }
+  // Cross bars — perpendicular grate
+  const crossCount = Math.max(2, Math.min(5, Math.round(def.d / 2.8)));
+  for (let i = 0; i < crossCount; i += 1) {
+    const z = -def.d * 0.44 + ((i / Math.max(1, crossCount - 1)) * def.d * 0.88);
+    createDecorPlane(scene, `${name}_crossBar_${i}`, root, {
+      width: Math.max(0.6, def.w * 0.86),
+      height: 0.10,
+      y: topY + 0.01,
+      z,
+      rgb: [108, 116, 124],
+      emissiveScale: 0.08,
+      alpha: isGround ? 0.12 : 0.18,
+    });
+  }
+  // Hazard stripes — orange diagonal band at front and back edges
+  for (const z of [-def.d * 0.42, def.d * 0.42]) {
+    createDecorPlane(scene, `${name}_hazardStripe_${z > 0 ? 'f' : 'b'}`, root, {
+      width: Math.max(1.6, def.w - 0.6),
+      height: 0.22,
+      y: topY + 0.02,
+      z,
+      rgb: palette.glow,
+      emissiveScale: 0.30,
+      alpha: isGround ? 0.18 : 0.28,
+    });
+  }
+  if (isGround || def.w < 10) return;
+  // Pipe fixtures at corners
+  for (const x of [-def.w * 0.38, def.w * 0.38]) {
+    createDecorBox(scene, `${name}_pipe_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.20,
+      height: 1.4,
+      depth: 0.20,
+      x,
+      y: topY + 0.7,
+      z: -def.d * 0.40,
+      rgb: palette.rim,
+      emissiveScale: 0.06,
+      roughness: 0.52,
+      shadowGen,
+    });
+    const valve = BABYLON.MeshBuilder.CreateCylinder(`${name}_valve_${x > 0 ? 'r' : 'l'}`, {
+      diameter: 0.30,
+      height: 0.12,
+      tessellation: 8,
+    }, scene);
+    valve.parent = root;
+    valve.position.set(x, topY + 1.34, -def.d * 0.40);
+    valve.material = createGlowMaterial(scene, `${name}_valveMat_${x > 0 ? 'r' : 'l'}`, palette.accent, {
+      emissive: 0.28,
+      roughness: 0.36,
+    });
+    markDecor(valve);
+  }
 }
 
 function addStormPlatformDetails(scene, root, name, def, palette, shadowGen) {
@@ -627,13 +702,9 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       ? new BABYLON.Color3(0.60, 0.44, 0.28)
       : theme === 'camp'
         ? new BABYLON.Color3(0.46, 0.34, 0.24)
-        : new BABYLON.Color3(
-          Math.min(1, (palette.slab[0] + 40) / 255),
-          Math.min(1, (palette.slab[1] + 34) / 255),
-          Math.min(1, (palette.slab[2] + 28) / 255),
-        );
+        : new BABYLON.Color3(0.14, 0.16, 0.18);  // factory: dark steel grey
   topMat.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10);
-  topMat.alpha = theme === 'storm' ? 0.42 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.52;
+  topMat.alpha = theme === 'storm' ? 0.42 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;  // factory: semi-transparent steel grate
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -641,7 +712,9 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   markGameplaySurface(top);
   markDecor(top);
 
-  if (theme === 'storm') {
+  if (theme === 'factory') {
+    addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen);
+  } else if (theme === 'storm') {
     addStormPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'library') {
     addLibraryPlatformDetails(scene, root, name, def, palette, shadowGen);
