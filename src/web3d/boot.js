@@ -2980,8 +2980,48 @@ export async function boot(options = {}) {
     return report;
   }
 
+  function era5TopologyReport() {
+    if (!isEra5Level || !world.authoredSpace) return null;
+    const report = {
+      levelId,
+      sectorCount: world.authoredSpace.sectors?.length ?? 0,
+      connectorCount: world.authoredSpace.connectors?.length ?? 0,
+      topology: world.authoredSpace.walkableReport?.topology ?? null,
+      sectors: (world.authoredSpace.sectors || []).map((sector) => ({
+        id: sector.id,
+        label: sector.label || sector.id,
+        x: roundNumber(sector.x),
+        z: roundNumber(sector.z),
+        w: roundNumber(sector.w),
+        d: roundNumber(sector.d),
+        floorY: roundNumber(sector.floorY),
+        ceilingY: roundNumber(sector.ceilingY),
+        openSky: !!sector.openSky,
+        floorSurfaceType: sector.floorSurfaceType || null,
+        wallLanguage: sector.wallLanguage || null,
+        landmarks: [...(sector.landmarks || [])],
+      })),
+      connectors: (world.authoredSpace.connectors || []).map((connector) => ({
+        id: connector.id,
+        type: connector.type || null,
+        sourceSector: connector.sourceSector || null,
+        destinationSector: connector.destinationSector || null,
+        blocked: !!connector.blocked,
+        x: roundNumber(connector.x),
+        z: roundNumber(connector.z),
+        w: roundNumber(connector.w),
+        d: roundNumber(connector.d),
+      })),
+      walkableReport: world.authoredSpace.walkableReport,
+    };
+    console.log('[Era5TopologyReport]', report);
+    return report;
+  }
+
   if (debugMode && isEra5Level) {
     window.__DADA_DEBUG__.era5VisionReport = era5VisionReport;
+    window.__DADA_DEBUG__.era5TopologyReport = era5TopologyReport;
+    window.__DADA_DEBUG__.era5WalkableReport = () => world.authoredSpace?.walkableReport ?? null;
     window.__DADA_DEBUG__.era5GetDebugView = () => ({ ...era5VisionState });
     window.__DADA_DEBUG__.era5SetDebugView = (patch = {}) => {
       Object.assign(era5VisionState, {

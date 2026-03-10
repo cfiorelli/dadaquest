@@ -976,7 +976,7 @@ test('@era5 runtime: level 6 conveyor zones push the player and expose conveyor 
   await startDebugLevel(page, 6);
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(-8.0, 1.45, -0.4);
+    window.__DADA_DEBUG__?.teleportPlayer?.(-10.0, 1.22, -0.6);
   });
   const before = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos ?? null);
   await page.waitForTimeout(1200);
@@ -994,6 +994,74 @@ test('@era5 runtime: level 6 conveyor zones push the player and expose conveyor 
     after.velocity.x ?? 0,
     after.velocity.z ?? 0,
   )).toBeGreaterThan(0.01);
+});
+
+test('@era5 runtime: level 6 exposes authored topology and clean walkable-surface validation', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 6);
+  await unlockThroughLevel(page, 5);
+  await startDebugLevel(page, 6);
+  await page.waitForTimeout(1200);
+
+  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
+  expect(topology).not.toBeNull();
+  expect(topology.sectorCount).toBeGreaterThanOrEqual(5);
+  expect(topology.connectorCount).toBeGreaterThanOrEqual(6);
+  expect(topology.topology?.hasCycle).toBe(true);
+  expect((topology.topology?.routeChoices ?? []).length).toBeGreaterThanOrEqual(2);
+  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBeGreaterThanOrEqual(20);
+  expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
+  expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
+  expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
+
+  const labels = (topology.sectors ?? []).map((sector) => sector.label);
+  expect(labels).toEqual(expect.arrayContaining([
+    'Loading Bay',
+    'Machine Hall',
+    'Service Loop',
+    'Furnace Bridge',
+    'Crane Bay',
+    'Control Room',
+  ]));
+});
+
+test('@era5 runtime: level 6 authored spaces keep turn and strafe camera behavior stable', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 6);
+  await unlockThroughLevel(page, 5);
+  await startDebugLevel(page, 6);
+  await focusGameplay(page);
+
+  const pose = { x: 40, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 };
+  await resetEra5Pose(page, pose);
+  const beforeTurn = await snapshotEra5Pose(page);
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
+  await page.waitForTimeout(350);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
+  const afterTurn = await snapshotEra5Pose(page);
+
+  expect(afterTurn.yaw).toBeGreaterThan(beforeTurn.yaw + 0.12);
+  expect(afterTurn.cameraYaw).toBeGreaterThan(beforeTurn.cameraYaw + 0.12);
+  expect(Math.abs(wrapDelta(afterTurn.cameraYaw, afterTurn.yaw))).toBeLessThan(0.06);
+
+  await resetEra5Pose(page, pose);
+  const beforeStrafe = await snapshotEra5Pose(page);
+  await dispatchHeldKey(page, 'keydown', { code: 'KeyD', key: 'd' });
+  await page.waitForTimeout(320);
+  await dispatchHeldKey(page, 'keyup', { code: 'KeyD', key: 'd' });
+  const afterStrafe = await snapshotEra5Pose(page);
+
+  expect(Math.abs(wrapDelta(afterStrafe.yaw, beforeStrafe.yaw))).toBeLessThan(0.03);
+  const delta = {
+    x: afterStrafe.x - beforeStrafe.x,
+    z: afterStrafe.z - beforeStrafe.z,
+  };
+  const facing = {
+    x: Math.sin(beforeStrafe.yaw),
+    z: Math.cos(beforeStrafe.yaw),
+  };
+  const right = getRightFromForward(facing);
+  expect(dotXZ(delta, right)).toBeGreaterThan(0.18);
 });
 
 test('@era5 runtime: level 7 lightning hazards visibly cycle from warn to active', async ({ page }) => {

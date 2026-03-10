@@ -13,6 +13,7 @@ import {
 import { createTelegraphedHazard } from './telegraphHazard.js';
 import { NoiseWanderMover } from './noiseMover.js';
 import { createThemeEnvironmentFx, markDecorNode } from './envFx.js';
+import { createAuthoredSurfaceAudit } from './eraAuthoredLayout.js';
 import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
@@ -158,6 +159,15 @@ function makeInvisibleCollider(scene, name, def) {
   mesh.position.set(def.x, def.y, def.z ?? 0);
   mesh.visibility = 0;
   mesh.isPickable = false;
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    gameplay: !!def.walkable,
+    gameplaySurface: !!def.walkable,
+    authoredSurfaceId: def.authoredSurfaceId || null,
+    walkable: def.walkable !== false,
+    walkableClassification: def.walkableClassification || def.classification || null,
+    minThickness: def.minThickness ?? null,
+  };
   return mesh;
 }
 
@@ -1015,6 +1025,15 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
+  root.metadata = {
+    ...(root.metadata || {}),
+    gameplay: def.walkable !== false,
+    gameplaySurface: def.walkable !== false,
+    authoredSurfaceId: def.authoredSurfaceId || null,
+    walkable: def.walkable !== false,
+    walkableClassification: def.walkableClassification || def.classification || null,
+    surfaceType: def.surfaceType || null,
+  };
 
   const slab = BABYLON.MeshBuilder.CreateBox(`${name}_slab`, {
     width: def.w,
@@ -1097,6 +1116,10 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     addLibraryPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'camp') {
     addCampPlatformDetails(scene, root, name, def, palette, shadowGen);
+  }
+
+  if (def.visible === false) {
+    root.setEnabled(false);
   }
 
   return root;
@@ -2863,6 +2886,9 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   era5Level.reset();
 
   const goalDeck = [...(layout.platforms || [])].reverse().find((surface) => surface.name === 'goalDeck' || surface.name === 'lookoutDeck' || surface.name === 'familyDeck') || layout.platforms?.[layout.platforms.length - 1];
+  const authoredSurfaceAudit = layout.authoredMap
+    ? createAuthoredSurfaceAudit(layout.authoredMap, allPlatforms, platformVisuals)
+    : null;
 
   return {
     ground: groundCollider,
@@ -2930,6 +2956,14 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     signs: [
       ...signs,
     ],
+    authoredSpace: authoredSurfaceAudit
+      ? {
+        sectors: layout.authoredMap.sectors,
+        connectors: layout.authoredMap.connectors,
+        walkableSurfaces: layout.authoredMap.walkableSurfaces,
+        walkableReport: authoredSurfaceAudit,
+      }
+      : null,
     goalGuardMinX: layout.goal.x - 4.6,
     goalMinBottomY: goalDeck ? (goalDeck.y + (goalDeck.h * 0.5)) - 0.2 : null,
     assetAnchors: {
