@@ -16,6 +16,15 @@ import { createThemeEnvironmentFx, markDecorNode } from './envFx.js';
 import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
+  aquarium: {
+    slab: [62, 118, 134],
+    rim: [18, 48, 62],
+    glow: [132, 240, 255],
+    line: [188, 250, 255],
+    enemy: [118, 255, 246],
+    accent: [255, 170, 236],
+    goalOutfit: 'level3',
+  },
   factory: {
     slab: [72, 78, 86],       // dark steel grey
     rim: [28, 32, 38],        // darker steel
@@ -55,6 +64,19 @@ const THEME_PALETTES = {
 };
 
 const THEME_SCENE_LOOKS = {
+  aquarium: {
+    clear: [10, 42, 62, 255],
+    fog: [16, 88, 116],
+    fogStart: 58,
+    fogEnd: 196,
+    keyDir: [-0.24, -1.0, 0.22],
+    keyIntensity: 1.20,
+    hemiIntensity: 0.86,
+    hemiColor: [136, 208, 224],
+    hemiGround: [0.02, 0.05, 0.07],
+    rimOffset: [-10, 18, -12],
+    rimIntensity: 0.66,
+  },
   factory: {
     clear: [68, 48, 28, 255],    // warm industrial amber — was near-black [34,24,16]
     fog: [110, 78, 46],          // amber haze — was [82,58,34]
@@ -267,6 +289,7 @@ function createDecorBox(scene, name, parent, {
   rgb,
   emissiveScale = 0.08,
   roughness = 0.56,
+  alpha = 1,
   shadowGen = null,
   cardboard = false,
 } = {}) {
@@ -275,7 +298,11 @@ function createDecorBox(scene, name, parent, {
   box.position.set(x, y, z);
   box.material = cardboard
     ? makeCardboard(scene, `${name}_mat`, rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, { roughness })
-    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness });
+    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness, alpha });
+  if (Number.isFinite(alpha) && alpha < 1) {
+    box.material.alpha = alpha;
+    box.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
   if (shadowGen) shadowGen.addShadowCaster(box);
   markDecor(box);
   return box;
@@ -292,6 +319,7 @@ function createDecorColumn(scene, name, parent, {
   rgb,
   emissiveScale = 0.08,
   roughness = 0.56,
+  alpha = 1,
   shadowGen = null,
   cardboard = false,
 } = {}) {
@@ -305,13 +333,18 @@ function createDecorColumn(scene, name, parent, {
   column.position.set(x, y, z);
   column.material = cardboard
     ? makeCardboard(scene, `${name}_mat`, rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, { roughness })
-    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness });
+    : createGlowMaterial(scene, `${name}_mat`, rgb, { emissive: emissiveScale, roughness, alpha });
+  if (Number.isFinite(alpha) && alpha < 1) {
+    column.material.alpha = alpha;
+    column.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
   if (shadowGen) shadowGen.addShadowCaster(column);
   markDecor(column);
   return column;
 }
 
 function getThemeStructureRgb(theme) {
+  if (theme === 'aquarium') return [36, 106, 126];
   if (theme === 'storm') return [56, 74, 96];
   if (theme === 'library') return [88, 60, 38];
   if (theme === 'camp') return [58, 42, 28];
@@ -665,6 +698,117 @@ function addCampPlatformDetails(scene, root, name, def, palette, shadowGen) {
   });
 }
 
+function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) {
+  const topY = (def.h * 0.5) + 0.04;
+  const isGround = name.endsWith('_ground');
+  const surfaceType = String(def.surfaceType || '');
+  const isCatwalk = surfaceType.includes('catwalk') || surfaceType.includes('grate');
+  const isMaintenance = surfaceType.includes('maintenance') || surfaceType.includes('drain');
+  const isGlass = surfaceType.includes('glass');
+  const isExhibit = surfaceType.includes('exhibit') || surfaceType.includes('viewing');
+
+  createDecorPlane(scene, `${name}_wetSheen`, root, {
+    width: Math.max(2.0, def.w - 0.8),
+    height: Math.max(0.8, Math.min(1.8, def.d * 0.30)),
+    y: topY,
+    rgb: isMaintenance ? [82, 156, 170] : isGlass ? [172, 248, 255] : [118, 210, 224],
+    emissiveScale: isGlass ? 0.18 : 0.12,
+    alpha: isGround ? 0.08 : isGlass ? 0.18 : 0.14,
+  });
+
+  if (isCatwalk) {
+    const grateCount = Math.max(4, Math.min(8, Math.round(def.w / 2.0)));
+    for (let i = 0; i < grateCount; i += 1) {
+      const x = -def.w * 0.42 + ((i / Math.max(1, grateCount - 1)) * def.w * 0.84);
+      createDecorPlane(scene, `${name}_grate_${i}`, root, {
+        width: 0.08,
+        height: Math.max(0.8, def.d * 0.82),
+        y: topY + 0.01,
+        x,
+        rotationX: Math.PI / 2,
+        rotationY: Math.PI / 2,
+        rgb: [164, 242, 252],
+        emissiveScale: 0.12,
+        alpha: 0.28,
+      });
+    }
+  } else {
+    const seamCount = Math.max(2, Math.min(5, Math.round(def.d / 2.2)));
+    for (let i = 0; i < seamCount; i += 1) {
+      const z = -def.d * 0.34 + ((i / Math.max(1, seamCount - 1)) * def.d * 0.68);
+      createDecorPlane(scene, `${name}_deckSeam_${i}`, root, {
+        width: Math.max(1.8, def.w - 1.0),
+        height: 0.10,
+        y: topY + 0.01,
+        z,
+        rgb: isMaintenance ? [60, 112, 128] : [96, 196, 208],
+        emissiveScale: 0.08,
+        alpha: 0.22,
+      });
+    }
+  }
+
+  for (const z of [-def.d * 0.38, def.d * 0.38]) {
+    createDecorPlane(scene, `${name}_edgeMark_${z > 0 ? 'r' : 'l'}`, root, {
+      width: Math.max(1.8, def.w - 0.9),
+      height: 0.16,
+      y: topY + 0.02,
+      z,
+      rgb: isMaintenance ? [90, 170, 182] : isExhibit ? [214, 248, 255] : palette.line,
+      emissiveScale: 0.14,
+      alpha: isGround ? 0.14 : 0.24,
+    });
+  }
+
+  if (isGround || def.w < 9.5) return;
+  for (const x of [-def.w * 0.40, def.w * 0.40]) {
+    createDecorBox(scene, `${name}_railPost_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.12,
+      height: isMaintenance ? 1.1 : 1.5,
+      depth: 0.12,
+      x,
+      y: topY + (isMaintenance ? 0.55 : 0.76),
+      z: -def.d * 0.34,
+      rgb: [102, 210, 224],
+      emissiveScale: 0.10,
+      roughness: 0.36,
+      shadowGen,
+    });
+    createDecorBox(scene, `${name}_railPostBack_${x > 0 ? 'r' : 'l'}`, root, {
+      width: 0.12,
+      height: isMaintenance ? 1.1 : 1.5,
+      depth: 0.12,
+      x,
+      y: topY + (isMaintenance ? 0.55 : 0.76),
+      z: def.d * 0.34,
+      rgb: [102, 210, 224],
+      emissiveScale: 0.10,
+      roughness: 0.36,
+      shadowGen,
+    });
+  }
+  createDecorPlane(scene, `${name}_frontRail`, root, {
+    width: Math.max(1.8, def.w - 1.0),
+    height: 0.05,
+    y: topY + (isMaintenance ? 1.00 : 1.34),
+    z: -def.d * 0.34,
+    rotationX: 0,
+    rgb: [188, 250, 255],
+    emissiveScale: 0.14,
+    alpha: 0.84,
+  });
+  createDecorPlane(scene, `${name}_backRail`, root, {
+    width: Math.max(1.8, def.w - 1.0),
+    height: 0.05,
+    y: topY + (isMaintenance ? 1.00 : 1.34),
+    z: def.d * 0.34,
+    rotationX: 0,
+    rgb: [188, 250, 255],
+    emissiveScale: 0.14,
+    alpha: 0.84,
+  });
+}
+
 // ── Library set-piece factories ──────────────────────────────────────────────
 
 const BOOK_SPINE_COLORS = [
@@ -892,6 +1036,44 @@ function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
   root.position.set(checkpoint.x, checkpoint.y - 0.06, checkpoint.z ?? 0);
   markDecor(root);
 
+  if (theme === 'aquarium') {
+    for (const x of [-1.55, 1.55]) {
+      createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.16,
+        height: 3.2,
+        depth: 0.16,
+        x,
+        y: 1.6,
+        z: 0,
+        rgb: palette.rim,
+        emissiveScale: 0.08,
+        roughness: 0.42,
+        shadowGen,
+      });
+      const globe = BABYLON.MeshBuilder.CreateSphere(`${name}_globe_${x > 0 ? 'r' : 'l'}`, {
+        diameter: 0.28,
+        segments: 8,
+      }, scene);
+      globe.parent = root;
+      globe.position.set(x, 2.72, 0);
+      globe.material = createGlowMaterial(scene, `${name}_globeMat_${x > 0 ? 'r' : 'l'}`, palette.glow, {
+        emissive: 0.34,
+        roughness: 0.18,
+      });
+      markDecor(globe);
+    }
+    createDecorPlane(scene, `${name}_beam`, root, {
+      width: 3.5,
+      height: 0.12,
+      y: 2.44,
+      rotationX: 0,
+      rgb: palette.line,
+      emissiveScale: 0.14,
+      alpha: 0.92,
+    });
+    return root;
+  }
+
   if (theme === 'storm') {
     for (const x of [-1.6, 1.6]) {
       createDecorBox(scene, `${name}_post_${x > 0 ? 'r' : 'l'}`, root, {
@@ -1013,6 +1195,7 @@ function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
 
 function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
+  const aquariumTheme = theme === 'aquarium';
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
 
@@ -1030,15 +1213,21 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       grainScale: theme === 'library' ? 4 : theme === 'storm' ? 5 : 3,
     })
     : createGlowMaterial(scene, `${name}_slabMat`, palette.slab, {
-      emissive: theme === 'storm' ? 0.18 : 0.28,
-      roughness: theme === 'storm' ? 0.42 : 0.26,
+      emissive: aquariumTheme ? 0.24 : theme === 'storm' ? 0.18 : 0.28,
+      roughness: aquariumTheme ? 0.30 : theme === 'storm' ? 0.42 : 0.26,
     });
   if (slab.material.emissiveColor) {
-    slab.material.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12);
+    slab.material.emissiveColor = toColor3(
+      palette.glow,
+      aquariumTheme ? 0.10 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12,
+    );
   }
   slab.enableEdgesRendering();
-  slab.edgesWidth = theme === 'storm' ? 1.9 : 1.6;
-  slab.edgesColor = toColor4(palette.glow, theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58);
+  slab.edgesWidth = aquariumTheme ? 1.8 : theme === 'storm' ? 1.9 : 1.6;
+  slab.edgesColor = toColor4(
+    palette.glow,
+    aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58,
+  );
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
   markGameplaySurface(slab);
@@ -1057,11 +1246,11 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       grainScale: theme === 'storm' ? 5 : 4,
     })
     : createGlowMaterial(scene, `${name}_rimMat`, palette.rim, {
-      emissive: theme === 'storm' ? 0.14 : 0.18,
-      roughness: 0.54,
+      emissive: aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18,
+      roughness: aquariumTheme ? 0.42 : 0.54,
     });
   if (rim.material.emissiveColor) {
-    rim.material.emissiveColor = toColor3(palette.rim, theme === 'storm' ? 0.08 : 0.04);
+    rim.material.emissiveColor = toColor3(palette.rim, aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04);
   }
   markGameplaySurface(rim);
 
@@ -1073,15 +1262,20 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   top.rotation.x = Math.PI / 2;
   top.position.y = (def.h * 0.5) + 0.01;
   const topMat = new BABYLON.StandardMaterial(`${name}_topMat`, scene);
-  topMat.diffuseColor = theme === 'storm'
+  topMat.diffuseColor = aquariumTheme
+    ? new BABYLON.Color3(0.10, 0.24, 0.30)
+    : theme === 'storm'
     ? new BABYLON.Color3(0.40, 0.38, 0.32)
     : theme === 'library'
       ? new BABYLON.Color3(0.60, 0.44, 0.28)
       : theme === 'camp'
         ? new BABYLON.Color3(0.46, 0.34, 0.24)
         : new BABYLON.Color3(0.14, 0.16, 0.18);  // factory: dark steel grey
-  topMat.emissiveColor = toColor3(palette.glow, theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10);
-  topMat.alpha = theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;  // factory: semi-transparent steel grate
+  topMat.emissiveColor = toColor3(
+    palette.glow,
+    aquariumTheme ? 0.14 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10,
+  );
+  topMat.alpha = aquariumTheme ? 0.62 : theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -1091,6 +1285,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
 
   if (theme === 'factory') {
     addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen);
+  } else if (theme === 'aquarium') {
+    addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'storm') {
     addStormPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'library') {
@@ -2053,6 +2249,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       rgb: def.rgb || getThemeStructureRgb(theme),
       emissiveScale: def.emissiveScale ?? (theme === 'storm' ? 0.06 : 0.04),
       roughness: def.roughness ?? 0.74,
+      alpha: def.alpha ?? 1,
       shadowGen,
       cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
     });
@@ -2075,6 +2272,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       rgb: def.rgb || getThemeStructureRgb(theme),
       emissiveScale: def.emissiveScale ?? (theme === 'storm' ? 0.08 : 0.04),
       roughness: def.roughness ?? 0.72,
+      alpha: def.alpha ?? 1,
       shadowGen,
       cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
     });
@@ -2137,7 +2335,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     });
     markDecor(marker);
     setRenderingGroup(marker, 3);
-    if (theme === 'storm' || theme === 'library' || theme === 'camp') {
+    if (theme === 'aquarium' || theme === 'storm' || theme === 'library' || theme === 'camp') {
       const frame = createThemeCheckpointFrame(scene, `${theme}_checkpointFrame_${index}`, cp, theme, shadowGen);
       setRenderingGroup(frame, 2);
       checkpointFrames.push(frame);
@@ -2213,7 +2411,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     const dad = createDad(scene, {
       x: layout.goal.x,
       y: layout.goal.y,
-      z: 0,
+      z: layout.goal.z ?? 0,
       outfit: 'level3',
       shadowGen,
       animate: animateGoal,
@@ -2226,7 +2424,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     const dad = createDad(scene, {
       x: layout.goal.x,
       y: layout.goal.y,
-      z: 0,
+      z: layout.goal.z ?? 0,
       outfit: palette.goalOutfit,
       shadowGen,
       animate: animateGoal,
@@ -2234,7 +2432,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     goalVisual = dad.goal;
     goalRoot = dad.root;
   }
-  goalRoot.position.z = 0;
+  goalRoot.position.z = layout.goal.z ?? 0;
 
   const conveyorZones = (layout.conveyors || layout.gusts || []).map((def, index) => ({
     def,

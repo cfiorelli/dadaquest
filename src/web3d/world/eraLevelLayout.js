@@ -10,9 +10,15 @@ export function surfaceTop(surface) {
 }
 
 export function getNearestSurfaceTopY(layout, x, z = 0) {
-  const surfaces = [layout.ground, ...(layout.platforms || [])];
+  const authoredWalkables = layout.authoredMap?.walkableSurfaces || null;
+  const surfaces = authoredWalkables?.length
+    ? authoredWalkables
+    : [layout.ground, ...(layout.platforms || [])];
   let bestTop = null;
   for (const surface of surfaces) {
+    if (!surface) continue;
+    if (surface.visible === false) continue;
+    if (surface.walkable === false) continue;
     if (!pointInsideSurface(surface, x, z)) continue;
     const top = surfaceTop(surface);
     if (bestTop === null || top > bestTop) {

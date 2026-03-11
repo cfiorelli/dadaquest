@@ -1223,11 +1223,11 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function getEra5WeaponHelp(levelId) {
-    if (levelId === 9) return 'Fire Paper Fan: Ctrl / Enter / Click';
-    if (levelId === 8) return 'Throw Bookmark Boomerang: Ctrl / Enter / Click';
-    if (levelId === 7) return 'Crack Kite String Whip: Ctrl / Enter / Click';
-    if (levelId === 6) return 'Fire Foam Blaster: Ctrl / Enter / Click';
-    return 'Fire Bubble Wand: Ctrl / Enter / Click';
+    if (levelId === 9) return 'Fire Paper Fan: F / Ctrl / Enter / Click';
+    if (levelId === 8) return 'Throw Bookmark Boomerang: F / Ctrl / Enter / Click';
+    if (levelId === 7) return 'Crack Kite String Whip: F / Ctrl / Enter / Click';
+    if (levelId === 6) return 'Fire Foam Blaster: F / Ctrl / Enter / Click';
+    return 'Fire Bubble Wand: F / Ctrl / Enter / Click';
   }
 
   function getEra5ToolHelp(levelId) {
@@ -1235,7 +1235,7 @@ export function createUI(uiRoot, options = {}) {
     if (levelId === 8) return 'Lantern beam toggle / boost: E';
     if (levelId === 7) return 'Kite Rig glide: hold Jump in air';
     if (levelId === 6) return 'Conveyor Boots traction: passive';
-    return 'Scuba Tank oxygen: avoid deep pockets';
+    return 'Scuba Tank: Space ascend, C descend in deep pockets';
   }
 
   function getGameplayLegendMarkup(levelId) {
@@ -1247,7 +1247,8 @@ export function createUI(uiRoot, options = {}) {
         <div><span>, / .</span> Strafe left / right</div>
         <div><span>W / S</span> Forward / back alias</div>
         <div><span>A / D</span> Strafe alias</div>
-        <div><span>Space</span> Jump / use</div>
+        <div><span>Space</span> Jump / ascend in float</div>
+        <div><span>C</span> Descend in float</div>
         <div><span>Shift</span> Run</div>
         <div>${getEra5WeaponHelp(levelId)}</div>
         <div>${getEra5ToolHelp(levelId)}</div>
@@ -1255,7 +1256,7 @@ export function createUI(uiRoot, options = {}) {
         <div><span>\\</span> Recenter camera</div>
         <div><span>I</span> Inventory</div>
         <div><span>R</span> Reset checkpoint</div>
-        <div><span>F</span> Wind Glide save (when unlocked)</div>
+        <div><span>G</span> Wind Glide save (when unlocked)</div>
         <div><span>M</span> Mute</div>
         <div><span>ESC</span> Menu</div>
       `;
@@ -1274,7 +1275,7 @@ export function createUI(uiRoot, options = {}) {
 
   function getControlHintMarkup(era5 = false, levelId = 1) {
     if (era5) {
-      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>E</span> Tool`;
+      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>F</span>/<span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
@@ -1718,8 +1719,8 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-label">Weapon</div>
           <div class="dada-era5-weapon-track" data-era5-weapon><div class="dada-era5-weapon-fill" data-era5-weapon-fill></div></div>
           <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
-          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: Ctrl / Enter / Click</div>
-          <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank oxygen: avoid deep pockets</div>
+          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: F / Ctrl / Enter / Click</div>
+          <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank: Space ascend, C descend in deep pockets</div>
         </div>
         <div class="dada-era5-hint" data-era5-hint>I Inventory</div>
       </div>
@@ -2320,8 +2321,8 @@ export function createUI(uiRoot, options = {}) {
       weaponCooldownMs = 0,
       weaponCooldownMaxMs = 350,
       inventoryHint = 'I Inventory',
-      weaponHelp = 'Fire Bubble Wand: Ctrl / Enter / Click',
-      toolHelp = 'Scuba Tank oxygen: avoid deep pockets',
+      weaponHelp = 'Fire Bubble Wand: F / Ctrl / Enter / Click',
+      toolHelp = 'Scuba Tank: Space ascend, C descend in deep pockets',
     } = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');

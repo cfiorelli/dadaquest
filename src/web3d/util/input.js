@@ -98,6 +98,10 @@ export class InputManager {
     return !!this.held['Space'];
   }
 
+  isDescendHeld() {
+    return !!this.held['KeyC'];
+  }
+
   /** True only once per press (must be consumed each frame). */
   consumeJump() {
     return !!this.held['Space'];
@@ -152,7 +156,8 @@ export class InputManager {
   }
 
   consumeAttackPress() {
-    return this.consumeAbilityPress('Enter')
+    return this.consumeAbilityPress('KeyF')
+      || this.consumeAbilityPress('Enter')
       || this.consumeAbilityPress('NumpadEnter')
       || this.consumeAbilityPress('ControlLeft')
       || this.consumeAbilityPress('ControlRight')

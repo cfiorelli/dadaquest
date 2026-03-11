@@ -387,7 +387,9 @@ export class PlayerController {
     const freeMove = options.movementMode === 'free' || this.movementMode === 'free';
     const floatMoveY = clamp(options.floatMoveY ?? 0, -1, 1);
     let moveZ = clamp(options.moveZ ?? 0, -1, 1);
-    const floatActive = !!options.floatActive && this.capeFloatTimerMs > 0;
+    const floatMode = options.floatMode || (options.floatActive ? 'cape' : null);
+    const swimFloatActive = floatMode === 'swim';
+    const floatActive = swimFloatActive || (floatMode === 'cape' && this.capeFloatTimerMs > 0);
     if (!freeMove) moveZ = 0;
     const explicitFacingYaw = Number.isFinite(options.facingYaw) ? wrapAngle(options.facingYaw) : null;
 
@@ -440,7 +442,7 @@ export class PlayerController {
       && !this.grounded
       && this.sideJumpWindowMs > 0
       && !this.sideJumpUsed;
-    if (canGroundJump || canAirJump || canSideJump) {
+    if (!swimFloatActive && (canGroundJump || canAirJump || canSideJump)) {
       const sideJumpDir = canSideJump ? this.sideJumpDir : 0;
       const sideJumpDirZ = canSideJump ? this.sideJumpDirZ : 0;
       const jumpReason = canAirJump ? 'air-jump' : 'buffer-consumed';
@@ -481,7 +483,7 @@ export class PlayerController {
     }
 
     // Variable jump: cut upward velocity if released early
-    if (this.jumping && !jumpHeld && this.vy > 0 && !this.jumpCutApplied) {
+    if (!swimFloatActive && this.jumping && !jumpHeld && this.vy > 0 && !this.jumpCutApplied) {
       this.vy *= JUMP_CUT_MULT;
       this.jumpCutApplied = true;
     }

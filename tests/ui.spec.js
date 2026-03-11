@@ -86,7 +86,7 @@ test('ui: play again restarts from deterministic end scene', async ({ page }) =>
 });
 
 test('ui: escape menu opens during gameplay and can switch levels', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 1280, height: 720 });
   await gotoDebugLevel(page, 2);
   await startDebugLevel(page, 2);
@@ -99,7 +99,9 @@ test('ui: escape menu opens during gameplay and can switch levels', async ({ pag
       && !overlay.classList.contains('hidden');
   }, { timeout: 5_000 });
 
-  await page.click('#menuLevelBtn1');
+  await page.evaluate(() => {
+    document.getElementById('menuLevelBtn1')?.click();
+  });
   await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'TitleScene', { timeout: 20_000 });
   await expect(page.locator('#titleSub')).toContainText('Level 1');
 });

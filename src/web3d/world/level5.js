@@ -1,234 +1,588 @@
-export const LANE_Z5 = 0;
+import { normalizeCoinsOnSurfaces } from './eraLevelLayout.js';
+import { compileAuthoredEraLayout } from './eraAuthoredLayout.js';
 
-const L = LANE_Z5;
-const COIN_HOVER_Y = 1.02;
+const L = 0;
 
-// NEW LAYOUT 2026-03-09: segmented aquarium service hall.
-// Platforms now have alternating Z offsets so the top-down footprint reads as
-// a zigzag hall — not a straight runway. Width varies: narrow catwalks vs wide
-// tank chambers. Z sequence: -2, +1, -2.5, +2, -4, +2.5, -1, +0.5, 0
-const BASE_LEVEL5 = {
+const BASE_LEVEL5 = compileAuthoredEraLayout({
   totalCollectibles: 18,
-  extents: { minX: -28, maxX: 132 },
-  spawn: { x: -22.0, y: 1.2, z: L },
-  goal: { x: 126.2, y: 2.15, z: L },
+  spawn: { x: -33.2, y: 1.28, z: 8.2 },
+  goal: { x: 74.8, y: 2.62, z: -3.8 },
+  theme: 'aquarium',
   showGroundVisual: false,
+  showRouteRibbons: false,
 
   acts: [
-    { id: 'A', label: 'Entry Dock', range: [-28, 18], jellyfishCount: 1 },
-    { id: 'B', label: 'Tank Chamber', range: [18, 58], jellyfishCount: 3 },
-    { id: 'C', label: 'Service Catwalk', range: [58, 92], jellyfishCount: 2 },
-    { id: 'D', label: 'Exhibit Hall', range: [92, 132], jellyfishCount: 3 },
+    { id: 'A', label: 'Spawn Dock', range: [-42, -2] },
+    { id: 'B', label: 'Viewing Chamber', range: [-2, 34] },
+    { id: 'C', label: 'Service Split', range: [34, 60] },
+    { id: 'D', label: 'Final Exhibit', range: [60, 86] },
   ],
 
-  checkpoints: [
-    { x: 16.0, y: 1.2, z: -1.0, label: 'Current Gate' },
-    { x: 54.0, y: 1.35, z: 1.5, label: 'Kelp Heart' },
-    { x: 91.5, y: 1.7, z: 1.0, label: 'Pressure Ring' },
-  ],
-
-  ground: { x: 52, y: -0.75, z: L, w: 176, h: 1.5, d: 22 },
-
-  platforms: [
-    // Act A — entry dock to glass bridge (Z: -2 → +1 zigzag)
-    { name: 'entryDock',      x: -18.0, y: 0.35, z: -2.0, w: 16.0, h: 0.70, d: 10.0 },
-    { name: 'glassBridge',    x:  -3.0, y: 0.58, z:  1.0, w:  9.0, h: 0.64, d:  4.5 },
-    // Act B — wide tank chamber → isolated kelp island (Z: -2.5 → +2)
-    { name: 'tankChamber',    x:  18.0, y: 0.94, z: -2.5, w: 22.0, h: 0.74, d: 13.0 },
-    { name: 'kelpIsland',     x:  37.0, y: 1.10, z:  2.0, w: 13.0, h: 0.74, d:  8.0 },
-    // Act C — narrow service catwalk → cylinder plaza → inner bridge (Z: -4 → +2.5 → -1)
-    { name: 'serviceCatwalk', x:  53.0, y: 1.42, z: -4.0, w:  9.0, h: 0.68, d:  3.5 },
-    { name: 'cylinderPlaza',  x:  68.0, y: 1.70, z:  2.5, w: 16.0, h: 0.76, d: 10.0 },
-    { name: 'innerBridge',    x:  82.0, y: 1.94, z: -1.0, w:  9.0, h: 0.70, d:  4.0 },
-    // Act D — wide exhibit hall → goal dock (Z: +0.5 → 0)
-    { name: 'exhibitHall',    x: 103.0, y: 2.00, z:  0.5, w: 24.0, h: 0.78, d: 13.0 },
-    { name: 'goalDeck',       x: 124.2, y: 2.22, z:  0.0, w: 12.0, h: 0.82, d: 10.0 },
-    { name: 'dockSideCatwalk', x: -18.0, y: 0.34, z:  5.5, w: 10.0, h: 0.58, d:  4.0 },
-    { name: 'tankServiceWing', x:  22.0, y: 0.94, z:  6.2, w: 12.0, h: 0.62, d:  4.6 },
-    { name: 'plazaSideLoop',   x:  68.0, y: 1.70, z: -6.4, w: 12.0, h: 0.60, d:  4.8 },
-    { name: 'exhibitSideDeck', x: 108.0, y: 2.02, z: -6.0, w: 14.0, h: 0.62, d:  4.8 },
-  ],
-
-  decorPlatforms: [
-    { name: 'tankBeamA',        x:  10.0, y: 4.8, z: -7.4, w: 20.0, h: 0.34, d: 2.2 },
-    { name: 'suspendedBridgeB', x:  34.0, y: 3.9, z:  6.6, w: 18.0, h: 0.32, d: 2.0 },
-    { name: 'serviceBalconyC',  x:  72.0, y: 4.5, z: -7.8, w: 20.0, h: 0.34, d: 2.4 },
-    { name: 'observationRingD', x: 108.0, y: 4.8, z:  7.2, w: 22.0, h: 0.36, d: 2.6 },
-    { name: 'entryPipeRun',     x: -10.0, y: 5.2, z:  7.8, w: 18.0, h: 0.30, d: 1.8, rotationZ: -0.06 },
-  ],
-
-  decorBlocks: [
-    { name: 'glassWallA',   x:  10.0, y: 4.8, z:  10.6, w: 30.0, h: 9.2, d: 1.6, rgb: [24, 94, 120], emissiveScale: 0.04, roughness: 0.52, alpha: 0.42 },
-    { name: 'serviceWallB', x:  62.0, y: 4.4, z: -10.2, w: 26.0, h: 8.4, d: 2.4, rgb: [14, 58, 78], emissiveScale: 0.03, roughness: 0.80 },
-    { name: 'glassWallC',   x: 108.0, y: 5.0, z:   9.8, w: 28.0, h: 9.8, d: 1.8, rgb: [24, 102, 126], emissiveScale: 0.04, roughness: 0.50, alpha: 0.38 },
-  ],
-
-  decorColumns: [
-    { name: 'tankClusterA', x:  34.0, y: 3.4, z: -8.8, diameter: 3.4, height: 6.8, rgb: [54, 168, 196], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
-    { name: 'tankClusterB', x:  70.0, y: 4.0, z:  8.8, diameter: 3.0, height: 7.6, rgb: [54, 160, 188], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
-    { name: 'tankClusterC', x: 114.0, y: 4.6, z: -8.4, diameter: 3.6, height: 8.2, rgb: [54, 168, 196], emissiveScale: 0.10, roughness: 0.34, alpha: 0.58 },
-  ],
+  authoredMap: {
+    id: 'aquarium-drift-map01',
+    startSector: 'spawn_dock',
+    goalSector: 'final_exhibit_platform',
+    sectors: [
+      {
+        id: 'spawn_dock',
+        label: 'Spawn Dock',
+        x: -31,
+        z: 8,
+        w: 22,
+        d: 18,
+        floorY: 0.76,
+        ceilingY: 8.8,
+        floorSurfaceType: 'wet_service_deck',
+        wallLanguage: 'steel_dock',
+        landmarks: ['dock crane', 'service gate'],
+        shell: {
+          rgb: [24, 72, 92],
+          roughness: 0.78,
+          openSides: ['west', 'east', 'south'],
+          beamCount: 3,
+          beamRgb: [74, 138, 156],
+        },
+        surfaces: [
+          { id: 'spawn_main', offsetX: -0.8, offsetZ: 0.0, w: 14.2, d: 8.8, h: 0.72, surfaceType: 'wet_service_deck', walkableClassification: 'dock-floor' },
+          { id: 'spawn_north', offsetX: -2.8, offsetZ: -5.0, w: 10.0, d: 4.0, h: 0.58, floorY: 0.72, surfaceType: 'drain_apron', walkableClassification: 'dock-apron' },
+          { id: 'spawn_south', offsetX: 5.6, offsetZ: 4.6, w: 7.2, d: 4.0, h: 0.56, floorY: 0.74, surfaceType: 'shell_service_deck', walkableClassification: 'dock-spur' },
+        ],
+        decorBlocks: [
+          { name: 'dock_crate_bank', offsetX: -7.8, offsetZ: -6.3, w: 5.4, h: 3.6, d: 3.4, rgb: [56, 90, 102], emissiveScale: 0.03, roughness: 0.86 },
+          { name: 'dock_filter_stack', offsetX: 8.8, offsetZ: -6.8, w: 4.2, h: 5.4, d: 3.2, rgb: [42, 86, 102], emissiveScale: 0.04, roughness: 0.80 },
+          { name: 'dock_water_wall', offsetX: 0.0, offsetZ: 9.6, w: 18.0, h: 7.2, d: 1.4, rgb: [44, 122, 148], emissiveScale: 0.06, roughness: 0.46, alpha: 0.44 },
+        ],
+        decorColumns: [
+          { name: 'dock_tank_post_a', offsetX: -9.8, offsetZ: 7.2, diameter: 1.0, height: 7.6, rgb: [78, 148, 168], roughness: 0.64 },
+          { name: 'dock_tank_post_b', offsetX: 9.8, offsetZ: 7.2, diameter: 1.0, height: 7.6, rgb: [78, 148, 168], roughness: 0.64 },
+        ],
+        decorPlatforms: [
+          { name: 'dock_pipe_run', offsetX: 0.0, offsetZ: 8.2, w: 15.6, h: 0.26, d: 1.4, y: 5.6, rgb: [60, 132, 150] },
+        ],
+        signage: [
+          { offsetX: 1.0, y: 5.2, offsetZ: -8.6, text: 'AQUARIUM DRIFT', width: 8.2, height: 1.9 },
+        ],
+      },
+      {
+        id: 'direct_chamber_approach',
+        label: 'Direct Chamber Approach',
+        x: -10,
+        z: 8,
+        w: 20,
+        d: 12,
+        floorY: 1.04,
+        ceilingY: 8.2,
+        floorSurfaceType: 'glass_bridge',
+        wallLanguage: 'service_bridge',
+        landmarks: ['glass bridge', 'pipe arch'],
+        shell: {
+          rgb: [26, 82, 102],
+          roughness: 0.74,
+          openSides: ['west', 'east'],
+          beamCount: 2,
+          beamRgb: [86, 166, 184],
+        },
+        surfaces: [
+          { id: 'direct_a', offsetX: -5.2, offsetZ: 0.0, w: 4.2, d: 4.4, h: 0.56, floorY: 0.86, surfaceType: 'glass_bridge', walkableClassification: 'bridge' },
+          { id: 'direct_b', offsetX: -0.8, offsetZ: 0.0, w: 4.4, d: 4.4, h: 0.56, floorY: 0.94, surfaceType: 'glass_bridge', walkableClassification: 'bridge' },
+          { id: 'direct_c', offsetX: 3.6, offsetZ: 0.0, w: 4.4, d: 4.4, h: 0.56, floorY: 1.04, surfaceType: 'glass_bridge', walkableClassification: 'bridge' },
+        ],
+        checkpoints: [
+          { id: 'cp_glass_bridge', offsetX: -1.2, offsetZ: 0.0, label: 'Glass Bridge' },
+        ],
+        decorPlatforms: [
+          { name: 'direct_pipe_arch', offsetX: 0.0, offsetZ: 0.0, w: 12.6, h: 0.24, d: 1.2, y: 4.9, rgb: [80, 156, 176] },
+        ],
+      },
+      {
+        id: 'side_service_catwalk',
+        label: 'Side Service Catwalk',
+        x: -15,
+        z: -10,
+        w: 28,
+        d: 8,
+        floorY: 0.94,
+        ceilingY: 6.8,
+        floorSurfaceType: 'catwalk_grate',
+        wallLanguage: 'service_catwalk',
+        landmarks: ['tank service rail', 'pump niche'],
+        shell: {
+          rgb: [20, 62, 82],
+          roughness: 0.82,
+          openSides: ['west', 'east'],
+          ceiling: false,
+          beamCount: 3,
+          beamRgb: [66, 130, 150],
+        },
+        surfaces: [
+          { id: 'side_main', offsetX: 0.0, offsetZ: 0.0, w: 22.4, d: 3.6, h: 0.56, floorY: 0.94, surfaceType: 'catwalk_grate', walkableClassification: 'catwalk' },
+          { id: 'side_niche', offsetX: 7.0, offsetZ: 2.0, w: 6.2, d: 2.6, h: 0.54, floorY: 1.02, surfaceType: 'maintenance_plate', walkableClassification: 'ledge' },
+        ],
+        decorBlocks: [
+          { name: 'side_tank_wall', offsetX: 0.0, offsetZ: -4.8, w: 24.0, h: 6.2, d: 1.2, rgb: [36, 110, 138], emissiveScale: 0.06, roughness: 0.50, alpha: 0.42 },
+          { name: 'side_pump_niche', offsetX: 9.0, offsetZ: 4.8, w: 4.2, h: 3.0, d: 1.6, rgb: [38, 78, 94], emissiveScale: 0.03, roughness: 0.84 },
+        ],
+        signage: [
+          { offsetX: 4.8, y: 4.4, offsetZ: 4.6, text: 'SERVICE CATWALK', width: 7.0, height: 1.7 },
+        ],
+      },
+      {
+        id: 'central_viewing_chamber',
+        label: 'Central Viewing Chamber',
+        x: 18,
+        z: 1,
+        w: 36,
+        d: 30,
+        floorY: 1.34,
+        ceilingY: 11.2,
+        floorSurfaceType: 'viewing_deck',
+        wallLanguage: 'tank_chamber',
+        landmarks: ['giant viewing glass', 'cylinder tank cluster'],
+        shell: {
+          rgb: [24, 74, 96],
+          roughness: 0.76,
+          openSides: ['west', 'east'],
+          beamCount: 5,
+          beamRgb: [76, 148, 170],
+        },
+        surfaces: [
+          { id: 'chamber_west', offsetX: -8.4, offsetZ: 5.6, w: 14.2, d: 8.2, h: 0.66, floorY: 1.24, surfaceType: 'wet_service_deck', walkableClassification: 'chamber-floor' },
+          { id: 'chamber_center', offsetX: 1.8, offsetZ: 0.4, w: 12.8, d: 8.4, h: 0.66, floorY: 1.34, surfaceType: 'viewing_deck', walkableClassification: 'chamber-floor' },
+          { id: 'chamber_south', offsetX: 6.2, offsetZ: -8.4, w: 11.4, d: 6.0, h: 0.60, floorY: 1.18, surfaceType: 'maintenance_plate', walkableClassification: 'chamber-floor' },
+          { id: 'chamber_north', offsetX: 7.8, offsetZ: 9.4, w: 10.2, d: 5.6, h: 0.60, floorY: 1.28, surfaceType: 'viewing_deck', walkableClassification: 'chamber-floor' },
+        ],
+        checkpoints: [
+          { id: 'cp_viewing_ring', offsetX: -1.2, offsetZ: 0.4, label: 'Viewing Ring' },
+        ],
+        decorBlocks: [
+          { name: 'chamber_glass_wall', offsetX: 0.0, offsetZ: 15.6, w: 30.0, h: 9.0, d: 1.6, rgb: [46, 136, 160], emissiveScale: 0.07, roughness: 0.46, alpha: 0.42 },
+          { name: 'chamber_support_bank', offsetX: 14.6, offsetZ: -10.8, w: 4.6, h: 5.0, d: 5.8, rgb: [34, 82, 100], emissiveScale: 0.03, roughness: 0.82 },
+          { name: 'chamber_filter_wall', offsetX: -15.0, offsetZ: -11.2, w: 3.0, h: 6.2, d: 9.4, rgb: [30, 76, 92], emissiveScale: 0.03, roughness: 0.84 },
+        ],
+        decorColumns: [
+          { name: 'tank_cluster_a', offsetX: 3.0, offsetZ: 8.0, diameter: 3.0, height: 7.6, rgb: [92, 198, 214], roughness: 0.40, alpha: 0.56 },
+          { name: 'tank_cluster_b', offsetX: 8.6, offsetZ: 3.6, diameter: 2.4, height: 6.6, rgb: [86, 188, 204], roughness: 0.40, alpha: 0.56 },
+          { name: 'tank_cluster_c', offsetX: 11.2, offsetZ: 10.4, diameter: 2.6, height: 8.4, rgb: [92, 198, 214], roughness: 0.40, alpha: 0.56 },
+        ],
+        decorPlatforms: [
+          { name: 'chamber_pipe_run_a', offsetX: -8.0, offsetZ: 13.4, w: 24.0, h: 0.28, d: 1.2, y: 6.4, rgb: [84, 154, 170] },
+          { name: 'chamber_pipe_run_b', offsetX: 6.0, offsetZ: -13.2, w: 22.0, h: 0.28, d: 1.2, y: 7.0, rgb: [70, 136, 156] },
+        ],
+        signage: [
+          { offsetX: 0.0, y: 6.0, offsetZ: -14.0, text: 'CENTRAL VIEWING CHAMBER', width: 11.2, height: 2.0 },
+        ],
+      },
+      {
+        id: 'overhead_cross_bridge',
+        label: 'Overhead Cross-Bridge',
+        x: 45,
+        z: 8,
+        w: 24,
+        d: 8,
+        floorY: 2.92,
+        ceilingY: 8.6,
+        floorSurfaceType: 'overhead_bridge',
+        wallLanguage: 'service_bridge',
+        landmarks: ['service bridge', 'pipe lattice'],
+        shell: {
+          rgb: [18, 62, 82],
+          roughness: 0.80,
+          openSides: ['west', 'east'],
+          ceiling: false,
+          beamCount: 2,
+          beamRgb: [88, 168, 186],
+        },
+        surfaces: [
+          { id: 'bridge_main', offsetX: 0.0, offsetZ: 0.0, w: 18.8, d: 4.0, h: 0.56, floorY: 2.92, surfaceType: 'catwalk_grate', walkableClassification: 'bridge' },
+          { id: 'bridge_node', offsetX: -6.8, offsetZ: -1.4, w: 6.2, d: 2.8, h: 0.54, floorY: 2.84, surfaceType: 'maintenance_plate', walkableClassification: 'bridge-node' },
+        ],
+        decorPlatforms: [
+          { name: 'bridge_lattice', offsetX: 0.0, offsetZ: 0.0, w: 19.0, h: 0.18, d: 0.6, y: 5.6, rgb: [94, 178, 198] },
+        ],
+      },
+      {
+        id: 'lower_maintenance_route',
+        label: 'Lower Maintenance Route',
+        x: 41,
+        z: -13,
+        w: 28,
+        d: 10,
+        floorY: 0.62,
+        ceilingY: 5.8,
+        floorSurfaceType: 'maintenance_channel',
+        wallLanguage: 'maintenance_trench',
+        landmarks: ['pump manifold', 'drain trench'],
+        shell: {
+          rgb: [18, 56, 72],
+          roughness: 0.84,
+          openSides: ['west', 'east'],
+          beamCount: 3,
+          beamRgb: [60, 126, 146],
+        },
+        surfaces: [
+          { id: 'maintenance_main', offsetX: 0.0, offsetZ: 0.0, w: 18.4, d: 4.8, h: 0.60, floorY: 0.62, surfaceType: 'maintenance_plate', walkableClassification: 'maintenance-floor' },
+          { id: 'maintenance_shelf', offsetX: 7.2, offsetZ: 2.2, w: 6.4, d: 3.0, h: 0.56, floorY: 0.82, surfaceType: 'drain_apron', walkableClassification: 'maintenance-shelf' },
+          { id: 'maintenance_pump_pad', offsetX: -7.6, offsetZ: -2.3, w: 5.8, d: 2.8, h: 0.56, floorY: 0.74, surfaceType: 'maintenance_plate', walkableClassification: 'maintenance-pad' },
+        ],
+        decorBlocks: [
+          { name: 'maintenance_pump_bank', offsetX: -10.2, offsetZ: -4.2, w: 6.0, h: 3.2, d: 1.8, rgb: [34, 78, 92], emissiveScale: 0.04, roughness: 0.82 },
+          { name: 'maintenance_pipe_wall', offsetX: 10.0, offsetZ: 4.8, w: 7.0, h: 2.4, d: 1.6, y: 2.0, rgb: [42, 96, 112], emissiveScale: 0.04, roughness: 0.78 },
+        ],
+        signage: [
+          { offsetX: 4.6, y: 4.0, offsetZ: 5.2, text: 'LOWER MAINTENANCE', width: 7.8, height: 1.8 },
+        ],
+      },
+      {
+        id: 'final_exhibit_platform',
+        label: 'Final Exhibit Platform',
+        x: 71,
+        z: -4,
+        w: 24,
+        d: 18,
+        floorY: 1.96,
+        ceilingY: 9.4,
+        floorSurfaceType: 'exhibit_deck',
+        wallLanguage: 'final_exhibit',
+        landmarks: ['main viewing glass', 'exhibit ring'],
+        shell: {
+          rgb: [22, 72, 94],
+          roughness: 0.76,
+          openSides: ['west'],
+          beamCount: 3,
+          beamRgb: [84, 160, 180],
+        },
+        surfaces: [
+          { id: 'final_main', offsetX: -2.8, offsetZ: 0.0, w: 16.2, d: 8.4, h: 0.72, floorY: 1.96, surfaceType: 'shell_service_deck', walkableClassification: 'final-floor' },
+          { id: 'goalDeck', name: 'goalDeck', offsetX: 4.8, offsetZ: 0.8, w: 12.0, d: 6.2, h: 0.76, floorY: 2.18, surfaceType: 'exhibit_deck', walkableClassification: 'goal-floor' },
+          { id: 'final_south', offsetX: 1.0, offsetZ: -5.6, w: 8.2, d: 3.2, h: 0.58, floorY: 1.74, surfaceType: 'maintenance_plate', walkableClassification: 'final-apron' },
+        ],
+        checkpoints: [
+          { id: 'cp_final_ring', offsetX: -8.0, offsetZ: -0.6, label: 'Final Exhibit' },
+        ],
+        decorBlocks: [
+          { name: 'final_glass_wall', offsetX: 9.6, offsetZ: 0.0, w: 2.0, h: 8.2, d: 12.4, rgb: [48, 136, 162], emissiveScale: 0.08, roughness: 0.42, alpha: 0.44 },
+          { name: 'final_ring_base', offsetX: -8.6, offsetZ: 5.6, w: 6.4, h: 4.2, d: 6.4, rgb: [40, 88, 104], emissiveScale: 0.05, roughness: 0.76 },
+        ],
+        decorColumns: [
+          { name: 'final_ring_column_a', offsetX: -9.2, offsetZ: 6.0, diameter: 1.8, height: 5.8, rgb: [92, 198, 214], roughness: 0.36, alpha: 0.56 },
+          { name: 'final_ring_column_b', offsetX: -5.6, offsetZ: 6.0, diameter: 1.8, height: 6.4, rgb: [92, 198, 214], roughness: 0.36, alpha: 0.56 },
+        ],
+        signage: [
+          { offsetX: -1.0, y: 6.0, offsetZ: 8.0, text: 'FINAL EXHIBIT', width: 7.0, height: 1.8 },
+        ],
+      },
+    ],
+    connectors: [
+      {
+        id: 'spawn_to_direct',
+        sourceSector: 'spawn_dock',
+        destinationSector: 'direct_chamber_approach',
+        type: 'doorway',
+        x: -20,
+        z: 8,
+        w: 12,
+        d: 8,
+        floorY: 0.92,
+        ceilingY: 6.8,
+        floorSurfaceType: 'threshold',
+        wallLanguage: 'dock_threshold',
+        landmarks: ['dock threshold'],
+        shell: false,
+        surfaces: [
+          { id: 'direct_threshold_a', offsetX: -3.6, offsetZ: 0.0, w: 3.4, d: 4.4, h: 0.56, floorY: 0.78, surfaceType: 'threshold', walkableClassification: 'connector' },
+          { id: 'direct_threshold_b', offsetX: 0.0, offsetZ: 0.0, w: 3.4, d: 4.4, h: 0.56, floorY: 0.86, surfaceType: 'threshold', walkableClassification: 'connector' },
+          { id: 'direct_threshold_c', offsetX: 3.4, offsetZ: 0.0, w: 3.0, d: 4.4, h: 0.56, floorY: 0.94, surfaceType: 'threshold', walkableClassification: 'connector' },
+        ],
+      },
+      {
+        id: 'spawn_to_side',
+        sourceSector: 'spawn_dock',
+        destinationSector: 'side_service_catwalk',
+        type: 'stairs',
+        x: -23,
+        z: -1,
+        w: 14,
+        d: 7,
+        floorY: 0.90,
+        ceilingY: 6.6,
+        floorSurfaceType: 'service_stair',
+        wallLanguage: 'dock_drop',
+        landmarks: ['dock stair'],
+        shell: false,
+        surfaces: [
+          { id: 'side_step_a', offsetX: -4.2, offsetZ: 0.0, w: 3.2, d: 4.2, h: 0.54, floorY: 0.82, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'side_step_b', offsetX: -0.8, offsetZ: 0.0, w: 3.2, d: 4.2, h: 0.54, floorY: 0.88, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'side_step_c', offsetX: 2.6, offsetZ: 0.0, w: 3.2, d: 4.2, h: 0.54, floorY: 0.94, surfaceType: 'landing', walkableClassification: 'stairs' },
+        ],
+      },
+      {
+        id: 'direct_to_chamber',
+        sourceSector: 'direct_chamber_approach',
+        destinationSector: 'central_viewing_chamber',
+        type: 'hall',
+        x: 4,
+        z: 7,
+        w: 16,
+        d: 8,
+        floorY: 1.18,
+        ceilingY: 7.6,
+        floorSurfaceType: 'glass_hall',
+        wallLanguage: 'tank_hall',
+        landmarks: ['viewing threshold'],
+        shell: {
+          rgb: [20, 74, 92],
+          roughness: 0.76,
+          openSides: ['west', 'east'],
+          beamCount: 2,
+          beamRgb: [78, 152, 170],
+        },
+        surfaces: [
+          { id: 'hall_a', offsetX: -4.8, offsetZ: 0.0, w: 3.6, d: 4.4, h: 0.56, floorY: 1.02, surfaceType: 'glass_bridge', walkableClassification: 'connector' },
+          { id: 'hall_b', offsetX: -1.0, offsetZ: 0.0, w: 3.6, d: 4.4, h: 0.56, floorY: 1.10, surfaceType: 'glass_bridge', walkableClassification: 'connector' },
+          { id: 'hall_c', offsetX: 2.8, offsetZ: 0.0, w: 3.6, d: 4.4, h: 0.56, floorY: 1.18, surfaceType: 'wet_service_deck', walkableClassification: 'connector' },
+        ],
+      },
+      {
+        id: 'side_to_chamber',
+        sourceSector: 'side_service_catwalk',
+        destinationSector: 'central_viewing_chamber',
+        type: 'hall',
+        x: 2,
+        z: -7,
+        w: 18,
+        d: 7,
+        floorY: 1.16,
+        ceilingY: 6.8,
+        floorSurfaceType: 'catwalk_hall',
+        wallLanguage: 'side_service_link',
+        landmarks: ['side link'],
+        shell: false,
+        surfaces: [
+          { id: 'side_link_a', offsetX: -5.4, offsetZ: 0.0, w: 4.2, d: 4.0, h: 0.54, floorY: 0.98, surfaceType: 'catwalk_grate', walkableClassification: 'connector' },
+          { id: 'side_link_b', offsetX: -1.0, offsetZ: 0.0, w: 4.2, d: 4.0, h: 0.54, floorY: 1.06, surfaceType: 'catwalk_grate', walkableClassification: 'connector' },
+          { id: 'side_link_c', offsetX: 3.4, offsetZ: 0.0, w: 4.2, d: 4.0, h: 0.54, floorY: 1.16, surfaceType: 'wet_service_deck', walkableClassification: 'connector' },
+        ],
+      },
+      {
+        id: 'chamber_to_upper',
+        sourceSector: 'central_viewing_chamber',
+        destinationSector: 'overhead_cross_bridge',
+        type: 'stairs',
+        x: 31,
+        z: 6,
+        w: 18,
+        d: 6,
+        floorY: 2.78,
+        ceilingY: 7.8,
+        floorSurfaceType: 'bridge_rise',
+        wallLanguage: 'upper_service_stair',
+        landmarks: ['upper stair'],
+        shell: false,
+        surfaces: [
+          { id: 'upper_step_a', offsetX: -5.6, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 1.58, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'upper_step_b', offsetX: -1.8, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 1.96, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'upper_step_c', offsetX: 2.0, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 2.36, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'upper_step_d', offsetX: 5.8, offsetZ: 0.0, w: 3.0, d: 4.0, h: 0.54, floorY: 2.78, surfaceType: 'landing', walkableClassification: 'stairs' },
+        ],
+      },
+      {
+        id: 'chamber_to_lower',
+        sourceSector: 'central_viewing_chamber',
+        destinationSector: 'lower_maintenance_route',
+        type: 'ramp',
+        x: 29,
+        z: -8,
+        w: 18,
+        d: 6,
+        floorY: 0.74,
+        ceilingY: 6.4,
+        floorSurfaceType: 'maintenance_ramp',
+        wallLanguage: 'maintenance_drop',
+        landmarks: ['maintenance ramp'],
+        shell: false,
+        surfaces: [
+          { id: 'lower_step_a', offsetX: -5.6, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 1.12, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'lower_step_b', offsetX: -1.8, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 0.96, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'lower_step_c', offsetX: 2.0, offsetZ: 0.0, w: 3.6, d: 4.0, h: 0.54, floorY: 0.82, surfaceType: 'step', walkableClassification: 'stairs' },
+          { id: 'lower_step_d', offsetX: 5.8, offsetZ: 0.0, w: 3.0, d: 4.0, h: 0.54, floorY: 0.70, surfaceType: 'landing', walkableClassification: 'stairs' },
+        ],
+      },
+      {
+        id: 'upper_to_final',
+        sourceSector: 'overhead_cross_bridge',
+        destinationSector: 'final_exhibit_platform',
+        type: 'bridge',
+        x: 58,
+        z: 4,
+        w: 20,
+        d: 6,
+        floorY: 1.96,
+        ceilingY: 7.2,
+        floorSurfaceType: 'cross_bridge',
+        wallLanguage: 'upper_exit_bridge',
+        landmarks: ['upper bridge'],
+        shell: {
+          rgb: [20, 66, 84],
+          roughness: 0.82,
+          openSides: ['west', 'east'],
+          ceiling: false,
+          beamCount: 2,
+          beamRgb: [88, 168, 186],
+        },
+        surfaces: [
+          { id: 'upper_bridge_a', offsetX: -6.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 2.70, surfaceType: 'catwalk_grate', walkableClassification: 'bridge' },
+          { id: 'upper_bridge_b', offsetX: -2.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 2.46, surfaceType: 'catwalk_grate', walkableClassification: 'bridge' },
+          { id: 'upper_bridge_c', offsetX: 2.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 2.20, surfaceType: 'glass_bridge', walkableClassification: 'bridge' },
+          { id: 'upper_bridge_d', offsetX: 6.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 1.96, surfaceType: 'glass_bridge', walkableClassification: 'bridge' },
+        ],
+      },
+      {
+        id: 'lower_to_final',
+        sourceSector: 'lower_maintenance_route',
+        destinationSector: 'final_exhibit_platform',
+        type: 'ramp',
+        x: 58,
+        z: -10,
+        w: 20,
+        d: 6,
+        floorY: 1.96,
+        ceilingY: 6.6,
+        floorSurfaceType: 'maintenance_rise',
+        wallLanguage: 'maintenance_exit',
+        landmarks: ['maintenance rise'],
+        shell: false,
+        surfaces: [
+          { id: 'lower_bridge_a', offsetX: -6.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 0.82, surfaceType: 'maintenance_plate', walkableClassification: 'stairs' },
+          { id: 'lower_bridge_b', offsetX: -2.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 1.16, surfaceType: 'maintenance_plate', walkableClassification: 'stairs' },
+          { id: 'lower_bridge_c', offsetX: 2.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 1.52, surfaceType: 'shell_service_deck', walkableClassification: 'stairs' },
+          { id: 'lower_bridge_d', offsetX: 6.0, offsetZ: 0.0, w: 3.8, d: 4.0, h: 0.54, floorY: 1.96, surfaceType: 'shell_service_deck', walkableClassification: 'stairs' },
+        ],
+      },
+      {
+        id: 'upper_lower_link',
+        sourceSector: 'overhead_cross_bridge',
+        destinationSector: 'lower_maintenance_route',
+        type: 'lift',
+        x: 49,
+        z: -2,
+        w: 12,
+        d: 10,
+        floorY: 2.62,
+        ceilingY: 8.4,
+        floorSurfaceType: 'service_shaft',
+        wallLanguage: 'vertical_service_link',
+        landmarks: ['maintenance shaft'],
+        shell: {
+          rgb: [18, 64, 80],
+          roughness: 0.84,
+          openSides: ['north', 'south'],
+          beamCount: 2,
+          beamRgb: [88, 164, 184],
+        },
+        surfaces: [
+          { id: 'shaft_top', offsetX: -1.2, offsetZ: 2.2, w: 4.0, d: 3.0, h: 0.54, floorY: 2.62, surfaceType: 'catwalk_grate', walkableClassification: 'connector' },
+          { id: 'shaft_mid', offsetX: 0.6, offsetZ: 0.0, w: 3.6, d: 2.8, h: 0.54, floorY: 1.74, surfaceType: 'maintenance_plate', walkableClassification: 'connector' },
+          { id: 'shaft_bottom', offsetX: 1.4, offsetZ: -2.4, w: 4.2, d: 3.0, h: 0.54, floorY: 0.86, surfaceType: 'maintenance_plate', walkableClassification: 'connector' },
+        ],
+      },
+    ],
+  },
 
   coins: [
-    // Act A — on entryDock and glassBridge
-    { x: -20.0, y: 0, z: -2.8 }, { x: -12.0, y: 0, z: -1.2 },
-    { x:  -5.5, y: 0, z:  0.8 }, { x:   8.5, y: 0, z: -0.5 },
-    // Act B — on tankChamber and kelpIsland
-    { x:  18.5, y: 0, z: -3.5 }, { x:  24.0, y: 0, z: -1.8 },
-    { x:  33.5, y: 0, z:  1.2 }, { x:  38.0, y: 0, z:  2.8 },
-    { x:  44.0, y: 0, z:  1.5 },
-    // Act C — service catwalk, plaza, bridge
-    { x:  53.0, y: 0, z: -3.8 }, { x:  63.0, y: 0, z: -1.2 },
-    { x:  68.0, y: 0, z:  3.2 }, { x:  78.0, y: 0, z:  1.8 },
-    { x:  82.5, y: 0, z: -0.5 },
-    // Act D — exhibit hall and goal
-    { x:  96.5, y: 0, z:  1.5 }, { x: 104.0, y: 0, z: -0.8 },
-    { x: 114.0, y: 0, z:  1.0 }, { x: 124.5, y: 0, z:  0.0 },
+    { x: -35.0, y: 0, z: 8.4 },
+    { x: -28.4, y: 0, z: 11.4 },
+    { x: -22.6, y: 0, z: 6.2 },
+    { x: -11.2, y: 0, z: 8.1 },
+    { x: -16.2, y: 0, z: -10.0 },
+    { x: 4.4, y: 0, z: 7.0 },
+    { x: 9.6, y: 0, z: 7.4 },
+    { x: 14.6, y: 0, z: 5.0 },
+    { x: 18.8, y: 0, z: 0.4 },
+    { x: 25.8, y: 0, z: -8.2 },
+    { x: 33.0, y: 0, z: 6.0 },
+    { x: 41.4, y: 0, z: -13.0 },
+    { x: 49.2, y: 0, z: -2.0 },
+    { x: 52.8, y: 0, z: 8.0 },
+    { x: 58.4, y: 0, z: -10.0 },
+    { x: 65.8, y: 0, z: -4.6 },
+    { x: 72.4, y: 0, z: -1.8 },
+    { x: 77.0, y: 0, z: -4.0 },
   ],
 
   currents: [
-    // Help cross from glassBridge → tankChamber (z: +1 → -2.5)
-    { name: 'currentA1', x:  -0.5, y: 1.35, z: -0.5, w: 8.0, h: 3.1, d: 6.0, pushX: 4.0, pushZ: -2.0 },
-    // Help cross from glassBridge left side
-    { name: 'currentA2', x:   8.5, y: 1.55, z:  0.5, w: 8.0, h: 3.2, d: 6.0, pushX: -3.5, pushZ: -1.5 },
-    // Help cross from kelpIsland → serviceCatwalk (z: +2 → -4)
-    { name: 'currentD1', x:  98.0, y: 2.25, z:  0.0, w: 7.4, h: 3.6, d: 6.0, pushX: 4.9, pushZ: -1.5 },
-    { name: 'currentD2', x: 110.5, y: 2.45, z:  0.5, w: 7.4, h: 3.6, d: 6.0, pushX: -3.8, pushZ:  1.5 },
+    { name: 'current_chamber_entry', x: 10.5, y: 2.15, z: 5.4, w: 7.8, h: 3.4, d: 5.8, pushX: 2.9, pushZ: -0.8 },
+    { name: 'current_chamber_cross', x: 20.8, y: 2.38, z: 0.6, w: 9.2, h: 3.8, d: 7.0, pushX: 1.4, pushZ: 2.8 },
+    { name: 'current_final_arc', x: 66.6, y: 3.02, z: -4.2, w: 8.2, h: 4.0, d: 6.2, pushX: 2.4, pushZ: 1.2 },
   ],
 
   deepWaterPockets: [
-    { name: 'deepPocketB', x:  37.0, y: 1.85, z:  1.0, w: 13.0, h: 3.2, d:  9.0 },
-    { name: 'deepPocketC', x:  68.0, y: 2.20, z:  1.0, w: 16.0, h: 3.6, d: 11.0 },
-    { name: 'deepPocketD', x: 105.0, y: 2.45, z:  0.5, w: 18.0, h: 3.8, d: 13.0 },
+    { name: 'viewing_pocket', x: 18.8, y: 2.48, z: 1.2, w: 11.2, h: 4.4, d: 8.4 },
+    { name: 'service_shaft_pocket', x: 49.4, y: 2.34, z: -2.0, w: 7.6, h: 5.8, d: 6.4 },
+    { name: 'final_tank_pocket', x: 69.8, y: 3.18, z: -3.8, w: 9.6, h: 4.6, d: 7.8 },
   ],
 
   airBubblePickups: [
-    { name: 'airBubbleB', x:  40.0, y: 1.95, z:  2.0, radius: 0.82, refill: 8 },
-    { name: 'airBubbleC', x:  82.5, y: 2.20, z: -0.8, radius: 0.82, refill: 8 },
-    { name: 'airBubbleD', x: 118.6, y: 2.45, z:  0.5, radius: 0.82, refill: 10 },
+    { name: 'bubble_viewing', x: 20.4, y: 2.34, z: 1.6, radius: 0.82, refill: 8 },
+    { name: 'bubble_shaft', x: 49.4, y: 2.38, z: -2.0, radius: 0.82, refill: 10 },
+    { name: 'bubble_final', x: 71.8, y: 3.10, z: -3.4, radius: 0.82, refill: 10 },
   ],
 
   eelRails: [
-    // On kelpIsland (z=+2)
-    { name: 'eelRailB',  x1: 34.0, y1: 0.35, x2: 40.0, y2: 2.15, z:  2.0, phaseOffset: 0.00 },
-    // On cylinderPlaza (z=+2.5)
-    { name: 'eelRailC1', x1: 65.0, y1: 0.55, x2: 71.0, y2: 2.45, z:  2.5, phaseOffset: 0.35 },
-    // On innerBridge (z=-1)
-    { name: 'eelRailC2', x1: 79.0, y1: 0.75, x2: 85.0, y2: 2.65, z: -1.0, phaseOffset: 0.70 },
+    { name: 'eel_viewing_north', x1: 12.0, y1: 1.18, x2: 22.6, y2: 1.86, z: 9.4, phaseOffset: 0.00 },
+    { name: 'eel_upper_bridge', x1: 39.0, y1: 2.72, x2: 51.0, y2: 3.12, z: 8.1, phaseOffset: 0.30 },
+    { name: 'eel_final_ring', x1: 64.0, y1: 1.94, x2: 73.0, y2: 2.48, z: -6.2, phaseOffset: 0.62 },
   ],
 
   vents: [
-    // On cylinderPlaza (z=+2.5 area)
-    { name: 'ventC1', x: 65.0, y: 0.58, z:  3.0, w: 2.0, h: 3.2, liftVy: 16.5, phaseOffset: 0.00 },
-    { name: 'ventC2', x: 74.0, y: 0.78, z:  1.8, w: 2.0, h: 3.4, liftVy: 17.2, phaseOffset: 0.45 },
-    // On exhibitHall (z=+0.5 area)
-    { name: 'ventD1', x: 102.0, y: 0.92, z: 0.5, w: 2.2, h: 3.4, liftVy: 16.4, phaseOffset: 0.20 },
+    { name: 'vent_chamber_lift', x: 24.8, y: 1.10, z: -7.6, w: 2.0, h: 3.6, liftVy: 16.2, phaseOffset: 0.12 },
+    { name: 'vent_lower_route', x: 41.2, y: 0.36, z: -12.8, w: 2.0, h: 3.4, liftVy: 15.8, phaseOffset: 0.48 },
+    { name: 'vent_final_arc', x: 66.2, y: 1.64, z: -4.2, w: 2.2, h: 3.6, liftVy: 16.6, phaseOffset: 0.74 },
   ],
 
   jellyfish: [
-    { name: 'jellyA1', x:   8.0, y: 1.55, z: -0.5, bounds: { minX:  5.0, maxX: 12.0, minY: 0.8, maxY: 2.6, minZ: -2.0, maxZ:  1.5 }, speed: 0.8, turnSpeed: 2.2, act: 'A' },
-    { name: 'jellyB1', x:  23.0, y: 1.80, z: -1.5, bounds: { minX: 18.0, maxX: 28.0, minY: 0.9, maxY: 2.9, minZ: -4.0, maxZ: -0.5 }, speed: 1.0, turnSpeed: 2.4, act: 'B' },
-    { name: 'jellyB2', x:  36.0, y: 1.95, z:  2.5, bounds: { minX: 32.0, maxX: 42.0, minY: 1.0, maxY: 3.1, minZ:  0.5, maxZ:  4.0 }, speed: 1.0, turnSpeed: 2.2, act: 'B' },
-    { name: 'jellyB3', x:  47.0, y: 2.05, z:  0.5, bounds: { minX: 43.0, maxX: 51.0, minY: 1.1, maxY: 3.2, minZ: -1.0, maxZ:  2.5 }, speed: 1.08, turnSpeed: 2.4, act: 'B' },
-    { name: 'jellyC1', x:  68.0, y: 2.25, z:  2.0, bounds: { minX: 64.0, maxX: 74.0, minY: 1.2, maxY: 3.4, minZ:  0.5, maxZ:  4.0 }, speed: 1.12, turnSpeed: 2.6, act: 'C' },
-    { name: 'jellyC2', x:  82.5, y: 2.45, z: -0.5, bounds: { minX: 79.0, maxX: 87.0, minY: 1.3, maxY: 3.6, minZ: -2.5, maxZ:  1.0 }, speed: 1.14, turnSpeed: 2.6, act: 'C' },
-    { name: 'jellyD1', x:  99.0, y: 2.50, z:  1.5, bounds: { minX: 95.0, maxX: 103.0, minY: 1.4, maxY: 3.8, minZ: -0.5, maxZ:  3.5 }, speed: 1.14, turnSpeed: 2.6, act: 'D' },
-    { name: 'jellyD2', x: 110.0, y: 2.65, z: -0.5, bounds: { minX: 106.0, maxX: 115.0, minY: 1.5, maxY: 3.9, minZ: -2.5, maxZ:  1.5 }, speed: 1.18, turnSpeed: 2.7, act: 'D' },
-    { name: 'jellyD3', x: 119.5, y: 2.80, z:  0.5, bounds: { minX: 116.0, maxX: 124.0, minY: 1.6, maxY: 4.0, minZ: -1.5, maxZ:  2.5 }, speed: 1.12, turnSpeed: 2.5, act: 'D' },
+    { name: 'jelly_approach', x: 9.0, y: 1.86, z: 7.2, bounds: { minX: 5.0, maxX: 13.6, minY: 1.0, maxY: 3.0, minZ: 4.4, maxZ: 9.2 }, speed: 0.86, turnSpeed: 2.4 },
+    { name: 'jelly_viewing_a', x: 17.6, y: 2.26, z: 4.8, bounds: { minX: 12.0, maxX: 23.6, minY: 1.2, maxY: 3.6, minZ: 1.0, maxZ: 8.6 }, speed: 0.98, turnSpeed: 2.5 },
+    { name: 'jelly_viewing_b', x: 24.4, y: 2.42, z: -1.2, bounds: { minX: 20.0, maxX: 30.4, minY: 1.3, maxY: 3.8, minZ: -5.0, maxZ: 2.4 }, speed: 1.04, turnSpeed: 2.6 },
+    { name: 'jelly_lower_a', x: 41.0, y: 1.48, z: -12.8, bounds: { minX: 34.0, maxX: 46.8, minY: 0.8, maxY: 2.8, minZ: -15.6, maxZ: -10.0 }, speed: 1.06, turnSpeed: 2.7 },
+    { name: 'jelly_lower_b', x: 49.6, y: 2.18, z: -2.2, bounds: { minX: 46.8, maxX: 52.4, minY: 1.0, maxY: 4.2, minZ: -4.8, maxZ: 0.8 }, speed: 1.08, turnSpeed: 2.8 },
+    { name: 'jelly_final_a', x: 67.2, y: 2.86, z: -3.8, bounds: { minX: 62.0, maxX: 72.8, minY: 1.8, maxY: 4.4, minZ: -7.4, maxZ: -1.0 }, speed: 1.12, turnSpeed: 2.8 },
+    { name: 'jelly_final_b', x: 73.6, y: 3.06, z: -0.8, bounds: { minX: 69.0, maxX: 78.8, minY: 2.0, maxY: 4.6, minZ: -3.8, maxZ: 2.2 }, speed: 1.10, turnSpeed: 2.7 },
   ],
 
   sharkSweep: {
-    name: 'sharkSweepFinale',
-    xMin: 103.0,
-    xMax: 121.6,
-    y: 2.55,
-    z: L,
-    width: 3.8,
-    height: 2.6,
-    phaseOffset: 0.25,
+    name: 'shark_final_sweep',
+    xMin: 61.2,
+    xMax: 76.8,
+    y: 2.62,
+    z: -4.1,
+    width: 4.2,
+    height: 2.8,
+    phaseOffset: 0.35,
   },
 
-  routeMarkers: [
-    { x: -10.0, z: -2.0, scale: 1.0 },
-    { x:  14.0, z: -0.5, scale: 1.0 },
-    { x:  40.0, z:  1.5, scale: 1.05 },
-    { x:  67.0, z:  1.0, scale: 1.08 },
-    { x:  94.0, z:  0.5, scale: 1.08 },
-    { x: 118.0, z:  0.0, scale: 1.10 },
-  ],
-
-  gateArches: [
-    { x:  -4.0, y: 2.4, z:  0.0, width: 10.0, height: 5.4 },
-    { x:  26.0, y: 2.8, z: -1.5, width: 10.5, height: 5.8 },
-    { x:  64.0, y: 3.2, z:  1.5, width: 10.2, height: 6.0 },
-    { x: 100.0, y: 3.5, z:  0.5, width: 11.0, height: 6.2 },
-  ],
-
   signage: [
-    { x:  8.0, y: 4.2, z:  6.0, text: 'AQUARIUM DEPTHS →', width: 8.2, height: 2.0 },
-    { x: 74.0, y: 4.5, z: -6.5, text: 'PRESSURE RING',     width: 6.4, height: 1.8 },
+    { x: -6.0, y: 5.8, z: 12.2, text: 'AQUARIUM DEPTHS →', width: 8.0, height: 1.8 },
+    { x: 47.8, y: 5.0, z: -17.8, text: 'LOWER MAINTENANCE', width: 7.8, height: 1.8 },
+    { x: 66.2, y: 6.2, z: 7.8, text: 'FINAL EXHIBIT', width: 6.8, height: 1.7 },
   ],
 
-  coralPillars: [
-    { x:  -6.0, y: 0.7, z:  7.4, radius: 1.2, height: 4.2 },
-    { x:  12.0, y: 0.8, z:  5.5, radius: 1.0, height: 3.4 },
-    { x:  40.0, y: 1.0, z: -5.8, radius: 1.2, height: 4.0 },
-    { x:  58.0, y: 1.2, z:  7.8, radius: 1.1, height: 4.4 },
-    { x:  75.0, y: 1.3, z:  5.5, radius: 1.1, height: 4.6 },
-    { x: 110.0, y: 1.5, z: -5.5, radius: 1.3, height: 5.2 },
+  decorBlocks: [
+    { name: 'aquarium_outer_glass', x: 18.0, y: 5.1, z: 18.8, w: 42.0, h: 10.8, d: 1.4, rgb: [40, 126, 152], emissiveScale: 0.06, roughness: 0.42, alpha: 0.34 },
+    { name: 'aquarium_machine_spine', x: 42.6, y: 3.2, z: -18.0, w: 20.0, h: 5.0, d: 2.0, rgb: [24, 68, 86], emissiveScale: 0.04, roughness: 0.82 },
   ],
 
-  glassTubes: [
-    { x:  -6.0, y: 4.2, z: -7.2, diameter: 4.4, length: 14.0 },
-    { x:  20.0, y: 4.6, z:  6.5, diameter: 4.0, length: 12.0 },
-    { x:  48.0, y: 4.8, z:  7.4, diameter: 4.4, length: 12.0 },
-    { x:  72.0, y: 5.2, z: -6.8, diameter: 4.8, length: 14.0 },
-    { x: 108.0, y: 5.8, z:  6.8, diameter: 4.6, length: 12.0 },
+  decorColumns: [
+    { name: 'aquarium_pillar_a', x: 3.0, y: 3.4, z: 15.2, diameter: 2.2, height: 7.6, rgb: [82, 184, 204], emissiveScale: 0.08, roughness: 0.42, alpha: 0.48 },
+    { name: 'aquarium_pillar_b', x: 56.0, y: 4.0, z: 13.4, diameter: 1.8, height: 8.2, rgb: [82, 184, 204], emissiveScale: 0.08, roughness: 0.42, alpha: 0.48 },
   ],
 
-  kelpCurtains: [
-    { x:  30.0, y: 2.8, z:  7.2, width: 8.0, height: 8.0 },
-    { x:  54.0, y: 3.0, z: -7.5, width: 9.0, height: 8.4 },
-    { x:  92.0, y: 3.4, z:  7.4, width: 9.6, height: 8.8 },
+  decorPlatforms: [
+    { name: 'aquarium_pipe_spine', x: 18.0, y: 7.4, z: 14.0, w: 54.0, h: 0.30, d: 1.6, rgb: [80, 156, 176] },
+    { name: 'aquarium_bridge_frame', x: 45.0, y: 6.0, z: 8.2, w: 20.0, h: 0.24, d: 0.9, rgb: [88, 170, 188] },
   ],
-};
-
-function pointInsideSurface(surface, x, z = L) {
-  return x >= (surface.x - (surface.w * 0.5))
-    && x <= (surface.x + (surface.w * 0.5))
-    && z >= ((surface.z ?? L) - (surface.d * 0.5))
-    && z <= ((surface.z ?? L) + (surface.d * 0.5));
-}
-
-function surfaceTop(surface) {
-  return surface.y + (surface.h * 0.5);
-}
-
-function getNearestSurfaceTopY(layout, x, z = L) {
-  const surfaces = [layout.ground, ...(layout.platforms || [])];
-  let bestTop = null;
-  for (const surface of surfaces) {
-    if (!pointInsideSurface(surface, x, z)) continue;
-    const top = surfaceTop(surface);
-    if (bestTop === null || top > bestTop) {
-      bestTop = top;
-    }
-  }
-  return bestTop;
-}
-
-function normalizeCoins(layout) {
-  return layout.coins.map((coin) => {
-    const top = getNearestSurfaceTopY(layout, coin.x, coin.z ?? L);
-    if (top === null) return { ...coin };
-    return {
-      ...coin,
-      y: Number((top + COIN_HOVER_Y).toFixed(3)),
-    };
-  });
-}
+});
 
 export const LEVEL5 = {
   ...BASE_LEVEL5,
-  coins: normalizeCoins(BASE_LEVEL5),
+  coins: normalizeCoinsOnSurfaces(BASE_LEVEL5, { defaultZ: L }),
 };

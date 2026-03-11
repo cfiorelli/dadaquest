@@ -70,6 +70,27 @@ const ERA5_CAMERA_HEIGHT = 5.6;
 const ERA5_CAMERA_FOCUS_HEIGHT = 1.30;
 const ERA5_CAMERA_LOOK_AHEAD = 6.4;
 const ERA5_CAMERA_FOV = 0.98;
+const ERA5_CAMERA_PRESETS = {
+  standard: {
+    id: 'standard',
+    label: 'Standard',
+    distance: ERA5_CAMERA_DISTANCE,
+    height: ERA5_CAMERA_HEIGHT,
+    focusHeight: ERA5_CAMERA_FOCUS_HEIGHT,
+    lookAhead: ERA5_CAMERA_LOOK_AHEAD,
+    fov: ERA5_CAMERA_FOV,
+  },
+  closer: {
+    id: 'closer',
+    label: 'Closer Over-Shoulder',
+    distance: 13.9,
+    height: 4.9,
+    focusHeight: 1.18,
+    lookAhead: 5.1,
+    fov: 1.02,
+  },
+};
+const ERA5_DEFAULT_CAMERA_PRESET = 'standard';
 const ERA5_CAMERA_YAW_SPEED = 1.55;
 const ERA5_CAMERA_YAW_SPRING = 8.8;
 const ERA5_CAMERA_YAW_DAMP = 6.4;
@@ -2398,20 +2419,21 @@ export async function boot(options = {}) {
   }
 
   // Camera — fixed angle, smooth follow
+  const initialEra5CameraPreset = ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
   const cameraStartPos = isEra5Level
     ? new BABYLON.Vector3(
-      (spawnPoint.x || -12) - (era5InitialForward.x * ERA5_CAMERA_DISTANCE),
-      (spawnPoint.y || 2) + ERA5_CAMERA_HEIGHT,
-      (spawnPoint.z || 0) - (era5InitialForward.z * ERA5_CAMERA_DISTANCE),
+      (spawnPoint.x || -12) - (era5InitialForward.x * initialEra5CameraPreset.distance),
+      (spawnPoint.y || 2) + initialEra5CameraPreset.height,
+      (spawnPoint.z || 0) - (era5InitialForward.z * initialEra5CameraPreset.distance),
     )
     : levelId === 2
     ? new BABYLON.Vector3((spawnPoint.x || -12) - 10.0, (spawnPoint.y || 2) + 10.0, -18.0)
     : new BABYLON.Vector3(-17.5, 7.05, CAMERA_FOLLOW_Z);
   const cameraStartTarget = isEra5Level
     ? new BABYLON.Vector3(
-      (spawnPoint.x || -12) + (era5InitialForward.x * ERA5_CAMERA_LOOK_AHEAD),
-      (spawnPoint.y || 2) + ERA5_CAMERA_FOCUS_HEIGHT,
-      (spawnPoint.z || 0) + (era5InitialForward.z * ERA5_CAMERA_LOOK_AHEAD),
+      (spawnPoint.x || -12) + (era5InitialForward.x * initialEra5CameraPreset.lookAhead),
+      (spawnPoint.y || 2) + initialEra5CameraPreset.focusHeight,
+      (spawnPoint.z || 0) + (era5InitialForward.z * initialEra5CameraPreset.lookAhead),
     )
     : levelId === 2
     ? new BABYLON.Vector3((spawnPoint.x || -12), (spawnPoint.y || 2) + 1.0, 0)
@@ -2420,9 +2442,6 @@ export async function boot(options = {}) {
   camera.setTarget(cameraStartTarget.clone());
   camera.minZ = 0.5;
   camera.maxZ = 100;
-  if (isEra5Level) {
-    camera.fov = ERA5_CAMERA_FOV;
-  }
   // Do NOT attach controls — camera is game-controlled, not user-controlled
 
   const playerRimLight = new BABYLON.PointLight('playerRimLight', new BABYLON.Vector3(-14, 4.5, -7), scene);
@@ -2434,12 +2453,14 @@ export async function boot(options = {}) {
   const useLevel2CameraOcclusionGuard = levelId === 2;
   const useGenericCameraOcclusionGuard = levelId === 3;
   const useEra5DecorOcclusion = isEra5Level;
+  let era5CameraPresetId = ERA5_DEFAULT_CAMERA_PRESET;
   let era5PlayerYaw = era5InitialPlayerYaw;
   let era5PlayerYawVel = 0;
   let era5CameraYaw = isEra5Level ? era5InitialPlayerYaw : 0;
   let era5CameraDesiredYaw = era5CameraYaw;
   let era5CameraYawVel = 0;
   let era5CameraManualLookMs = 0;
+  let era5CameraDebugOverride = null;
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
   let era5CurrentOccluderName = null;
@@ -2452,6 +2473,10 @@ export async function boot(options = {}) {
     hideLargePlanes: false,
     forceEnvironmentVisible: false,
   };
+  const getEra5CameraPreset = () => ERA5_CAMERA_PRESETS[era5CameraPresetId] || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+  if (isEra5Level) {
+    camera.fov = getEra5CameraPreset().fov;
+  }
   const era5VisionMeshState = new Map();
   const era5VisionOriginalScene = {
     fogMode: scene.fogMode,
@@ -3044,16 +3069,16 @@ export async function boot(options = {}) {
     if (toolId === 'lantern') return 'Lantern reveal / boost: E';
     if (toolId === 'kite_rig') return 'Hold Jump in air to glide';
     if (toolId === 'conveyor_boots') return 'Conveyor Boots traction: passive';
-    return 'Scuba Tank oxygen: avoid deep pockets';
+    return 'Scuba Tank: Space ascend, C descend in deep pockets';
   }
 
   function getEra5WeaponHelpText(weaponDef = getEquippedEra5WeaponDef()) {
     const weaponId = weaponDef?.defId || '';
-    if (weaponId === 'paper_fan') return 'Fire Paper Fan: Ctrl / Enter / Click';
-    if (weaponId === 'bookmark_boomerang') return 'Throw Bookmark Boomerang: Ctrl / Enter / Click';
-    if (weaponId === 'kite_string_whip') return 'Crack Kite String Whip: Ctrl / Enter / Click';
-    if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: Ctrl / Enter / Click';
-    return 'Fire Bubble Wand: Ctrl / Enter / Click';
+    if (weaponId === 'paper_fan') return 'Fire Paper Fan: F / Ctrl / Enter / Click';
+    if (weaponId === 'bookmark_boomerang') return 'Throw Bookmark Boomerang: F / Ctrl / Enter / Click';
+    if (weaponId === 'kite_string_whip') return 'Crack Kite String Whip: F / Ctrl / Enter / Click';
+    if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: F / Ctrl / Enter / Click';
+    return 'Fire Bubble Wand: F / Ctrl / Enter / Click';
   }
 
   function updateBuffHud() {
@@ -3124,7 +3149,7 @@ export async function boot(options = {}) {
     const meterMax = getEra5MeterMax(toolDef);
     const inventoryHint = [
       era5InventoryOpen ? 'I Close' : 'I Inventory',
-      progression.windGlideUnlocked ? 'F Wind Glide' : '',
+      progression.windGlideUnlocked ? 'G Wind Glide' : '',
     ].filter(Boolean).join(' • ');
     ui.updateEra5Hud({
       hp: era5Hp,
@@ -3831,7 +3856,7 @@ export async function boot(options = {}) {
       ui.showEra5Teaser(3600);
     }
     if (completionResult.windGlideUnlockedNow && !progression.unlocksShown?.windGlide) {
-      maybeShowUnlockBanner('WIND GLIDE INSTALLED!', 'Press F in air for one emergency glide per run.', 'windGlide', 3000);
+      maybeShowUnlockBanner('WIND GLIDE INSTALLED!', 'Press G in air for one emergency glide per run.', 'windGlide', 3000);
     }
     state = 'end';
     player.setWinAnimationActive(false);
@@ -3934,7 +3959,7 @@ export async function boot(options = {}) {
     if (world.level2) world.level2.reset();
     if (world.level3) world.level3.reset();
     if (world.level4) world.level4.reset();
-    if (world.level5) world.level5.reset();
+    if (world.level5 && world.level5 !== world.era5Level) world.level5.reset();
     if (world.era5Level) world.era5Level.reset();
 
     for (const pickup of pickups) {
@@ -3967,12 +3992,24 @@ export async function boot(options = {}) {
     camera.position.copyFrom(cameraStartPos);
     camera.setTarget(cameraStartTarget.clone());
     if (isEra5Level) {
+      const preset = getEra5CameraPreset();
+      const resetForward = getYawForwardXZ(era5InitialPlayerYaw).normalize();
+      camera.position.set(
+        (spawnPoint.x || -12) - (resetForward.x * preset.distance),
+        (spawnPoint.y || 2) + preset.height,
+        (spawnPoint.z || 0) - (resetForward.z * preset.distance),
+      );
+      camera.setTarget(new BABYLON.Vector3(
+        (spawnPoint.x || -12) + (resetForward.x * preset.lookAhead),
+        (spawnPoint.y || 2) + preset.focusHeight,
+        (spawnPoint.z || 0) + (resetForward.z * preset.lookAhead),
+      ));
       era5CameraYaw = era5InitialPlayerYaw;
       era5CameraDesiredYaw = era5CameraYaw;
       era5CameraYawVel = 0;
       era5CameraManualLookMs = 0;
       era5CurrentOccluderName = null;
-      camera.fov = ERA5_CAMERA_FOV;
+      camera.fov = preset.fov;
     }
     updateActorDebug();
   }
@@ -4095,15 +4132,7 @@ export async function boot(options = {}) {
     }
     if (code === 'KeyF') {
       if (isEra5Level) {
-        if (useWindGlide()) {
-          window.__DADA_DEBUG__.backflip = player.getBackflipState();
-          updateBuffHud();
-          return true;
-        }
-        const started = player.triggerBackflip();
-        window.__DADA_DEBUG__.backflip = player.getBackflipState();
-        updateBuffHud();
-        return started;
+        return fireEra5Weapon();
       }
       if (!player.canTriggerAirFlip()) return false;
       let started = false;
@@ -4118,6 +4147,17 @@ export async function boot(options = {}) {
       window.__DADA_DEBUG__.backflip = player.getBackflipState();
       updateBuffHud();
       return started;
+    }
+    if (code === 'KeyG') {
+      if (isEra5Level) {
+        if (useWindGlide()) {
+          window.__DADA_DEBUG__.backflip = player.getBackflipState();
+          updateBuffHud();
+          return true;
+        }
+        return false;
+      }
+      return false;
     }
     if (code === 'KeyE') {
       if (isEra5Level) {
@@ -4267,6 +4307,69 @@ export async function boot(options = {}) {
         cameraYaw: era5CameraYaw,
       };
     };
+    window.__DADA_DEBUG__.setEra5CameraPreset = (presetId = ERA5_DEFAULT_CAMERA_PRESET) => {
+      if (!isEra5Level) return null;
+      const nextPreset = ERA5_CAMERA_PRESETS[presetId] || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+      era5CameraPresetId = nextPreset.id;
+      camera.fov = nextPreset.fov;
+      const forward = getYawForwardXZ(era5PlayerYaw).normalize();
+      const focus = new BABYLON.Vector3(
+        player.mesh.position.x + (forward.x * nextPreset.lookAhead),
+        player.mesh.position.y + nextPreset.focusHeight,
+        player.mesh.position.z + (forward.z * nextPreset.lookAhead),
+      );
+      camera.position.set(
+        player.mesh.position.x - (forward.x * nextPreset.distance),
+        player.mesh.position.y + nextPreset.height,
+        player.mesh.position.z - (forward.z * nextPreset.distance),
+      );
+      camera.setTarget(focus);
+      return {
+        id: nextPreset.id,
+        label: nextPreset.label,
+        distance: nextPreset.distance,
+        height: nextPreset.height,
+        focusHeight: nextPreset.focusHeight,
+        lookAhead: nextPreset.lookAhead,
+        fov: nextPreset.fov,
+      };
+    };
+    window.__DADA_DEBUG__.setEra5CameraDebugView = ({
+      position = null,
+      target = null,
+      fov = null,
+      label = 'debug',
+    } = {}) => {
+      if (!isEra5Level) return null;
+      if (!position || !target) {
+        era5CameraDebugOverride = null;
+        return null;
+      }
+      era5CameraDebugOverride = {
+        label,
+        position: {
+          x: Number(position.x ?? camera.position.x),
+          y: Number(position.y ?? camera.position.y),
+          z: Number(position.z ?? camera.position.z),
+        },
+        target: {
+          x: Number(target.x ?? player.mesh.position.x),
+          y: Number(target.y ?? (player.mesh.position.y + 1.2)),
+          z: Number(target.z ?? player.mesh.position.z),
+        },
+        fov: Number.isFinite(fov) ? Number(fov) : null,
+      };
+      return {
+        label: era5CameraDebugOverride.label,
+        position: { ...era5CameraDebugOverride.position },
+        target: { ...era5CameraDebugOverride.target },
+        fov: era5CameraDebugOverride.fov,
+      };
+    };
+    window.__DADA_DEBUG__.clearEra5CameraDebugView = () => {
+      era5CameraDebugOverride = null;
+      return null;
+    };
     window.__DADA_DEBUG__.toggleGameplayMenu = () => {
       if (state === 'menu') {
         closeGameplayMenu();
@@ -4366,7 +4469,7 @@ export async function boot(options = {}) {
         playerTriggered: runtime?.playerTriggered ?? false,
       };
     };
-    window.__DADA_DEBUG__.triggerLevel5Hazard = (name = 'eelRailB') => {
+    window.__DADA_DEBUG__.triggerLevel5Hazard = (name = 'eel_viewing_north') => {
       if (levelId !== 5) return false;
       return world.level5?.debugForceHazard?.(name, {
         pos: player.mesh.position,
@@ -4374,9 +4477,31 @@ export async function boot(options = {}) {
         triggerDamage: applyEra5Damage,
       }) ?? false;
     };
+    window.__DADA_DEBUG__.era5EnemyReport = () => world.era5Level?.getEnemyReport?.() ?? null;
+    window.__DADA_DEBUG__.era5ShowEnemyBounds = (enabled = true) => {
+      return world.era5Level?.setEnemyDebugView?.({ showBounds: !!enabled }) ?? null;
+    };
+    window.__DADA_DEBUG__.era5ForceEnemyDebugLook = (enabled = true) => {
+      return world.era5Level?.setEnemyDebugView?.({ highContrast: !!enabled }) ?? null;
+    };
     window.__DADA_DEBUG__.placeLevel5DebugJellyfish = (forward = { x: 1, z: 0 }) => {
       if (levelId !== 5) return false;
       return world.level5?.placeDebugJellyfish?.(player.mesh.position.clone(), forward) ?? false;
+    };
+    window.__DADA_DEBUG__.testLevel5BubbleStun = () => {
+      if (levelId !== 5) return null;
+      const forward = getEra5PlayerForward();
+      world.level5?.placeDebugJellyfish?.(player.mesh.position.clone(), forward);
+      const samplePosition = player.mesh.position.add(new BABYLON.Vector3(forward.x * 1.1, 0.72, forward.z * 1.1));
+      const hit = world.level5?.tryHitByBubble?.({
+        position: samplePosition,
+        radius: Math.max(0.26, era5State.stats.weaponProjectileRadius ?? 0.32),
+        stunMs: Math.max(200, (era5State.stats.weaponStunSec ?? 1.5) * 1000),
+      }) ?? { hit: false };
+      return {
+        hit,
+        enemies: world.era5Level?.getEnemyReport?.()?.enemies ?? [],
+      };
     };
     window.__DADA_DEBUG__.fireEra5Weapon = () => fireEra5Weapon();
     window.__DADA_DEBUG__.toggleEra5Tool = () => toggleEra5Tool();
@@ -4444,6 +4569,9 @@ export async function boot(options = {}) {
           || ev.code === 'KeyA'
           || ev.code === 'KeyS'
           || ev.code === 'KeyD'
+          || ev.code === 'KeyC'
+          || ev.code === 'KeyF'
+          || ev.code === 'KeyG'
           || ev.code === 'Space'
           || ev.code === 'ShiftLeft'
           || ev.code === 'ShiftRight'
@@ -4465,8 +4593,23 @@ export async function boot(options = {}) {
         return;
       }
       if ((ev.code === 'KeyF' || ev.key === 'f' || ev.key === 'F') && !ev.repeat) {
+        if (isEra5Level) {
+          ev.preventDefault();
+          return;
+        }
         ev.preventDefault();
         triggerGameplayHotkey('KeyF');
+        return;
+      }
+      if ((ev.code === 'KeyG' || ev.key === 'g' || ev.key === 'G') && !ev.repeat) {
+        if (isEra5Level) {
+          ev.preventDefault();
+          triggerGameplayHotkey('KeyG');
+          return;
+        }
+      }
+      if ((ev.code === 'KeyC' || ev.key === 'c' || ev.key === 'C') && isEra5Level) {
+        ev.preventDefault();
         return;
       }
       if ((ev.code === 'KeyE' || ev.key === 'e' || ev.key === 'E') && !ev.repeat) {
@@ -5126,14 +5269,25 @@ export async function boot(options = {}) {
             : input.getMoveY();
         const rawTurnAxis = idleSuppressed || !isEra5Level ? 0 : input.getEra5TurnAxis();
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
-        const jumpJustPressed = jumpPress.edge;
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
+        const descendHeld = !idleSuppressed && isEra5Level ? input.isDescendHeld() : false;
         const attackPressed = !idleSuppressed && isEra5Level ? input.consumeAttackPress() : false;
         const cameraYawInput = !idleSuppressed && isEra5Level ? input.getCameraYawInput() : 0;
         const cameraRecenter = !idleSuppressed && isEra5Level ? input.consumeCameraRecenter() : false;
         const era5ControlDt = Math.min(dt, 1 / 30);
         let moveX = rawMoveX;
         let moveZ = 0;
+        const era5ToolDef = isEra5Level ? getEquippedEra5ToolDef() : null;
+        const scubaFloatActive = !!(
+          isEra5Level
+          && era5ToolDef?.defId === 'scuba_tank'
+          && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position))
+        );
+        const jumpJustPressed = scubaFloatActive ? false : jumpPress.edge;
+        const playerJumpHeld = scubaFloatActive ? false : jumpHeld;
+        const era5FloatMoveY = scubaFloatActive
+          ? clamp((jumpHeld ? 1 : 0) + (descendHeld ? -1 : 0), -1, 1)
+          : 0;
         if (isEra5Level) {
           era5PlayerYawVel = rawTurnAxis * ERA5_TURN_MAX_SPEED;
           era5PlayerYaw = wrapToPi(era5PlayerYaw + (era5PlayerYawVel * era5ControlDt));
@@ -5164,9 +5318,9 @@ export async function boot(options = {}) {
           prepareEra5ToolMotion(dt, { jumpHeld });
         }
         const { halfH } = player.getCollisionHalfExtents();
-        player.update(dt, moveX, jumpJustPressed, jumpHeld, jumpPress.pressId, {
-          floatMoveY: isEra5Level ? 0 : rawMoveY,
-          floatActive: player.isCapeFloating(),
+        player.update(dt, moveX, jumpJustPressed, playerJumpHeld, jumpPress.pressId, {
+          floatMoveY: isEra5Level ? era5FloatMoveY : rawMoveY,
+          floatMode: scubaFloatActive ? 'swim' : player.isCapeFloating() ? 'cape' : null,
           moveZ,
           movementMode: isEra5Level ? 'free' : 'lane',
           facingYaw: isEra5Level ? era5PlayerYaw : null,
@@ -5334,29 +5488,50 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (isEra5Level) {
-        // Direct camera yaw tracking — zero spring lag, no overshoot, no rebound.
-        // The desired yaw tracks player yaw when not in manual-look mode,
-        // so this gives nearly 1:1 camera-to-player rotation.
-        era5CameraYaw = era5CameraDesiredYaw;
-        era5CameraYawVel = 0;
-        const cameraForward = getEra5CameraForward();
-        const lookForward = getEra5PlayerForward();
-        const focusPos = new BABYLON.Vector3(px, py + ERA5_CAMERA_FOCUS_HEIGHT, player.mesh.position.z);
-        const desiredTarget = new BABYLON.Vector3(
-          px + (lookForward.x * ERA5_CAMERA_LOOK_AHEAD),
-          py + ERA5_CAMERA_FOCUS_HEIGHT,
-          player.mesh.position.z + (lookForward.z * ERA5_CAMERA_LOOK_AHEAD),
-        );
-        const desiredCameraPos = new BABYLON.Vector3(
-          px - (cameraForward.x * ERA5_CAMERA_DISTANCE),
-          py + ERA5_CAMERA_HEIGHT,
-          player.mesh.position.z - (cameraForward.z * ERA5_CAMERA_DISTANCE),
-        );
-        const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
-        era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
-        camera.position.copyFrom(occlusion.correctedPos);
-        camera.setTarget(desiredTarget);
-        updateEra5DecorOcclusion(dt, focusPos, camera.position);
+        const preset = getEra5CameraPreset();
+        if (era5CameraDebugOverride) {
+          const debugTarget = new BABYLON.Vector3(
+            era5CameraDebugOverride.target.x,
+            era5CameraDebugOverride.target.y,
+            era5CameraDebugOverride.target.z,
+          );
+          era5CurrentOccluderName = null;
+          camera.position.set(
+            era5CameraDebugOverride.position.x,
+            era5CameraDebugOverride.position.y,
+            era5CameraDebugOverride.position.z,
+          );
+          camera.setTarget(debugTarget);
+          camera.fov = Number.isFinite(era5CameraDebugOverride.fov)
+            ? era5CameraDebugOverride.fov
+            : preset.fov;
+          updateEra5DecorOcclusion(dt, debugTarget, camera.position);
+        } else {
+          // Direct camera yaw tracking — zero spring lag, no overshoot, no rebound.
+          // The desired yaw tracks player yaw when not in manual-look mode,
+          // so this gives nearly 1:1 camera-to-player rotation.
+          era5CameraYaw = era5CameraDesiredYaw;
+          era5CameraYawVel = 0;
+          const cameraForward = getEra5CameraForward();
+          const lookForward = getEra5PlayerForward();
+          const focusPos = new BABYLON.Vector3(px, py + preset.focusHeight, player.mesh.position.z);
+          const desiredTarget = new BABYLON.Vector3(
+            px + (lookForward.x * preset.lookAhead),
+            py + preset.focusHeight,
+            player.mesh.position.z + (lookForward.z * preset.lookAhead),
+          );
+          const desiredCameraPos = new BABYLON.Vector3(
+            px - (cameraForward.x * preset.distance),
+            py + preset.height,
+            player.mesh.position.z - (cameraForward.z * preset.distance),
+          );
+          const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
+          era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
+          camera.position.copyFrom(occlusion.correctedPos);
+          camera.setTarget(desiredTarget);
+          camera.fov = preset.fov;
+          updateEra5DecorOcclusion(dt, focusPos, camera.position);
+        }
       } else if (levelId === 2) {
         const desiredCameraPos = new BABYLON.Vector3(px - 10.0, py + 10.0, -18.0);
         camera.position.x = damp(camera.position.x, desiredCameraPos.x, 4.5, dt);
@@ -5479,6 +5654,15 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.cameraYaw = era5CameraYaw;
     window.__DADA_DEBUG__.cameraDesiredYaw = Number(era5CameraDesiredYaw.toFixed(4));
     window.__DADA_DEBUG__.cameraYawVel = Number(era5CameraYawVel.toFixed(4));
+    window.__DADA_DEBUG__.cameraPreset = isEra5Level ? getEra5CameraPreset() : null;
+    window.__DADA_DEBUG__.cameraDebugOverride = isEra5Level && era5CameraDebugOverride
+      ? {
+        label: era5CameraDebugOverride.label,
+        position: { ...era5CameraDebugOverride.position },
+        target: { ...era5CameraDebugOverride.target },
+        fov: era5CameraDebugOverride.fov,
+      }
+      : null;
     {
       const debugForward = getEra5CameraForward();
       const debugRight = getEra5CameraRight();
