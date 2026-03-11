@@ -4477,6 +4477,7 @@ export async function boot(options = {}) {
         triggerDamage: applyEra5Damage,
       }) ?? false;
     };
+    window.__DADA_DEBUG__.era5TopologyReport = () => world.era5Level?.getTopologyReport?.() ?? null;
     window.__DADA_DEBUG__.era5EnemyReport = () => world.era5Level?.getEnemyReport?.() ?? null;
     window.__DADA_DEBUG__.era5ShowEnemyBounds = (enabled = true) => {
       return world.era5Level?.setEnemyDebugView?.({ showBounds: !!enabled }) ?? null;

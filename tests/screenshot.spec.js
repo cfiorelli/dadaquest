@@ -32,6 +32,7 @@ async function hideGameplayUi(page) {
       [data-era5-hud], #titleScreen, #titleOverlay, #gameplayHud, #gameplayMenu, #titleMenu,
       #loadingOverlay, #endOverlay, button, [role="button"], [data-title-screen], [data-title-preview],
       [data-title-level-grid], [data-controls-hint], [data-era5-buffs], [data-era5-inventory-hint],
+      #era5DevOverlay,
       .dada-toast-layer, .dada-status-banner, .dada-toast {
         display: none !important;
       }
@@ -164,7 +165,7 @@ test('capture authored Level 6 gameplay and topology proof screenshots', async (
   });
 });
 
-test('capture authored Level 5 gameplay, top-down, and enemy-readability proof screenshots', async ({ page }) => {
+test('capture Level 5 aquarium review screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -185,60 +186,66 @@ test('capture authored Level 5 gameplay, top-down, and enemy-readability proof s
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 12.4,
-      y: 1.92,
-      z: 6.4,
-      yaw: 0.22,
-      cameraYaw: 0.22,
+      x: -30.4,
+      y: 1.82,
+      z: 7.6,
+      yaw: 1.10,
+      cameraYaw: 1.10,
     });
   });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'docs/screenshots/level5-authored-gameplay.png',
+    path: 'docs/screenshots/level5-aquarium-spawn.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
-  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.());
-  const bounds = topology.sectors.reduce((acc, sector) => ({
-    minX: Math.min(acc.minX, sector.x - sector.w * 0.5),
-    maxX: Math.max(acc.maxX, sector.x + sector.w * 0.5),
-    minZ: Math.min(acc.minZ, sector.z - sector.d * 0.5),
-    maxZ: Math.max(acc.maxZ, sector.z + sector.d * 0.5),
-  }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
-  const centerX = (bounds.minX + bounds.maxX) * 0.5;
-  const centerZ = (bounds.minZ + bounds.maxZ) * 0.5;
-  const spanX = bounds.maxX - bounds.minX;
-  const spanZ = bounds.maxZ - bounds.minZ;
-  const topDownHeight = Math.max(62, Math.max(spanX, spanZ) * 0.92);
-  await page.evaluate(({ centerX: x, centerZ: z, topDownHeight: y }) => {
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'topdown',
-      position: { x: x + 0.01, y, z: z + 0.01 },
-      target: { x, y: 1.5, z },
-      fov: 0.82,
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 6.4,
+      y: 1.84,
+      z: -1.4,
+      yaw: 0.96,
+      cameraYaw: 0.96,
     });
-  }, { centerX, centerZ, topDownHeight });
-  await page.waitForTimeout(260);
+  });
+  await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'docs/screenshots/level5-authored-topology.png',
+    path: 'docs/screenshots/level5-aquarium-hero-chamber.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 38.6,
+      y: 1.30,
+      z: -12.8,
+      yaw: 0.54,
+      cameraYaw: 0.54,
+    });
+  });
+  await page.waitForTimeout(500);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-aquarium-lower-route.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 17.8,
-      y: 2.12,
-      z: 3.2,
-      yaw: 0.18,
-      cameraYaw: 0.18,
+      x: 10.2,
+      y: 2.16,
+      z: 8.6,
+      yaw: 0.74,
+      cameraYaw: 0.74,
     });
-    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1, z: 0 });
+    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1.8, z: 1.2 });
   });
-  await page.waitForTimeout(350);
+  await page.waitForTimeout(450);
   await page.screenshot({
-    path: 'docs/screenshots/level5-authored-enemy.png',
+    path: 'docs/screenshots/level5-aquarium-enemy-readability.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 });

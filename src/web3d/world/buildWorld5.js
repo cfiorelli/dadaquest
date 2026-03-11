@@ -377,27 +377,44 @@ function createJellyfish(scene, def, shadowGen) {
   root.position.set(def.x, def.y, def.z ?? 0);
 
   const bell = BABYLON.MeshBuilder.CreateSphere(`${def.name}_bell`, {
-    diameter: 0.82,
+    diameter: 0.92,
     segments: 14,
   }, scene);
   bell.parent = root;
   bell.scaling.y = 0.75;
   bell.material = makeGlowMaterial(scene, `${def.name}_bellMat`, [118, 255, 248], {
     emissive: 0.30,
-    alpha: 0.42,
+    alpha: 0.48,
     roughness: 0.16,
   });
   shadowGen.addShadowCaster(bell);
   markHazard(bell);
 
+  const silhouette = BABYLON.MeshBuilder.CreateDisc(`${def.name}_silhouette`, {
+    radius: 0.58,
+    tessellation: 28,
+  }, scene);
+  silhouette.parent = root;
+  silhouette.position.set(0, 0.02, 0);
+  silhouette.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+  const silhouetteMat = new BABYLON.StandardMaterial(`${def.name}_silhouetteMat`, scene);
+  silhouetteMat.diffuseColor = new BABYLON.Color3(0.04, 0.09, 0.14);
+  silhouetteMat.emissiveColor = new BABYLON.Color3(0.04, 0.10, 0.12);
+  silhouetteMat.alpha = 0.30;
+  silhouetteMat.specularColor = BABYLON.Color3.Black();
+  silhouetteMat.backFaceCulling = false;
+  silhouetteMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  silhouette.material = silhouetteMat;
+  markHazard(silhouette);
+
   const core = BABYLON.MeshBuilder.CreateSphere(`${def.name}_core`, {
-    diameter: 0.28,
+    diameter: 0.34,
     segments: 8,
   }, scene);
   core.parent = root;
   core.position.y = 0.05;
   core.material = makeGlowMaterial(scene, `${def.name}_coreMat`, [255, 156, 242], {
-    emissive: 0.42,
+    emissive: 0.46,
     roughness: 0.12,
   });
   markHazard(core);
@@ -411,13 +428,13 @@ function createJellyfish(scene, def, shadowGen) {
     ];
     const tentacle = BABYLON.MeshBuilder.CreateTube(`${def.name}_tentacle_${i}`, {
       path,
-      radius: 0.018,
+      radius: 0.022,
       tessellation: 8,
     }, scene);
     tentacle.parent = root;
     tentacle.material = makeGlowMaterial(scene, `${def.name}_tentacleMat_${i}`, [142, 255, 246], {
       emissive: 0.18,
-      alpha: 0.36,
+      alpha: 0.42,
       roughness: 0.24,
     });
     tentacles.push(tentacle);
@@ -443,21 +460,24 @@ function createJellyfish(scene, def, shadowGen) {
 
   function applyMaterialLook() {
     if (state.highContrast) {
-      bell.material.alpha = 0.76;
+      bell.material.alpha = 0.82;
       bell.material.emissiveColor = new BABYLON.Color3(0.42, 0.62, 0.72);
       core.material.emissiveColor = new BABYLON.Color3(0.72, 0.32, 0.66);
+      silhouette.material.alpha = 0.52;
     } else if (api.stunnedMs > 0) {
       bell.material.alpha = 0.16;
       core.material.emissiveColor = new BABYLON.Color3(0.16, 0.18, 0.24);
+      silhouette.material.alpha = 0.12;
     } else {
-      bell.material.alpha = 0.42;
+      bell.material.alpha = 0.48;
       bell.material.emissiveColor = new BABYLON.Color3(0.14, 0.30, 0.30);
       core.material.emissiveColor = new BABYLON.Color3(0.42, 0.26, 0.40);
+      silhouette.material.alpha = 0.28;
     }
   }
 
   function applyDebugView() {
-    for (const mesh of [bell, core, ...tentacles]) {
+    for (const mesh of [bell, silhouette, core, ...tentacles]) {
       mesh.showBoundingBox = state.showBounds;
     }
     applyMaterialLook();

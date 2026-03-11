@@ -13,6 +13,7 @@ import {
 import { createTelegraphedHazard } from './telegraphHazard.js';
 import { NoiseWanderMover } from './noiseMover.js';
 import { createThemeEnvironmentFx, markDecorNode } from './envFx.js';
+import { createAuthoredSurfaceAudit } from './eraAuthoredLayout.js';
 import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
@@ -180,6 +181,14 @@ function makeInvisibleCollider(scene, name, def) {
   mesh.position.set(def.x, def.y, def.z ?? 0);
   mesh.visibility = 0;
   mesh.isPickable = false;
+  if (def?.authoredSurfaceId) {
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      authoredSurfaceId: def.authoredSurfaceId,
+      gameplaySurface: true,
+      gameplay: true,
+    };
+  }
   return mesh;
 }
 
@@ -698,25 +707,270 @@ function addCampPlatformDetails(scene, root, name, def, palette, shadowGen) {
   });
 }
 
-function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) {
+function getAquariumSurfaceProfile(def = {}) {
+  const surfaceType = String(def.surfaceType || def.floorSurfaceType || '').toLowerCase();
+  if (!surfaceType) return null;
+  const ownerId = String(def.ownerId || def.connectorId || def.sectorId || def.name || '').toLowerCase();
+  const isStep = surfaceType === 'step' || surfaceType === 'landing';
+
+  let family = 'service';
+  if (surfaceType.includes('viewing') || surfaceType.includes('exhibit')) {
+    family = 'exhibit';
+  } else if (surfaceType.includes('glass')) {
+    family = 'glass';
+  } else if (
+    surfaceType.includes('maintenance')
+    || surfaceType.includes('drain')
+    || surfaceType.includes('channel')
+    || surfaceType.includes('shaft')
+    || (isStep && /(maintenance|lower|shaft)/.test(ownerId))
+  ) {
+    family = 'maintenance';
+  } else if (
+    surfaceType.includes('catwalk')
+    || surfaceType.includes('grate')
+    || surfaceType.includes('cross_bridge')
+    || surfaceType.includes('bridge_rise')
+    || surfaceType.includes('overhead_bridge')
+    || (isStep && /(upper|bridge|side|catwalk)/.test(ownerId))
+  ) {
+    family = 'catwalk';
+  } else if (
+    surfaceType.includes('wet_service')
+    || surfaceType.includes('shell_service')
+    || surfaceType.includes('threshold')
+    || surfaceType.includes('service')
+    || isStep
+  ) {
+    family = 'service';
+  }
+
+  const profileByFamily = {
+    exhibit: {
+      family: 'exhibit',
+      slabRgb: [88, 126, 138],
+      slabEmissive: 0.18,
+      slabRoughness: 0.34,
+      rimRgb: [22, 56, 68],
+      rimEmissive: 0.08,
+      rimRoughness: 0.40,
+      topRgb: [26, 74, 88],
+      topAlpha: 0.54,
+      topEmissive: 0.09,
+      glowRgb: [198, 248, 255],
+      lineRgb: [236, 252, 255],
+      sheenRgb: [196, 244, 255],
+      sheenAlpha: 0.24,
+      seamRgb: [102, 188, 202],
+      seamAlpha: 0.28,
+      railRgb: [226, 252, 255],
+      railAlpha: 0.84,
+      stripeRgb: [118, 194, 210],
+      stripeAlpha: 0.18,
+      grimeRgb: [62, 108, 118],
+      shellRgb: [146, 194, 186],
+      railStyle: 'glass',
+      railHeight: 1.02,
+      postHeight: 0.92,
+      edgeAlpha: 0.34,
+      glassBarrier: true,
+    },
+    glass: {
+      family: 'glass',
+      slabRgb: [68, 114, 130],
+      slabEmissive: 0.18,
+      slabRoughness: 0.34,
+      rimRgb: [18, 52, 68],
+      rimEmissive: 0.10,
+      rimRoughness: 0.38,
+      topRgb: [32, 94, 112],
+      topAlpha: 0.56,
+      topEmissive: 0.12,
+      glowRgb: [194, 250, 255],
+      lineRgb: [214, 250, 255],
+      sheenRgb: [198, 248, 255],
+      sheenAlpha: 0.20,
+      seamRgb: [110, 198, 214],
+      seamAlpha: 0.24,
+      railRgb: [212, 250, 255],
+      railAlpha: 0.80,
+      stripeRgb: [122, 198, 212],
+      stripeAlpha: 0.14,
+      grimeRgb: [50, 102, 118],
+      shellRgb: [142, 192, 186],
+      railStyle: 'glass',
+      railHeight: 0.90,
+      postHeight: 0.86,
+      edgeAlpha: 0.26,
+      glassBarrier: true,
+    },
+    service: {
+      family: 'service',
+      slabRgb: [64, 86, 96],
+      slabEmissive: 0.12,
+      slabRoughness: 0.54,
+      rimRgb: [20, 40, 50],
+      rimEmissive: 0.06,
+      rimRoughness: 0.56,
+      topRgb: [16, 38, 46],
+      topAlpha: 0.92,
+      topEmissive: 0.08,
+      glowRgb: [112, 198, 214],
+      lineRgb: [168, 228, 238],
+      sheenRgb: [104, 178, 194],
+      sheenAlpha: 0.14,
+      seamRgb: [66, 122, 136],
+      seamAlpha: 0.24,
+      railRgb: [180, 220, 230],
+      railAlpha: 0.80,
+      stripeRgb: [242, 190, 92],
+      stripeAlpha: 0.72,
+      grimeRgb: [42, 82, 94],
+      shellRgb: [126, 168, 160],
+      railStyle: 'pipe',
+      railHeight: 0.86,
+      postHeight: 0.84,
+      edgeAlpha: 0.32,
+      glassBarrier: false,
+    },
+    catwalk: {
+      family: 'catwalk',
+      slabRgb: [42, 48, 54],
+      slabEmissive: 0.08,
+      slabRoughness: 0.64,
+      rimRgb: [10, 14, 18],
+      rimEmissive: 0.04,
+      rimRoughness: 0.66,
+      topRgb: [10, 14, 18],
+      topAlpha: 0.98,
+      topEmissive: 0.04,
+      glowRgb: [132, 214, 228],
+      lineRgb: [248, 202, 96],
+      sheenRgb: [78, 132, 146],
+      sheenAlpha: 0.05,
+      seamRgb: [78, 126, 138],
+      seamAlpha: 0.12,
+      railRgb: [198, 232, 240],
+      railAlpha: 0.90,
+      stripeRgb: [248, 194, 92],
+      stripeAlpha: 0.90,
+      grimeRgb: [38, 72, 82],
+      shellRgb: [106, 138, 134],
+      railStyle: 'pipe',
+      railHeight: 1.16,
+      postHeight: 1.08,
+      edgeAlpha: 0.42,
+      glassBarrier: false,
+    },
+    maintenance: {
+      family: 'maintenance',
+      slabRgb: [34, 42, 46],
+      slabEmissive: 0.06,
+      slabRoughness: 0.70,
+      rimRgb: [12, 18, 24],
+      rimEmissive: 0.03,
+      rimRoughness: 0.68,
+      topRgb: [12, 18, 22],
+      topAlpha: 0.96,
+      topEmissive: 0.03,
+      glowRgb: [88, 136, 146],
+      lineRgb: [96, 132, 138],
+      sheenRgb: [62, 100, 106],
+      sheenAlpha: 0.06,
+      seamRgb: [52, 82, 92],
+      seamAlpha: 0.14,
+      railRgb: [102, 132, 136],
+      railAlpha: 0.48,
+      stripeRgb: [148, 114, 72],
+      stripeAlpha: 0.16,
+      grimeRgb: [58, 82, 72],
+      shellRgb: [150, 160, 138],
+      railStyle: 'curb',
+      railHeight: 0.42,
+      postHeight: 0.36,
+      edgeAlpha: 0.20,
+      glassBarrier: false,
+    },
+  };
+
+  return {
+    ...profileByFamily[family],
+    surfaceType,
+    ownerId,
+  };
+}
+
+function addAquariumPipeBundle(scene, root, name, {
+  axis = 'x',
+  length = 6,
+  x = 0,
+  y = 0,
+  z = 0,
+  count = 3,
+  spacing = 0.28,
+  thickness = 0.18,
+  rgb = [82, 150, 166],
+} = {}) {
+  for (let i = 0; i < count; i += 1) {
+    const offset = (i - ((count - 1) * 0.5)) * spacing;
+    createDecorBox(scene, `${name}_${i}`, root, {
+      width: axis === 'x' ? length : thickness,
+      height: thickness,
+      depth: axis === 'z' ? length : thickness,
+      x: axis === 'x' ? x : x + offset,
+      y: y + (i * 0.02),
+      z: axis === 'z' ? z : z + offset,
+      rgb,
+      emissiveScale: 0.06,
+      roughness: 0.36,
+    });
+  }
+}
+
+function addAquariumDebrisCluster(scene, root, name, {
+  x = 0,
+  y = 0,
+  z = 0,
+  rgb = [132, 154, 144],
+  shadowGen = null,
+} = {}) {
+  const pieces = [
+    { dx: 0.00, dz: 0.00, w: 0.34, h: 0.14, d: 0.26 },
+    { dx: 0.22, dz: 0.12, w: 0.22, h: 0.10, d: 0.18 },
+    { dx: -0.18, dz: -0.14, w: 0.18, h: 0.08, d: 0.16 },
+    { dx: 0.10, dz: -0.20, w: 0.16, h: 0.06, d: 0.14 },
+  ];
+  pieces.forEach((piece, index) => {
+    createDecorBox(scene, `${name}_${index}`, root, {
+      width: piece.w,
+      height: piece.h,
+      depth: piece.d,
+      x: x + piece.dx,
+      y: y + (piece.h * 0.5),
+      z: z + piece.dz,
+      rgb,
+      emissiveScale: 0.03,
+      roughness: 0.88,
+      shadowGen,
+    });
+  });
+}
+
+function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, profile = getAquariumSurfaceProfile(def)) {
+  if (!profile) return;
   const topY = (def.h * 0.5) + 0.04;
   const isGround = name.endsWith('_ground');
-  const surfaceType = String(def.surfaceType || '');
-  const isCatwalk = surfaceType.includes('catwalk') || surfaceType.includes('grate');
-  const isMaintenance = surfaceType.includes('maintenance') || surfaceType.includes('drain');
-  const isGlass = surfaceType.includes('glass');
-  const isExhibit = surfaceType.includes('exhibit') || surfaceType.includes('viewing');
 
   createDecorPlane(scene, `${name}_wetSheen`, root, {
     width: Math.max(2.0, def.w - 0.8),
     height: Math.max(0.8, Math.min(1.8, def.d * 0.30)),
     y: topY,
-    rgb: isMaintenance ? [82, 156, 170] : isGlass ? [172, 248, 255] : [118, 210, 224],
-    emissiveScale: isGlass ? 0.18 : 0.12,
-    alpha: isGround ? 0.08 : isGlass ? 0.18 : 0.14,
+    rgb: profile.sheenRgb,
+    emissiveScale: profile.family === 'glass' || profile.family === 'exhibit' ? 0.14 : 0.08,
+    alpha: isGround ? 0.08 : profile.sheenAlpha,
   });
 
-  if (isCatwalk) {
+  if (profile.family === 'catwalk') {
     const grateCount = Math.max(4, Math.min(8, Math.round(def.w / 2.0)));
     for (let i = 0; i < grateCount; i += 1) {
       const x = -def.w * 0.42 + ((i / Math.max(1, grateCount - 1)) * def.w * 0.84);
@@ -727,9 +981,22 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) 
         x,
         rotationX: Math.PI / 2,
         rotationY: Math.PI / 2,
-        rgb: [164, 242, 252],
+        rgb: profile.glowRgb,
         emissiveScale: 0.12,
-        alpha: 0.28,
+        alpha: 0.30,
+      });
+    }
+    const crossCount = Math.max(2, Math.min(5, Math.round(def.d / 1.4)));
+    for (let i = 0; i < crossCount; i += 1) {
+      const z = -def.d * 0.34 + ((i / Math.max(1, crossCount - 1)) * def.d * 0.68);
+      createDecorPlane(scene, `${name}_cross_${i}`, root, {
+        width: Math.max(1.4, def.w - 0.9),
+        height: 0.08,
+        y: topY + 0.015,
+        z,
+        rgb: profile.seamRgb,
+        emissiveScale: 0.08,
+        alpha: 0.18,
       });
     }
   } else {
@@ -741,11 +1008,96 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) 
         height: 0.10,
         y: topY + 0.01,
         z,
-        rgb: isMaintenance ? [60, 112, 128] : [96, 196, 208],
+        rgb: profile.seamRgb,
         emissiveScale: 0.08,
-        alpha: 0.22,
+        alpha: profile.seamAlpha,
       });
     }
+  }
+
+  if (profile.family === 'maintenance') {
+    const drainCount = Math.max(3, Math.min(6, Math.round(def.w / 2.6)));
+    for (let i = 0; i < drainCount; i += 1) {
+      const x = -def.w * 0.34 + ((i / Math.max(1, drainCount - 1)) * def.w * 0.68);
+      createDecorPlane(scene, `${name}_drain_${i}`, root, {
+        width: 0.12,
+        height: Math.max(0.8, def.d * 0.66),
+        y: topY + 0.014,
+        x,
+        rotationX: Math.PI / 2,
+        rotationY: Math.PI / 2,
+        rgb: [22, 30, 34],
+        emissiveScale: 0.02,
+        alpha: 0.42,
+      });
+    }
+    createDecorPlane(scene, `${name}_grimeBand`, root, {
+      width: Math.max(1.8, def.w - 1.2),
+      height: Math.max(0.8, def.d * 0.18),
+      y: topY + 0.012,
+      z: def.d * 0.16,
+      rgb: profile.grimeRgb,
+      emissiveScale: 0.04,
+      alpha: 0.18,
+    });
+    addAquariumDebrisCluster(scene, root, `${name}_shells_a`, {
+      x: -def.w * 0.30,
+      y: topY,
+      z: def.d * 0.24,
+      rgb: profile.shellRgb,
+      shadowGen,
+    });
+    addAquariumDebrisCluster(scene, root, `${name}_shells_b`, {
+      x: def.w * 0.22,
+      y: topY,
+      z: -def.d * 0.18,
+      rgb: profile.shellRgb,
+      shadowGen,
+    });
+  }
+
+  if (profile.family === 'service') {
+    createDecorPlane(scene, `${name}_cautionBand`, root, {
+      width: Math.max(1.2, def.w * 0.36),
+      height: 0.18,
+      x: def.w * 0.18,
+      y: topY + 0.02,
+      z: -def.d * 0.20,
+      rgb: profile.stripeRgb,
+      emissiveScale: 0.16,
+      alpha: profile.stripeAlpha,
+    });
+    addAquariumPipeBundle(scene, root, `${name}_serviceBundle`, {
+      axis: 'x',
+      length: Math.max(2.0, def.w - 1.6),
+      x: 0,
+      y: topY + 0.28,
+      z: def.d * 0.26,
+      count: 3,
+      spacing: 0.22,
+      thickness: 0.14,
+      rgb: [92, 170, 182],
+    });
+  }
+
+  if (profile.family === 'glass' || profile.family === 'exhibit') {
+    createDecorPlane(scene, `${name}_viewerStrip`, root, {
+      width: Math.max(1.2, def.w * 0.56),
+      height: 0.22,
+      y: topY + 0.02,
+      z: -def.d * 0.24,
+      rgb: profile.lineRgb,
+      emissiveScale: 0.18,
+      alpha: 0.18,
+    });
+    createDecorPlane(scene, `${name}_insetFrame`, root, {
+      width: Math.max(1.2, def.w - 0.78),
+      height: Math.max(0.8, def.d - 0.78),
+      y: topY + 0.02,
+      rgb: profile.lineRgb,
+      emissiveScale: 0.12,
+      alpha: 0.10,
+    });
   }
 
   for (const z of [-def.d * 0.38, def.d * 0.38]) {
@@ -754,9 +1106,9 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) 
       height: 0.16,
       y: topY + 0.02,
       z,
-      rgb: isMaintenance ? [90, 170, 182] : isExhibit ? [214, 248, 255] : palette.line,
+      rgb: profile.family === 'catwalk' ? profile.stripeRgb : profile.lineRgb,
       emissiveScale: 0.14,
-      alpha: isGround ? 0.14 : 0.24,
+      alpha: isGround ? 0.14 : profile.edgeAlpha,
     });
   }
 
@@ -764,49 +1116,115 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen) 
   for (const x of [-def.w * 0.40, def.w * 0.40]) {
     createDecorBox(scene, `${name}_railPost_${x > 0 ? 'r' : 'l'}`, root, {
       width: 0.12,
-      height: isMaintenance ? 1.1 : 1.5,
+      height: profile.postHeight,
       depth: 0.12,
       x,
-      y: topY + (isMaintenance ? 0.55 : 0.76),
+      y: topY + (profile.postHeight * 0.5),
       z: -def.d * 0.34,
-      rgb: [102, 210, 224],
+      rgb: profile.railRgb,
       emissiveScale: 0.10,
       roughness: 0.36,
       shadowGen,
     });
     createDecorBox(scene, `${name}_railPostBack_${x > 0 ? 'r' : 'l'}`, root, {
       width: 0.12,
-      height: isMaintenance ? 1.1 : 1.5,
+      height: profile.postHeight,
       depth: 0.12,
       x,
-      y: topY + (isMaintenance ? 0.55 : 0.76),
+      y: topY + (profile.postHeight * 0.5),
       z: def.d * 0.34,
-      rgb: [102, 210, 224],
+      rgb: profile.railRgb,
       emissiveScale: 0.10,
       roughness: 0.36,
       shadowGen,
     });
   }
-  createDecorPlane(scene, `${name}_frontRail`, root, {
-    width: Math.max(1.8, def.w - 1.0),
-    height: 0.05,
-    y: topY + (isMaintenance ? 1.00 : 1.34),
-    z: -def.d * 0.34,
-    rotationX: 0,
-    rgb: [188, 250, 255],
-    emissiveScale: 0.14,
-    alpha: 0.84,
-  });
-  createDecorPlane(scene, `${name}_backRail`, root, {
-    width: Math.max(1.8, def.w - 1.0),
-    height: 0.05,
-    y: topY + (isMaintenance ? 1.00 : 1.34),
-    z: def.d * 0.34,
-    rotationX: 0,
-    rgb: [188, 250, 255],
-    emissiveScale: 0.14,
-    alpha: 0.84,
-  });
+  if (profile.railStyle === 'glass') {
+    for (const z of [-def.d * 0.34, def.d * 0.34]) {
+      createDecorPlane(scene, `${name}_glassRail_${z > 0 ? 'back' : 'front'}`, root, {
+        width: Math.max(1.8, def.w - 1.0),
+        height: profile.railHeight,
+        y: topY + (profile.railHeight * 0.5),
+        z,
+        rotationX: 0,
+        rgb: profile.railRgb,
+        emissiveScale: 0.10,
+        alpha: 0.14,
+      });
+      createDecorPlane(scene, `${name}_glassRailCap_${z > 0 ? 'back' : 'front'}`, root, {
+        width: Math.max(1.8, def.w - 1.0),
+        height: 0.05,
+        y: topY + profile.railHeight,
+        z,
+        rotationX: 0,
+        rgb: profile.railRgb,
+        emissiveScale: 0.16,
+        alpha: profile.railAlpha,
+      });
+    }
+  } else if (profile.railStyle === 'pipe') {
+    createDecorPlane(scene, `${name}_frontRail`, root, {
+      width: Math.max(1.8, def.w - 1.0),
+      height: 0.05,
+      y: topY + profile.railHeight,
+      z: -def.d * 0.34,
+      rotationX: 0,
+      rgb: profile.railRgb,
+      emissiveScale: 0.14,
+      alpha: profile.railAlpha,
+    });
+    createDecorPlane(scene, `${name}_backRail`, root, {
+      width: Math.max(1.8, def.w - 1.0),
+      height: 0.05,
+      y: topY + profile.railHeight,
+      z: def.d * 0.34,
+      rotationX: 0,
+      rgb: profile.railRgb,
+      emissiveScale: 0.14,
+      alpha: profile.railAlpha,
+    });
+  } else if (profile.railStyle === 'curb') {
+    for (const z of [-def.d * 0.34, def.d * 0.34]) {
+      createDecorBox(scene, `${name}_curb_${z > 0 ? 'back' : 'front'}`, root, {
+        width: Math.max(1.8, def.w - 0.8),
+        height: 0.16,
+        depth: 0.18,
+        y: topY + 0.08,
+        z,
+        rgb: profile.grimeRgb,
+        emissiveScale: 0.04,
+        roughness: 0.82,
+        shadowGen,
+      });
+    }
+  }
+
+  if (profile.family === 'catwalk') {
+    addAquariumPipeBundle(scene, root, `${name}_catwalkBundle`, {
+      axis: 'x',
+      length: Math.max(2.0, def.w - 1.8),
+      x: 0,
+      y: topY + 0.24,
+      z: def.d * 0.26,
+      count: 4,
+      spacing: 0.18,
+      thickness: 0.10,
+      rgb: [104, 180, 192],
+    });
+    for (const x of [-def.w * 0.34, def.w * 0.34]) {
+      createDecorPlane(scene, `${name}_warning_${x > 0 ? 'r' : 'l'}`, root, {
+        width: 0.22,
+        height: Math.max(0.9, def.d * 0.72),
+        x,
+        y: topY + 0.02,
+        rotationX: Math.PI / 2,
+        rotationY: Math.PI / 2,
+        rgb: profile.stripeRgb,
+        emissiveScale: 0.18,
+        alpha: 0.20,
+      });
+    }
+  }
 }
 
 // ── Library set-piece factories ──────────────────────────────────────────────
@@ -1196,8 +1614,17 @@ function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
 function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const aquariumTheme = theme === 'aquarium';
+  const aquariumSurfaceProfile = aquariumTheme ? getAquariumSurfaceProfile(def) : null;
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
+  if (def?.authoredSurfaceId) {
+    root.metadata = {
+      ...(root.metadata || {}),
+      authoredSurfaceId: def.authoredSurfaceId,
+      gameplaySurface: true,
+      gameplay: true,
+    };
+  }
 
   const slab = BABYLON.MeshBuilder.CreateBox(`${name}_slab`, {
     width: def.w,
@@ -1212,21 +1639,21 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       noiseAmt: theme === 'library' ? 14 : theme === 'storm' ? 20 : 18,
       grainScale: theme === 'library' ? 4 : theme === 'storm' ? 5 : 3,
     })
-    : createGlowMaterial(scene, `${name}_slabMat`, palette.slab, {
-      emissive: aquariumTheme ? 0.24 : theme === 'storm' ? 0.18 : 0.28,
-      roughness: aquariumTheme ? 0.30 : theme === 'storm' ? 0.42 : 0.26,
+    : createGlowMaterial(scene, `${name}_slabMat`, aquariumSurfaceProfile?.slabRgb || palette.slab, {
+      emissive: aquariumSurfaceProfile?.slabEmissive ?? (aquariumTheme ? 0.24 : theme === 'storm' ? 0.18 : 0.28),
+      roughness: aquariumSurfaceProfile?.slabRoughness ?? (aquariumTheme ? 0.30 : theme === 'storm' ? 0.42 : 0.26),
     });
   if (slab.material.emissiveColor) {
     slab.material.emissiveColor = toColor3(
-      palette.glow,
-      aquariumTheme ? 0.10 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12,
+      aquariumSurfaceProfile?.glowRgb || palette.glow,
+      aquariumSurfaceProfile ? 0.08 : aquariumTheme ? 0.10 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12,
     );
   }
   slab.enableEdgesRendering();
   slab.edgesWidth = aquariumTheme ? 1.8 : theme === 'storm' ? 1.9 : 1.6;
   slab.edgesColor = toColor4(
-    palette.glow,
-    aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58,
+    aquariumSurfaceProfile?.glowRgb || palette.glow,
+    aquariumSurfaceProfile ? 0.56 : aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58,
   );
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
@@ -1245,12 +1672,15 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       noiseAmt: theme === 'storm' ? 22 : 20,
       grainScale: theme === 'storm' ? 5 : 4,
     })
-    : createGlowMaterial(scene, `${name}_rimMat`, palette.rim, {
-      emissive: aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18,
-      roughness: aquariumTheme ? 0.42 : 0.54,
+    : createGlowMaterial(scene, `${name}_rimMat`, aquariumSurfaceProfile?.rimRgb || palette.rim, {
+      emissive: aquariumSurfaceProfile?.rimEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18),
+      roughness: aquariumSurfaceProfile?.rimRoughness ?? (aquariumTheme ? 0.42 : 0.54),
     });
   if (rim.material.emissiveColor) {
-    rim.material.emissiveColor = toColor3(palette.rim, aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04);
+    rim.material.emissiveColor = toColor3(
+      aquariumSurfaceProfile?.rimRgb || palette.rim,
+      aquariumSurfaceProfile ? 0.04 : aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04,
+    );
   }
   markGameplaySurface(rim);
 
@@ -1262,7 +1692,9 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   top.rotation.x = Math.PI / 2;
   top.position.y = (def.h * 0.5) + 0.01;
   const topMat = new BABYLON.StandardMaterial(`${name}_topMat`, scene);
-  topMat.diffuseColor = aquariumTheme
+  topMat.diffuseColor = aquariumSurfaceProfile
+    ? toColor3(aquariumSurfaceProfile.topRgb)
+    : aquariumTheme
     ? new BABYLON.Color3(0.10, 0.24, 0.30)
     : theme === 'storm'
     ? new BABYLON.Color3(0.40, 0.38, 0.32)
@@ -1272,10 +1704,10 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
         ? new BABYLON.Color3(0.46, 0.34, 0.24)
         : new BABYLON.Color3(0.14, 0.16, 0.18);  // factory: dark steel grey
   topMat.emissiveColor = toColor3(
-    palette.glow,
-    aquariumTheme ? 0.14 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10,
+    aquariumSurfaceProfile?.glowRgb || palette.glow,
+    aquariumSurfaceProfile?.topEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10),
   );
-  topMat.alpha = aquariumTheme ? 0.62 : theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48;
+  topMat.alpha = aquariumSurfaceProfile?.topAlpha ?? (aquariumTheme ? 0.62 : theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48);
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -1286,7 +1718,7 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   if (theme === 'factory') {
     addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'aquarium') {
-    addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen);
+    addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, aquariumSurfaceProfile);
   } else if (theme === 'storm') {
     addStormPlatformDetails(scene, root, name, def, palette, shadowGen);
   } else if (theme === 'library') {
@@ -2237,6 +2669,25 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     decorPlatforms.push(visual);
   }
 
+  const decorPlanes = [];
+  for (const [index, def] of (layout.decorPlanes || []).entries()) {
+    const plane = createDecorPlane(scene, `${theme}_decorPlane_${def.name || index}`, null, {
+      width: def.width,
+      height: def.height,
+      x: def.x,
+      y: def.y,
+      z: def.z ?? 0,
+      rotationX: def.rotationX ?? 0,
+      rotationY: def.rotationY ?? 0,
+      rotationZ: def.rotationZ ?? 0,
+      rgb: def.rgb || getThemeStructureRgb(theme),
+      emissiveScale: def.emissiveScale ?? 0.06,
+      alpha: def.alpha ?? 0.22,
+    });
+    setRenderingGroup(plane, 1);
+    decorPlanes.push(plane);
+  }
+
   const decorBlocks = [];
   for (const [index, def] of (layout.decorBlocks || []).entries()) {
     const block = createDecorBox(scene, `${theme}_decorBlock_${def.name || index}`, null, {
@@ -2997,6 +3448,44 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
         return { hit: true, target: enemy.def.name };
       }
       return { hit: false };
+    },
+    getTopologyReport() {
+      if (!layout.authoredMap) return null;
+      return {
+        mapId: layout.authoredMap.id,
+        sectorCount: layout.authoredMap.sectors?.length ?? 0,
+        connectorCount: layout.authoredMap.connectors?.length ?? 0,
+        sectors: (layout.authoredMap.sectors || []).map((sector) => ({
+          id: sector.id,
+          label: sector.label,
+          x: sector.x,
+          z: sector.z,
+          w: sector.w,
+          d: sector.d,
+          floorSurfaceType: sector.floorSurfaceType,
+          wallLanguage: sector.wallLanguage,
+        })),
+        connectors: (layout.authoredMap.connectors || []).map((connector) => ({
+          id: connector.id,
+          sourceSector: connector.sourceSector,
+          destinationSector: connector.destinationSector,
+          type: connector.type,
+          x: connector.x,
+          z: connector.z,
+          w: connector.w,
+          d: connector.d,
+          floorSurfaceType: connector.floorSurfaceType,
+        })),
+        topology: layout.authoredMap.topology,
+        walkableReport: createAuthoredSurfaceAudit(
+          layout.authoredMap,
+          allPlatforms,
+          [
+            ...platformVisuals,
+            ...optionalSurfaces.map((surface) => surface.visual),
+          ],
+        ),
+      };
     },
     getDebugState() {
       return {
