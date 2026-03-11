@@ -80,9 +80,27 @@ export class JuiceFx {
       [0.45, 'rgba(255,225,145,0.65)'],
       [1, 'rgba(255,215,130,0)'],
     ]);
+    const enemyHitTex = createRadialTexture(scene, 'enemyHitTex', [
+      [0, 'rgba(255,206,246,0.96)'],
+      [0.40, 'rgba(255,110,198,0.58)'],
+      [1, 'rgba(255,110,198,0)'],
+    ]);
+    const hazardHitTex = createRadialTexture(scene, 'hazardHitTex', [
+      [0, 'rgba(255,236,186,0.96)'],
+      [0.42, 'rgba(255,174,86,0.62)'],
+      [1, 'rgba(255,174,86,0)'],
+    ]);
+    const waterHitTex = createRadialTexture(scene, 'waterHitTex', [
+      [0, 'rgba(182,236,255,0.96)'],
+      [0.42, 'rgba(96,186,255,0.58)'],
+      [1, 'rgba(96,186,255,0)'],
+    ]);
 
     this.dustMat = makeBillboardMaterial(scene, 'dustFxMat', dustTex);
     this.sparkleMat = makeBillboardMaterial(scene, 'sparkleFxMat', sparkleTex);
+    this.enemyHitMat = makeBillboardMaterial(scene, 'enemyHitFxMat', enemyHitTex);
+    this.hazardHitMat = makeBillboardMaterial(scene, 'hazardHitFxMat', hazardHitTex);
+    this.waterHitMat = makeBillboardMaterial(scene, 'waterHitFxMat', waterHitTex);
   }
 
   _alloc(material, idPrefix) {
@@ -239,6 +257,37 @@ export class JuiceFx {
         vz: Math.sin(angle) * 0.18,
       });
     }
+  }
+
+  spawnImpactBurst(pos, { kind = 'hazard', direction = null } = {}) {
+    if (!this.enabled) return;
+    const material = kind === 'enemy'
+      ? this.enemyHitMat
+      : kind === 'water'
+        ? this.waterHitMat
+        : this.hazardHitMat;
+    const forward = direction && Number.isFinite(direction.x) && Number.isFinite(direction.z)
+      ? { x: direction.x, z: direction.z }
+      : { x: 0, z: 0 };
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const dirX = Math.cos(angle) + (forward.x * 0.24);
+      const dirZ = Math.sin(angle) + (forward.z * 0.24);
+      this._spawn(material, `${kind}Impact`, pos.x + (dirX * 0.12), pos.y + 0.56, pos.z + (dirZ * 0.08), {
+        life: 0.34,
+        startScale: 0.16,
+        endScale: 0.50,
+        vx: dirX * 0.72,
+        vy: 0.18 + ((i % 2) * 0.06),
+        vz: dirZ * 0.18,
+      });
+    }
+    this._spawn(material, `${kind}ImpactCore`, pos.x, pos.y + 0.62, pos.z - 0.04, {
+      life: 0.24,
+      startScale: 0.22,
+      endScale: 0.56,
+      vy: 0.10,
+    });
   }
 
   update(dt) {

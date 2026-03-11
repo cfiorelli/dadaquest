@@ -2418,8 +2418,20 @@ export async function boot(options = {}) {
     }
   }
 
+  const getEra5PresetTable = () => {
+    if (!isEra5Level || !world.cameraPresets) return ERA5_CAMERA_PRESETS;
+    return world.cameraPresets;
+  };
+  const getEra5DefaultPresetId = () => {
+    const presetTable = getEra5PresetTable();
+    if (isEra5Level && world.defaultCameraPreset && presetTable[world.defaultCameraPreset]) {
+      return world.defaultCameraPreset;
+    }
+    return ERA5_DEFAULT_CAMERA_PRESET;
+  };
+
   // Camera — fixed angle, smooth follow
-  const initialEra5CameraPreset = ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+  const initialEra5CameraPreset = getEra5PresetTable()[getEra5DefaultPresetId()] || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
   const cameraStartPos = isEra5Level
     ? new BABYLON.Vector3(
       (spawnPoint.x || -12) - (era5InitialForward.x * initialEra5CameraPreset.distance),
@@ -2453,7 +2465,7 @@ export async function boot(options = {}) {
   const useLevel2CameraOcclusionGuard = levelId === 2;
   const useGenericCameraOcclusionGuard = levelId === 3;
   const useEra5DecorOcclusion = isEra5Level;
-  let era5CameraPresetId = ERA5_DEFAULT_CAMERA_PRESET;
+  let era5CameraPresetId = getEra5DefaultPresetId();
   let era5PlayerYaw = era5InitialPlayerYaw;
   let era5PlayerYawVel = 0;
   let era5CameraYaw = isEra5Level ? era5InitialPlayerYaw : 0;
@@ -2473,7 +2485,13 @@ export async function boot(options = {}) {
     hideLargePlanes: false,
     forceEnvironmentVisible: false,
   };
-  const getEra5CameraPreset = () => ERA5_CAMERA_PRESETS[era5CameraPresetId] || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+  let era5LastDamageEvent = null;
+  const getEra5CameraPreset = () => {
+    const presetTable = getEra5PresetTable();
+    return presetTable[era5CameraPresetId]
+      || presetTable[getEra5DefaultPresetId()]
+      || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+  };
   if (isEra5Level) {
     camera.fov = getEra5CameraPreset().fov;
   }
@@ -3403,15 +3421,61 @@ export async function boot(options = {}) {
     return true;
   }
 
+  function describeEra5DamageSource(source) {
+    const key = String(source || 'hazard').toLowerCase();
+    const enemySources = new Set([
+      'jellyfish',
+      'spark_sprite',
+      'windup_toy',
+      'paper_bird',
+      'origami_crane',
+      'origami_fox',
+      'origami_frog',
+    ]);
+    const waterSources = new Set(['oxygen', 'water']);
+    const labels = {
+      jellyfish: 'Jellyfish',
+      eel_rail: 'Eel rail',
+      shark_shadow: 'Shark sweep',
+      oxygen: 'Oxygen',
+      spark_sprite: 'Spark sprite',
+      windup_toy: 'Wind-up toy',
+      paper_bird: 'Paper bird',
+      origami_crane: 'Origami crane',
+      origami_fox: 'Origami fox',
+      origami_frog: 'Origami frog',
+      lightning: 'Lightning',
+      ink: 'Ink',
+      press: 'Stamp press',
+      tripline: 'Lantern line',
+      ember: 'Ember pocket',
+      puppet_sweep: 'Shadow sweep',
+      line: 'Sweep line',
+      hazard: 'Hazard',
+    };
+    const label = labels[key] || key.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (enemySources.has(key)) {
+      return { category: 'enemy', tone: 'enemy', label };
+    }
+    if (waterSources.has(key)) {
+      return { category: 'water', tone: 'water', label };
+    }
+    return { category: 'hazard', tone: 'hazard', label };
+  }
+
   function applyEra5Damage(source, hitDirection = { x: 1, z: 0 }, options = {}) {
     if (!isEra5Level || state !== 'gameplay' || respawnState) return false;
     if (player.isInvulnerable()) return false;
+    const descriptor = describeEra5DamageSource(source);
     const invulnMs = Number.isFinite(options?.invulnMs) ? options.invulnMs : 1000;
     const resist = clamp(options?.resist ?? 0, 0, 0.4);
     const knockbackScale = 1 - (resist * 0.7);
     const directionX = Number.isFinite(hitDirection?.x) ? hitDirection.x : 1;
     const directionZ = Number.isFinite(hitDirection?.z) ? hitDirection.z : 0;
+    const impactDirection = { x: directionX, z: directionZ };
+    let shieldAbsorbed = false;
     if (era5Shield > 0) {
+      shieldAbsorbed = true;
       era5Shield = Math.max(0, era5Shield - 1);
       player.applyHit({
         direction: directionX,
@@ -3420,7 +3484,11 @@ export async function boot(options = {}) {
         upward: 2.9 * knockbackScale,
         invulnMs: 600,
       });
-      ui.showStatus('Shield hit!', 650);
+      ui.showStatus(`${descriptor.label} hit shield!`, 1200, { tone: descriptor.tone });
+      juiceFx.spawnImpactBurst(player.mesh.position, {
+        kind: descriptor.category,
+        direction: impactDirection,
+      });
     } else {
       era5Hp = Math.max(0, era5Hp - 1);
       player.applyHit({
@@ -3430,13 +3498,35 @@ export async function boot(options = {}) {
         upward: 3.4 * knockbackScale,
         invulnMs,
       });
-      ui.showStatus(`${source} hit!`, 650);
+      ui.showStatus(`${descriptor.label} hit!`, 1200, { tone: descriptor.tone });
+      juiceFx.spawnImpactBurst(player.mesh.position, {
+        kind: descriptor.category,
+        direction: impactDirection,
+      });
       if (era5Hp <= 0) {
+        era5LastDamageEvent = {
+          source,
+          category: descriptor.category,
+          label: descriptor.label,
+          shielded: false,
+          hp: era5Hp,
+          shield: era5Shield,
+          timeMs: performance.now(),
+        };
         restoreEra5Vitals();
         triggerReset(`${source}_defeat`, directionX >= 0 ? 1 : -1);
         return true;
       }
     }
+    era5LastDamageEvent = {
+      source,
+      category: descriptor.category,
+      label: descriptor.label,
+      shielded: shieldAbsorbed,
+      hp: era5Hp,
+      shield: era5Shield,
+      timeMs: performance.now(),
+    };
     audio.playCue(levelId, 'collision');
     syncEra5Ui();
     return true;
@@ -4309,7 +4399,10 @@ export async function boot(options = {}) {
     };
     window.__DADA_DEBUG__.setEra5CameraPreset = (presetId = ERA5_DEFAULT_CAMERA_PRESET) => {
       if (!isEra5Level) return null;
-      const nextPreset = ERA5_CAMERA_PRESETS[presetId] || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
+      const presetTable = getEra5PresetTable();
+      const nextPreset = presetTable[presetId]
+        || presetTable[getEra5DefaultPresetId()]
+        || ERA5_CAMERA_PRESETS[ERA5_DEFAULT_CAMERA_PRESET];
       era5CameraPresetId = nextPreset.id;
       camera.fov = nextPreset.fov;
       const forward = getYawForwardXZ(era5PlayerYaw).normalize();
@@ -4334,6 +4427,7 @@ export async function boot(options = {}) {
         fov: nextPreset.fov,
       };
     };
+    window.__DADA_DEBUG__.getEra5LastDamage = () => era5LastDamageEvent;
     window.__DADA_DEBUG__.setEra5CameraDebugView = ({
       position = null,
       target = null,
@@ -4507,11 +4601,18 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.fireEra5Weapon = () => fireEra5Weapon();
     window.__DADA_DEBUG__.toggleEra5Tool = () => toggleEra5Tool();
     window.__DADA_DEBUG__.useWindGlide = () => useWindGlide();
-    window.__DADA_DEBUG__.setEra5Vitals = ({ hp, shield, oxygen } = {}) => {
+    window.__DADA_DEBUG__.setEra5Vitals = ({ hp, shield, oxygen, clearInvuln = false, clearLastDamage = false } = {}) => {
       if (!isEra5Level) return null;
       if (Number.isFinite(hp)) era5Hp = Math.max(0, Math.min(Math.round(era5State.stats.hpMax ?? 3), Math.round(hp)));
       if (Number.isFinite(shield)) era5Shield = Math.max(0, Math.min(Math.round(era5State.stats.shieldMax ?? 1), Math.round(shield)));
       if (Number.isFinite(oxygen)) era5Oxygen = Math.max(0, Math.min(getEra5MeterMax(), oxygen));
+      if (clearInvuln) {
+        player.invulnTimerMs = 0;
+        player.visual?.setEnabled?.(true);
+      }
+      if (clearLastDamage) {
+        era5LastDamageEvent = null;
+      }
       syncEra5Ui();
       return window.__DADA_DEBUG__.era5Vitals;
     };

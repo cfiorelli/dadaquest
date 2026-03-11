@@ -192,6 +192,17 @@ function makeInvisibleCollider(scene, name, def) {
   return mesh;
 }
 
+function makeSolidBlockerCollider(scene, name, def, metadata = {}) {
+  const mesh = makeInvisibleCollider(scene, name, def);
+  mesh.metadata = {
+    ...(mesh.metadata || {}),
+    gameplayBlocker: true,
+    gameplay: false,
+    ...metadata,
+  };
+  return mesh;
+}
+
 function markDecor(node) {
   markDecorNode(node, { cameraBlocker: false });
 }
@@ -2689,6 +2700,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   }
 
   const decorBlocks = [];
+  const decorBlockColliders = [];
   for (const [index, def] of (layout.decorBlocks || []).entries()) {
     const block = createDecorBox(scene, `${theme}_decorBlock_${def.name || index}`, null, {
       width: def.w,
@@ -2708,9 +2720,23 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     if (Number.isFinite(def.rotationZ)) block.rotation.z = def.rotationZ;
     setRenderingGroup(block, 1);
     decorBlocks.push(block);
+    if (def.solid) {
+      decorBlockColliders.push(makeSolidBlockerCollider(scene, `${theme}_${def.name || index}_solidCol`, {
+        x: def.x,
+        y: def.y,
+        z: def.z ?? 0,
+        w: def.w,
+        h: def.h,
+        d: def.d,
+      }, {
+        role: 'solidBlocker',
+      }));
+    }
   }
+  allPlatforms.push(...decorBlockColliders);
 
   const decorColumns = [];
+  const decorColumnColliders = [];
   for (const [index, def] of (layout.decorColumns || []).entries()) {
     const column = createDecorColumn(scene, `${theme}_decorColumn_${def.name || index}`, null, {
       diameter: def.diameter ?? 1,
@@ -2730,7 +2756,21 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     if (Number.isFinite(def.rotationY)) column.rotation.y = def.rotationY;
     setRenderingGroup(column, 1);
     decorColumns.push(column);
+    if (def.solid) {
+      const diameter = Math.max(def.diameter ?? 0, def.diameterTop ?? 0, def.diameterBottom ?? 0, 0.2);
+      decorColumnColliders.push(makeSolidBlockerCollider(scene, `${theme}_${def.name || index}_solidCol`, {
+        x: def.x,
+        y: def.y,
+        z: def.z ?? 0,
+        w: diameter,
+        h: def.height ?? 4,
+        d: diameter,
+      }, {
+        role: 'solidColumn',
+      }));
+    }
   }
+  allPlatforms.push(...decorColumnColliders);
 
   const optionalSurfaces = [];
   for (const def of layout.hiddenBridges || []) {
@@ -3561,6 +3601,9 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     foregroundMeshes: [],
     extents: layout.extents,
     spawn: layout.spawn,
+    spawnYaw: layout.spawnYaw,
+    cameraPresets: layout.cameraPresets || null,
+    defaultCameraPreset: layout.defaultCameraPreset || null,
     checkpoints,
     pickups,
     coins,

@@ -26,7 +26,7 @@ async function unlockThroughLevel(page, completedLevel = 5) {
   }, completedLevel);
 }
 
-async function hideGameplayUi(page) {
+async function hideGameplayUi(page, { keepStatus = false } = {}) {
   await page.addStyleTag({
     content: `
       [data-era5-hud], #titleScreen, #titleOverlay, #gameplayHud, #gameplayMenu, #titleMenu,
@@ -36,7 +36,12 @@ async function hideGameplayUi(page) {
       .dada-toast-layer, .dada-status-banner, .dada-toast {
         display: none !important;
       }
-      #uiRoot { display: none !important; }
+      ${keepStatus ? `
+        #gameplayHud, [data-era5-hud], [data-controls-hint], [data-era5-buffs],
+        [data-era5-inventory-hint], .dada-era5-reticle, .dada-pop, .dada-fade {
+          display: none !important;
+        }
+      ` : '#uiRoot { display: none !important; }'}
       body { margin: 0; background: #000; }
     `,
   });
@@ -165,7 +170,7 @@ test('capture authored Level 6 gameplay and topology proof screenshots', async (
   });
 });
 
-test('capture Level 5 aquarium review screenshots', async ({ page }) => {
+test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -180,72 +185,185 @@ test('capture Level 5 aquarium review screenshots', async ({ page }) => {
     { timeout: 30_000 },
   );
   await page.waitForTimeout(1800);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -39.2,
+      y: 1.92,
+      z: 6.8,
+      yaw: 0.48,
+      cameraYaw: 0.48,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-start-review',
+      position: { x: -52.0, y: 9.4, z: -6.0 },
+      target: { x: -30.0, y: 2.4, z: 8.2 },
+      fov: 0.80,
+    });
+  });
+  await page.waitForTimeout(500);
   await hideGameplayUi(page);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -30.4,
-      y: 1.82,
-      z: 7.6,
-      yaw: 1.10,
-      cameraYaw: 1.10,
-    });
-  });
-  await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'docs/screenshots/level5-aquarium-spawn.png',
+    path: 'docs/screenshots/level5-rebuild-start-view.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 6.4,
-      y: 1.84,
-      z: -1.4,
-      yaw: 0.96,
-      cameraYaw: 0.96,
+      x: 10.8,
+      y: 2.18,
+      z: 14.0,
+      yaw: 0.72,
+      cameraYaw: 0.72,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-hero-review',
+      position: { x: -4.0, y: 10.2, z: -1.0 },
+      target: { x: 9.8, y: 2.8, z: 18.8 },
+      fov: 0.82,
     });
   });
   await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'docs/screenshots/level5-aquarium-hero-chamber.png',
+    path: 'docs/screenshots/level5-rebuild-hero-chamber.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 38.6,
-      y: 1.30,
-      z: -12.8,
-      yaw: 0.54,
-      cameraYaw: 0.54,
-    });
-  });
-  await page.waitForTimeout(500);
-  await page.screenshot({
-    path: 'docs/screenshots/level5-aquarium-lower-route.png',
-    clip: { x: 0, y: 0, width: 1440, height: 900 },
-  });
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 10.2,
-      y: 2.16,
-      z: 8.6,
+      x: -12.2,
+      y: 1.86,
+      z: 20.8,
       yaw: 0.74,
       cameraYaw: 0.74,
     });
-    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.({ x: 1.8, z: 1.2 });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-public-review',
+      position: { x: -28.0, y: 7.2, z: 28.0 },
+      target: { x: -6.0, y: 2.4, z: 18.0 },
+      fov: 0.80,
+    });
   });
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'docs/screenshots/level5-aquarium-enemy-readability.png',
+    path: 'docs/screenshots/level5-rebuild-public-route.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -16.2,
+      y: 1.42,
+      z: -9.6,
+      yaw: 1.48,
+      cameraYaw: 1.48,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-service-review',
+      position: { x: -30.0, y: 6.4, z: -18.0 },
+      target: { x: -12.0, y: 1.6, z: -9.0 },
+      fov: 0.82,
+    });
+  });
+  await page.waitForTimeout(500);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-rebuild-service-route.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 17.6,
+      y: 1.18,
+      z: -11.0,
+      yaw: 1.20,
+      cameraYaw: 1.20,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-maintenance-review',
+      position: { x: 4.0, y: 5.6, z: -19.0 },
+      target: { x: 24.0, y: 1.4, z: -8.0 },
+      fov: 0.84,
+    });
+  });
+  await page.waitForTimeout(500);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-rebuild-maintenance-route.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 48.0,
+      y: 2.06,
+      z: 2.2,
+      yaw: 0.76,
+      cameraYaw: 0.76,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'level5-goal-review',
+      position: { x: 34.0, y: 7.2, z: -8.0 },
+      target: { x: 54.6, y: 2.8, z: 3.0 },
+      fov: 0.82,
+    });
+  });
+  await page.waitForTimeout(500);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-rebuild-goal-approach.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.reload();
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1500);
+  await hideGameplayUi(page, { keepStatus: true });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 8.8,
+      y: 2.0,
+      z: 16.2,
+      yaw: 1.06,
+      cameraYaw: 1.06,
+    });
+    const forward = window.__DADA_DEBUG__?.playerForward ?? { x: 1, z: 0 };
+    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
+  });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 3, shield: 1, oxygen: 20 });
+    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('jellyfish');
+  });
+  await page.waitForTimeout(120);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-impact-enemy-hit.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 8.4,
+      y: 1.92,
+      z: 18.0,
+      yaw: 1.12,
+      cameraYaw: 1.12,
+    });
+    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 3, shield: 0, oxygen: 20 });
+    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_viewing_north');
+  });
+  await page.waitForTimeout(120);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-impact-hazard-hit.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 });

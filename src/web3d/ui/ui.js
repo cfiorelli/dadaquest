@@ -389,6 +389,30 @@ const CSS = `
   opacity: 1;
   transform: translateY(0);
 }
+.dada-status.tone-enemy {
+  color: #fff0fa;
+  background: rgba(92, 34, 72, 0.80);
+  border-color: rgba(255, 164, 220, 0.52);
+  box-shadow: 0 10px 22px rgba(92, 34, 72, 0.28);
+}
+.dada-status.tone-hazard {
+  color: #fff7e6;
+  background: rgba(90, 56, 18, 0.82);
+  border-color: rgba(255, 210, 136, 0.52);
+  box-shadow: 0 10px 22px rgba(90, 56, 18, 0.26);
+}
+.dada-status.tone-water {
+  color: #eefaff;
+  background: rgba(24, 66, 102, 0.84);
+  border-color: rgba(138, 224, 255, 0.52);
+  box-shadow: 0 10px 22px rgba(24, 66, 102, 0.30);
+}
+.dada-status.tone-system {
+  color: #f2fbff;
+  background: rgba(34, 54, 78, 0.78);
+  border-color: rgba(152, 214, 248, 0.42);
+  box-shadow: 0 10px 22px rgba(18, 26, 34, 0.24);
+}
 .dada-fade {
   position: absolute;
   top: 0;
@@ -2131,12 +2155,17 @@ export function createUI(uiRoot, options = {}) {
         popEl.classList.remove('visible');
       }, durationMs);
     },
-    showStatus(text, durationMs = 1600) {
+    showStatus(text, durationMs = 1600, options = {}) {
       if (statusTimer) clearTimeout(statusTimer);
+      const tone = options?.tone ? `tone-${String(options.tone)}` : '';
+      statusEl.className = `dada-status${tone ? ` ${tone}` : ''}`;
+      statusEl.dataset.tone = options?.tone || '';
       statusEl.textContent = text;
       statusEl.classList.add('visible');
       statusTimer = setTimeout(() => {
         statusEl.classList.remove('visible');
+        statusEl.className = 'dada-status';
+        statusEl.dataset.tone = '';
       }, durationMs);
     },
     setFade(alpha) {
