@@ -158,10 +158,13 @@ function computeExtentsFromBoxes(boxes) {
 function buildShellDecor(owner, shell, defaultRgb) {
   if (shell === false) return { blocks: [], platforms: [] };
   const bounds = resolveBounds(owner);
-  const wallHeight = resolveValue(shell?.wallHeight, resolveValue(owner.ceilingY, owner.floorY + 8) - owner.floorY);
+  const wallBaseY = owner.floorY - resolveValue(shell?.floorSkirt, 0);
+  const ceilingY = resolveValue(owner.ceilingY, owner.floorY + 8);
+  const wallHeight = resolveValue(shell?.wallHeight, ceilingY - wallBaseY);
   const wallThickness = resolveValue(shell?.wallThickness, 1.1);
   const wallRgb = shell?.rgb || defaultRgb;
   const openSides = new Set(shell?.openSides || []);
+  const solidSides = new Set(shell?.solidSides || []);
   const blocks = [];
   const platforms = [];
 
@@ -176,7 +179,7 @@ function buildShellDecor(owner, shell, defaultRgb) {
     blocks.push({
       name: `${owner.id}_${side.side}_wall`,
       x: side.x,
-      y: owner.floorY + (wallHeight * 0.5),
+      y: wallBaseY + (wallHeight * 0.5),
       z: side.z,
       w: side.w,
       h: wallHeight,
@@ -184,6 +187,7 @@ function buildShellDecor(owner, shell, defaultRgb) {
       rgb: wallRgb,
       emissiveScale: shell?.emissiveScale ?? 0.03,
       roughness: shell?.roughness ?? 0.88,
+      solid: shell?.solid === true || solidSides.has(side.side),
     });
   }
 
@@ -191,7 +195,6 @@ function buildShellDecor(owner, shell, defaultRgb) {
     return { blocks, platforms };
   }
 
-  const ceilingY = resolveValue(owner.ceilingY, owner.floorY + wallHeight + 0.2);
   platforms.push({
     name: `${owner.id}_ceiling`,
     x: bounds.x,

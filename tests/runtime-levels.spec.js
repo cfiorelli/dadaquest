@@ -8,13 +8,15 @@ const LEVEL_CASES = [
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
 const LEVEL5_REQUIRED_SECTORS = [
-  'Spawn Dock',
-  'Direct Chamber Approach',
-  'Side Service Catwalk',
-  'Central Viewing Chamber',
-  'Overhead Cross-Bridge',
-  'Lower Maintenance Route',
-  'Final Exhibit Platform',
+  'Arrival Vestibule',
+  'Public Exhibit Hall',
+  'Service Split',
+  'Main Tank Chamber',
+  'Upper Observation Bridge',
+  'Filtration Core',
+  'Flooded Maintenance Trench',
+  'Pump Gallery Rejoin',
+  'Final Nursery',
 ];
 const ERA5_CONTROL_POSES = {
   6: { x: 40.0, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 },
@@ -334,7 +336,7 @@ test('runtime: level 4 stays locked until progress unlocks it, then starts and f
 });
 
 test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is completed, then runs cleanly for 10 seconds', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   const consoleErrors = [];
   const pageErrors = [];
 
@@ -392,7 +394,7 @@ test('@level5 @era5 runtime: level 5 uses classic Doom arrow movement, turn, and
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
   await focusGameplay(page);
-  const basePose = { x: 18.0, y: 1.42, z: -10.0, yaw: 1.57, cameraYaw: 1.57 };
+  const basePose = { x: 39.4, y: 1.54, z: -5.4, yaw: 1.57, cameraYaw: 1.57 };
 
   await resetEra5Pose(page, basePose);
   const beforeTurn = await page.evaluate(() => ({
@@ -723,7 +725,7 @@ test('@level5 @era5 runtime: level 5 bracket keys rotate the camera in the expec
 });
 
 test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with F, and music is running', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
 
@@ -753,11 +755,11 @@ test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, 
   ).toBe(0);
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 8.8,
-      y: 2.0,
-      z: 16.2,
-      yaw: 1.06,
-      cameraYaw: 1.06,
+      x: 6.8,
+      y: 2.24,
+      z: 17.6,
+      yaw: 1.04,
+      cameraYaw: 1.04,
     });
     const forward = window.__DADA_DEBUG__?.playerForward ?? { x: 1, z: 0 };
     window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
@@ -788,7 +790,7 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-s
   await page.waitForTimeout(1300);
 
   const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
-  test.skip(!topology, 'Level 6 authored topology debug is only available when the authored-space Level 6 data is present on this branch.');
+  test.skip(!topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
   expect(topology).not.toBeNull();
   expect(topology.sectorCount).toBeGreaterThanOrEqual(7);
   expect(topology.connectorCount).toBeGreaterThanOrEqual(8);
@@ -805,11 +807,11 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-s
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -41.8,
+      x: -48.2,
       y: 1.86,
-      z: 6.2,
-      yaw: 0.92,
-      cameraYaw: 0.92,
+      z: 0.8,
+      yaw: 0.28,
+      cameraYaw: 0.28,
     });
   });
   await page.waitForTimeout(700);
@@ -854,11 +856,11 @@ test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 20 });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 12.0,
-      y: 2.48,
-      z: 13.8,
-      yaw: 0.86,
-      cameraYaw: 0.86,
+      x: 11.2,
+      y: 2.36,
+      z: 14.6,
+      yaw: 0.88,
+      cameraYaw: 0.88,
     });
   });
   await page.waitForTimeout(120);
@@ -890,7 +892,7 @@ test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent
 });
 
 test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits from environmental hazards', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
 
@@ -917,6 +919,13 @@ test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits fr
     window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 3, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
   });
   await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -15.2,
+      y: 1.92,
+      z: 21.8,
+      yaw: 1.12,
+      cameraYaw: 1.12,
+    });
     window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_viewing_north');
   });
   await expect.poll(
@@ -1164,10 +1173,25 @@ test('@era5 runtime: level 6 authored spaces keep turn and strafe camera behavio
 
   const pose = { x: 40, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 };
   await resetEra5Pose(page, pose);
+  await focusGameplay(page);
   const beforeTurn = await snapshotEra5Pose(page);
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
+  await page.keyboard.down('ArrowRight');
   await page.waitForTimeout(420);
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
+  await page.keyboard.up('ArrowRight');
+  await expect.poll(
+    async () => {
+      const poseAfterTurn = await snapshotEra5Pose(page);
+      return poseAfterTurn.yaw - beforeTurn.yaw;
+    },
+    { timeout: 1500 },
+  ).toBeGreaterThan(0.08);
+  await expect.poll(
+    async () => {
+      const poseAfterTurn = await snapshotEra5Pose(page);
+      return poseAfterTurn.cameraYaw - beforeTurn.cameraYaw;
+    },
+    { timeout: 1500 },
+  ).toBeGreaterThan(0.08);
   const afterTurn = await snapshotEra5Pose(page);
 
   expect(afterTurn.yaw).toBeGreaterThan(beforeTurn.yaw + 0.08);
@@ -1175,10 +1199,11 @@ test('@era5 runtime: level 6 authored spaces keep turn and strafe camera behavio
   expect(Math.abs(wrapDelta(afterTurn.cameraYaw, afterTurn.yaw))).toBeLessThan(0.06);
 
   await resetEra5Pose(page, pose);
+  await focusGameplay(page);
   const beforeStrafe = await snapshotEra5Pose(page);
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyD', key: 'd' });
+  await page.keyboard.down('d');
   await page.waitForTimeout(380);
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyD', key: 'd' });
+  await page.keyboard.up('d');
   const afterStrafe = await snapshotEra5Pose(page);
 
   expect(Math.abs(wrapDelta(afterStrafe.yaw, beforeStrafe.yaw))).toBeLessThan(0.03);

@@ -18,10 +18,10 @@ import { makeCardboard, makePlastic, makePaper } from '../materials.js';
 
 const THEME_PALETTES = {
   aquarium: {
-    slab: [62, 118, 134],
-    rim: [18, 48, 62],
-    glow: [132, 240, 255],
-    line: [188, 250, 255],
+    slab: [48, 94, 108],
+    rim: [10, 24, 34],
+    glow: [154, 240, 255],
+    line: [228, 248, 255],
     enemy: [118, 255, 246],
     accent: [255, 170, 236],
     goalOutfit: 'level3',
@@ -66,17 +66,17 @@ const THEME_PALETTES = {
 
 const THEME_SCENE_LOOKS = {
   aquarium: {
-    clear: [10, 42, 62, 255],
-    fog: [16, 88, 116],
-    fogStart: 58,
-    fogEnd: 196,
+    clear: [6, 24, 34, 255],
+    fog: [10, 58, 78],
+    fogStart: 54,
+    fogEnd: 182,
     keyDir: [-0.24, -1.0, 0.22],
-    keyIntensity: 1.20,
-    hemiIntensity: 0.86,
-    hemiColor: [136, 208, 224],
-    hemiGround: [0.02, 0.05, 0.07],
+    keyIntensity: 1.14,
+    hemiIntensity: 0.72,
+    hemiColor: [116, 184, 204],
+    hemiGround: [0.01, 0.03, 0.05],
     rimOffset: [-10, 18, -12],
-    rimIntensity: 0.66,
+    rimIntensity: 0.54,
   },
   factory: {
     clear: [68, 48, 28, 255],    // warm industrial amber — was near-black [34,24,16]
@@ -723,6 +723,7 @@ function getAquariumSurfaceProfile(def = {}) {
   if (!surfaceType) return null;
   const ownerId = String(def.ownerId || def.connectorId || def.sectorId || def.name || '').toLowerCase();
   const isStep = surfaceType === 'step' || surfaceType === 'landing';
+  const roomSurface = def.roomSurface === true || def.walkableClassification === 'room-floor';
 
   let family = 'service';
   if (surfaceType.includes('viewing') || surfaceType.includes('exhibit')) {
@@ -904,11 +905,25 @@ function getAquariumSurfaceProfile(def = {}) {
     },
   };
 
-  return {
+  const profile = {
     ...profileByFamily[family],
     surfaceType,
     ownerId,
+    roomSurface,
   };
+
+  if (roomSurface && (family === 'exhibit' || family === 'glass')) {
+    profile.slabEmissive = 0.14;
+    profile.slabRoughness = 0.46;
+    profile.topAlpha = family === 'glass' ? 0.88 : 0.92;
+    profile.topEmissive = 0.06;
+    profile.sheenAlpha = family === 'glass' ? 0.14 : 0.10;
+    profile.seamAlpha = family === 'glass' ? 0.18 : 0.16;
+    profile.edgeAlpha = family === 'glass' ? 0.08 : 0.06;
+    profile.railAlpha = family === 'glass' ? 0.70 : 0.58;
+  }
+
+  return profile;
 }
 
 function addAquariumPipeBundle(scene, root, name, {
@@ -971,6 +986,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
   if (!profile) return;
   const topY = (def.h * 0.5) + 0.04;
   const isGround = name.endsWith('_ground');
+  const roomSurface = def.roomSurface === true || def.walkableClassification === 'room-floor';
 
   createDecorPlane(scene, `${name}_wetSheen`, root, {
     width: Math.max(2.0, def.w - 0.8),
@@ -981,7 +997,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
     alpha: isGround ? 0.08 : profile.sheenAlpha,
   });
 
-  if (profile.family === 'catwalk') {
+  if (profile.family === 'catwalk' && !roomSurface) {
     const grateCount = Math.max(4, Math.min(8, Math.round(def.w / 2.0)));
     for (let i = 0; i < grateCount; i += 1) {
       const x = -def.w * 0.42 + ((i / Math.max(1, grateCount - 1)) * def.w * 0.84);
@@ -1071,19 +1087,19 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
     createDecorPlane(scene, `${name}_cautionBand`, root, {
       width: Math.max(1.2, def.w * 0.36),
       height: 0.18,
-      x: def.w * 0.18,
+      x: roomSurface ? 0 : def.w * 0.18,
       y: topY + 0.02,
-      z: -def.d * 0.20,
+      z: roomSurface ? def.d * 0.18 : -def.d * 0.20,
       rgb: profile.stripeRgb,
       emissiveScale: 0.16,
-      alpha: profile.stripeAlpha,
+      alpha: roomSurface ? Math.min(0.34, profile.stripeAlpha * 0.42) : profile.stripeAlpha,
     });
     addAquariumPipeBundle(scene, root, `${name}_serviceBundle`, {
       axis: 'x',
       length: Math.max(2.0, def.w - 1.6),
       x: 0,
-      y: topY + 0.28,
-      z: def.d * 0.26,
+      y: topY + (roomSurface ? 0.14 : 0.28),
+      z: roomSurface ? def.d * 0.30 : def.d * 0.26,
       count: 3,
       spacing: 0.22,
       thickness: 0.14,
@@ -1096,10 +1112,10 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
       width: Math.max(1.2, def.w * 0.56),
       height: 0.22,
       y: topY + 0.02,
-      z: -def.d * 0.24,
+      z: roomSurface ? def.d * 0.22 : -def.d * 0.24,
       rgb: profile.lineRgb,
       emissiveScale: 0.18,
-      alpha: 0.18,
+      alpha: roomSurface ? 0.12 : 0.18,
     });
     createDecorPlane(scene, `${name}_insetFrame`, root, {
       width: Math.max(1.2, def.w - 0.78),
@@ -1107,7 +1123,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
       y: topY + 0.02,
       rgb: profile.lineRgb,
       emissiveScale: 0.12,
-      alpha: 0.10,
+      alpha: roomSurface ? 0.06 : 0.10,
     });
   }
 
@@ -1123,7 +1139,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
     });
   }
 
-  if (isGround || def.w < 9.5) return;
+  if (roomSurface || isGround || def.w < 9.5) return;
   for (const x of [-def.w * 0.40, def.w * 0.40]) {
     createDecorBox(scene, `${name}_railPost_${x > 0 ? 'r' : 'l'}`, root, {
       width: 0.12,
@@ -1626,6 +1642,7 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const aquariumTheme = theme === 'aquarium';
   const aquariumSurfaceProfile = aquariumTheme ? getAquariumSurfaceProfile(def) : null;
+  const flatAquariumRoomFloor = aquariumTheme && aquariumSurfaceProfile?.roomSurface === true;
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
   if (def?.authoredSurfaceId) {
@@ -1637,13 +1654,18 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     };
   }
 
+  const slabHeight = flatAquariumRoomFloor
+    ? Math.max(0.10, def.h * 0.18)
+    : def.h * 0.82;
   const slab = BABYLON.MeshBuilder.CreateBox(`${name}_slab`, {
     width: def.w,
-    height: def.h * 0.82,
+    height: slabHeight,
     depth: def.d,
   }, scene);
   slab.parent = root;
-  slab.position.y = 0.02;
+  slab.position.y = flatAquariumRoomFloor
+    ? ((def.h * 0.5) - (slabHeight * 0.5) - 0.06)
+    : 0.02;
   slab.material = theme === 'library' || theme === 'camp' || theme === 'storm'
     ? makeCardboard(scene, `${name}_slabMat`, palette.slab[0] / 255, palette.slab[1] / 255, palette.slab[2] / 255, {
       roughness: theme === 'library' ? 0.88 : theme === 'storm' ? 0.92 : 0.80,
@@ -1661,39 +1683,51 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     );
   }
   slab.enableEdgesRendering();
-  slab.edgesWidth = aquariumTheme ? 1.8 : theme === 'storm' ? 1.9 : 1.6;
+  slab.edgesWidth = flatAquariumRoomFloor
+    ? 0.18
+    : aquariumSurfaceProfile?.roomSurface
+      ? 0.84
+    : aquariumTheme
+      ? 1.8
+      : theme === 'storm'
+        ? 1.9
+        : 1.6;
   slab.edgesColor = toColor4(
     aquariumSurfaceProfile?.glowRgb || palette.glow,
-    aquariumSurfaceProfile ? 0.56 : aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58,
+    flatAquariumRoomFloor
+      ? 0.03
+      : aquariumSurfaceProfile?.edgeAlpha ?? (aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58),
   );
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
   markGameplaySurface(slab);
 
-  const rim = BABYLON.MeshBuilder.CreateBox(`${name}_rim`, {
-    width: def.w + 0.08,
-    height: def.h * 0.26,
-    depth: def.d + 0.08,
-  }, scene);
-  rim.parent = root;
-  rim.position.y = -(def.h * 0.32);
-  rim.material = theme === 'library' || theme === 'camp' || theme === 'storm'
-    ? makeCardboard(scene, `${name}_rimMat`, palette.rim[0] / 255, palette.rim[1] / 255, palette.rim[2] / 255, {
-      roughness: theme === 'storm' ? 0.90 : 0.88,
-      noiseAmt: theme === 'storm' ? 22 : 20,
-      grainScale: theme === 'storm' ? 5 : 4,
-    })
-    : createGlowMaterial(scene, `${name}_rimMat`, aquariumSurfaceProfile?.rimRgb || palette.rim, {
-      emissive: aquariumSurfaceProfile?.rimEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18),
-      roughness: aquariumSurfaceProfile?.rimRoughness ?? (aquariumTheme ? 0.42 : 0.54),
-    });
-  if (rim.material.emissiveColor) {
-    rim.material.emissiveColor = toColor3(
-      aquariumSurfaceProfile?.rimRgb || palette.rim,
-      aquariumSurfaceProfile ? 0.04 : aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04,
-    );
+  if (!flatAquariumRoomFloor) {
+    const rim = BABYLON.MeshBuilder.CreateBox(`${name}_rim`, {
+      width: def.w + 0.08,
+      height: def.h * 0.26,
+      depth: def.d + 0.08,
+    }, scene);
+    rim.parent = root;
+    rim.position.y = -(def.h * 0.32);
+    rim.material = theme === 'library' || theme === 'camp' || theme === 'storm'
+      ? makeCardboard(scene, `${name}_rimMat`, palette.rim[0] / 255, palette.rim[1] / 255, palette.rim[2] / 255, {
+        roughness: theme === 'storm' ? 0.90 : 0.88,
+        noiseAmt: theme === 'storm' ? 22 : 20,
+        grainScale: theme === 'storm' ? 5 : 4,
+      })
+      : createGlowMaterial(scene, `${name}_rimMat`, aquariumSurfaceProfile?.rimRgb || palette.rim, {
+        emissive: aquariumSurfaceProfile?.rimEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18),
+        roughness: aquariumSurfaceProfile?.rimRoughness ?? (aquariumTheme ? 0.42 : 0.54),
+      });
+    if (rim.material.emissiveColor) {
+      rim.material.emissiveColor = toColor3(
+        aquariumSurfaceProfile?.rimRgb || palette.rim,
+        aquariumSurfaceProfile ? 0.04 : aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04,
+      );
+    }
+    markGameplaySurface(rim);
   }
-  markGameplaySurface(rim);
 
   const top = BABYLON.MeshBuilder.CreatePlane(`${name}_top`, {
     width: Math.max(0.5, def.w - 0.16),

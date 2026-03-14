@@ -170,8 +170,8 @@ test('capture authored Level 6 gameplay and topology proof screenshots', async (
   });
 });
 
-test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
-  test.setTimeout(120_000);
+test('capture Level 5 MAP-class route proof screenshots', async ({ page }) => {
+  test.setTimeout(300_000);
   await mkdir('docs/screenshots', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -187,137 +187,163 @@ test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
   await page.waitForTimeout(1800);
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -39.2,
-      y: 1.92,
-      z: 6.8,
+      x: -49.2,
+      y: 1.46,
+      z: 0.8,
       yaw: 0.48,
       cameraYaw: 0.48,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-start-review',
-      position: { x: -52.0, y: 9.4, z: -6.0 },
-      target: { x: -30.0, y: 2.4, z: 8.2 },
-      fov: 0.80,
+      label: 'l5-start-review',
+      position: { x: -55.2, y: 2.1, z: -4.4 },
+      target: { x: -43.2, y: 1.7, z: 4.8 },
+      fov: 0.74,
     });
   });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await hideGameplayUi(page);
   await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-start-view.png',
+    path: 'docs/screenshots/level5-reset-start-view.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 10.8,
-      y: 2.18,
-      z: 14.0,
-      yaw: 0.72,
-      cameraYaw: 0.72,
+      x: -41.2,
+      y: 1.46,
+      z: -0.6,
+      yaw: 0.98,
+      cameraYaw: 0.98,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-hero-review',
-      position: { x: -4.0, y: 10.2, z: -1.0 },
-      target: { x: 9.8, y: 2.8, z: 18.8 },
+      label: 'l5-fork-review',
+      position: { x: -45.8, y: 2.2, z: 5.8 },
+      target: { x: -33.8, y: 1.8, z: 2.0 },
+      fov: 0.74,
+    });
+  });
+  await page.waitForTimeout(700);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-reset-first-fork.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -2.8,
+      y: 1.92,
+      z: 5.2,
+      yaw: 0.92,
+      cameraYaw: 0.92,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-chamber-review',
+      position: { x: 16.8, y: 2.6, z: 16.8 },
+      target: { x: 3.8, y: 2.5, z: 8.2 },
+      fov: 0.76,
+    });
+  });
+  await page.waitForTimeout(700);
+  await page.screenshot({
+    path: 'docs/screenshots/level5-reset-hero-chamber.png',
+    clip: { x: 0, y: 0, width: 1440, height: 900 },
+  });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -34.4,
+      y: 1.48,
+      z: 14.2,
+      yaw: 0.88,
+      cameraYaw: 0.88,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-public-review',
+      position: { x: -38.8, y: 2.4, z: 20.8 },
+      target: { x: -27.2, y: 2.0, z: 13.6 },
       fov: 0.82,
     });
   });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-hero-chamber.png',
-    clip: { x: 0, y: 0, width: 1440, height: 900 },
-  });
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('standard');
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -12.2,
-      y: 1.86,
-      z: 20.8,
-      yaw: 0.74,
-      cameraYaw: 0.74,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-public-review',
-      position: { x: -28.0, y: 7.2, z: 28.0 },
-      target: { x: -6.0, y: 2.4, z: 18.0 },
-      fov: 0.80,
-    });
-  });
-  await page.waitForTimeout(500);
-  await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-public-route.png',
+    path: 'docs/screenshots/level5-reset-public-route.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -16.2,
-      y: 1.42,
-      z: -9.6,
-      yaw: 1.48,
-      cameraYaw: 1.48,
+      x: -25.6,
+      y: 1.60,
+      z: -11.8,
+      yaw: 0.36,
+      cameraYaw: 0.36,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-service-review',
-      position: { x: -30.0, y: 6.4, z: -18.0 },
-      target: { x: -12.0, y: 1.6, z: -9.0 },
-      fov: 0.82,
+      label: 'l5-service-review',
+      position: { x: -30.2, y: 2.1, z: -13.6 },
+      target: { x: -16.8, y: 1.6, z: -10.6 },
+      fov: 0.74,
     });
   });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-service-route.png',
+    path: 'docs/screenshots/level5-reset-service-route.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 17.6,
-      y: 1.18,
-      z: -11.0,
-      yaw: 1.20,
-      cameraYaw: 1.20,
+      x: 18.8,
+      y: 1.10,
+      z: -18.4,
+      yaw: 0.48,
+      cameraYaw: 0.48,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-maintenance-review',
-      position: { x: 4.0, y: 5.6, z: -19.0 },
-      target: { x: 24.0, y: 1.4, z: -8.0 },
-      fov: 0.84,
+      label: 'l5-trench-review',
+      position: { x: 13.6, y: 1.8, z: -20.8 },
+      target: { x: 24.6, y: 1.1, z: -17.0 },
+      fov: 0.72,
     });
   });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-maintenance-route.png',
+    path: 'docs/screenshots/level5-reset-maintenance-route.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 48.0,
-      y: 2.06,
-      z: 2.2,
-      yaw: 0.76,
-      cameraYaw: 0.76,
+      x: 49.8,
+      y: 1.90,
+      z: 5.8,
+      yaw: 1.12,
+      cameraYaw: 1.12,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'level5-goal-review',
-      position: { x: 34.0, y: 7.2, z: -8.0 },
-      target: { x: 54.6, y: 2.8, z: 3.0 },
-      fov: 0.82,
+      label: 'l5-goal-review',
+      position: { x: 44.6, y: 2.8, z: 3.8 },
+      target: { x: 58.0, y: 2.3, z: 10.2 },
+      fov: 0.68,
     });
   });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(700);
   await page.screenshot({
-    path: 'docs/screenshots/level5-rebuild-goal-approach.png',
+    path: 'docs/screenshots/level5-reset-goal-approach.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
+});
 
-  await page.reload();
+test('capture Level 5 MAP-class damage proof screenshots', async ({ page }) => {
+  test.setTimeout(120_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
   await gotoDebugLevel(page, 5);
   await unlockThroughLevel(page, 4);
   await page.evaluate(() => {
@@ -330,11 +356,11 @@ test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 8.8,
-      y: 2.0,
-      z: 16.2,
-      yaw: 1.06,
-      cameraYaw: 1.06,
+      x: 6.8,
+      y: 2.24,
+      z: 17.6,
+      yaw: 1.04,
+      cameraYaw: 1.04,
     });
     const forward = window.__DADA_DEBUG__?.playerForward ?? { x: 1, z: 0 };
     window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
@@ -346,15 +372,16 @@ test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
   });
   await page.waitForTimeout(120);
   await page.screenshot({
-    path: 'docs/screenshots/level5-impact-enemy-hit.png',
+    path: 'docs/screenshots/level5-damage-enemy-hit.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 
   await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 8.4,
+      x: -15.2,
       y: 1.92,
-      z: 18.0,
+      z: 21.8,
       yaw: 1.12,
       cameraYaw: 1.12,
     });
@@ -363,7 +390,7 @@ test('capture Level 5 rebuild proof screenshots', async ({ page }) => {
   });
   await page.waitForTimeout(120);
   await page.screenshot({
-    path: 'docs/screenshots/level5-impact-hazard-hit.png',
+    path: 'docs/screenshots/level5-damage-hazard-hit.png',
     clip: { x: 0, y: 0, width: 1440, height: 900 },
   });
 });
