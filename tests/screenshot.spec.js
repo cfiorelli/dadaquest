@@ -13,6 +13,37 @@ async function gotoDebugLevel(page, levelId) {
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
 }
 
+async function focusGameplay(page) {
+  await page.mouse.click(640, 360);
+  await page.waitForTimeout(60);
+}
+
+async function dispatchHeldKey(page, type, { code, key, altKey = false, ctrlKey = false, shiftKey = false }) {
+  await page.evaluate(({ eventType, eventCode, eventKey, eventAltKey, eventCtrlKey, eventShiftKey }) => {
+    const target = document;
+    target.dispatchEvent(new KeyboardEvent(eventType, {
+      bubbles: true,
+      cancelable: true,
+      code: eventCode,
+      key: eventKey,
+      altKey: eventAltKey,
+      ctrlKey: eventCtrlKey,
+      shiftKey: eventShiftKey,
+    }));
+  }, {
+    eventType: type,
+    eventCode: code,
+    eventKey: key,
+    eventAltKey: altKey,
+    eventCtrlKey: ctrlKey,
+    eventShiftKey: shiftKey,
+  });
+}
+
+function wrapDelta(a, b) {
+  return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
 async function unlockThroughLevel(page, completedLevel = 5) {
   await page.evaluate((maxLevel) => {
     const levelCompleted = {};
@@ -172,6 +203,133 @@ async function getLevel5StarterRoomAudit(page) {
       structuralCeilingShellCount: shellMeshes.filter((mesh) => mesh.decorIntent === 'ceiling').length,
     };
   });
+}
+
+function isLevel5StarterRoomRenderMesh(name) {
+  const value = String(name || '');
+  return [
+    'ceiling_shell',
+    'ceiling_light_panel',
+    'north_wall',
+    'south_wall',
+    'east_wall',
+    'west_wall',
+    'future_exit_blocker',
+  ].some((token) => value.includes(token));
+}
+
+function getAuditSampleName(sample) {
+  return String(sample?.sourceName || sample?.mesh || '');
+}
+
+function expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit) {
+  expect(starterAudit.transparentShells).toEqual([]);
+  expect(starterAudit.visibleGoalMeshes).toEqual([]);
+  expect(starterAudit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
+  expect(starterAudit.actorSummary?.goal?.visibleMeshCount ?? 0).toBe(0);
+  expect(starterAudit.actorSummary?.goal?.allowInvisible).toBe(true);
+  expect(launchAudit.roomBounds).not.toBeNull();
+  expect(launchAudit.cameraPos).not.toBeNull();
+  expect(launchAudit.cameraDebugOverride).toBeNull();
+  expect(launchAudit.fadedMeshes).toBe(0);
+  expect(launchAudit.cameraInsideRoom).toBe(true);
+  expect(launchAudit.occluderMesh).toBe('neutral_decorBlock_west_wall');
+  expect(Math.abs(wrapDelta(launchAudit.cameraYaw ?? 0, launchAudit.cameraDesiredYaw ?? 0))).toBeLessThan(0.01);
+  expect(Math.abs(wrapDelta(launchAudit.cameraYaw ?? 0, launchAudit.playerYaw ?? 0))).toBeLessThan(0.01);
+  const unstableShells = launchAudit.shellMeshes.filter((mesh) => (
+    !mesh.enabled
+    || !mesh.isVisible
+    || mesh.visibility < 0.999
+    || (mesh.materialAlpha !== null && mesh.materialAlpha < 0.999)
+    || mesh.transparencyMode !== null
+  ));
+  expect(unstableShells).toEqual([]);
+  const sampleMap = Object.fromEntries((launchAudit.sampleHits || []).map((sample) => [sample.id, getAuditSampleName(sample)]));
+  expect(sampleMap.topCenter).toMatch(/ceiling_shell|ceiling_light_panel/);
+  expect(isLevel5StarterRoomRenderMesh(sampleMap.upperLeft)).toBe(true);
+  expect(isLevel5StarterRoomRenderMesh(sampleMap.upperRight)).toBe(true);
+}
+
+async function getLevel5StarterRoomLaunchAudit(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const camera = scene?.activeCamera ?? null;
+    const engine = scene?.getEngine?.() ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const toRoundedVector = (value) => value ? ({
+      x: Number(value.x.toFixed(3)),
+      y: Number(value.y.toFixed(3)),
+      z: Number(value.z.toFixed(3)),
+    }) : null;
+    const sampleAt = (id, nx, ny) => {
+      if (!scene || !camera || !engine) {
+        return { id, mesh: null, sourceName: null };
+      }
+      const pick = scene.pick(
+        engine.getRenderWidth(true) * nx,
+        engine.getRenderHeight(true) * ny,
+        (mesh) => mesh?.isEnabled?.() !== false
+          && mesh?.isVisible !== false
+          && (mesh?.visibility ?? 1) > 0.02,
+        false,
+        camera,
+      );
+      return {
+        id,
+        mesh: pick?.pickedMesh?.name ?? null,
+        sourceName: pick?.pickedMesh?.metadata?.sourceName ?? null,
+      };
+    };
+    const shellMeshes = (scene?.meshes ?? [])
+      .filter((mesh) => mesh?.metadata?.structuralShell === true && !mesh?.metadata?.truthRole)
+      .map((mesh) => ({
+        name: mesh.metadata?.sourceName || mesh.name,
+        enabled: mesh.isEnabled?.() ?? false,
+        isVisible: mesh.isVisible !== false,
+        visibility: Number((mesh.visibility ?? 1).toFixed(3)),
+        materialAlpha: typeof mesh.material?.alpha === 'number' ? Number(mesh.material.alpha.toFixed(3)) : null,
+        transparencyMode: mesh.material?.transparencyMode ?? null,
+      }));
+    const cameraPos = toRoundedVector(camera?.position ?? null);
+    return {
+      roomBounds,
+      cameraPos,
+      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
+      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+      cameraDesiredYaw: window.__DADA_DEBUG__?.cameraDesiredYaw ?? null,
+      cameraDebugOverride: window.__DADA_DEBUG__?.cameraDebugOverride ?? null,
+      occluderMesh: window.__DADA_DEBUG__?.occluderMesh ?? null,
+      fadedMeshes: window.__DADA_DEBUG__?.fadedMeshes ?? null,
+      cameraInsideRoom: !!(roomBounds && cameraPos
+        && cameraPos.x > (roomBounds.minX + 0.05)
+        && cameraPos.x < (roomBounds.maxX - 0.05)
+        && cameraPos.z > (roomBounds.minZ + 0.05)
+        && cameraPos.z < (roomBounds.maxZ - 0.05)),
+      sampleHits: [
+        sampleAt('topCenter', 0.5, 0.12),
+        sampleAt('upperLeft', 0.18, 0.22),
+        sampleAt('upperRight', 0.82, 0.22),
+      ],
+      shellMeshes,
+    };
+  });
+}
+
+async function tapEra5LeftTurnTwice(page) {
+  for (let i = 0; i < 2; i += 1) {
+    await dispatchHeldKey(page, 'keydown', { code: 'ArrowLeft', key: 'ArrowLeft' });
+    await page.waitForTimeout(90);
+    await dispatchHeldKey(page, 'keyup', { code: 'ArrowLeft', key: 'ArrowLeft' });
+    await page.waitForTimeout(120);
+  }
+  await page.waitForTimeout(180);
 }
 
 async function renderTopologySvg(browser, topology, {
@@ -451,4 +609,41 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
   });
+});
+
+test('capture Level 5 room reset launch-state and double-left-turn proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-room-reset-launch-turn', { recursive: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1280, height: 720 },
+    });
+    await copyFile(path, `docs/proof/level5-room-reset-launch-turn/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+  await hideGameplayUi(page);
+
+  const initialStarterAudit = await getLevel5StarterRoomAudit(page);
+  const initialLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(initialStarterAudit, initialLaunchAudit);
+  await captureProof('docs/screenshots/level5-room-reset-load-initial.png');
+
+  await tapEra5LeftTurnTwice(page);
+
+  const turnedStarterAudit = await getLevel5StarterRoomAudit(page);
+  const turnedLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(turnedStarterAudit, turnedLaunchAudit);
+  await captureProof('docs/screenshots/level5-room-reset-load-double-left.png');
 });

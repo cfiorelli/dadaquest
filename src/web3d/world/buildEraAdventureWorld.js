@@ -2921,6 +2921,8 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       structuralShell: def.structuralShell === true || def.solid === true,
       decorIntent: def.decorIntent || 'structure',
       cameraFadeable: def.cameraFadeable ?? !(def.structuralShell === true || def.solid === true),
+      cameraIgnore: def.cameraIgnore ?? true,
+      cameraBlocker: def.cameraBlocker ?? false,
     });
     decorBlocks.push(block);
     if (def.solid) {
