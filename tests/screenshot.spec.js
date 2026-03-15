@@ -170,10 +170,10 @@ test('capture authored Level 6 gameplay and topology proof screenshots', async (
   });
 });
 
-test('capture Level 5 restart proof screenshots', async ({ page }) => {
+test('capture Level 5 floorplan rebuild proof screenshots', async ({ page }) => {
   test.setTimeout(300_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-restart', { recursive: true });
+  await mkdir('docs/proof/level5-floorplan-rebuild', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -181,7 +181,7 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-restart/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-floorplan-rebuild/${path.split('/').pop()}`);
   }
 
   await gotoDebugLevel(page, 5);
@@ -203,88 +203,88 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -40.0,
+      x: -44.0,
       y: 1.28,
-      z: 0.0,
+      z: -18.0,
       yaw: 0.12,
       cameraYaw: 0.12,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-start',
-      position: { x: -37.8, y: 1.9, z: -1.4 },
-      target: { x: -31.6, y: 1.7, z: 0.0 },
+      label: 'l5-floorplan-start',
+      position: { x: -41.8, y: 1.9, z: -21.2 },
+      target: { x: -36.4, y: 1.7, z: -17.4 },
       fov: 0.34,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-restart-start.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-start.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -24.8,
+      x: -31.2,
       y: 1.18,
-      z: 7.6,
+      z: -5.4,
       yaw: 0.22,
       cameraYaw: 0.22,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-fork-public',
-      position: { x: -21.6, y: 2.2, z: 6.4 },
-      target: { x: -18.2, y: 1.9, z: 16.8 },
+      label: 'l5-floorplan-fork-public',
+      position: { x: -35.0, y: 2.2, z: -7.6 },
+      target: { x: -22.4, y: 1.8, z: -3.4 },
       fov: 0.34,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-restart-fork-public.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-fork-public.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -24.6,
+      x: -28.0,
       y: 1.16,
-      z: -4.0,
+      z: 14.0,
       yaw: 0.18,
       cameraYaw: 0.18,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-fork-service',
-      position: { x: -22.4, y: 2.1, z: -7.0 },
-      target: { x: -17.4, y: 1.8, z: -5.0 },
+      label: 'l5-floorplan-fork-service',
+      position: { x: -31.4, y: 2.2, z: 18.2 },
+      target: { x: -21.0, y: 1.8, z: 13.0 },
       fov: 0.34,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-restart-fork-service.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-fork-service.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -1.6,
+      x: 2.0,
       y: 1.48,
-      z: 9.4,
+      z: 6.8,
       yaw: 0.16,
       cameraYaw: 0.16,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-chamber',
-      position: { x: -5.4, y: 2.7, z: 2.8 },
-      target: { x: 6.4, y: 2.3, z: 13.8 },
+      label: 'l5-floorplan-chamber',
+      position: { x: -5.8, y: 2.8, z: 9.8 },
+      target: { x: 2.4, y: 2.1, z: -1.8 },
       fov: 0.32,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-restart-hero-chamber.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-hero-chamber.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 24.8,
+      x: 26.0,
       y: 1.34,
-      z: -1.8,
+      z: 5.8,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-hazard',
-      position: { x: 21.8, y: 2.4, z: -4.4 },
-      target: { x: 28.6, y: 1.7, z: -1.0 },
+      label: 'l5-floorplan-hazard',
+      position: { x: 20.8, y: 2.5, z: 9.4 },
+      target: { x: 29.2, y: 1.7, z: 5.8 },
       fov: 0.44,
     });
   });
@@ -293,25 +293,25 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
     return rails.some((hazard) => hazard.name === 'eel_spill_gate' && hazard.state === 'active');
   }, { timeout: 8_000 });
   await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-restart-hazard-room.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-hazard-room.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 41.2,
+      x: 46.8,
       y: 1.36,
-      z: 5.6,
+      z: 2.0,
       yaw: 0.46,
       cameraYaw: 0.46,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-goal',
-      position: { x: 41.0, y: 2.2, z: 4.0 },
-      target: { x: 47.4, y: 2.4, z: 8.6 },
+      label: 'l5-floorplan-goal',
+      position: { x: 43.0, y: 2.3, z: 0.4 },
+      target: { x: 50.0, y: 2.1, z: 2.2 },
       fov: 0.32,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-restart-goal-room.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-goal-room.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -321,21 +321,21 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
       respawnAnchors: true,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 24.8,
+      x: 30.8,
       y: 1.36,
-      z: -1.8,
+      z: 8.4,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-respawn',
-      position: { x: 21.8, y: 2.4, z: -4.8 },
-      target: { x: 24.8, y: 1.5, z: -1.8 },
+      label: 'l5-floorplan-respawn',
+      position: { x: 25.0, y: 2.4, z: 10.2 },
+      target: { x: 30.8, y: 1.5, z: 8.4 },
       fov: 0.48,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-restart-respawn-anchor.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-respawn-anchor.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -345,21 +345,21 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 4.8,
+      x: 2.0,
       y: 1.44,
-      z: 8.6,
+      z: 7.8,
       yaw: 0.28,
       cameraYaw: 0.28,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-walkable',
-      position: { x: 0.8, y: 2.8, z: 6.2 },
-      target: { x: 8.0, y: 1.9, z: 10.0 },
+      label: 'l5-floorplan-walkable',
+      position: { x: -1.8, y: 2.8, z: 11.6 },
+      target: { x: 4.2, y: 1.9, z: 5.6 },
       fov: 0.54,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-restart-walkable-overlay.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-walkable-overlay.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -369,21 +369,21 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -29.0,
+      x: -39.8,
       y: 1.20,
-      z: 1.8,
+      z: -11.2,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-restart-collision',
-      position: { x: -31.8, y: 2.6, z: 0.6 },
-      target: { x: -25.2, y: 1.6, z: 2.2 },
+      label: 'l5-floorplan-collision',
+      position: { x: -43.0, y: 2.6, z: -13.0 },
+      target: { x: -36.0, y: 1.6, z: -10.4 },
       fov: 0.56,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-restart-collision-overlay.png');
+  await captureProof('docs/screenshots/level5-floorplan-rebuild-collision-overlay.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({

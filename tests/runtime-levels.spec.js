@@ -8,8 +8,8 @@ const LEVEL_CASES = [
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
 const LEVEL5_REQUIRED_SECTORS = [
-  'Arrival Vestibule',
-  'Public Exhibit Hall',
+  'Start',
+  'Public Hall',
   'Service Elbow',
   'Hero Tank Chamber',
   'Filtration Hazard Room',
@@ -391,7 +391,7 @@ test('@level5 @era5 runtime: level 5 uses classic Doom arrow movement, turn, and
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
   await focusGameplay(page);
-  const basePose = { x: 39.4, y: 1.54, z: -5.4, yaw: 1.57, cameraYaw: 1.57 };
+  const basePose = { x: -21.0, y: 1.46, z: -14.0, yaw: 0.0, cameraYaw: 0.0 };
 
   await resetEra5Pose(page, basePose);
   const beforeTurn = await page.evaluate(() => ({
@@ -752,9 +752,9 @@ test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, 
   ).toBe(0);
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 6.8,
+      x: 2.0,
       y: 2.24,
-      z: 17.6,
+      z: -3.0,
       yaw: 1.04,
       cameraYaw: 1.04,
     });
@@ -813,18 +813,18 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, coherent truth r
   expect(collision?.invisibleBlockers ?? []).toEqual([]);
   expect(collision?.roomVolumeShells ?? []).toEqual([]);
   expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
-  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(4);
+  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(3);
   expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
 
   const labels = (topology.sectors ?? []).map((sector) => sector.label);
   expect(labels).toEqual(expect.arrayContaining(LEVEL5_REQUIRED_SECTORS));
 
   for (const sample of [
-    { x: -40.0, y: 1.48, z: 0.0, yaw: 0.18, minY: 1.05 },
-    { x: -18.2, y: 1.54, z: 12.0, yaw: 0.26, minY: 1.12 },
-    { x: 5.2, y: 1.70, z: 8.4, yaw: 0.28, minY: 1.12 },
-    { x: 24.8, y: 1.42, z: -1.8, yaw: 0.20, minY: 1.10 },
-    { x: 47.0, y: 1.68, z: 8.8, yaw: 0.16, minY: 1.12 },
+    { x: -44.0, y: 1.46, z: -18.0, yaw: 0.12, minY: 1.02 },
+    { x: -28.0, y: 1.48, z: -4.0, yaw: 0.20, minY: 1.06 },
+    { x: 2.0, y: 1.52, z: 8.2, yaw: 0.24, minY: 1.10 },
+    { x: 30.8, y: 1.42, z: 8.4, yaw: 0.18, minY: 1.10 },
+    { x: 50.0, y: 1.60, z: 2.0, yaw: 0.16, minY: 1.12 },
   ]) {
     await page.evaluate((pose) => {
       window.__DADA_DEBUG__?.setEra5Pose?.({
@@ -877,9 +877,9 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 24.8,
+      x: 30.8,
       y: 1.36,
-      z: -1.8,
+      z: 8.4,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
@@ -887,14 +887,14 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.checkpointIndex ?? 0),
     { timeout: 5_000 },
-  ).toBeGreaterThanOrEqual(3);
+  ).toBeGreaterThanOrEqual(2);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 1, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 28.0,
+      x: 25.2,
       y: 1.28,
-      z: -1.8,
+      z: 6.8,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
@@ -939,8 +939,8 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
   expect(finalState.pos).not.toBeNull();
   expect(finalState.pos.y).toBeGreaterThan(1.0);
   expect(finalState.pos.y).toBeLessThan(2.0);
-  expect(Math.abs(finalState.pos.x - 24.8)).toBeLessThan(2.5);
-  expect(Math.abs(finalState.pos.z - (-1.8))).toBeLessThan(2.5);
+  expect(Math.abs(finalState.pos.x - 30.8)).toBeLessThan(2.5);
+  expect(Math.abs(finalState.pos.z - 8.4)).toBeLessThan(2.5);
   expect(finalState.anchor?.id).toBe('cp_filtration_core');
 });
 
@@ -955,9 +955,9 @@ test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 20 });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 6.4,
-      y: 2.36,
-      z: 12.4,
+      x: 2.0,
+      y: 2.30,
+      z: -3.0,
       yaw: 0.68,
       cameraYaw: 0.68,
     });
@@ -1019,9 +1019,9 @@ test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits fr
   });
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 28.0,
+      x: 25.2,
       y: 1.28,
-      z: -1.8,
+      z: 6.8,
       yaw: 0.20,
       cameraYaw: 0.20,
     });
