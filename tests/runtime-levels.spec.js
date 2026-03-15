@@ -127,6 +127,149 @@ async function unlockEra5(page, { completed5 = false } = {}) {
   await unlockThroughLevel(page, completed5 ? 5 : 4);
 }
 
+async function getLevel5StarterRoomAudit(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const actorSummary = window.__DADA_DEBUG__?.actors ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const meshes = scene?.meshes ?? [];
+    const isVisibleMesh = (mesh) => mesh?.isEnabled?.() !== false
+      && mesh?.isVisible !== false
+      && (mesh?.visibility ?? 1) > 0.02;
+    const getBounds = (mesh) => {
+      const box = mesh.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: box.minimumWorld.x,
+        maxX: box.maximumWorld.x,
+        minY: box.minimumWorld.y,
+        maxY: box.maximumWorld.y,
+        minZ: box.minimumWorld.z,
+        maxZ: box.maximumWorld.z,
+      };
+    };
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const isGoalMesh = (mesh) => {
+      if (!(mesh?.name || mesh?.parent)) return false;
+      if (mesh.name === 'goalTrigger') return false;
+      if ((mesh.metadata?.role || '').toLowerCase() === 'goal') return true;
+      let node = mesh;
+      while (node) {
+        const name = String(node.name || '').toLowerCase();
+        if (name.includes('dad') || name.includes('goal')) return true;
+        node = node.parent || null;
+      }
+      return false;
+    };
+
+    const shellMeshes = meshes
+      .filter((mesh) => mesh?.metadata?.structuralShell === true && !mesh?.metadata?.truthRole)
+      .map((mesh) => ({
+        name: mesh.metadata?.sourceName || mesh.name,
+        decorIntent: mesh.metadata?.decorIntent || null,
+        enabled: mesh.isEnabled?.() ?? false,
+        isVisible: mesh.isVisible !== false,
+        visibility: Number((mesh.visibility ?? 1).toFixed(3)),
+        bounds: getBounds(mesh),
+        materialAlpha: typeof mesh.material?.alpha === 'number' ? Number(mesh.material.alpha.toFixed(3)) : null,
+        transparencyMode: mesh.material?.transparencyMode ?? null,
+      }));
+    const transparentShells = shellMeshes.filter((mesh) => (
+      !mesh.enabled
+      || !mesh.isVisible
+      || (mesh.materialAlpha !== null && mesh.materialAlpha < 0.999)
+      || mesh.transparencyMode !== null
+    ));
+
+    const visibleGoalMeshes = meshes
+      .filter((mesh) => isVisibleMesh(mesh) && isGoalMesh(mesh))
+      .map((mesh) => ({
+        name: mesh.name,
+        position: (() => {
+          const pos = mesh.getAbsolutePosition?.();
+          return pos ? {
+            x: Number(pos.x.toFixed(3)),
+            y: Number(pos.y.toFixed(3)),
+            z: Number(pos.z.toFixed(3)),
+          } : null;
+        })(),
+      }));
+
+    const unexpectedVisibleActorsOutsideRoom = visibleGoalMeshes.filter((mesh) => roomBounds && mesh.position && (
+      mesh.position.x < (roomBounds.minX - 0.01)
+      || mesh.position.x > (roomBounds.maxX + 0.01)
+      || mesh.position.z < (roomBounds.minZ - 0.01)
+      || mesh.position.z > (roomBounds.maxZ + 0.01)
+    ));
+
+    const ceilingMeshes = meshes
+      .map((mesh) => ({
+        truthRole: mesh.metadata?.truthRole || null,
+        bounds: getBounds(mesh),
+        sourceName: String(mesh.metadata?.sourceName || mesh.name || ''),
+        decorIntent: mesh.metadata?.decorIntent || null,
+        materialAlpha: typeof mesh.material?.alpha === 'number' ? Number(mesh.material.alpha.toFixed(3)) : null,
+        transparencyMode: mesh.material?.transparencyMode ?? null,
+      }))
+      .filter(({ bounds, truthRole, sourceName, decorIntent }) => (
+        !!bounds && (
+          !truthRole
+        ) && (
+          sourceName.toLowerCase().includes('ceiling')
+          || sourceName.toLowerCase().includes('light_panel')
+          || decorIntent === 'ceiling'
+          || decorIntent === 'light-fixture'
+        )
+      ))
+      .map(({ bounds, sourceName, decorIntent, materialAlpha, transparencyMode }) => ({
+        name: sourceName,
+        decorIntent,
+        bounds,
+        materialAlpha,
+        transparencyMode,
+      }));
+
+    const coplanarCeilingPairs = [];
+    for (let index = 0; index < ceilingMeshes.length; index += 1) {
+      for (let otherIndex = index + 1; otherIndex < ceilingMeshes.length; otherIndex += 1) {
+        const left = ceilingMeshes[index];
+        const right = ceilingMeshes[otherIndex];
+        if (!left.bounds || !right.bounds) continue;
+        if (!overlaps(left.bounds.minX, left.bounds.maxX, right.bounds.minX, right.bounds.maxX)) continue;
+        if (!overlaps(left.bounds.minZ, left.bounds.maxZ, right.bounds.minZ, right.bounds.maxZ)) continue;
+        const planesLeft = [left.bounds.minY, left.bounds.maxY];
+        const planesRight = [right.bounds.minY, right.bounds.maxY];
+        const sharedPlane = planesLeft.find((planeLeft) => planesRight.some((planeRight) => Math.abs(planeLeft - planeRight) < 0.001));
+        if (!Number.isFinite(sharedPlane)) continue;
+        coplanarCeilingPairs.push({
+          left: left.name,
+          right: right.name,
+          sharedPlaneY: Number(sharedPlane.toFixed(3)),
+        });
+      }
+    }
+
+    return {
+      roomBounds,
+      actorSummary,
+      shellMeshes,
+      transparentShells,
+      visibleGoalMeshes,
+      unexpectedVisibleActorsOutsideRoom,
+      ceilingMeshes,
+      structuralCeilingShells: shellMeshes.filter((mesh) => mesh.decorIntent === 'ceiling'),
+      coplanarCeilingPairs,
+    };
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
@@ -416,17 +559,39 @@ test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell t
   expect(room?.label).toBe('Starter Room');
   expect(Number(room?.w?.toFixed?.(2) ?? room?.w)).toBe(24);
   expect(Number(room?.d?.toFixed?.(2) ?? room?.d)).toBe(18);
+  const audit = await getLevel5StarterRoomAudit(page);
+  expect(audit.structuralCeilingShells).toHaveLength(1);
+  expect(audit.transparentShells).toEqual([]);
+  expect(audit.coplanarCeilingPairs).toEqual([]);
+  expect(audit.visibleGoalMeshes).toEqual([]);
+  expect(audit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
+  expect(audit.actorSummary?.goal?.visibleMeshCount ?? 0).toBe(0);
+  expect(audit.actorSummary?.goal?.allowInvisible).toBe(true);
 
   await resetEra5Pose(page, { x: 12.0, y: 0.42, z: 9.0, yaw: 0.0, cameraYaw: 0.0 });
-  const fadedSamples = [];
-  await page.keyboard.down('ArrowRight');
-  for (let i = 0; i < 10; i += 1) {
-    await page.waitForTimeout(90);
-    const report = await page.evaluate(() => window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 6 }) ?? null);
-    fadedSamples.push(report?.counts?.fadedMeshes ?? null);
+  const sweepSamples = [];
+  for (let i = 0; i < 16; i += 1) {
+    const yaw = (i / 16) * Math.PI * 2;
+    await resetEra5Pose(page, {
+      x: 12.0,
+      y: 0.42,
+      z: 9.0,
+      yaw,
+      cameraYaw: yaw,
+    });
+    await page.waitForTimeout(120);
+    sweepSamples.push(await page.evaluate(() => {
+      const report = window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 6 }) ?? null;
+      return {
+        fadedMeshes: report?.counts?.fadedMeshes ?? null,
+        occluderMesh: report?.occluderMesh ?? null,
+        goalVisibleMeshCount: window.__DADA_DEBUG__?.actors?.goal?.visibleMeshCount ?? null,
+      };
+    }));
   }
-  await page.keyboard.up('ArrowRight');
-  expect(fadedSamples.every((value) => value === 0)).toBe(true);
+  expect(sweepSamples.every((sample) => sample.fadedMeshes === 0)).toBe(true);
+  expect(sweepSamples.every((sample) => sample.occluderMesh === null)).toBe(true);
+  expect(sweepSamples.every((sample) => sample.goalVisibleMeshCount === 0)).toBe(true);
 });
 
 test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible exit blocker keeps the player inside the room', async ({ page }) => {

@@ -76,6 +76,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
   cameraPresets: LEVEL5_CAMERA_PRESETS,
   spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 9.0 },
   goal: { x: 80.0, y: PLAYER_SPAWN_Y, z: 9.0 },
+  goalPresentation: 'trigger-only',
   theme: 'neutral',
   showGroundVisual: false,
   showRouteRibbons: false,
@@ -191,6 +192,14 @@ export const LEVEL5 = compileAuthoredEraLayout({
             decorIntent: 'ceiling',
             blockerReason: 'room-boundary',
           }),
+          block('ceiling_light_panel', ROOM_CENTER_X, ROOM_HEIGHT - 0.10, ROOM_CENTER_Z, 8.0, 0.12, 3.0, {
+            rgb: [244, 246, 240],
+            roughness: 0.98,
+            emissiveScale: 0.18,
+            solid: false,
+            cameraFadeable: false,
+            decorIntent: 'light-fixture',
+          }),
           block('future_exit_blocker', ROOM_WIDTH - 0.1, DOOR_HEIGHT * 0.5, ROOM_CENTER_Z, 0.9, DOOR_HEIGHT, DOOR_WIDTH - 0.2, {
             rgb: [158, 162, 166],
             roughness: 0.94,
@@ -213,18 +222,4 @@ export const LEVEL5 = compileAuthoredEraLayout({
   vents: [],
   jellyfish: [],
   signage: [],
-  decorPlanes: [
-    {
-      name: 'ceiling_light_panel',
-      x: ROOM_CENTER_X,
-      y: ROOM_HEIGHT,
-      z: ROOM_CENTER_Z,
-      width: 8.0,
-      height: 3.0,
-      rotationX: Math.PI / 2,
-      rgb: [244, 246, 240],
-      emissiveScale: 0.22,
-      alpha: 0.98,
-    },
-  ],
 });

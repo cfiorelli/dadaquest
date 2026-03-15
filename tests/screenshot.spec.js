@@ -1,5 +1,5 @@
 // @ts-check
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { copyFile, mkdir } from 'node:fs/promises';
 
 const SHOT_SCENES = [
@@ -44,6 +44,133 @@ async function hideGameplayUi(page, { keepStatus = false } = {}) {
       ` : '#uiRoot { display: none !important; }'}
       body { margin: 0; background: #000; }
     `,
+  });
+}
+
+async function getLevel5StarterRoomAudit(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const actorSummary = window.__DADA_DEBUG__?.actors ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const meshes = scene?.meshes ?? [];
+    const isVisibleMesh = (mesh) => mesh?.isEnabled?.() !== false
+      && mesh?.isVisible !== false
+      && (mesh?.visibility ?? 1) > 0.02;
+    const getBounds = (mesh) => {
+      const box = mesh.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: box.minimumWorld.x,
+        maxX: box.maximumWorld.x,
+        minY: box.minimumWorld.y,
+        maxY: box.maximumWorld.y,
+        minZ: box.minimumWorld.z,
+        maxZ: box.maximumWorld.z,
+      };
+    };
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const isGoalMesh = (mesh) => {
+      if (mesh.name === 'goalTrigger') return false;
+      if ((mesh.metadata?.role || '').toLowerCase() === 'goal') return true;
+      let node = mesh;
+      while (node) {
+        const name = String(node.name || '').toLowerCase();
+        if (name.includes('dad') || name.includes('goal')) return true;
+        node = node.parent || null;
+      }
+      return false;
+    };
+
+    const shellMeshes = meshes
+      .filter((mesh) => mesh?.metadata?.structuralShell === true && !mesh?.metadata?.truthRole)
+      .map((mesh) => ({
+        name: mesh.metadata?.sourceName || mesh.name,
+        decorIntent: mesh.metadata?.decorIntent || null,
+        enabled: mesh.isEnabled?.() ?? false,
+        isVisible: mesh.isVisible !== false,
+        visibility: Number((mesh.visibility ?? 1).toFixed(3)),
+        materialAlpha: typeof mesh.material?.alpha === 'number' ? Number(mesh.material.alpha.toFixed(3)) : null,
+        transparencyMode: mesh.material?.transparencyMode ?? null,
+      }));
+    const transparentShells = shellMeshes.filter((mesh) => (
+      !mesh.enabled
+      || !mesh.isVisible
+      || (mesh.materialAlpha !== null && mesh.materialAlpha < 0.999)
+      || mesh.transparencyMode !== null
+    ));
+
+    const visibleGoalMeshes = meshes
+      .filter((mesh) => isVisibleMesh(mesh) && isGoalMesh(mesh))
+      .map((mesh) => ({
+        name: mesh.name,
+        position: (() => {
+          const pos = mesh.getAbsolutePosition?.();
+          return pos ? {
+            x: Number(pos.x.toFixed(3)),
+            y: Number(pos.y.toFixed(3)),
+            z: Number(pos.z.toFixed(3)),
+          } : null;
+        })(),
+      }));
+
+    const ceilingMeshes = meshes
+      .map((mesh) => ({
+        truthRole: mesh.metadata?.truthRole || null,
+        bounds: getBounds(mesh),
+        sourceName: String(mesh.metadata?.sourceName || mesh.name || ''),
+        decorIntent: mesh.metadata?.decorIntent || null,
+      }))
+      .filter(({ bounds, truthRole, sourceName, decorIntent }) => (
+        !!bounds && (
+          !truthRole
+        ) && (
+          sourceName.toLowerCase().includes('ceiling')
+          || sourceName.toLowerCase().includes('light_panel')
+          || decorIntent === 'ceiling'
+          || decorIntent === 'light-fixture'
+        )
+      ));
+    const coplanarCeilingPairs = [];
+    for (let index = 0; index < ceilingMeshes.length; index += 1) {
+      for (let otherIndex = index + 1; otherIndex < ceilingMeshes.length; otherIndex += 1) {
+        const left = ceilingMeshes[index];
+        const right = ceilingMeshes[otherIndex];
+        if (!left.bounds || !right.bounds) continue;
+        if (!overlaps(left.bounds.minX, left.bounds.maxX, right.bounds.minX, right.bounds.maxX)) continue;
+        if (!overlaps(left.bounds.minZ, left.bounds.maxZ, right.bounds.minZ, right.bounds.maxZ)) continue;
+        const planesLeft = [left.bounds.minY, left.bounds.maxY];
+        const planesRight = [right.bounds.minY, right.bounds.maxY];
+        const sharedPlane = planesLeft.find((planeLeft) => planesRight.some((planeRight) => Math.abs(planeLeft - planeRight) < 0.001));
+        if (!Number.isFinite(sharedPlane)) continue;
+        coplanarCeilingPairs.push({
+          left: left.sourceName,
+          right: right.sourceName,
+          sharedPlaneY: Number(sharedPlane.toFixed(3)),
+        });
+      }
+    }
+
+    return {
+      roomBounds,
+      actorSummary,
+      transparentShells,
+      visibleGoalMeshes,
+      unexpectedVisibleActorsOutsideRoom: visibleGoalMeshes.filter((mesh) => roomBounds && mesh.position && (
+        mesh.position.x < (roomBounds.minX - 0.01)
+        || mesh.position.x > (roomBounds.maxX + 0.01)
+        || mesh.position.z < (roomBounds.minZ - 0.01)
+        || mesh.position.z > (roomBounds.maxZ + 0.01)
+      )),
+      coplanarCeilingPairs,
+      structuralCeilingShellCount: shellMeshes.filter((mesh) => mesh.decorIntent === 'ceiling').length,
+    };
   });
 }
 
@@ -192,6 +319,15 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
   await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
   await page.waitForTimeout(1800);
   await hideGameplayUi(page);
+
+  const audit = await getLevel5StarterRoomAudit(page);
+  expect(audit.structuralCeilingShellCount).toBe(1);
+  expect(audit.transparentShells).toEqual([]);
+  expect(audit.coplanarCeilingPairs).toEqual([]);
+  expect(audit.visibleGoalMeshes).toEqual([]);
+  expect(audit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
+  expect(audit.actorSummary?.goal?.visibleMeshCount ?? 0).toBe(0);
+  expect(audit.actorSummary?.goal?.allowInvisible).toBe(true);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');

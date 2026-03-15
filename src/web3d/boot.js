@@ -1478,10 +1478,13 @@ export async function boot(options = {}) {
   const goalPos = world.goalRoot.getAbsolutePosition();
   actorState.goal = {
     loaded: false,
-    usingFallback: true,
-    reason: `procedural_human_dad_level${levelId}`,
+    usingFallback: world.goalPresentation !== 'trigger-only',
+    reason: world.goalPresentation === 'trigger-only'
+      ? 'hidden_goal_trigger'
+      : `procedural_human_dad_level${levelId}`,
     worldPos: [goalPos.x, goalPos.y, goalPos.z],
     bboxSize: [0, 0, 0],
+    allowInvisible: world.goalPresentation === 'trigger-only',
   };
 
   for (const signRoot of world.signs || []) {
@@ -2411,13 +2414,6 @@ export async function boot(options = {}) {
   }
 
   let era5VisibilityFailureReason = '';
-  if (import.meta.env.DEV && levelId === 5) {
-    const initialGameplayMeshCount = getEra5GameplayMeshes().length;
-    if (initialGameplayMeshCount <= 20) {
-      era5VisibilityFailureReason = `Level 5 gameplay mesh count too low: ${initialGameplayMeshCount} <= 20`;
-      console.error(`[level5] ${era5VisibilityFailureReason}`);
-    }
-  }
 
   const getEra5PresetTable = () => {
     if (!isEra5Level || !world.cameraPresets) return ERA5_CAMERA_PRESETS;
@@ -2726,13 +2722,14 @@ export async function boot(options = {}) {
       ).length;
       const pos = node?.getAbsolutePosition?.() || bounds.center;
       const usingFallback = actorState[roleName].usingFallback;
+      const allowInvisible = actorState[roleName].allowInvisible === true;
 
-      if (visibleCount === 0 && debugMode && !actorInvisibleLogged[roleName]) {
+      if (visibleCount === 0 && debugMode && !allowInvisible && !actorInvisibleLogged[roleName]) {
         const cause = actorState[roleName].loaded ? 'loaded_but_invisible' : 'load_failed_using_fallback';
         console.error(`[actors] ${roleName} invisible (${cause})`);
         actorInvisibleLogged[roleName] = true;
       }
-      if (visibleCount > 0) {
+      if (visibleCount > 0 || allowInvisible) {
         actorInvisibleLogged[roleName] = false;
       }
 
@@ -2743,6 +2740,7 @@ export async function boot(options = {}) {
         worldPos: [pos.x, pos.y, pos.z],
         bboxSize: [bounds.size.x, bounds.size.y, bounds.size.z],
         visibleMeshCount: visibleCount,
+        allowInvisible,
       };
     };
 

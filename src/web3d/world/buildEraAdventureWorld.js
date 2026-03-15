@@ -383,6 +383,39 @@ function createDecorBox(scene, name, parent, {
   return box;
 }
 
+function createHiddenGoalTrigger(scene, {
+  x,
+  y,
+  z = 0,
+  goalVolume = { width: 3.0, height: 7.0, depth: 3.0, yOffset: -1.8 },
+} = {}) {
+  const root = new BABYLON.TransformNode('goalTriggerRoot', scene);
+  root.position.set(x, y, z);
+  root.metadata = {
+    ...(root.metadata || {}),
+    goalPresentation: 'trigger-only',
+  };
+
+  const goal = BABYLON.MeshBuilder.CreateBox('goalTrigger', {
+    width: goalVolume.width,
+    height: goalVolume.height,
+    depth: goalVolume.depth,
+  }, scene);
+  goal.parent = root;
+  goal.position.y = goalVolume.yOffset ?? 0;
+  goal.visibility = 0;
+  goal.isVisible = false;
+  goal.isPickable = false;
+  goal.checkCollisions = false;
+  goal.metadata = {
+    ...(goal.metadata || {}),
+    cameraIgnore: true,
+    goalPresentation: 'trigger-only',
+  };
+
+  return { root, goal };
+}
+
 function createDecorColumn(scene, name, parent, {
   diameterTop = null,
   diameterBottom = null,
@@ -3099,8 +3132,20 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
 
   let goalVisual;
   let goalRoot;
+  const goalPresentation = layout.goalPresentation === 'trigger-only'
+    ? 'trigger-only'
+    : 'actor';
   let familySetpiece = null;
-  if (theme === 'camp') {
+  if (goalPresentation === 'trigger-only') {
+    const hiddenGoal = createHiddenGoalTrigger(scene, {
+      x: layout.goal.x,
+      y: layout.goal.y,
+      z: layout.goal.z ?? 0,
+      goalVolume: layout.goalVolume,
+    });
+    goalVisual = hiddenGoal.goal;
+    goalRoot = hiddenGoal.root;
+  } else if (theme === 'camp') {
     const dad = createDad(scene, {
       x: layout.goal.x,
       y: layout.goal.y,
@@ -3799,6 +3844,7 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     platforms: allPlatforms,
     goal: goalVisual,
     goalRoot,
+    goalPresentation,
     shadowGen,
     foregroundMeshes: [],
     extents: layout.extents,
