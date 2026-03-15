@@ -2364,6 +2364,7 @@ export async function boot(options = {}) {
     for (const mesh of scene.meshes) {
       if (!(mesh instanceof BABYLON.Mesh)) continue;
       if (!mesh.metadata?.decor || mesh.metadata?.gameplaySurface || mesh.metadata?.gameplay || mesh.metadata?.hazard) continue;
+      if (mesh.metadata?.cameraFadeable === false) continue;
       const material = mesh.material;
       if (!material) continue;
       prepareFadeMaterial(material);
@@ -2464,7 +2465,7 @@ export async function boot(options = {}) {
   const cameraIgnoredMeshes = new Set([player.blobShadow]);
   const useLevel2CameraOcclusionGuard = levelId === 2;
   const useGenericCameraOcclusionGuard = levelId === 3;
-  const useEra5DecorOcclusion = isEra5Level;
+  const useEra5DecorOcclusion = isEra5Level && world.disableDecorOcclusionFade !== true;
   let era5CameraPresetId = getEra5DefaultPresetId();
   let era5PlayerYaw = era5InitialPlayerYaw;
   let era5PlayerYawVel = 0;
@@ -2598,6 +2599,7 @@ export async function boot(options = {}) {
     goal: false,
   };
   window.__DADA_DEBUG__.lastRespawnReason = '';
+  window.__DADA_DEBUG__.lastRespawnAnchor = null;
   window.__DADA_DEBUG__.checkpointIndex = activeCheckpointIndex;
   window.__DADA_DEBUG__.onesieBuffMs = 0;
   window.__DADA_DEBUG__.coinsCollected = coinsCollected;
@@ -4571,7 +4573,16 @@ export async function boot(options = {}) {
         triggerDamage: applyEra5Damage,
       }) ?? false;
     };
+    window.__DADA_DEBUG__.forceEra5Damage = (source = 'eel_rail', direction = { x: 1, z: 0 }, options = {}) => {
+      if (!isEra5Level) return false;
+      return applyEra5Damage(source, direction, options);
+    };
     window.__DADA_DEBUG__.era5TopologyReport = () => world.era5Level?.getTopologyReport?.() ?? null;
+    window.__DADA_DEBUG__.level5TruthReport = () => (levelId === 5 ? world.level5?.getTruthReport?.() ?? null : null);
+    window.__DADA_DEBUG__.level5CollisionReport = () => (levelId === 5 ? world.level5?.getCollisionReport?.() ?? null : null);
+    window.__DADA_DEBUG__.level5WalkableReport = () => (levelId === 5 ? world.level5?.getWalkableReport?.() ?? null : null);
+    window.__DADA_DEBUG__.level5RespawnReport = () => (levelId === 5 ? world.level5?.getRespawnReport?.() ?? null : null);
+    window.__DADA_DEBUG__.setLevel5TruthOverlay = (nextState = {}) => (levelId === 5 ? world.level5?.setTruthOverlay?.(nextState) ?? null : null);
     window.__DADA_DEBUG__.era5EnemyReport = () => world.era5Level?.getEnemyReport?.() ?? null;
     window.__DADA_DEBUG__.era5ShowEnemyBounds = (enabled = true) => {
       return world.era5Level?.setEnemyDebugView?.({ showBounds: !!enabled }) ?? null;
@@ -4855,6 +4866,21 @@ export async function boot(options = {}) {
   }
 
   function resolveRespawnPosition(baseSpawn) {
+    const levelSpecific = world.level5?.resolveRespawnPosition?.({
+      baseSpawn,
+      player,
+      reason: respawnState?.reason || null,
+      activeCheckpointIndex,
+      worldExtents,
+    });
+    if (levelSpecific?.position) {
+      window.__DADA_DEBUG__.lastRespawnAnchor = levelSpecific.anchor || null;
+      return levelSpecific.position;
+    }
+    if (levelSpecific && Number.isFinite(levelSpecific.x) && Number.isFinite(levelSpecific.y)) {
+      window.__DADA_DEBUG__.lastRespawnAnchor = levelSpecific.anchor || null;
+      return levelSpecific;
+    }
     const { halfW, halfH, halfD } = player.getCollisionHalfExtents();
     const baseZ = Number.isFinite(baseSpawn.z) ? baseSpawn.z : 0;
 

@@ -782,7 +782,7 @@ test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, 
   ).toBe(true);
 });
 
-test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-surface validation, and smooth camera yaw while turning', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 exposes authored topology, coherent truth reports, clean walkable-surface validation, and smooth camera yaw while turning', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
@@ -791,8 +791,16 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-s
   await page.waitForTimeout(1300);
 
   const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
+  const truth = await page.evaluate(() => window.__DADA_DEBUG__?.level5TruthReport?.() ?? null);
+  const collision = await page.evaluate(() => window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null);
+  const walkable = await page.evaluate(() => window.__DADA_DEBUG__?.level5WalkableReport?.() ?? null);
+  const respawn = await page.evaluate(() => window.__DADA_DEBUG__?.level5RespawnReport?.() ?? null);
   test.skip(!topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
   expect(topology).not.toBeNull();
+  expect(truth).not.toBeNull();
+  expect(collision).not.toBeNull();
+  expect(walkable).not.toBeNull();
+  expect(respawn).not.toBeNull();
   expect(topology.sectorCount).toBeGreaterThanOrEqual(7);
   expect(topology.connectorCount).toBeGreaterThanOrEqual(8);
   expect(topology.topology?.hasCycle).toBe(true);
@@ -802,27 +810,44 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-s
   expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
   expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
   expect(topology.walkableReport?.unclassifiedWalkables ?? []).toEqual([]);
+  expect(truth?.disableDecorOcclusionFade).toBe(true);
+  expect(truth?.fadeableShells ?? []).toEqual([]);
+  expect(truth?.cullRiskShells ?? []).toEqual([]);
+  expect(collision?.unownedBlockers ?? []).toEqual([]);
+  expect(collision?.invisibleBlockers ?? []).toEqual([]);
+  expect(collision?.roomVolumeShells ?? []).toEqual([]);
+  expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
+  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(5);
+  expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
 
   const labels = (topology.sectors ?? []).map((sector) => sector.label);
   expect(labels).toEqual(expect.arrayContaining(LEVEL5_REQUIRED_SECTORS));
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -48.2,
-      y: 1.86,
-      z: 0.8,
-      yaw: 0.28,
-      cameraYaw: 0.28,
-    });
-  });
-  await page.waitForTimeout(700);
-  const surfaceHold = await page.evaluate(() => ({
-    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
-    y: window.__DADA_DEBUG__?.playerPos?.y ?? null,
-  }));
-  expect(surfaceHold.sceneKey).toBe('CribScene');
-  expect(surfaceHold.y).not.toBeNull();
-  expect(surfaceHold.y).toBeGreaterThan(1.05);
+  for (const sample of [
+    { x: -48.2, y: 1.86, z: 0.8, yaw: 0.28, minY: 1.05 },
+    { x: -43.2, y: 1.52, z: 13.8, yaw: 0.34, minY: 1.10 },
+    { x: -8.2, y: 1.62, z: 12.6, yaw: 0.44, minY: 1.12 },
+    { x: 16.2, y: 1.32, z: -2.0, yaw: 0.24, minY: 1.10 },
+    { x: 57.2, y: 1.96, z: 24.2, yaw: 0.18, minY: 1.55 },
+  ]) {
+    await page.evaluate((pose) => {
+      window.__DADA_DEBUG__?.setEra5Pose?.({
+        x: pose.x,
+        y: pose.y,
+        z: pose.z,
+        yaw: pose.yaw,
+        cameraYaw: pose.yaw,
+      });
+    }, sample);
+    await page.waitForTimeout(420);
+    const surfaceHold = await page.evaluate(() => ({
+      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+      y: window.__DADA_DEBUG__?.playerPos?.y ?? null,
+    }));
+    expect(surfaceHold.sceneKey).toBe('CribScene');
+    expect(surfaceHold.y).not.toBeNull();
+    expect(surfaceHold.y).toBeGreaterThan(sample.minY);
+  }
 
   await page.keyboard.down('ArrowRight');
   const yawSamples = [];
@@ -844,6 +869,83 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, clean walkable-s
   expect(deltas.length).toBeGreaterThan(8);
   expect(Math.max(...deltas)).toBeLessThan(0.32);
   expect(Math.min(...deltas)).toBeGreaterThan(-0.08);
+});
+
+test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored anchors instead of roof or hidden geometry', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 16.2,
+      y: 1.32,
+      z: -2.0,
+      yaw: 0.24,
+      cameraYaw: 0.24,
+    });
+  });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.checkpointIndex ?? 0),
+    { timeout: 5_000 },
+  ).toBeGreaterThanOrEqual(3);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 1, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 21.2,
+      y: 1.24,
+      z: -2.4,
+      yaw: 0.24,
+      cameraYaw: 0.24,
+    });
+    window.__DADA_DEBUG__?.forceEra5Damage?.('eel_rail', { x: 1, z: 0 }, { invulnMs: 0 });
+  });
+
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.getEra5LastDamage?.() ?? null),
+    { timeout: 3_000 },
+  ).toMatchObject({
+    source: 'eel_rail',
+    category: 'hazard',
+    shielded: false,
+  });
+
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnAnchor ?? null),
+    { timeout: 6_000 },
+  ).toMatchObject({
+    id: 'cp_filtration_core',
+    spaceId: 'filtration_core',
+  });
+
+  await expect.poll(
+    async () => page.evaluate(() => ({
+      pos: window.__DADA_DEBUG__?.playerPos ?? null,
+      anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
+      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    })),
+    { timeout: 6_000 },
+  ).toMatchObject({
+    sceneKey: 'CribScene',
+    anchor: {
+      id: 'cp_filtration_core',
+    },
+  });
+
+  const finalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+    anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
+  }));
+  expect(finalState.pos).not.toBeNull();
+  expect(finalState.pos.y).toBeGreaterThan(1.0);
+  expect(finalState.pos.y).toBeLessThan(2.0);
+  expect(Math.abs(finalState.pos.x - 16.2)).toBeLessThan(2.5);
+  expect(Math.abs(finalState.pos.z - (-2.0))).toBeLessThan(2.5);
+  expect(finalState.anchor?.id).toBe('cp_filtration_core');
 });
 
 test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent and C descent with no release drift', async ({ page }) => {

@@ -72,7 +72,7 @@ const LEVEL5_CAMERA_PRESETS = {
 
 const BASE_LEVEL5 = compileAuthoredEraLayout({
   totalCollectibles: 18,
-  spawnYaw: 0.34,
+  spawnYaw: 0.08,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
   spawn: { x: -61.4, y: 1.28, z: 0.2 },
@@ -80,6 +80,14 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
   theme: 'aquarium',
   showGroundVisual: false,
   showRouteRibbons: false,
+  disableDecorOcclusionFade: true,
+  respawnAnchors: [
+    { id: 'level5_spawn_anchor', label: 'Arrival Airlock Vestibule', x: -61.4, y: 1.28, z: 0.2, spaceId: 'arrival_airlock_vestibule', allowedReason: 'spawn' },
+    { id: 'cp_public_spine', checkpointId: 'cp_public_spine', label: 'Public Exhibits', x: -43.2, y: 1.44, z: 13.8, spaceId: 'public_exhibit_spine', allowedReason: 'checkpoint' },
+    { id: 'cp_hero_chamber', checkpointId: 'cp_hero_chamber', label: 'Main Tank Chamber', x: -8.0, y: 1.54, z: 12.6, spaceId: 'main_tank_chamber', allowedReason: 'checkpoint' },
+    { id: 'cp_filtration_core', checkpointId: 'cp_filtration_core', label: 'Filtration Core', x: 16.2, y: 1.30, z: -2.0, spaceId: 'filtration_core', allowedReason: 'checkpoint' },
+    { id: 'cp_pump_gallery', checkpointId: 'cp_pump_gallery', label: 'Pump Gallery', x: 38.0, y: 1.48, z: -6.0, spaceId: 'pump_gallery_rejoin', allowedReason: 'checkpoint' },
+  ],
 
   acts: [
     { id: 'A', label: 'Arrival Threshold + Route Split', range: [-66, -34] },
@@ -144,9 +152,9 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.04,
             roughness: 0.34,
             alpha: 0.24,
-            solid: true,
+            interiorVisible: true,
           }),
-          block('arrival_fork_bulkhead', 3.8, 0.0, 3.8, 5.4, 8.2, {
+          block('arrival_fork_bulkhead', 3.6, 0.0, 4.6, 5.6, 9.2, {
             rgb: [24, 68, 82],
             roughness: 0.84,
             emissiveScale: 0.03,
@@ -168,6 +176,24 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             rgb: [70, 108, 118],
             roughness: 0.78,
             emissiveScale: 0.03,
+          }),
+          block('arrival_portal_header', 4.6, 0.0, 3.6, 0.54, 8.8, {
+            y: 5.02,
+            rgb: [26, 72, 86],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+          }),
+          block('arrival_public_baffle', 1.2, 4.2, 4.2, 4.8, 1.4, {
+            rgb: [22, 64, 78],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('arrival_service_baffle', 1.2, -4.2, 4.2, 4.8, 1.4, {
+            rgb: [22, 60, 74],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
           }),
           block('arrival_lower_hull', -0.2, 0.0, 12.0, 2.8, 8.4, {
             y: -0.64,
@@ -231,7 +257,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         checkpoints: [
-          { id: 'cp_public_spine', offsetX: 0.8, offsetZ: 0.8, label: 'Public Exhibits' },
+          { id: 'cp_public_spine', anchorId: 'cp_public_spine', offsetX: 0.8, offsetZ: 0.8, label: 'Public Exhibits' },
         ],
         decorBlocks: [
           block('public_north_tank_wall', 0.0, 7.0, 14.4, 6.0, 0.8, {
@@ -245,7 +271,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.04,
             roughness: 0.34,
             alpha: 0.24,
-            solid: true,
+            interiorVisible: true,
           }),
           block('public_touch_pool_frame', 5.8, -1.4, 3.8, 3.6, 0.8, {
             rgb: [56, 150, 174],
@@ -258,7 +284,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.04,
             roughness: 0.34,
             alpha: 0.26,
-            solid: true,
+            interiorVisible: true,
           }),
           block('public_touch_pool_backwall', 5.8, -6.8, 4.8, 3.8, 1.2, {
             rgb: [18, 44, 56],
@@ -278,11 +304,23 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('public_center_partition', 1.8, 0.8, 2.6, 4.8, 5.2, {
+          block('public_center_partition', 1.2, 1.0, 3.4, 5.2, 6.6, {
             rgb: [24, 68, 82],
             roughness: 0.82,
             emissiveScale: 0.03,
             solid: true,
+          }),
+          block('public_west_entry_screen', -5.8, 1.0, 2.4, 4.8, 5.6, {
+            rgb: [22, 64, 78],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('public_west_entry_header', -4.0, 0.8, 6.8, 0.46, 6.8, {
+            y: 4.98,
+            rgb: [26, 72, 86],
+            roughness: 0.82,
+            emissiveScale: 0.03,
           }),
           block('public_south_wall_mass', -1.2, -6.4, 13.8, 4.8, 1.8, {
             rgb: [22, 62, 76],
@@ -396,6 +434,12 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           block('service_locker_bank', 5.4, -3.8, 3.2, 3.8, 1.6, {
             rgb: [56, 92, 104],
             roughness: 0.80,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('service_west_screen', -5.8, 0.0, 2.2, 4.4, 5.4, {
+            rgb: [18, 52, 64],
+            roughness: 0.88,
             emissiveScale: 0.03,
             solid: true,
           }),
@@ -542,8 +586,8 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['west', 'east'],
           solid: true,
-          ceiling: true,
-          beamCount: 2,
+          ceiling: false,
+          beamCount: 0,
         },
         surfaces: [
           surface('reveal_entry_run', -2.0, -0.8, 10.8, 5.0, 'viewing_deck', {
@@ -558,9 +602,15 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         decorBlocks: [
-          block('reveal_corner_wall', 0.4, 0.0, 4.8, 5.2, 6.0, {
+          block('reveal_corner_wall', 0.2, 0.0, 6.2, 5.4, 7.8, {
             rgb: [24, 68, 82],
             roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('reveal_north_shroud', 0.4, 4.8, 10.6, 5.2, 2.0, {
+            rgb: [22, 64, 78],
+            roughness: 0.84,
             emissiveScale: 0.03,
             solid: true,
           }),
@@ -575,7 +625,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.34,
             emissiveScale: 0.04,
             alpha: 0.20,
-            solid: true,
+            interiorVisible: true,
           }),
           block('reveal_south_portal_jamb', 4.8, -4.0, 2.0, 5.0, 3.2, {
             rgb: [22, 64, 78],
@@ -621,69 +671,69 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           beamCount: 0,
         },
         surfaces: [
-          surface('chamber_entry_gallery', -6.8, 1.2, 9.8, 9.8, 'viewing_deck', {
+          surface('chamber_entry_gallery', -6.4, 1.0, 8.8, 7.8, 'viewing_deck', {
             floorY: 1.06,
             walkableClassification: 'room-floor',
             roomSurface: true,
           }),
-          surface('chamber_north_concourse', -1.0, 6.8, 14.6, 4.2, 'viewing_deck', {
+          surface('chamber_north_concourse', -2.4, 6.2, 11.2, 3.8, 'viewing_deck', {
             floorY: 1.10,
             walkableClassification: 'room-floor',
             roomSurface: true,
           }),
-          surface('chamber_east_machine_apron', 7.2, 1.0, 6.0, 9.2, 'exhibit_deck', {
+          surface('chamber_east_machine_apron', 7.6, 1.0, 5.4, 7.2, 'exhibit_deck', {
             floorY: 1.14,
             walkableClassification: 'room-floor',
             roomSurface: true,
           }),
-          surface('chamber_south_service_lip', 0.8, -5.4, 12.0, 3.2, 'shell_service_deck', {
+          surface('chamber_south_service_lip', 1.2, -5.2, 9.6, 2.8, 'shell_service_deck', {
             floorY: 0.98,
             walkableClassification: 'room-floor',
             roomSurface: true,
           }),
         ],
         checkpoints: [
-          { id: 'cp_hero_chamber', offsetX: -7.0, offsetZ: 2.6, label: 'Main Tank Chamber' },
+          { id: 'cp_hero_chamber', anchorId: 'cp_hero_chamber', offsetX: -7.0, offsetZ: 2.6, label: 'Main Tank Chamber' },
         ],
         decorBlocks: [
-          block('chamber_entry_shoulder', -10.4, 3.8, 3.8, 6.0, 8.4, {
+          block('chamber_entry_shoulder', -10.8, 4.2, 5.0, 6.8, 12.0, {
             rgb: [24, 68, 82],
             roughness: 0.84,
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('chamber_entry_mask', -6.2, 7.0, 3.8, 5.8, 4.4, {
+          block('chamber_entry_mask', -6.4, 7.0, 5.8, 6.2, 7.0, {
             rgb: [24, 70, 84],
             roughness: 0.82,
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('chamber_tank_front_wall', -1.2, 7.2, 12.8, 7.0, 1.0, {
+          block('chamber_tank_front_wall', -2.2, 7.0, 15.4, 7.2, 1.2, {
             rgb: [58, 154, 176],
             roughness: 0.38,
             emissiveScale: 0.10,
             alpha: 0.80,
           }),
-          block('chamber_tank_volume', -1.2, 11.6, 11.8, 6.6, 9.4, {
+          block('chamber_tank_volume', -2.2, 12.0, 14.6, 7.0, 11.8, {
             rgb: [22, 90, 116],
             roughness: 0.34,
             emissiveScale: 0.04,
             alpha: 0.26,
-            solid: true,
+            interiorVisible: true,
           }),
-          block('chamber_tank_side_w', -7.2, 11.6, 1.0, 6.6, 9.4, {
+          block('chamber_tank_side_w', -9.4, 12.0, 1.2, 7.0, 11.8, {
             rgb: [68, 160, 184],
             roughness: 0.38,
             emissiveScale: 0.10,
             alpha: 0.72,
           }),
-          block('chamber_tank_side_e', 4.8, 11.6, 1.0, 6.6, 9.4, {
+          block('chamber_tank_side_e', 5.2, 12.0, 1.2, 7.0, 11.8, {
             rgb: [68, 160, 184],
             roughness: 0.38,
             emissiveScale: 0.10,
             alpha: 0.72,
           }),
-          block('chamber_tank_base', -1.2, 11.6, 12.2, 1.8, 10.0, {
+          block('chamber_tank_base', -2.2, 12.0, 15.0, 2.0, 12.2, {
             y: 0.28,
             rgb: [24, 56, 68],
             roughness: 0.78,
@@ -696,25 +746,31 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('chamber_landmark_machine', 10.0, 2.0, 4.8, 6.8, 6.2, {
+          block('chamber_mid_spine', 1.2, 6.2, 4.4, 6.0, 13.2, {
+            rgb: [24, 68, 82],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('chamber_landmark_machine', 10.8, 1.8, 5.8, 7.4, 7.4, {
             rgb: [36, 96, 112],
             roughness: 0.62,
             emissiveScale: 0.05,
             solid: true,
           }),
-          block('chamber_landmark_base', 10.0, 2.0, 7.2, 2.0, 8.0, {
+          block('chamber_landmark_base', 10.8, 1.8, 8.2, 2.2, 9.2, {
             y: 0.72,
             rgb: [42, 84, 96],
             roughness: 0.72,
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('chamber_landmark_stack', 11.2, 5.6, 2.2, 7.8, 2.2, {
+          block('chamber_landmark_stack', 12.2, 5.8, 2.8, 8.4, 2.8, {
             rgb: [72, 154, 176],
             roughness: 0.40,
             emissiveScale: 0.08,
             alpha: 0.34,
-            solid: true,
+            interiorVisible: true,
           }),
           block('chamber_observation_portal', 10.6, 9.8, 2.6, 5.8, 5.4, {
             rgb: [20, 60, 74],
@@ -728,7 +784,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.70,
             emissiveScale: 0.03,
           }),
-          block('chamber_lower_route_frame', 5.8, -4.2, 4.4, 5.0, 5.8, {
+          block('chamber_lower_route_frame', 5.8, -4.4, 6.4, 5.4, 7.2, {
             rgb: [22, 64, 78],
             roughness: 0.84,
             emissiveScale: 0.03,
@@ -752,9 +808,21 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.03,
             solid: true,
           }),
-          block('chamber_south_machine_bank', -1.2, -8.8, 14.0, 4.6, 2.6, {
+          block('chamber_south_machine_bank', -1.4, -9.0, 16.0, 5.0, 3.8, {
             rgb: [28, 66, 78],
             roughness: 0.80,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('chamber_south_return_wall_w', -4.4, -6.8, 3.0, 5.2, 2.2, {
+            rgb: [22, 64, 78],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('chamber_south_return_wall_e', 6.8, -6.8, 3.0, 5.2, 2.2, {
+            rgb: [22, 64, 78],
+            roughness: 0.84,
             emissiveScale: 0.03,
             solid: true,
           }),
@@ -776,6 +844,24 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.03,
             solid: true,
           }),
+          block('chamber_entry_lintel', -8.2, 4.8, 7.8, 0.52, 7.2, {
+            y: 5.72,
+            rgb: [24, 70, 84],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+          }),
+          block('chamber_south_route_lintel', 5.8, -6.8, 6.8, 0.52, 4.4, {
+            y: 4.96,
+            rgb: [24, 70, 84],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+          }),
+          block('chamber_east_backwall', 14.8, 7.6, 2.2, 7.4, 15.6, {
+            rgb: [20, 58, 72],
+            roughness: 0.84,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
         ],
         decorColumns: [
           column('chamber_filtration_ring_a', 12.0, 10.8, 2.6, 7.2, {
@@ -783,47 +869,38 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.44,
             emissiveScale: 0.06,
             alpha: 0.34,
-            solid: true,
+            interiorVisible: true,
           }),
           column('chamber_filtration_ring_b', 15.2, 14.0, 2.2, 7.8, {
             rgb: [76, 170, 190],
             roughness: 0.44,
             emissiveScale: 0.06,
             alpha: 0.34,
-            solid: true,
+            interiorVisible: true,
           }),
           column('chamber_filtration_ring_c', 10.2, 15.6, 2.0, 6.8, {
             rgb: [76, 170, 190],
             roughness: 0.44,
             emissiveScale: 0.06,
             alpha: 0.34,
-            solid: true,
+            interiorVisible: true,
           }),
           column('chamber_tank_cluster_main', 7.4, 9.6, 3.8, 6.2, {
             rgb: [84, 186, 204],
             roughness: 0.34,
             emissiveScale: 0.08,
             alpha: 0.26,
-            solid: true,
+            interiorVisible: true,
           }),
           column('chamber_tank_cluster_small', 10.4, 11.8, 2.4, 5.6, {
             rgb: [84, 186, 204],
             roughness: 0.34,
             emissiveScale: 0.08,
             alpha: 0.24,
-            solid: true,
+            interiorVisible: true,
           }),
         ],
-        decorPlatforms: [
-          platform('chamber_top_frame_north', -1.2, 18.8, 15.6, 0.26, 1.0, {
-            y: 7.2,
-            rgb: [28, 82, 96],
-          }),
-          platform('chamber_top_frame_east', 10.8, 10.2, 1.0, 0.26, 12.0, {
-            y: 7.2,
-            rgb: [28, 82, 96],
-          }),
-        ],
+        decorPlatforms: [],
         signage: [
           { offsetX: -1.6, y: 6.2, offsetZ: -11.4, text: 'MAIN TANK CHAMBER', width: 8.0, height: 1.7 },
         ],
@@ -851,11 +928,11 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           beamCount: 0,
         },
         surfaces: [
-          surface('upper_bridge_main', 0.0, 0.0, 9.4, 3.6, 'catwalk_grate', {
+          surface('upper_bridge_main', 0.0, 0.0, 7.0, 3.2, 'catwalk_grate', {
             floorY: 3.14,
             walkableClassification: 'bridge',
           }),
-          surface('upper_bridge_overlook', -2.4, 1.6, 4.2, 2.0, 'viewing_deck', {
+          surface('upper_bridge_overlook', -2.0, 1.4, 3.6, 1.8, 'viewing_deck', {
             floorY: 3.18,
             walkableClassification: 'lookout',
           }),
@@ -916,8 +993,8 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['west', 'south'],
           solid: true,
-          ceiling: true,
-          beamCount: 2,
+          ceiling: false,
+          beamCount: 0,
         },
         surfaces: [
           surface('core_safe_walk', -4.8, -0.2, 4.6, 10.4, 'wet_service_deck', {
@@ -937,7 +1014,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         checkpoints: [
-          { id: 'cp_filtration_core', offsetX: -1.8, offsetZ: 0.0, label: 'Filtration Core' },
+          { id: 'cp_filtration_core', anchorId: 'cp_filtration_core', offsetX: -1.8, offsetZ: 0.0, label: 'Filtration Core' },
         ],
         decorBlocks: [
           block('core_basin_volume', 3.6, 0.2, 6.8, 4.4, 6.8, {
@@ -945,7 +1022,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.44,
             emissiveScale: 0.04,
             alpha: 0.18,
-            solid: true,
+            interiorVisible: true,
           }),
           block('core_manifold_bank', 6.2, -4.8, 4.6, 4.6, 2.0, {
             rgb: [44, 94, 108],
@@ -953,10 +1030,28 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.04,
             solid: true,
           }),
-          block('core_spill_gate_frame', 2.2, -1.0, 8.6, 4.6, 1.4, {
+          block('core_spill_gate_frame', 2.2, -1.0, 8.8, 5.0, 1.8, {
             rgb: [28, 74, 88],
             roughness: 0.70,
             emissiveScale: 0.04,
+            solid: true,
+          }),
+          block('core_east_backwall', 7.8, 0.0, 1.8, 5.2, 10.8, {
+            rgb: [22, 60, 74],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('core_north_bulkhead', 0.0, 5.8, 12.8, 5.0, 1.6, {
+            rgb: [22, 60, 72],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('core_south_bulkhead', -2.4, -5.8, 8.2, 5.0, 1.6, {
+            rgb: [22, 60, 72],
+            roughness: 0.82,
+            emissiveScale: 0.03,
             solid: true,
           }),
           block('core_safe_curb', -1.4, -0.8, 1.0, 0.8, 9.0, {
@@ -992,6 +1087,12 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.92,
             emissiveScale: 0.02,
             solid: true,
+          }),
+          block('core_spill_header', 2.4, -0.8, 8.8, 0.52, 3.0, {
+            y: 4.86,
+            rgb: [24, 70, 82],
+            roughness: 0.80,
+            emissiveScale: 0.03,
           }),
         ],
         signage: [
@@ -1063,6 +1164,18 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.05,
             alpha: 0.18,
           }),
+          block('trench_overhead_header', -1.4, -0.2, 12.2, 0.42, 3.0, {
+            y: 3.72,
+            rgb: [18, 42, 50],
+            roughness: 0.86,
+            emissiveScale: 0.03,
+          }),
+          block('trench_north_bulkhead', -1.0, -4.2, 12.8, 3.0, 1.4, {
+            rgb: [18, 42, 50],
+            roughness: 0.86,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
         ],
       },
       {
@@ -1105,7 +1218,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         checkpoints: [
-          { id: 'cp_pump_gallery', offsetX: 0.0, offsetZ: 0.0, label: 'Pump Gallery' },
+          { id: 'cp_pump_gallery', anchorId: 'cp_pump_gallery', offsetX: 0.0, offsetZ: 0.0, label: 'Pump Gallery' },
         ],
         decorBlocks: [
           block('pump_machine_bank', 5.0, -3.8, 5.8, 4.4, 2.2, {
@@ -1139,6 +1252,12 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.82,
             emissiveScale: 0.03,
           }),
+          block('pump_east_backwall', 6.8, 0.6, 1.6, 5.0, 8.8, {
+            rgb: [22, 62, 76],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
         ],
       },
       {
@@ -1160,7 +1279,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['west', 'north'],
           solid: true,
-          ceiling: true,
+          ceiling: false,
           beamCount: 0,
         },
         surfaces: [
@@ -1176,7 +1295,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         decorBlocks: [
-          block('compression_goal_baffle', 1.6, -0.2, 3.0, 4.8, 5.0, {
+          block('compression_goal_baffle', 1.2, -0.2, 3.8, 5.0, 6.0, {
             rgb: [24, 70, 84],
             roughness: 0.82,
             emissiveScale: 0.03,
@@ -1228,7 +1347,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['west'],
           solid: true,
-          ceiling: true,
+          ceiling: false,
           beamCount: 0,
         },
         surfaces: [
@@ -1244,8 +1363,9 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
           surface('goalDeck', 4.8, 1.2, 3.4, 3.6, 'exhibit_deck', {
             name: 'goalDeck',
-            floorY: 1.92,
+            floorY: 1.88,
             walkableClassification: 'goal',
+            roomSurface: true,
           }),
         ],
         decorBlocks: [
@@ -1260,9 +1380,9 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             roughness: 0.34,
             emissiveScale: 0.04,
             alpha: 0.24,
-            solid: true,
+            interiorVisible: true,
           }),
-          block('nursery_goal_backdrop', 5.0, 4.2, 7.0, 6.0, 2.6, {
+          block('nursery_goal_backdrop', 5.0, 4.2, 7.8, 6.2, 3.4, {
             rgb: [26, 76, 90],
             roughness: 0.80,
             emissiveScale: 0.03,
@@ -1322,6 +1442,30 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
             emissiveScale: 0.03,
             solid: true,
           }),
+          block('nursery_goal_niche_backer_l', 2.0, 5.6, 1.8, 4.8, 2.6, {
+            rgb: [22, 66, 80],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('nursery_goal_niche_backer_r', 8.0, 5.6, 1.8, 4.8, 2.6, {
+            rgb: [22, 66, 80],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('nursery_goal_threshold_screen', -2.0, -1.2, 3.2, 4.8, 4.8, {
+            rgb: [24, 68, 82],
+            roughness: 0.82,
+            emissiveScale: 0.03,
+            solid: true,
+          }),
+          block('nursery_entry_portal_header', -1.0, -2.4, 7.4, 0.46, 4.0, {
+            y: 4.92,
+            rgb: [92, 180, 196],
+            roughness: 0.34,
+            emissiveScale: 0.09,
+          }),
           block('nursery_cradle_ring', 0.2, 3.6, 7.2, 0.30, 7.2, {
             y: 4.8,
             rgb: [110, 196, 210],
@@ -1355,8 +1499,8 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['north', 'south'],
           solid: true,
-          ceiling: false,
-          beamCount: 0,
+          ceiling: true,
+          beamCount: 1,
         },
         surfaces: [
           surface('arrival_public_floor', 0.0, 0.0, 6.0, 9.4, 'viewing_deck', {
@@ -1366,7 +1510,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         decorBlocks: [
-          block('arrival_public_turn_frame', 1.4, 1.8, 2.0, 4.8, 3.8, {
+          block('arrival_public_turn_frame', 1.8, 1.8, 3.6, 5.0, 6.2, {
             rgb: [24, 68, 82],
             roughness: 0.84,
             emissiveScale: 0.03,
@@ -1401,8 +1545,8 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           floorSkirt: 0.56,
           openSides: ['north', 'south'],
           solid: true,
-          ceiling: false,
-          beamCount: 0,
+          ceiling: true,
+          beamCount: 1,
         },
         surfaces: [
           surface('arrival_service_floor', 0.0, 0.0, 6.0, 7.6, 'shell_service_deck', {
@@ -1412,7 +1556,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         decorBlocks: [
-          block('arrival_service_turn_frame', -1.2, -1.4, 1.8, 4.4, 3.4, {
+          block('arrival_service_turn_frame', -1.8, -1.6, 3.4, 4.8, 5.8, {
             rgb: [20, 56, 68],
             roughness: 0.86,
             emissiveScale: 0.03,
@@ -1536,7 +1680,7 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           }),
         ],
         decorBlocks: [
-          block('reveal_chamber_jamb', 2.2, 1.6, 2.0, 5.0, 4.0, {
+          block('reveal_chamber_jamb', 2.6, 1.8, 3.0, 5.2, 5.2, {
             rgb: [22, 66, 80],
             roughness: 0.84,
             emissiveScale: 0.03,
@@ -1775,17 +1919,17 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
           beamCount: 0,
         },
         surfaces: [
-          surface('upper_return_north', 0.0, -4.8, 5.8, 3.4, 'catwalk_grate', {
+          surface('upper_return_north', 0.0, -4.8, 4.8, 3.2, 'catwalk_grate', {
             floorY: 3.00,
             walkableClassification: 'connector',
             roomSurface: true,
           }),
-          surface('upper_return_mid', 0.0, 0.0, 5.8, 3.4, 'maintenance_plate', {
+          surface('upper_return_mid', 0.0, 0.0, 4.6, 3.2, 'maintenance_plate', {
             floorY: 2.06,
             walkableClassification: 'connector',
             roomSurface: true,
           }),
-          surface('upper_return_south', 0.0, 4.8, 6.0, 3.6, 'shell_service_deck', {
+          surface('upper_return_south', 0.0, 4.8, 4.8, 3.4, 'shell_service_deck', {
             floorY: 1.18,
             walkableClassification: 'connector',
             roomSurface: true,
@@ -1993,23 +2137,192 @@ const BASE_LEVEL5 = compileAuthoredEraLayout({
   ],
 
   decorBlocks: [
-    { name: 'arrival_exterior_shell', x: -60.0, y: 3.2, z: 0.0, w: 18.0, h: 6.2, d: 14.0, rgb: [18, 44, 56], emissiveScale: 0.02, roughness: 0.92, solid: true },
     { name: 'fork_split_spine', x: -50.0, y: 3.2, z: 0.0, w: 3.0, h: 5.4, d: 11.4, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.86, solid: true },
     { name: 'fork_north_portal_mass', x: -47.6, y: 3.2, z: 6.4, w: 4.4, h: 5.0, d: 2.4, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.84, solid: true },
     { name: 'fork_south_portal_mass', x: -47.6, y: 3.2, z: -6.4, w: 4.4, h: 5.0, d: 2.4, rgb: [20, 54, 66], emissiveScale: 0.03, roughness: 0.84, solid: true },
-    { name: 'public_north_housing', x: -44.0, y: 4.6, z: 22.8, w: 22.0, h: 7.0, d: 6.2, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
-    { name: 'service_south_housing', x: -32.0, y: 4.0, z: -20.4, w: 28.0, h: 6.6, d: 6.0, rgb: [18, 48, 60], emissiveScale: 0.03, roughness: 0.90, solid: true },
-    { name: 'chamber_east_housing', x: 12.0, y: 4.8, z: 26.4, w: 20.0, h: 7.4, d: 6.4, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
-    { name: 'chamber_service_annex', x: 9.6, y: 3.2, z: -10.8, w: 16.0, h: 5.2, d: 5.2, rgb: [20, 56, 70], emissiveScale: 0.03, roughness: 0.88, solid: true },
-    { name: 'pump_annex_housing', x: 39.6, y: 4.4, z: -14.6, w: 14.0, h: 7.0, d: 5.6, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
-    { name: 'nursery_outer_housing', x: 58.2, y: 4.6, z: 32.8, w: 18.0, h: 7.0, d: 6.0, rgb: [22, 66, 82], emissiveScale: 0.03, roughness: 0.86, solid: true },
-    { name: 'nursery_goal_shell', x: 61.0, y: 4.6, z: 24.8, w: 8.4, h: 6.2, d: 8.4, rgb: [22, 70, 84], emissiveScale: 0.03, roughness: 0.84, solid: true },
+    { name: 'fork_public_sidewall_n', x: -45.8, y: 3.2, z: 10.8, w: 8.0, h: 5.0, d: 2.0, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'fork_public_sidewall_s', x: -45.8, y: 3.2, z: 3.8, w: 8.0, h: 5.0, d: 2.0, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'fork_public_header', x: -45.8, y: 5.0, z: 7.2, w: 8.4, h: 0.52, d: 4.8, rgb: [18, 50, 60], emissiveScale: 0.03, roughness: 0.86, solid: true },
+    { name: 'fork_service_sidewall_n', x: -45.8, y: 3.2, z: -4.0, w: 8.0, h: 5.0, d: 2.0, rgb: [14, 40, 50], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'fork_service_sidewall_s', x: -45.8, y: 3.2, z: -11.0, w: 8.0, h: 5.0, d: 2.0, rgb: [14, 40, 50], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'fork_service_header', x: -45.8, y: 5.0, z: -7.4, w: 8.4, h: 0.52, d: 4.8, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    {
+      name: 'fork_public_screen',
+      ownerType: 'space',
+      ownerId: 'public_exhibit_spine',
+      ownerLabel: 'Public Exhibit Spine',
+      spaceId: 'public_exhibit_spine',
+      spaceLabel: 'Public Exhibit Spine',
+      blockerReason: 'room-boundary',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: -44.2,
+      y: 3.4,
+      z: 10.0,
+      w: 10.8,
+      h: 5.4,
+      d: 1.8,
+      rgb: [20, 58, 72],
+      emissiveScale: 0.03,
+      roughness: 0.86,
+      solid: true,
+    },
+    {
+      name: 'fork_service_screen',
+      ownerType: 'space',
+      ownerId: 'service_access_elbow',
+      ownerLabel: 'Service Access Elbow',
+      spaceId: 'service_access_elbow',
+      spaceLabel: 'Service Access Elbow',
+      blockerReason: 'room-boundary',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: -43.8,
+      y: 3.2,
+      z: -9.2,
+      w: 10.2,
+      h: 5.2,
+      d: 1.8,
+      rgb: [18, 52, 64],
+      emissiveScale: 0.03,
+      roughness: 0.88,
+      solid: true,
+    },
+    {
+      name: 'public_service_divider_west',
+      ownerType: 'space',
+      ownerId: 'public_exhibit_spine',
+      ownerLabel: 'Public Exhibit Spine',
+      spaceId: 'public_exhibit_spine',
+      spaceLabel: 'Public Exhibit Spine',
+      blockerReason: 'route-divider',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: -28.0,
+      y: 3.6,
+      z: 0.0,
+      w: 34.0,
+      h: 6.0,
+      d: 1.8,
+      rgb: [20, 58, 72],
+      emissiveScale: 0.03,
+      roughness: 0.88,
+      solid: true,
+    },
+    {
+      name: 'public_service_divider_mid',
+      ownerType: 'space',
+      ownerId: 'main_tank_chamber',
+      ownerLabel: 'Main Tank Chamber',
+      spaceId: 'main_tank_chamber',
+      spaceLabel: 'Main Tank Chamber',
+      blockerReason: 'route-divider',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: 0.0,
+      y: 3.8,
+      z: 0.4,
+      w: 22.0,
+      h: 6.4,
+      d: 1.8,
+      rgb: [20, 60, 74],
+      emissiveScale: 0.03,
+      roughness: 0.86,
+      solid: true,
+    },
+    { name: 'public_north_service_wall', x: -44.0, y: 4.8, z: 26.2, w: 22.0, h: 6.4, d: 2.2, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'service_south_service_wall', x: -32.0, y: 4.0, z: -23.8, w: 28.0, h: 6.0, d: 2.0, rgb: [18, 48, 60], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'chamber_north_service_wall', x: 12.0, y: 4.8, z: 30.0, w: 20.0, h: 6.6, d: 2.2, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'chamber_service_cap', x: 9.6, y: 3.2, z: -14.0, w: 16.0, h: 4.8, d: 2.0, rgb: [20, 56, 70], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'chamber_reveal_header', x: -14.4, y: 5.0, z: 12.6, w: 5.8, h: 0.52, d: 8.2, rgb: [18, 50, 60], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'chamber_tank_west_buttress', x: -12.0, y: 3.8, z: 13.6, w: 2.2, h: 6.0, d: 12.0, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'chamber_machine_backer', x: 14.2, y: 3.8, z: 5.4, w: 3.4, h: 6.2, d: 11.6, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'chamber_bridge_header', x: 10.8, y: 5.2, z: 9.0, w: 4.2, h: 0.48, d: 6.0, rgb: [18, 52, 62], emissiveScale: 0.03, roughness: 0.86, solid: true },
+    { name: 'chamber_room_west_wall_n', x: -18.2, y: 4.0, z: 18.2, w: 2.2, h: 6.8, d: 6.2, rgb: [14, 38, 48], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'chamber_room_west_wall_s', x: -18.2, y: 4.0, z: 3.2, w: 2.2, h: 6.8, d: 8.2, rgb: [14, 38, 48], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'chamber_room_backwall', x: -0.2, y: 4.0, z: 21.2, w: 20.8, h: 6.8, d: 2.2, rgb: [14, 40, 50], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'chamber_room_east_wall', x: 17.0, y: 4.0, z: 11.0, w: 2.2, h: 6.8, d: 19.2, rgb: [14, 38, 48], emissiveScale: 0.03, roughness: 0.90, solid: true },
+    { name: 'chamber_room_canopy', x: -1.2, y: 6.6, z: 12.4, w: 14.8, h: 0.52, d: 9.2, rgb: [16, 44, 54], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    {
+      name: 'chamber_reveal_flank_wall',
+      ownerType: 'space',
+      ownerId: 'main_tank_chamber',
+      ownerLabel: 'Main Tank Chamber',
+      spaceId: 'main_tank_chamber',
+      spaceLabel: 'Main Tank Chamber',
+      blockerReason: 'room-boundary',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: -16.6,
+      y: 3.8,
+      z: 9.6,
+      w: 1.8,
+      h: 6.2,
+      d: 14.4,
+      rgb: [20, 58, 72],
+      emissiveScale: 0.03,
+      roughness: 0.86,
+      solid: true,
+    },
+    {
+      name: 'chamber_south_route_divider',
+      ownerType: 'space',
+      ownerId: 'main_tank_chamber',
+      ownerLabel: 'Main Tank Chamber',
+      spaceId: 'main_tank_chamber',
+      spaceLabel: 'Main Tank Chamber',
+      blockerReason: 'route-divider',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: -2.8,
+      y: 3.4,
+      z: -2.0,
+      w: 12.4,
+      h: 5.8,
+      d: 1.8,
+      rgb: [22, 62, 76],
+      emissiveScale: 0.03,
+      roughness: 0.84,
+      solid: true,
+    },
+    {
+      name: 'filtration_trench_divider',
+      ownerType: 'space',
+      ownerId: 'filtration_core',
+      ownerLabel: 'Filtration Core',
+      spaceId: 'filtration_core',
+      spaceLabel: 'Filtration Core',
+      blockerReason: 'route-divider',
+      structuralShell: true,
+      cameraFadeable: false,
+      x: 22.8,
+      y: 3.0,
+      z: -10.8,
+      w: 16.0,
+      h: 5.0,
+      d: 1.8,
+      rgb: [18, 52, 64],
+      emissiveScale: 0.03,
+      roughness: 0.88,
+      solid: true,
+    },
+    { name: 'pump_annex_service_wall', x: 39.6, y: 4.4, z: -17.8, w: 14.0, h: 6.2, d: 2.0, rgb: [20, 58, 72], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'nursery_outer_service_wall', x: 58.2, y: 4.6, z: 36.0, w: 18.0, h: 6.2, d: 2.0, rgb: [22, 66, 82], emissiveScale: 0.03, roughness: 0.86, solid: true },
+    { name: 'nursery_goal_backing_wall', x: 61.0, y: 4.6, z: 29.2, w: 8.4, h: 6.0, d: 2.0, rgb: [22, 70, 84], emissiveScale: 0.03, roughness: 0.84, solid: true },
+    { name: 'goal_approach_sidewall_l', x: 51.2, y: 3.8, z: 16.8, w: 2.0, h: 5.2, d: 9.6, rgb: [18, 48, 58], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'goal_approach_sidewall_r', x: 57.8, y: 3.8, z: 19.2, w: 2.0, h: 5.2, d: 9.6, rgb: [18, 48, 58], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'goal_approach_header', x: 54.6, y: 5.0, z: 17.8, w: 7.6, h: 0.52, d: 5.2, rgb: [18, 52, 62], emissiveScale: 0.03, roughness: 0.86, solid: true },
+    { name: 'goal_back_curtain_wall', x: 59.8, y: 4.6, z: 31.6, w: 11.4, h: 6.2, d: 1.8, rgb: [18, 52, 64], emissiveScale: 0.03, roughness: 0.86, solid: true },
+    { name: 'goal_room_left_wall', x: 51.0, y: 4.2, z: 24.8, w: 2.2, h: 6.4, d: 13.8, rgb: [14, 42, 52], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'goal_room_right_wall', x: 65.0, y: 4.2, z: 24.8, w: 2.2, h: 6.4, d: 13.8, rgb: [14, 42, 52], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'goal_room_backwall', x: 58.0, y: 4.2, z: 33.0, w: 12.4, h: 6.4, d: 2.2, rgb: [14, 42, 52], emissiveScale: 0.03, roughness: 0.88, solid: true },
+    { name: 'goal_room_canopy', x: 57.8, y: 6.1, z: 25.2, w: 10.8, h: 0.52, d: 10.2, rgb: [16, 46, 56], emissiveScale: 0.03, roughness: 0.86, solid: true },
   ],
 
   decorColumns: [
-    { name: 'chamber_support_pillar_w', x: -13.4, y: 4.4, z: 16.0, diameter: 1.4, height: 8.2, rgb: [84, 180, 198], emissiveScale: 0.06, roughness: 0.42, alpha: 0.28, solid: true },
-    { name: 'chamber_support_pillar_e', x: 13.2, y: 4.6, z: 17.8, diameter: 1.4, height: 8.6, rgb: [84, 180, 198], emissiveScale: 0.06, roughness: 0.42, alpha: 0.28, solid: true },
-    { name: 'nursery_recovery_pod', x: 58.0, y: 4.2, z: 27.4, diameter: 5.2, height: 5.8, rgb: [94, 198, 214], emissiveScale: 0.08, roughness: 0.30, alpha: 0.24, solid: true },
+    { name: 'chamber_support_pillar_w', x: -13.4, y: 4.4, z: 16.0, diameter: 1.4, height: 8.2, rgb: [84, 180, 198], emissiveScale: 0.06, roughness: 0.42, alpha: 0.28, interiorVisible: true },
+    { name: 'chamber_support_pillar_e', x: 13.2, y: 4.6, z: 17.8, diameter: 1.4, height: 8.6, rgb: [84, 180, 198], emissiveScale: 0.06, roughness: 0.42, alpha: 0.28, interiorVisible: true },
+    { name: 'nursery_recovery_pod', x: 58.0, y: 4.2, z: 27.4, diameter: 5.2, height: 5.8, rgb: [94, 198, 214], emissiveScale: 0.08, roughness: 0.30, alpha: 0.24, interiorVisible: true },
   ],
 
   decorPlatforms: [],

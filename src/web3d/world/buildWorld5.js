@@ -606,10 +606,56 @@ function mergeDebugState(baseState = {}, extraState = {}) {
   };
 }
 
+function getMeshDimensions(mesh) {
+  const bounds = mesh?.getBoundingInfo?.()?.boundingBox;
+  if (!bounds) return null;
+  return {
+    w: Number((bounds.extendSizeWorld.x * 2).toFixed(3)),
+    h: Number((bounds.extendSizeWorld.y * 2).toFixed(3)),
+    d: Number((bounds.extendSizeWorld.z * 2).toFixed(3)),
+    topY: Number(bounds.maximumWorld.y.toFixed(3)),
+    minY: Number(bounds.minimumWorld.y.toFixed(3)),
+  };
+}
+
+function buildLevel5RespawnAnchor(anchor, fallbackIndex = 0) {
+  return {
+    id: anchor.id || anchor.anchorId || anchor.checkpointId || `level5_anchor_${fallbackIndex}`,
+    label: anchor.label || anchor.ownerLabel || anchor.spaceLabel || `Level 5 Anchor ${fallbackIndex + 1}`,
+    x: Number((anchor.x ?? anchor.spawn?.x ?? 0).toFixed(3)),
+    y: Number((anchor.y ?? anchor.spawn?.y ?? 0).toFixed(3)),
+    z: Number((anchor.z ?? anchor.spawn?.z ?? 0).toFixed(3)),
+    checkpointId: anchor.checkpointId || anchor.id || null,
+    spaceId: anchor.spaceId || null,
+    allowedReason: anchor.allowedReason || 'checkpoint',
+  };
+}
+
+function createOverlayMaterial(scene, name, rgb, alpha) {
+  const material = new BABYLON.StandardMaterial(name, scene);
+  material.diffuseColor = new BABYLON.Color3(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
+  material.emissiveColor = new BABYLON.Color3((rgb[0] / 255) * 0.22, (rgb[1] / 255) * 0.22, (rgb[2] / 255) * 0.22);
+  material.specularColor = BABYLON.Color3.Black();
+  material.alpha = alpha;
+  material.backFaceCulling = false;
+  material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  return material;
+}
+
 export function buildWorld5(scene, options = {}) {
   const world = buildEraAdventureWorld(scene, LEVEL5, options);
   const shadowGen = world.shadowGen;
   const baseLevel = world.era5Level;
+  const truthGeometry = world.truthGeometry || {};
+  const truthColliderMeshes = truthGeometry.colliderMeshes || [];
+  const truthVisualMeshes = [
+    ...(truthGeometry.platformVisuals || []),
+    ...(truthGeometry.decorPlatforms || []),
+    ...(truthGeometry.decorBlocks || []),
+    ...(truthGeometry.decorColumns || []),
+    ...(truthGeometry.decorPlanes || []),
+    ...(truthGeometry.checkpointFrames || []),
+  ];
 
   const currentJets = (LEVEL5.currents || []).map((def) => createCurrentJet(scene, def));
   const deepWaterPockets = (LEVEL5.deepWaterPockets || []).map((def) => createDeepWaterPocket(scene, def));
@@ -627,6 +673,351 @@ export function buildWorld5(scene, options = {}) {
     showBounds: false,
     highContrast: false,
   };
+  let lastResolvedRespawn = null;
+
+  const authoredRespawnAnchors = (world.respawnAnchors?.length
+    ? world.respawnAnchors
+    : [
+      {
+        id: 'level5_spawn_anchor',
+        label: 'Arrival Airlock Vestibule',
+        x: world.spawn.x,
+        y: world.spawn.y,
+        z: world.spawn.z ?? 0,
+        allowedReason: 'spawn',
+        spaceId: 'arrival_airlock_vestibule',
+      },
+      ...(world.checkpoints || []).map((checkpoint) => ({
+        id: checkpoint.spawn?.anchorId || checkpoint.id,
+        label: checkpoint.label,
+        x: checkpoint.spawn?.x ?? checkpoint.x,
+        y: checkpoint.spawn?.y ?? checkpoint.y,
+        z: checkpoint.spawn?.z ?? checkpoint.z ?? 0,
+        checkpointId: checkpoint.id,
+        allowedReason: 'checkpoint',
+        spaceId: checkpoint.spawn?.spaceId || null,
+      })),
+    ])
+    .map((anchor, index) => buildLevel5RespawnAnchor(anchor, index));
+  const respawnAnchorMap = new Map(authoredRespawnAnchors.map((anchor) => [anchor.id, anchor]));
+
+  const sourceVisuals = new Map();
+  for (const mesh of truthVisualMeshes) {
+    const sourceName = mesh?.metadata?.sourceName;
+    if (!sourceName) continue;
+    if (!sourceVisuals.has(sourceName)) sourceVisuals.set(sourceName, []);
+    sourceVisuals.get(sourceName).push(mesh);
+  }
+
+  const truthOverlayRoot = new BABYLON.TransformNode('level5_truth_overlay_root', scene);
+  truthOverlayRoot.setEnabled(false);
+  markDecor(truthOverlayRoot);
+  const overlayState = {
+    walkables: false,
+    colliders: false,
+    respawnAnchors: false,
+    hazards: false,
+  };
+  const walkableOverlayMat = createOverlayMaterial(scene, 'level5_truth_walkable_mat', [112, 255, 168], 0.22);
+  const colliderOverlayMat = createOverlayMaterial(scene, 'level5_truth_collider_mat', [255, 122, 112], 0.18);
+  const hazardOverlayMat = createOverlayMaterial(scene, 'level5_truth_hazard_mat', [255, 214, 92], 0.16);
+  const respawnOverlayMat = createOverlayMaterial(scene, 'level5_truth_respawn_mat', [126, 198, 255], 0.38);
+  const walkableOverlayNodes = [];
+  const colliderOverlayNodes = [];
+  const hazardOverlayNodes = [];
+  const respawnOverlayNodes = [];
+
+  function markTruthOverlayMesh(mesh) {
+    markDecor(mesh);
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    mesh.renderingGroupId = 2;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      cameraIgnore: true,
+      gameplay: false,
+      decor: true,
+      truthOverlay: true,
+    };
+  }
+
+  function buildOverlayBox(name, dims, position, material) {
+    const mesh = BABYLON.MeshBuilder.CreateBox(name, {
+      width: Math.max(dims.w, 0.08),
+      height: Math.max(dims.h, 0.08),
+      depth: Math.max(dims.d, 0.08),
+    }, scene);
+    mesh.parent = truthOverlayRoot;
+    mesh.position.copyFrom(position);
+    mesh.material = material;
+    markTruthOverlayMesh(mesh);
+    return mesh;
+  }
+
+  for (const mesh of truthColliderMeshes) {
+    const dims = getMeshDimensions(mesh);
+    if (!dims) continue;
+    const md = mesh.metadata || {};
+    const overlay = buildOverlayBox(
+      `${mesh.name}_truth_overlay`,
+      dims,
+      mesh.position.clone(),
+      md.truthRole === 'walkable' ? walkableOverlayMat : colliderOverlayMat,
+    );
+    if (md.truthRole === 'walkable') {
+      walkableOverlayNodes.push(overlay);
+    } else if (md.truthRole === 'blocker') {
+      colliderOverlayNodes.push(overlay);
+    }
+  }
+
+  for (const hazard of world.hazards || []) {
+    if (!Number.isFinite(hazard.minX) || !Number.isFinite(hazard.maxX) || !Number.isFinite(hazard.minY) || !Number.isFinite(hazard.maxY)) continue;
+    const width = Math.max(0.2, hazard.maxX - hazard.minX);
+    const height = Math.max(0.2, hazard.maxY - hazard.minY);
+    const depth = Math.max(0.8, (hazard.maxZ ?? 0) - (hazard.minZ ?? 0) || 2.0);
+    const overlay = buildOverlayBox(
+      `${hazard.name}_truth_hazard`,
+      { w: width, h: height, d: depth },
+      new BABYLON.Vector3(
+        (hazard.minX + hazard.maxX) * 0.5,
+        (hazard.minY + hazard.maxY) * 0.5,
+        Number.isFinite(hazard.minZ) && Number.isFinite(hazard.maxZ) ? (hazard.minZ + hazard.maxZ) * 0.5 : 0,
+      ),
+      hazardOverlayMat,
+    );
+    hazardOverlayNodes.push(overlay);
+  }
+
+  for (const anchor of authoredRespawnAnchors) {
+    const marker = BABYLON.MeshBuilder.CreateSphere(`${anchor.id}_truth_respawn`, {
+      diameter: 0.72,
+      segments: 10,
+    }, scene);
+    marker.parent = truthOverlayRoot;
+    marker.position.set(anchor.x, anchor.y + 0.36, anchor.z);
+    marker.material = respawnOverlayMat;
+    markTruthOverlayMesh(marker);
+    respawnOverlayNodes.push(marker);
+  }
+
+  function applyTruthOverlayState() {
+    truthOverlayRoot.setEnabled(
+      overlayState.walkables || overlayState.colliders || overlayState.respawnAnchors || overlayState.hazards,
+    );
+    for (const node of walkableOverlayNodes) node.setEnabled(overlayState.walkables);
+    for (const node of colliderOverlayNodes) node.setEnabled(overlayState.colliders);
+    for (const node of hazardOverlayNodes) node.setEnabled(overlayState.hazards);
+    for (const node of respawnOverlayNodes) node.setEnabled(overlayState.respawnAnchors);
+  }
+
+  function getCollisionReport() {
+    const blockerColliders = truthColliderMeshes.filter((mesh) => mesh?.metadata?.truthRole === 'blocker');
+    const blockers = blockerColliders.map((mesh) => {
+      const md = mesh.metadata || {};
+      const dims = getMeshDimensions(mesh);
+      const visibleOwner = md.sourceName ? sourceVisuals.get(md.sourceName) || [] : [];
+      return {
+        name: mesh.name,
+        sourceName: md.sourceName || null,
+        spaceId: md.spaceId || md.ownerId || null,
+        spaceLabel: md.spaceLabel || md.ownerLabel || null,
+        blockerReason: md.blockerReason || null,
+        structuralShell: md.structuralShell === true,
+        visibleOwnerCount: visibleOwner.length,
+        position: {
+          x: Number(mesh.position.x.toFixed(3)),
+          y: Number(mesh.position.y.toFixed(3)),
+          z: Number(mesh.position.z.toFixed(3)),
+        },
+        dimensions: dims,
+      };
+    });
+    const unownedBlockers = blockers.filter((entry) => !entry.spaceId && !entry.blockerReason);
+    const invisibleBlockers = blockers.filter((entry) => entry.visibleOwnerCount === 0 && entry.blockerReason !== 'room-boundary');
+    const roomVolumeShells = blockers.filter((entry) => {
+      const dims = entry.dimensions;
+      const sourceName = entry.sourceName || '';
+      return entry.structuralShell
+        && dims
+        && Math.min(dims.w, dims.d) >= 5.0
+        && dims.h >= 4.8
+        && (!entry.spaceId || /shell|housing|outer|annex/i.test(sourceName));
+    });
+    return {
+      blockerCount: blockers.length,
+      blockers,
+      unownedBlockers,
+      invisibleBlockers,
+      roomVolumeShells,
+    };
+  }
+
+  function getWalkableReport() {
+    const topology = baseLevel.getTopologyReport?.() ?? null;
+    const baseWalkable = topology?.walkableReport ?? null;
+    const walkableColliders = truthColliderMeshes.filter((mesh) => mesh?.metadata?.truthRole === 'walkable');
+    const visibleWalkables = (truthGeometry.platformVisuals || []).map((mesh) => ({
+      name: mesh.name,
+      authoredSurfaceId: mesh.metadata?.authoredSurfaceId || null,
+      spaceId: mesh.metadata?.spaceId || mesh.metadata?.ownerId || null,
+      walkableClassification: mesh.metadata?.walkableClassification || null,
+      surfaceType: mesh.metadata?.surfaceType || null,
+      dimensions: getMeshDimensions(mesh),
+      visible: mesh.isEnabled?.() !== false && mesh.visibility !== 0,
+    }));
+    const missingVisuals = walkableColliders
+      .filter((mesh) => {
+        const authoredSurfaceId = mesh.metadata?.authoredSurfaceId;
+        return authoredSurfaceId && !visibleWalkables.some((entry) => entry.authoredSurfaceId === authoredSurfaceId);
+      })
+      .map((mesh) => mesh.metadata?.authoredSurfaceId || mesh.name);
+    const suspiciousFloorLikeDecor = (truthGeometry.decorBlocks || [])
+      .map((mesh) => ({
+        mesh,
+        dims: getMeshDimensions(mesh),
+      }))
+      .filter(({ mesh, dims }) => {
+        if (!dims) return false;
+        const md = mesh.metadata || {};
+        const name = md.sourceName || mesh.name || '';
+        if (md.gameplaySurface) return false;
+        if (md.decorIntent === 'wall' || md.decorIntent === 'ceiling' || md.decorIntent === 'beam') return false;
+        if (/lower_hull|underhull|backwall|backing_wall|sidewall|partition|jamb|baffle|frame|header|canopy/i.test(name)) return false;
+        return dims.h <= 1.6 && dims.w >= 3.0 && dims.d >= 3.0 && dims.topY >= 0.2 && dims.topY <= 3.8;
+      })
+      .map(({ mesh, dims }) => ({
+        sourceName: mesh.metadata?.sourceName || mesh.name,
+        spaceId: mesh.metadata?.spaceId || null,
+        dimensions: dims,
+      }));
+
+    return {
+      ...(baseWalkable || {}),
+      walkableColliderCount: walkableColliders.length,
+      walkableVisualCount: visibleWalkables.length,
+      walkableVisuals: visibleWalkables,
+      missingVisibleWalkables: missingVisuals,
+      suspiciousFloorLikeDecor,
+    };
+  }
+
+  function getTruthReport() {
+    const collision = getCollisionReport();
+    const walkable = getWalkableReport();
+    const structuralShellVisuals = truthVisualMeshes
+      .filter((mesh) => mesh?.metadata?.structuralShell === true)
+      .map((mesh) => ({
+        sourceName: mesh.metadata?.sourceName || mesh.name,
+        spaceId: mesh.metadata?.spaceId || null,
+        decorIntent: mesh.metadata?.decorIntent || null,
+        cameraFadeable: mesh.metadata?.cameraFadeable === true,
+        dims: getMeshDimensions(mesh),
+      }));
+    const fadeableShells = structuralShellVisuals.filter((entry) => entry.cameraFadeable);
+    const cullRiskShells = structuralShellVisuals.filter((entry) => {
+      const dims = entry.dims;
+      const sourceName = entry.sourceName || '';
+      return dims
+        && entry.decorIntent !== 'wall'
+        && entry.decorIntent !== 'beam'
+        && entry.decorIntent !== 'ceiling'
+        && Math.min(dims.w, dims.d) >= 5.0
+        && dims.h >= 4.8
+        && (!entry.spaceId || /shell|housing|outer|annex/i.test(sourceName));
+    });
+    return {
+      truthVersion: 1,
+      disableDecorOcclusionFade: world.disableDecorOcclusionFade === true,
+      walkableReport: walkable,
+      collisionReport: collision,
+      respawnReport: getRespawnReport(),
+      structuralShellVisualCount: structuralShellVisuals.length,
+      fadeableShells,
+      cullRiskShells,
+    };
+  }
+
+  function getRespawnReport() {
+    return {
+      anchorCount: authoredRespawnAnchors.length,
+      anchors: authoredRespawnAnchors.map((anchor) => ({
+        ...anchor,
+      })),
+      selectedAnchor: lastResolvedRespawn ? { ...lastResolvedRespawn } : null,
+    };
+  }
+
+  function setTruthOverlay(nextState = {}) {
+    overlayState.walkables = nextState.walkables ?? nextState.showWalkables ?? overlayState.walkables;
+    overlayState.colliders = nextState.colliders ?? nextState.showColliders ?? overlayState.colliders;
+    overlayState.respawnAnchors = nextState.respawnAnchors ?? nextState.showRespawnAnchors ?? overlayState.respawnAnchors;
+    overlayState.hazards = nextState.hazards ?? nextState.showHazards ?? overlayState.hazards;
+    applyTruthOverlayState();
+    return { ...overlayState };
+  }
+
+  function resolveRespawnPosition(baseSpawn = {}) {
+    const requestedSpawn = baseSpawn?.baseSpawn || baseSpawn || {};
+    let anchor = null;
+    let selectedBy = 'fallback';
+    if (requestedSpawn.anchorId && respawnAnchorMap.has(requestedSpawn.anchorId)) {
+      anchor = respawnAnchorMap.get(requestedSpawn.anchorId);
+      selectedBy = 'anchorId';
+    }
+    if (!anchor && requestedSpawn.checkpointId) {
+      anchor = authoredRespawnAnchors.find((entry) => entry.checkpointId === requestedSpawn.checkpointId) || null;
+      if (anchor) selectedBy = 'checkpointId';
+    }
+    if (!anchor && Number.isFinite(requestedSpawn.x) && Number.isFinite(requestedSpawn.y)) {
+      let bestDistance = Infinity;
+      for (const candidate of authoredRespawnAnchors) {
+        const dx = candidate.x - requestedSpawn.x;
+        const dy = candidate.y - requestedSpawn.y;
+        const dz = candidate.z - (requestedSpawn.z ?? 0);
+        const distance = Math.hypot(dx, dy * 0.6, dz);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          anchor = candidate;
+        }
+      }
+      if (anchor) selectedBy = 'nearest-explicit-anchor';
+    }
+    if (!anchor) {
+      anchor = authoredRespawnAnchors[0] || buildLevel5RespawnAnchor({
+        id: 'level5_spawn_anchor',
+        label: 'Arrival Airlock Vestibule',
+        x: world.spawn.x,
+        y: world.spawn.y,
+        z: world.spawn.z ?? 0,
+        allowedReason: 'spawn',
+        spaceId: 'arrival_airlock_vestibule',
+      });
+    }
+    lastResolvedRespawn = {
+      id: anchor.id,
+      label: anchor.label,
+      checkpointId: anchor.checkpointId || null,
+      spaceId: anchor.spaceId || null,
+      selectedBy,
+      x: anchor.x,
+      y: anchor.y,
+      z: anchor.z,
+    };
+    return {
+      position: {
+        x: anchor.x,
+        y: anchor.y,
+        z: anchor.z,
+        anchorId: anchor.id,
+        checkpointId: anchor.checkpointId || anchor.id,
+        spaceId: anchor.spaceId || null,
+      },
+      anchor: {
+        ...lastResolvedRespawn,
+      },
+    };
+  }
 
   const eelHazards = eelRails.map((eelRail) => createTelegraphedHazard({
     name: eelRail.name,
@@ -865,6 +1256,7 @@ export function buildWorld5(scene, options = {}) {
       currentPushTimer = 0;
       currentPushForce = 0;
       currentPushZ = 0;
+      lastResolvedRespawn = null;
       baseLevel.reset();
       for (const jet of currentJets) {
         jet.playerInside = false;
@@ -883,6 +1275,8 @@ export function buildWorld5(scene, options = {}) {
         bubble.reset();
       }
       sharkHazard?.reset();
+      resolveRespawnPosition(world.spawn);
+      applyTruthOverlayState();
     },
     debugForceHazard(name, { pos, player, triggerDamage } = {}) {
       if (name === 'shark' || name === LEVEL5.sharkSweep?.name) {
@@ -932,6 +1326,24 @@ export function buildWorld5(scene, options = {}) {
     setEnemyDebugView(nextState = {}) {
       return setEnemyDebugView(nextState);
     },
+    resolveRespawnPosition(baseSpawn = {}) {
+      return resolveRespawnPosition(baseSpawn);
+    },
+    getTruthReport() {
+      return getTruthReport();
+    },
+    getCollisionReport() {
+      return getCollisionReport();
+    },
+    getWalkableReport() {
+      return getWalkableReport();
+    },
+    getRespawnReport() {
+      return getRespawnReport();
+    },
+    setTruthOverlay(nextState = {}) {
+      return setTruthOverlay(nextState);
+    },
     getDebugState() {
       return mergeDebugState(baseLevel.getDebugState?.() ?? {}, {
         currentPushTimer: Number(currentPushTimer.toFixed(3)),
@@ -959,8 +1371,10 @@ export function buildWorld5(scene, options = {}) {
           state: hazard.getState().state,
         })),
         sharkSweep: sharkHazard ? sharkHazard.getState() : null,
+        respawnAnchor: lastResolvedRespawn ? { ...lastResolvedRespawn } : null,
         jellyfish: getEnemyReport().enemies,
         enemyDebug: { ...enemyDebugState },
+        truthOverlay: { ...overlayState },
       });
     },
   };

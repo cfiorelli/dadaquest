@@ -187,6 +187,15 @@ function makeInvisibleCollider(scene, name, def) {
       authoredSurfaceId: def.authoredSurfaceId,
       gameplaySurface: true,
       gameplay: true,
+      truthRole: 'walkable',
+      colliderKind: 'walkable',
+      walkableClassification: def.walkableClassification || null,
+      surfaceType: def.surfaceType || null,
+      ownerType: def.ownerType || null,
+      ownerId: def.ownerId || null,
+      ownerLabel: def.ownerLabel || null,
+      sectorId: def.sectorId || null,
+      connectorId: def.connectorId || null,
     };
   }
   return mesh;
@@ -196,6 +205,8 @@ function makeSolidBlockerCollider(scene, name, def, metadata = {}) {
   const mesh = makeInvisibleCollider(scene, name, def);
   mesh.metadata = {
     ...(mesh.metadata || {}),
+    truthRole: 'blocker',
+    colliderKind: 'blocker',
     gameplayBlocker: true,
     gameplay: false,
     ...metadata,
@@ -225,6 +236,7 @@ function markDecorStructure(node) {
     gameplay: false,
     decor: true,
     cameraIgnore: true,
+    cameraFadeable: false,
   };
   const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
   for (const mesh of meshes) {
@@ -235,9 +247,26 @@ function markDecorStructure(node) {
       gameplay: false,
       decor: true,
       cameraIgnore: true,
+      cameraFadeable: false,
     };
     mesh.isPickable = false;
     mesh.checkCollisions = false;
+  }
+}
+
+function applyNodeMetadata(node, metadata = {}) {
+  if (!node || !metadata || Object.keys(metadata).length === 0) return;
+  node.metadata = {
+    ...(node.metadata || {}),
+    ...metadata,
+  };
+  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+  for (const mesh of meshes) {
+    if (!(mesh instanceof BABYLON.Mesh)) continue;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      ...metadata,
+    };
   }
 }
 
@@ -312,6 +341,7 @@ function createDecorBox(scene, name, parent, {
   alpha = 1,
   shadowGen = null,
   cardboard = false,
+  interiorVisible = false,
 } = {}) {
   const box = BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
   box.parent = parent;
@@ -322,6 +352,9 @@ function createDecorBox(scene, name, parent, {
   if (Number.isFinite(alpha) && alpha < 1) {
     box.material.alpha = alpha;
     box.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
+  if (box.material && Object.prototype.hasOwnProperty.call(box.material, 'backFaceCulling') && ((Number.isFinite(alpha) && alpha < 1) || interiorVisible)) {
+    box.material.backFaceCulling = false;
   }
   if (shadowGen) shadowGen.addShadowCaster(box);
   markDecor(box);
@@ -342,6 +375,7 @@ function createDecorColumn(scene, name, parent, {
   alpha = 1,
   shadowGen = null,
   cardboard = false,
+  interiorVisible = false,
 } = {}) {
   const column = BABYLON.MeshBuilder.CreateCylinder(name, {
     diameterTop: diameterTop ?? diameter,
@@ -357,6 +391,9 @@ function createDecorColumn(scene, name, parent, {
   if (Number.isFinite(alpha) && alpha < 1) {
     column.material.alpha = alpha;
     column.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  }
+  if (column.material && Object.prototype.hasOwnProperty.call(column.material, 'backFaceCulling') && ((Number.isFinite(alpha) && alpha < 1) || interiorVisible)) {
+    column.material.backFaceCulling = false;
   }
   if (shadowGen) shadowGen.addShadowCaster(column);
   markDecor(column);
@@ -987,6 +1024,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
   const topY = (def.h * 0.5) + 0.04;
   const isGround = name.endsWith('_ground');
   const roomSurface = def.roomSurface === true || def.walkableClassification === 'room-floor';
+  const boundedRoomSurface = roomSurface && profile.family !== 'catwalk';
 
   createDecorPlane(scene, `${name}_wetSheen`, root, {
     width: Math.max(2.0, def.w - 0.8),
@@ -994,7 +1032,7 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
     y: topY,
     rgb: profile.sheenRgb,
     emissiveScale: profile.family === 'glass' || profile.family === 'exhibit' ? 0.14 : 0.08,
-    alpha: isGround ? 0.08 : profile.sheenAlpha,
+    alpha: isGround ? 0.08 : boundedRoomSurface ? Math.min(profile.sheenAlpha, 0.06) : profile.sheenAlpha,
   });
 
   if (profile.family === 'catwalk' && !roomSurface) {
@@ -1085,18 +1123,18 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
 
   if (profile.family === 'service') {
     createDecorPlane(scene, `${name}_cautionBand`, root, {
-      width: Math.max(1.2, def.w * 0.36),
+      width: Math.max(1.0, boundedRoomSurface ? def.w * 0.24 : def.w * 0.36),
       height: 0.18,
       x: roomSurface ? 0 : def.w * 0.18,
       y: topY + 0.02,
       z: roomSurface ? def.d * 0.18 : -def.d * 0.20,
       rgb: profile.stripeRgb,
       emissiveScale: 0.16,
-      alpha: roomSurface ? Math.min(0.34, profile.stripeAlpha * 0.42) : profile.stripeAlpha,
+      alpha: roomSurface ? Math.min(0.24, profile.stripeAlpha * 0.28) : profile.stripeAlpha,
     });
     addAquariumPipeBundle(scene, root, `${name}_serviceBundle`, {
       axis: 'x',
-      length: Math.max(2.0, def.w - 1.6),
+      length: Math.max(2.0, boundedRoomSurface ? def.w * 0.42 : def.w - 1.6),
       x: 0,
       y: topY + (roomSurface ? 0.14 : 0.28),
       z: roomSurface ? def.d * 0.30 : def.d * 0.26,
@@ -1109,34 +1147,38 @@ function addAquariumPlatformDetails(scene, root, name, def, palette, shadowGen, 
 
   if (profile.family === 'glass' || profile.family === 'exhibit') {
     createDecorPlane(scene, `${name}_viewerStrip`, root, {
-      width: Math.max(1.2, def.w * 0.56),
+      width: Math.max(1.2, boundedRoomSurface ? def.w * 0.28 : def.w * 0.56),
       height: 0.22,
       y: topY + 0.02,
       z: roomSurface ? def.d * 0.22 : -def.d * 0.24,
       rgb: profile.lineRgb,
       emissiveScale: 0.18,
-      alpha: roomSurface ? 0.12 : 0.18,
+      alpha: roomSurface ? 0.08 : 0.18,
     });
-    createDecorPlane(scene, `${name}_insetFrame`, root, {
-      width: Math.max(1.2, def.w - 0.78),
-      height: Math.max(0.8, def.d - 0.78),
-      y: topY + 0.02,
-      rgb: profile.lineRgb,
-      emissiveScale: 0.12,
-      alpha: roomSurface ? 0.06 : 0.10,
-    });
+    if (!boundedRoomSurface) {
+      createDecorPlane(scene, `${name}_insetFrame`, root, {
+        width: Math.max(1.2, def.w - 0.78),
+        height: Math.max(0.8, def.d - 0.78),
+        y: topY + 0.02,
+        rgb: profile.lineRgb,
+        emissiveScale: 0.12,
+        alpha: roomSurface ? 0.06 : 0.10,
+      });
+    }
   }
 
-  for (const z of [-def.d * 0.38, def.d * 0.38]) {
-    createDecorPlane(scene, `${name}_edgeMark_${z > 0 ? 'r' : 'l'}`, root, {
-      width: Math.max(1.8, def.w - 0.9),
-      height: 0.16,
-      y: topY + 0.02,
-      z,
-      rgb: profile.family === 'catwalk' ? profile.stripeRgb : profile.lineRgb,
-      emissiveScale: 0.14,
-      alpha: isGround ? 0.14 : profile.edgeAlpha,
-    });
+  if (!boundedRoomSurface) {
+    for (const z of [-def.d * 0.38, def.d * 0.38]) {
+      createDecorPlane(scene, `${name}_edgeMark_${z > 0 ? 'r' : 'l'}`, root, {
+        width: Math.max(1.8, def.w - 0.9),
+        height: 0.16,
+        y: topY + 0.02,
+        z,
+        rgb: profile.family === 'catwalk' ? profile.stripeRgb : profile.lineRgb,
+        emissiveScale: 0.14,
+        alpha: isGround ? 0.14 : profile.edgeAlpha,
+      });
+    }
   }
 
   if (roomSurface || isGround || def.w < 9.5) return;
@@ -1642,7 +1684,10 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const aquariumTheme = theme === 'aquarium';
   const aquariumSurfaceProfile = aquariumTheme ? getAquariumSurfaceProfile(def) : null;
-  const flatAquariumRoomFloor = aquariumTheme && aquariumSurfaceProfile?.roomSurface === true;
+  const roomSurface = def.roomSurface === true || def.walkableClassification === 'room-floor';
+  const flatAquariumRoomFloor = aquariumTheme
+    && roomSurface
+    && def.forceThickVisual !== true;
   const root = new BABYLON.TransformNode(`${name}_root`, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
   if (def?.authoredSurfaceId) {
@@ -1651,6 +1696,14 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       authoredSurfaceId: def.authoredSurfaceId,
       gameplaySurface: true,
       gameplay: true,
+      truthRole: 'walkable',
+      walkableClassification: def.walkableClassification || null,
+      ownerId: def.ownerId || null,
+      ownerLabel: def.ownerLabel || null,
+      ownerType: def.ownerType || null,
+      sectorId: def.sectorId || null,
+      connectorId: def.connectorId || null,
+      surfaceType: def.surfaceType || null,
     };
   }
 
@@ -1679,12 +1732,24 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   if (slab.material.emissiveColor) {
     slab.material.emissiveColor = toColor3(
       aquariumSurfaceProfile?.glowRgb || palette.glow,
-      aquariumSurfaceProfile ? 0.08 : aquariumTheme ? 0.10 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.05 : theme === 'camp' ? 0.04 : 0.12,
+      aquariumSurfaceProfile
+        ? roomSurface
+          ? 0.05
+          : 0.08
+        : aquariumTheme
+          ? 0.10
+          : theme === 'storm'
+            ? 0.08
+            : theme === 'library'
+              ? 0.05
+              : theme === 'camp'
+                ? 0.04
+                : 0.12,
     );
   }
   slab.enableEdgesRendering();
   slab.edgesWidth = flatAquariumRoomFloor
-    ? 0.18
+    ? 0.10
     : aquariumSurfaceProfile?.roomSurface
       ? 0.84
     : aquariumTheme
@@ -1695,12 +1760,13 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   slab.edgesColor = toColor4(
     aquariumSurfaceProfile?.glowRgb || palette.glow,
     flatAquariumRoomFloor
-      ? 0.03
+      ? 0.01
       : aquariumSurfaceProfile?.edgeAlpha ?? (aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58),
   );
   slab.receiveShadows = true;
   shadowGen.addShadowCaster(slab);
   markGameplaySurface(slab);
+  applyNodeMetadata(slab, root.metadata || {});
 
   if (!flatAquariumRoomFloor) {
     const rim = BABYLON.MeshBuilder.CreateBox(`${name}_rim`, {
@@ -1752,13 +1818,26 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     aquariumSurfaceProfile?.glowRgb || palette.glow,
     aquariumSurfaceProfile?.topEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10),
   );
-  topMat.alpha = aquariumSurfaceProfile?.topAlpha ?? (aquariumTheme ? 0.62 : theme === 'storm' ? 0.82 : theme === 'library' ? 0.74 : theme === 'camp' ? 0.68 : 0.48);
+  topMat.alpha = aquariumSurfaceProfile
+    ? roomSurface
+      ? Math.max(0.96, aquariumSurfaceProfile.topAlpha)
+      : aquariumSurfaceProfile.topAlpha
+    : aquariumTheme
+      ? 0.62
+      : theme === 'storm'
+        ? 0.82
+        : theme === 'library'
+          ? 0.74
+          : theme === 'camp'
+            ? 0.68
+            : 0.48;
   topMat.specularColor = BABYLON.Color3.Black();
   topMat.backFaceCulling = false;
   topMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   top.material = topMat;
   markGameplaySurface(top);
   markDecor(top);
+  applyNodeMetadata(top, root.metadata || {});
 
   if (theme === 'factory') {
     addFactoryPlatformDetails(scene, root, name, def, palette, shadowGen);
@@ -2710,6 +2789,17 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     if (Number.isFinite(def.rotationY)) visual.rotation.y = def.rotationY;
     if (Number.isFinite(def.rotationZ)) visual.rotation.z = def.rotationZ;
     markDecorStructure(visual);
+    applyNodeMetadata(visual, {
+      decor: true,
+      gameplay: false,
+      gameplaySurface: false,
+      sourceName: def.name,
+      spaceId: def.spaceId || def.ownerId || null,
+      spaceLabel: def.spaceLabel || def.ownerLabel || null,
+      decorIntent: def.decorIntent || 'ceiling',
+      structuralShell: def.structuralShell === true,
+      cameraFadeable: def.cameraFadeable ?? false,
+    });
     setRenderingGroup(visual, 2);
     decorPlatforms.push(visual);
   }
@@ -2749,10 +2839,23 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       alpha: def.alpha ?? 1,
       shadowGen,
       cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
+      interiorVisible: def.interiorVisible ?? false,
     });
     if (Number.isFinite(def.rotationY)) block.rotation.y = def.rotationY;
     if (Number.isFinite(def.rotationZ)) block.rotation.z = def.rotationZ;
     setRenderingGroup(block, 1);
+    applyNodeMetadata(block, {
+      decor: true,
+      gameplay: false,
+      gameplaySurface: false,
+      sourceName: def.name || `decorBlock_${index}`,
+      spaceId: def.spaceId || def.ownerId || null,
+      spaceLabel: def.spaceLabel || def.ownerLabel || null,
+      blockerReason: def.blockerReason || null,
+      structuralShell: def.structuralShell === true || def.solid === true,
+      decorIntent: def.decorIntent || 'structure',
+      cameraFadeable: def.cameraFadeable ?? !(def.structuralShell === true || def.solid === true),
+    });
     decorBlocks.push(block);
     if (def.solid) {
       decorBlockColliders.push(makeSolidBlockerCollider(scene, `${theme}_${def.name || index}_solidCol`, {
@@ -2764,6 +2867,11 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
         d: def.d,
       }, {
         role: 'solidBlocker',
+        sourceName: def.name || `decorBlock_${index}`,
+        spaceId: def.spaceId || def.ownerId || null,
+        spaceLabel: def.spaceLabel || def.ownerLabel || null,
+        blockerReason: def.blockerReason || 'structural-blocker',
+        structuralShell: def.structuralShell === true || false,
       }));
     }
   }
@@ -2786,9 +2894,22 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
       alpha: def.alpha ?? 1,
       shadowGen,
       cardboard: def.cardboard ?? (theme === 'library' || theme === 'camp'),
+      interiorVisible: def.interiorVisible ?? false,
     });
     if (Number.isFinite(def.rotationY)) column.rotation.y = def.rotationY;
     setRenderingGroup(column, 1);
+    applyNodeMetadata(column, {
+      decor: true,
+      gameplay: false,
+      gameplaySurface: false,
+      sourceName: def.name || `decorColumn_${index}`,
+      spaceId: def.spaceId || def.ownerId || null,
+      spaceLabel: def.spaceLabel || def.ownerLabel || null,
+      blockerReason: def.blockerReason || null,
+      structuralShell: def.structuralShell === true || def.solid === true,
+      decorIntent: def.decorIntent || 'structure',
+      cameraFadeable: def.cameraFadeable ?? !(def.structuralShell === true || def.solid === true),
+    });
     decorColumns.push(column);
     if (def.solid) {
       const diameter = Math.max(def.diameter ?? 0, def.diameterTop ?? 0, def.diameterBottom ?? 0, 0.2);
@@ -2801,6 +2922,11 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
         d: diameter,
       }, {
         role: 'solidColumn',
+        sourceName: def.name || `decorColumn_${index}`,
+        spaceId: def.spaceId || def.ownerId || null,
+        spaceLabel: def.spaceLabel || def.ownerLabel || null,
+        blockerReason: def.blockerReason || 'structural-column',
+        structuralShell: def.structuralShell === true || false,
       }));
     }
   }
@@ -2867,8 +2993,17 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     }
     return {
       index: index + 1,
+      id: cp.id || `checkpoint_${index}`,
+      anchorId: cp.anchorId || cp.id || `checkpoint_${index}`,
       label: cp.label,
-      spawn: { x: cp.x, y: cp.y, z: cp.z ?? 0 },
+      spawn: {
+        x: cp.x,
+        y: cp.y,
+        z: cp.z ?? 0,
+        anchorId: cp.anchorId || cp.id || `checkpoint_${index}`,
+        checkpointId: cp.id || `checkpoint_${index}`,
+        spaceId: cp.spaceId || cp.ownerId || null,
+      },
       radius: 1.24,
       marker,
     };
@@ -3638,9 +3773,20 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
     spawnYaw: layout.spawnYaw,
     cameraPresets: layout.cameraPresets || null,
     defaultCameraPreset: layout.defaultCameraPreset || null,
+    disableDecorOcclusionFade: layout.disableDecorOcclusionFade === true,
+    respawnAnchors: layout.respawnAnchors || [],
     checkpoints,
     pickups,
     coins,
+    truthGeometry: {
+      colliderMeshes: allPlatforms,
+      platformVisuals,
+      decorPlatforms,
+      decorBlocks,
+      decorColumns,
+      decorPlanes,
+      checkpointFrames,
+    },
     hazards: [
       ...conveyorZones.map((zone) => ({
         name: zone.def.name,
