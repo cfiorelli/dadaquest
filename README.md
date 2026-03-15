@@ -46,6 +46,15 @@ npm run test:screenshot
 
 Testing workflow details live in [TESTING.md](./TESTING.md).
 
+## Process Packets
+
+Use the repo task-packet system for future Codex work:
+
+- [AGENTS.md](./AGENTS.md)
+- [docs/process/CODEX_TASK_PACKETS.md](./docs/process/CODEX_TASK_PACKETS.md)
+- [docs/process/PHASE_GATES.md](./docs/process/PHASE_GATES.md)
+- [docs/process/templates/](./docs/process/templates/)
+
 ## Deterministic Modes
 
 - `?test=1`

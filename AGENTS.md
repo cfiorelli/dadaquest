@@ -36,6 +36,87 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
+## Repo Execution Contract
+
+### Default landing rule
+
+- Land validated work directly on `main`.
+- Push directly to `origin/main`.
+- Do not open a PR unless the task explicitly requires one.
+
+### Validation rule
+
+- Use built preview for final validation.
+- Do not treat HMR or dev-server behavior as final proof.
+- Baseline final validation commands for repo work that changes behavior:
+
+```bash
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173
+curl -I http://127.0.0.1:4173/
+```
+
+- Add the smallest sensible Playwright slice for the task.
+- Run `npx playwright test --project=chromium` when shared runtime behavior changes.
+
+### Proof artifact rule
+
+- Save review screenshots under `docs/screenshots/`.
+- Copy final proof sets into `docs/proof/<pass-name>/`.
+- Final reports should name exact artifact paths, not just describe the shots.
+
+### Level integrity rules
+
+- Levels `1` through `4` must remain unchanged in content, controls, camera feel, and music unless a task explicitly targets them.
+- Era 5 work must stay on the authored-space system.
+- Do not revert Era 5 levels to legacy slab/path authoring.
+
+### Truth-first rule
+
+The following must align before composition or polish work is considered complete:
+
+- visible world
+- collidable world
+- walkable world
+- hazard world
+- respawn world
+
+If those truths disagree, fix that before improving appearance.
+
+### Banned Era 5 fallback patterns
+
+Do not ship Era 5 work that relies on:
+
+- giant open container with slabs inside
+- direct spawn-to-goal sightline
+- fake chamber that is just a widened runway
+- enemy on pad in void
+- DaDa on pad in void
+- dark floor as sole hazard telegraph
+- recolor-only route differentiation
+- helper/debug geometry leaking into normal play
+- invisible blockers without explicit justification
+
+### Phase-gate rule
+
+Use bounded packets unless the task explicitly overrides this:
+
+1. audit
+2. repair
+3. rebuild-slice
+4. composition-pass
+
+- Audit establishes evidence and root cause.
+- Repair fixes one bug class with one proof obligation.
+- Rebuild-slice replaces broken spaces with a small truthful slice before broader ambition.
+- Composition-pass happens only after truth is green and must not reopen truth bugs.
+
+Use the packet system in:
+
+- `docs/process/CODEX_TASK_PACKETS.md`
+- `docs/process/PHASE_GATES.md`
+- `docs/process/templates/`
+
 <!-- BEGIN BEADS INTEGRATION -->
 ## Issue Tracking with bd (beads)
 
@@ -134,7 +215,7 @@ For more details, see README.md and docs/QUICKSTART.md.
    ```bash
    git pull --rebase
    bd sync
-   git push
+   git push origin main
    git status  # MUST show "up to date with origin"
    ```
 5. **Clean up** - Clear stashes, prune remote branches
