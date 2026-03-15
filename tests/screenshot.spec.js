@@ -170,10 +170,10 @@ test('capture authored Level 6 gameplay and topology proof screenshots', async (
   });
 });
 
-test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
+test('capture Level 5 restart proof screenshots', async ({ page }) => {
   test.setTimeout(300_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-truth-pass', { recursive: true });
+  await mkdir('docs/proof/level5-restart', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -181,7 +181,7 @@ test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-truth-pass/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-restart/${path.split('/').pop()}`);
   }
 
   await gotoDebugLevel(page, 5);
@@ -202,97 +202,115 @@ test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -61.4,
-      y: 1.30,
-      z: 0.2,
-      yaw: 0.36,
-      cameraYaw: 0.36,
-    });
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-  });
-  await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-truth-start-view.png');
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -50.6,
-      y: 1.22,
-      z: -0.2,
-      yaw: 0.18,
-      cameraYaw: 0.18,
-    });
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-  });
-  await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-truth-first-fork.png');
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -17.0,
+      x: -40.0,
       y: 1.28,
-      z: 14.2,
+      z: 0.0,
       yaw: 0.12,
       cameraYaw: 0.12,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-truth-chamber',
-      position: { x: -13.8, y: 2.6, z: 9.2 },
-      target: { x: 3.4, y: 2.5, z: 15.8 },
-      fov: 0.40,
+      label: 'l5-restart-start',
+      position: { x: -37.8, y: 1.9, z: -1.4 },
+      target: { x: -31.6, y: 1.7, z: 0.0 },
+      fov: 0.34,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-truth-hero-chamber.png');
+  await captureProof('docs/screenshots/level5-restart-start.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -44.8,
+      x: -24.8,
+      y: 1.18,
+      z: 7.6,
+      yaw: 0.22,
+      cameraYaw: 0.22,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-restart-fork-public',
+      position: { x: -21.6, y: 2.2, z: 6.4 },
+      target: { x: -18.2, y: 1.9, z: 16.8 },
+      fov: 0.34,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-restart-fork-public.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -24.6,
       y: 1.16,
-      z: 8.8,
-      yaw: 0.10,
-      cameraYaw: 0.10,
+      z: -4.0,
+      yaw: 0.18,
+      cameraYaw: 0.18,
     });
-    const forward = window.__DADA_DEBUG__?.playerForward ?? { x: 1, z: 0 };
-    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-restart-fork-service',
+      position: { x: -22.4, y: 2.1, z: -7.0 },
+      target: { x: -17.4, y: 1.8, z: -5.0 },
+      fov: 0.34,
+    });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-truth-enemy-pocket.png');
+  await captureProof('docs/screenshots/level5-restart-fork-service.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 13.8,
-      y: 1.12,
-      z: -5.0,
-      yaw: 0.36,
-      cameraYaw: 0.36,
+      x: -1.6,
+      y: 1.48,
+      z: 9.4,
+      yaw: 0.16,
+      cameraYaw: 0.16,
     });
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-restart-chamber',
+      position: { x: -5.4, y: 2.7, z: 2.8 },
+      target: { x: 6.4, y: 2.3, z: 13.8 },
+      fov: 0.32,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-restart-hero-chamber.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 24.8,
+      y: 1.34,
+      z: -1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-restart-hazard',
+      position: { x: 21.8, y: 2.4, z: -4.4 },
+      target: { x: 28.6, y: 1.7, z: -1.0 },
+      fov: 0.44,
+    });
   });
   await page.waitForFunction(() => {
     const rails = window.__DADA_DEBUG__?.era5LevelState?.eelRails ?? [];
     return rails.some((hazard) => hazard.name === 'eel_spill_gate' && hazard.state === 'active');
   }, { timeout: 8_000 });
   await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-truth-hazard-room.png');
+  await captureProof('docs/screenshots/level5-restart-hazard-room.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 51.6,
-      y: 1.56,
-      z: 16.4,
-      yaw: 0.70,
-      cameraYaw: 0.70,
+      x: 41.2,
+      y: 1.36,
+      z: 5.6,
+      yaw: 0.46,
+      cameraYaw: 0.46,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-truth-goal',
-      position: { x: 52.6, y: 2.8, z: 18.4 },
-      target: { x: 59.6, y: 2.5, z: 25.8 },
-      fov: 0.38,
+      label: 'l5-restart-goal',
+      position: { x: 41.0, y: 2.2, z: 4.0 },
+      target: { x: 47.4, y: 2.4, z: 8.6 },
+      fov: 0.32,
     });
   });
   await page.waitForTimeout(1000);
-  await captureProof('docs/screenshots/level5-truth-goal-room.png');
+  await captureProof('docs/screenshots/level5-restart-goal-room.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -302,21 +320,21 @@ test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
       respawnAnchors: true,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 16.4,
-      y: 1.32,
-      z: -2.0,
-      yaw: 0.24,
-      cameraYaw: 0.24,
+      x: 24.8,
+      y: 1.36,
+      z: -1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-truth-respawn',
-      position: { x: 12.8, y: 2.4, z: -5.6 },
-      target: { x: 16.4, y: 1.5, z: -2.0 },
+      label: 'l5-restart-respawn',
+      position: { x: 21.8, y: 2.4, z: -4.8 },
+      target: { x: 24.8, y: 1.5, z: -1.8 },
       fov: 0.48,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-truth-respawn-anchor.png');
+  await captureProof('docs/screenshots/level5-restart-respawn-anchor.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -326,21 +344,21 @@ test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -8.8,
-      y: 1.40,
-      z: 7.8,
-      yaw: 0.42,
-      cameraYaw: 0.42,
+      x: 4.8,
+      y: 1.44,
+      z: 8.6,
+      yaw: 0.28,
+      cameraYaw: 0.28,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-truth-walkable',
-      position: { x: -10.4, y: 2.6, z: 6.6 },
-      target: { x: 6.8, y: 2.0, z: 10.0 },
-      fov: 0.50,
+      label: 'l5-restart-walkable',
+      position: { x: 0.8, y: 2.8, z: 6.2 },
+      target: { x: 8.0, y: 1.9, z: 10.0 },
+      fov: 0.54,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-truth-walkable-overlay.png');
+  await captureProof('docs/screenshots/level5-restart-walkable-overlay.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
@@ -350,21 +368,21 @@ test('capture Level 5 truth-pass proof screenshots', async ({ page }) => {
       respawnAnchors: false,
     });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -49.6,
-      y: 1.22,
-      z: 0.0,
-      yaw: 0.18,
-      cameraYaw: 0.18,
+      x: -29.0,
+      y: 1.20,
+      z: 1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-truth-collision',
-      position: { x: -52.8, y: 2.4, z: -0.8 },
-      target: { x: -44.2, y: 1.7, z: 1.6 },
-      fov: 0.58,
+      label: 'l5-restart-collision',
+      position: { x: -31.8, y: 2.6, z: 0.6 },
+      target: { x: -25.2, y: 1.6, z: 2.2 },
+      fov: 0.56,
     });
   });
   await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-truth-collision-overlay.png');
+  await captureProof('docs/screenshots/level5-restart-collision-overlay.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({

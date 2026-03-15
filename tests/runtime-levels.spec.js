@@ -8,16 +8,12 @@ const LEVEL_CASES = [
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
 const LEVEL5_REQUIRED_SECTORS = [
-  'Arrival Airlock Vestibule',
-  'Public Exhibit Spine',
-  'Service Access Elbow',
-  'Chamber Reveal Gallery',
-  'Main Tank Chamber',
-  'Upper Observation Bridge',
-  'Filtration Core',
-  'Flooded Maintenance Trench',
-  'Pump Gallery Rejoin',
-  'Nursery Recovery Alcove',
+  'Arrival Vestibule',
+  'Public Exhibit Hall',
+  'Service Elbow',
+  'Hero Tank Chamber',
+  'Filtration Hazard Room',
+  'Nursery Goal Room',
 ];
 const ERA5_CONTROL_POSES = {
   6: { x: 40.0, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 },
@@ -801,11 +797,11 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, coherent truth r
   expect(collision).not.toBeNull();
   expect(walkable).not.toBeNull();
   expect(respawn).not.toBeNull();
-  expect(topology.sectorCount).toBeGreaterThanOrEqual(7);
-  expect(topology.connectorCount).toBeGreaterThanOrEqual(8);
+  expect(topology.sectorCount).toBeGreaterThanOrEqual(6);
+  expect(topology.connectorCount).toBeGreaterThanOrEqual(6);
   expect(topology.topology?.hasCycle).toBe(true);
   expect((topology.topology?.routeChoices ?? []).length).toBeGreaterThanOrEqual(2);
-  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBeGreaterThanOrEqual(45);
+  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBeGreaterThanOrEqual(20);
   expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
   expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
   expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
@@ -817,18 +813,18 @@ test('@level5 @era5 runtime: level 5 exposes authored topology, coherent truth r
   expect(collision?.invisibleBlockers ?? []).toEqual([]);
   expect(collision?.roomVolumeShells ?? []).toEqual([]);
   expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
-  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(5);
+  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(4);
   expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
 
   const labels = (topology.sectors ?? []).map((sector) => sector.label);
   expect(labels).toEqual(expect.arrayContaining(LEVEL5_REQUIRED_SECTORS));
 
   for (const sample of [
-    { x: -48.2, y: 1.86, z: 0.8, yaw: 0.28, minY: 1.05 },
-    { x: -43.2, y: 1.52, z: 13.8, yaw: 0.34, minY: 1.10 },
-    { x: -8.2, y: 1.62, z: 12.6, yaw: 0.44, minY: 1.12 },
-    { x: 16.2, y: 1.32, z: -2.0, yaw: 0.24, minY: 1.10 },
-    { x: 57.2, y: 1.96, z: 24.2, yaw: 0.18, minY: 1.55 },
+    { x: -40.0, y: 1.48, z: 0.0, yaw: 0.18, minY: 1.05 },
+    { x: -18.2, y: 1.54, z: 12.0, yaw: 0.26, minY: 1.12 },
+    { x: 5.2, y: 1.70, z: 8.4, yaw: 0.28, minY: 1.12 },
+    { x: 24.8, y: 1.42, z: -1.8, yaw: 0.20, minY: 1.10 },
+    { x: 47.0, y: 1.68, z: 8.8, yaw: 0.16, minY: 1.12 },
   ]) {
     await page.evaluate((pose) => {
       window.__DADA_DEBUG__?.setEra5Pose?.({
@@ -881,11 +877,11 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 16.2,
-      y: 1.32,
-      z: -2.0,
-      yaw: 0.24,
-      cameraYaw: 0.24,
+      x: 24.8,
+      y: 1.36,
+      z: -1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
     });
   });
   await expect.poll(
@@ -896,11 +892,11 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 1, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 21.2,
-      y: 1.24,
-      z: -2.4,
-      yaw: 0.24,
-      cameraYaw: 0.24,
+      x: 28.0,
+      y: 1.28,
+      z: -1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.forceEra5Damage?.('eel_rail', { x: 1, z: 0 }, { invulnMs: 0 });
   });
@@ -919,7 +915,7 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
     { timeout: 6_000 },
   ).toMatchObject({
     id: 'cp_filtration_core',
-    spaceId: 'filtration_core',
+    spaceId: 'filtration_hazard_room',
   });
 
   await expect.poll(
@@ -943,8 +939,8 @@ test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored 
   expect(finalState.pos).not.toBeNull();
   expect(finalState.pos.y).toBeGreaterThan(1.0);
   expect(finalState.pos.y).toBeLessThan(2.0);
-  expect(Math.abs(finalState.pos.x - 16.2)).toBeLessThan(2.5);
-  expect(Math.abs(finalState.pos.z - (-2.0))).toBeLessThan(2.5);
+  expect(Math.abs(finalState.pos.x - 24.8)).toBeLessThan(2.5);
+  expect(Math.abs(finalState.pos.z - (-1.8))).toBeLessThan(2.5);
   expect(finalState.anchor?.id).toBe('cp_filtration_core');
 });
 
@@ -959,11 +955,11 @@ test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 20 });
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 11.2,
+      x: 6.4,
       y: 2.36,
-      z: 14.6,
-      yaw: 0.88,
-      cameraYaw: 0.88,
+      z: 12.4,
+      yaw: 0.68,
+      cameraYaw: 0.68,
     });
   });
   await page.waitForTimeout(120);
@@ -1023,11 +1019,11 @@ test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits fr
   });
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 21.2,
-      y: 1.24,
-      z: -2.4,
-      yaw: 0.24,
-      cameraYaw: 0.24,
+      x: 28.0,
+      y: 1.28,
+      z: -1.8,
+      yaw: 0.20,
+      cameraYaw: 0.20,
     });
     window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_spill_gate');
   });
