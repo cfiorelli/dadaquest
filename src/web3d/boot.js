@@ -762,11 +762,56 @@ function isRenderableCameraObstacle(mesh, ignoredMeshes) {
   return true;
 }
 
+function isPointInsideBoundingBox(bounds, point, epsilon = 0.0001) {
+  if (!bounds || !point) return false;
+  return point.x >= (bounds.minimumWorld.x - epsilon)
+    && point.x <= (bounds.maximumWorld.x + epsilon)
+    && point.y >= (bounds.minimumWorld.y - epsilon)
+    && point.y <= (bounds.maximumWorld.y + epsilon)
+    && point.z >= (bounds.minimumWorld.z - epsilon)
+    && point.z <= (bounds.maximumWorld.z + epsilon);
+}
+
+function getRayBoundingBoxEntryDistance(bounds, origin, direction, maxDistance) {
+  if (!bounds || !origin || !direction || !Number.isFinite(maxDistance) || maxDistance <= 0.0001) return null;
+  let entry = 0;
+  let exit = maxDistance;
+  for (const axis of ['x', 'y', 'z']) {
+    const dir = direction[axis];
+    const min = bounds.minimumWorld[axis];
+    const max = bounds.maximumWorld[axis];
+    const start = origin[axis];
+    if (Math.abs(dir) <= 0.000001) {
+      if (start < min || start > max) return null;
+      continue;
+    }
+    let t0 = (min - start) / dir;
+    let t1 = (max - start) / dir;
+    if (t0 > t1) [t0, t1] = [t1, t0];
+    entry = Math.max(entry, t0);
+    exit = Math.min(exit, t1);
+    if (entry > exit) return null;
+  }
+  if (exit <= 0.0001) return null;
+  return Math.max(0, entry);
+}
+
 function resolveCameraOcclusion(scene, focusPos, desiredPos, ignoredMeshes) {
   const toCamera = desiredPos.subtract(focusPos);
   const desiredDistance = toCamera.length();
   if (desiredDistance <= 0.001) {
-    return { correctedPos: desiredPos, hit: null };
+    return {
+      correctedPos: desiredPos,
+      hit: null,
+      info: {
+        desiredDistance: 0,
+        pickDistance: null,
+        entryDistance: null,
+        safeDistance: 0,
+        correctedInsidePickedBounds: false,
+        usedEntryClamp: false,
+      },
+    };
   }
 
   const rayDir = toCamera.scale(1 / desiredDistance);
@@ -778,13 +823,46 @@ function resolveCameraOcclusion(scene, focusPos, desiredPos, ignoredMeshes) {
   );
 
   if (!pick?.hit || !pick.pickedPoint) {
-    return { correctedPos: desiredPos, hit: null };
+    return {
+      correctedPos: desiredPos,
+      hit: null,
+      info: {
+        desiredDistance,
+        pickDistance: null,
+        entryDistance: null,
+        safeDistance: desiredDistance,
+        correctedInsidePickedBounds: false,
+        usedEntryClamp: false,
+      },
+    };
   }
 
-  const safeDistance = Math.max(0.85, Math.min(desiredDistance, pick.distance - 0.3));
+  const pickedMesh = pick.pickedMesh || pick.mesh || null;
+  const pickedBounds = pickedMesh?.getBoundingInfo?.()?.boundingBox ?? null;
+  let safeDistance = Math.max(0.85, Math.min(desiredDistance, pick.distance - 0.3));
+  let correctedPos = focusPos.add(rayDir.scale(safeDistance));
+  const correctedInsidePickedBounds = isPointInsideBoundingBox(pickedBounds, correctedPos);
+  let entryDistance = null;
+  let usedEntryClamp = false;
+  if (correctedInsidePickedBounds) {
+    entryDistance = getRayBoundingBoxEntryDistance(pickedBounds, focusPos, rayDir, desiredDistance);
+    if (Number.isFinite(entryDistance)) {
+      safeDistance = Math.min(safeDistance, Math.max(0.05, entryDistance - 0.3));
+      correctedPos = focusPos.add(rayDir.scale(safeDistance));
+      usedEntryClamp = true;
+    }
+  }
   return {
-    correctedPos: focusPos.add(rayDir.scale(safeDistance)),
+    correctedPos,
     hit: pick,
+    info: {
+      desiredDistance,
+      pickDistance: Number.isFinite(pick.distance) ? pick.distance : null,
+      entryDistance,
+      safeDistance,
+      correctedInsidePickedBounds,
+      usedEntryClamp,
+    },
   };
 }
 
@@ -2473,6 +2551,7 @@ export async function boot(options = {}) {
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
   let era5CurrentOccluderName = null;
+  let era5CurrentOcclusionInfo = null;
   const era5DevOverlay = debugMode && isEra5Level ? createEra5DevOverlay() : null;
   const era5VisionQuery = debugMode && isEra5Level ? readEra5VisionQuery() : { enabled: false };
   const era5VisionState = {
@@ -2637,6 +2716,7 @@ export async function boot(options = {}) {
   window.__DADA_DEBUG__.decorMeshes = isEra5Level ? getEra5SceneStats().decorMeshes.length : 0;
   window.__DADA_DEBUG__.fadedMeshes = 0;
   window.__DADA_DEBUG__.occluderMesh = null;
+  window.__DADA_DEBUG__.cameraOcclusion = null;
   window.__DADA_DEBUG__.era5VisibilityFailureReason = era5VisibilityFailureReason || null;
   if (debugMode) {
     const LANE_Z = 0;
@@ -3015,6 +3095,14 @@ export async function boot(options = {}) {
         fadedMeshes: getEra5SceneStats().fadedMeshes,
       },
       occluderMesh: era5CurrentOccluderName,
+      occlusion: era5CurrentOcclusionInfo ? {
+        desiredDistance: roundNumber(era5CurrentOcclusionInfo.desiredDistance),
+        pickDistance: roundNumber(era5CurrentOcclusionInfo.pickDistance),
+        entryDistance: roundNumber(era5CurrentOcclusionInfo.entryDistance),
+        safeDistance: roundNumber(era5CurrentOcclusionInfo.safeDistance),
+        correctedInsidePickedBounds: !!era5CurrentOcclusionInfo.correctedInsidePickedBounds,
+        usedEntryClamp: !!era5CurrentOcclusionInfo.usedEntryClamp,
+      } : null,
       debugView: { ...era5VisionState },
       largestEnvironmentMeshes,
       largePlanes,
@@ -5622,6 +5710,7 @@ export async function boot(options = {}) {
             era5CameraDebugOverride.target.z,
           );
           era5CurrentOccluderName = null;
+          era5CurrentOcclusionInfo = null;
           camera.position.set(
             era5CameraDebugOverride.position.x,
             era5CameraDebugOverride.position.y,
@@ -5653,6 +5742,7 @@ export async function boot(options = {}) {
           );
           const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
           era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
+          era5CurrentOcclusionInfo = occlusion.info || null;
           camera.position.copyFrom(occlusion.correctedPos);
           camera.setTarget(desiredTarget);
           camera.fov = preset.fov;
@@ -5815,6 +5905,16 @@ export async function boot(options = {}) {
       window.__DADA_DEBUG__.decorMeshes = era5SceneStats.decorMeshes.length;
       window.__DADA_DEBUG__.fadedMeshes = era5SceneStats.fadedMeshes;
       window.__DADA_DEBUG__.occluderMesh = era5CurrentOccluderName;
+      window.__DADA_DEBUG__.cameraOcclusion = era5CurrentOcclusionInfo
+        ? {
+          desiredDistance: roundNumber(era5CurrentOcclusionInfo.desiredDistance),
+          pickDistance: roundNumber(era5CurrentOcclusionInfo.pickDistance),
+          entryDistance: roundNumber(era5CurrentOcclusionInfo.entryDistance),
+          safeDistance: roundNumber(era5CurrentOcclusionInfo.safeDistance),
+          correctedInsidePickedBounds: !!era5CurrentOcclusionInfo.correctedInsidePickedBounds,
+          usedEntryClamp: !!era5CurrentOcclusionInfo.usedEntryClamp,
+        }
+        : null;
       window.__DADA_DEBUG__.levelId = levelId;
       if (era5DevOverlay) {
         era5DevOverlay.textContent = [

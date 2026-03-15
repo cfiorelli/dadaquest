@@ -398,6 +398,119 @@ async function tapEra5LeftTurnTwice(page) {
   await page.waitForTimeout(180);
 }
 
+function expectLevel5JumpPhaseInsideStarterRoom(phase, roomBounds, ceilingY) {
+  expect(phase).not.toBeNull();
+  expect(phase.cameraPos).not.toBeNull();
+  expect(phase.cameraTarget).not.toBeNull();
+  expect(phase.playerPos).not.toBeNull();
+  expect(phase.cameraAboveCeiling).toBe(false);
+  expect(phase.cameraInsideRoomXZ).toBe(true);
+  expect(phase.cameraPos.y).toBeLessThanOrEqual(ceilingY + 0.001);
+}
+
+async function captureLevel5JumpCameraTrace(page) {
+  return page.evaluate(async () => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.[0] ?? null;
+    const ceilingY = Number.isFinite(room?.ceilingY) ? room.ceilingY : 6.0;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const readState = (label) => {
+      const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+      const camera = scene?.activeCamera ?? null;
+      const cameraTarget = camera?.getTarget?.() ?? null;
+      const playerPos = window.__DADA_DEBUG__?.playerPos ?? null;
+      const cameraPos = camera?.position ?? null;
+      return {
+        label,
+        playerPos: playerPos ? {
+          x: Number(playerPos.x.toFixed(3)),
+          y: Number(playerPos.y.toFixed(3)),
+          z: Number(playerPos.z.toFixed(3)),
+        } : null,
+        playerVy: Number((window.__DADA_DEBUG__?.playerController?.vy ?? 0).toFixed(3)),
+        grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+        cameraPos: cameraPos ? {
+          x: Number(cameraPos.x.toFixed(3)),
+          y: Number(cameraPos.y.toFixed(3)),
+          z: Number(cameraPos.z.toFixed(3)),
+        } : null,
+        cameraTarget: cameraTarget ? {
+          x: Number(cameraTarget.x.toFixed(3)),
+          y: Number(cameraTarget.y.toFixed(3)),
+          z: Number(cameraTarget.z.toFixed(3)),
+        } : null,
+        cameraYaw: Number((window.__DADA_DEBUG__?.cameraYaw ?? 0).toFixed(3)),
+        cameraDesiredYaw: Number((window.__DADA_DEBUG__?.cameraDesiredYaw ?? 0).toFixed(3)),
+        occluderMesh: window.__DADA_DEBUG__?.occluderMesh ?? null,
+        occlusion: window.__DADA_DEBUG__?.cameraOcclusion ?? null,
+        cameraAboveCeiling: !!(cameraPos && cameraPos.y > (ceilingY + 0.001)),
+        cameraInsideRoomXZ: !!(roomBounds && cameraPos
+          && cameraPos.x > (roomBounds.minX + 0.05)
+          && cameraPos.x < (roomBounds.maxX - 0.05)
+          && cameraPos.z > (roomBounds.minZ + 0.05)
+          && cameraPos.z < (roomBounds.maxZ - 0.05)),
+      };
+    };
+
+    const frames = [readState('before_jump')];
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    }));
+    for (let i = 0; i < 20; i += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      frames.push(readState(`jump_press_${i}`));
+    }
+    document.dispatchEvent(new KeyboardEvent('keyup', {
+      bubbles: true,
+      cancelable: true,
+      code: 'Space',
+      key: ' ',
+    }));
+    let airborneSeen = frames.some((frame) => !frame.grounded);
+    for (let i = 0; i < 180; i += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const frame = readState(`jump_trace_${i}`);
+      frames.push(frame);
+      airborneSeen ||= !frame.grounded;
+      if (airborneSeen && frame.grounded) break;
+    }
+
+    const ascent = frames.find((frame) => !frame.grounded && frame.playerVy > 0.4) ?? null;
+    const airborneFrames = frames.filter((frame) => !frame.grounded && frame.playerPos);
+    const apex = airborneFrames.reduce((best, frame) => (
+      !best || frame.playerPos.y > best.playerPos.y ? frame : best
+    ), null);
+    const landing = frames.find((frame, index) => (
+      airborneSeen
+      && index > 0
+      && frame.grounded
+      && frames[index - 1]
+      && !frames[index - 1].grounded
+    )) ?? frames.at(-1) ?? null;
+
+    return {
+      roomBounds,
+      ceilingY,
+      before: frames[0] ?? null,
+      ascent,
+      apex,
+      landing,
+      anyCameraAboveCeiling: frames.some((frame) => frame.cameraAboveCeiling),
+      anyCameraOutsideRoomXZ: frames.some((frame) => !frame.cameraInsideRoomXZ),
+      ceilingOccluderSeen: frames.some((frame) => frame.occluderMesh === 'neutral_decorBlock_ceiling_shell'),
+      entryClampSeen: frames.some((frame) => frame.occlusion?.usedEntryClamp === true),
+    };
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
@@ -745,6 +858,36 @@ test('@level5 @era5 runtime: level 5 launch frame and two brief left turns keep 
   const turnedStarterAudit = await getLevel5StarterRoomAudit(page);
   const turnedLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
   expectLevel5StarterRoomLaunchAudit(turnedStarterAudit, turnedLaunchAudit);
+});
+
+test('@level5 @era5 runtime: level 5 jump camera stays below the ceiling and inside the starter-room shell through ascent apex and landing', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const jumpTrace = await captureLevel5JumpCameraTrace(page);
+  expect(jumpTrace.roomBounds).not.toBeNull();
+  expect(Number(jumpTrace.ceilingY?.toFixed?.(3) ?? jumpTrace.ceilingY)).toBe(6);
+  expect(jumpTrace.anyCameraAboveCeiling).toBe(false);
+  expect(jumpTrace.anyCameraOutsideRoomXZ).toBe(false);
+  expect(jumpTrace.ceilingOccluderSeen).toBe(true);
+  expect(jumpTrace.entryClampSeen).toBe(true);
+  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.before, jumpTrace.roomBounds, jumpTrace.ceilingY);
+  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.ascent, jumpTrace.roomBounds, jumpTrace.ceilingY);
+  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.apex, jumpTrace.roomBounds, jumpTrace.ceilingY);
+  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.landing, jumpTrace.roomBounds, jumpTrace.ceilingY);
+  expect(jumpTrace.ascent.playerVy).toBeGreaterThan(0.4);
+  expect(jumpTrace.apex.occlusion?.pickDistance).not.toBeNull();
+  expect(jumpTrace.apex.occlusion?.safeDistance).toBeLessThan(jumpTrace.apex.occlusion?.pickDistance ?? Infinity);
+  expect(jumpTrace.landing.grounded).toBe(true);
+  expect(Math.abs(jumpTrace.landing.cameraPos.y - jumpTrace.before.cameraPos.y)).toBeLessThan(0.05);
 });
 
 test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible exit blocker keeps the player inside the room', async ({ page }) => {

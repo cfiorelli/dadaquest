@@ -332,6 +332,66 @@ async function tapEra5LeftTurnTwice(page) {
   await page.waitForTimeout(180);
 }
 
+function expectLevel5JumpStateInsideStarterRoom(state) {
+  expect(state).not.toBeNull();
+  expect(state.roomBounds).not.toBeNull();
+  expect(state.cameraPos).not.toBeNull();
+  expect(state.cameraTarget).not.toBeNull();
+  expect(state.playerPos).not.toBeNull();
+  expect(state.cameraAboveCeiling).toBe(false);
+  expect(state.cameraInsideRoomXZ).toBe(true);
+}
+
+async function getLevel5JumpCameraState(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const camera = scene?.activeCamera ?? null;
+    const cameraTarget = camera?.getTarget?.() ?? null;
+    const cameraPos = camera?.position ?? null;
+    const playerPos = window.__DADA_DEBUG__?.playerPos ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const ceilingY = Number.isFinite(room?.ceilingY) ? room.ceilingY : 6.0;
+    return {
+      roomBounds,
+      ceilingY,
+      playerPos: playerPos ? {
+        x: Number(playerPos.x.toFixed(3)),
+        y: Number(playerPos.y.toFixed(3)),
+        z: Number(playerPos.z.toFixed(3)),
+      } : null,
+      playerVy: Number((window.__DADA_DEBUG__?.playerController?.vy ?? 0).toFixed(3)),
+      grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+      cameraPos: cameraPos ? {
+        x: Number(cameraPos.x.toFixed(3)),
+        y: Number(cameraPos.y.toFixed(3)),
+        z: Number(cameraPos.z.toFixed(3)),
+      } : null,
+      cameraTarget: cameraTarget ? {
+        x: Number(cameraTarget.x.toFixed(3)),
+        y: Number(cameraTarget.y.toFixed(3)),
+        z: Number(cameraTarget.z.toFixed(3)),
+      } : null,
+      cameraYaw: Number((window.__DADA_DEBUG__?.cameraYaw ?? 0).toFixed(3)),
+      cameraDesiredYaw: Number((window.__DADA_DEBUG__?.cameraDesiredYaw ?? 0).toFixed(3)),
+      occluderMesh: window.__DADA_DEBUG__?.occluderMesh ?? null,
+      occlusion: window.__DADA_DEBUG__?.cameraOcclusion ?? null,
+      cameraAboveCeiling: !!(cameraPos && cameraPos.y > (ceilingY + 0.001)),
+      cameraInsideRoomXZ: !!(roomBounds && cameraPos
+        && cameraPos.x > (roomBounds.minX + 0.05)
+        && cameraPos.x < (roomBounds.maxX - 0.05)
+        && cameraPos.z > (roomBounds.minZ + 0.05)
+        && cameraPos.z < (roomBounds.maxZ - 0.05)),
+    };
+  });
+}
+
 async function renderTopologySvg(browser, topology, {
   path,
   title,
@@ -646,4 +706,83 @@ test('capture Level 5 room reset launch-state and double-left-turn proof screens
   const turnedLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
   expectLevel5StarterRoomLaunchAudit(turnedStarterAudit, turnedLaunchAudit);
   await captureProof('docs/screenshots/level5-room-reset-load-double-left.png');
+});
+
+test('capture Level 5 room reset jump camera proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-room-reset-jump-camera', { recursive: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1280, height: 720 },
+    });
+    await copyFile(path, `docs/proof/level5-room-reset-jump-camera/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+  await hideGameplayUi(page);
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const before = await getLevel5JumpCameraState(page);
+  expectLevel5JumpStateInsideStarterRoom(before);
+  await captureProof('docs/screenshots/level5-room-reset-jump-before.png');
+
+  await dispatchHeldKey(page, 'keydown', { code: 'Space', key: ' ' });
+  await page.waitForTimeout(320);
+  await dispatchHeldKey(page, 'keyup', { code: 'Space', key: ' ' });
+
+  let ascentShot = false;
+  let landingShot = false;
+  let airborneSeen = false;
+  let ascentState = null;
+  let apexState = null;
+  let landingState = null;
+  let apexHeight = -Infinity;
+
+  for (let i = 0; i < 180; i += 1) {
+    const state = await getLevel5JumpCameraState(page);
+    airborneSeen ||= !state.grounded;
+    expectLevel5JumpStateInsideStarterRoom(state);
+
+    if (!ascentShot && !state.grounded && state.playerVy > 0.4) {
+      ascentState = state;
+      ascentShot = true;
+      await captureProof('docs/screenshots/level5-room-reset-jump-ascent.png');
+    }
+
+    if (!state.grounded && airborneSeen && state.playerPos && state.playerPos.y >= apexHeight) {
+      apexHeight = state.playerPos.y;
+      apexState = state;
+      await captureProof('docs/screenshots/level5-room-reset-jump-apex.png');
+    }
+
+    if (airborneSeen && state.grounded) {
+      landingState = state;
+      landingShot = true;
+      await captureProof('docs/screenshots/level5-room-reset-jump-landing.png');
+      break;
+    }
+
+    await page.waitForTimeout(40);
+  }
+
+  expect(ascentShot).toBe(true);
+  expect(apexState).not.toBeNull();
+  expect(landingShot).toBe(true);
+  expectLevel5JumpStateInsideStarterRoom(ascentState);
+  expectLevel5JumpStateInsideStarterRoom(apexState);
+  expectLevel5JumpStateInsideStarterRoom(landingState);
 });
