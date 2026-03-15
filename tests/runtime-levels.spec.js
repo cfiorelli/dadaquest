@@ -8,15 +8,16 @@ const LEVEL_CASES = [
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
 const LEVEL5_REQUIRED_SECTORS = [
-  'Arrival Vestibule',
-  'Public Exhibit Hall',
-  'Service Split',
+  'Arrival Airlock Vestibule',
+  'Public Exhibit Spine',
+  'Service Access Elbow',
+  'Chamber Reveal Gallery',
   'Main Tank Chamber',
   'Upper Observation Bridge',
   'Filtration Core',
   'Flooded Maintenance Trench',
   'Pump Gallery Rejoin',
-  'Final Nursery',
+  'Nursery Recovery Alcove',
 ];
 const ERA5_CONTROL_POSES = {
   6: { x: 40.0, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 },
@@ -920,13 +921,13 @@ test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits fr
   });
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: -15.2,
-      y: 1.92,
-      z: 21.8,
-      yaw: 1.12,
-      cameraYaw: 1.12,
+      x: 21.2,
+      y: 1.24,
+      z: -2.4,
+      yaw: 0.24,
+      cameraYaw: 0.24,
     });
-    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_viewing_north');
+    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_spill_gate');
   });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.getEra5LastDamage?.() ?? null),

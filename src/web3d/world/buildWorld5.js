@@ -292,7 +292,7 @@ function createEelRail(scene, def) {
   markHazard(postR);
 
   const beam = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_beam`, {
-    diameter: 0.14,
+    diameter: 0.18,
     height: length,
     tessellation: 20,
   }, scene);
@@ -307,13 +307,13 @@ function createEelRail(scene, def) {
 
   const halo = BABYLON.MeshBuilder.CreatePlane(`${def.name}_halo`, {
     width: length + 0.35,
-    height: 0.42,
+    height: 0.52,
   }, scene);
   halo.parent = root;
   const haloMat = new BABYLON.StandardMaterial(`${def.name}_haloMat`, scene);
   haloMat.diffuseColor = new BABYLON.Color3(0.24, 1.0, 0.92);
   haloMat.emissiveColor = new BABYLON.Color3(0.14, 0.44, 0.38);
-  haloMat.alpha = 0.18;
+  haloMat.alpha = 0.24;
   haloMat.backFaceCulling = false;
   haloMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   halo.material = haloMat;
@@ -377,7 +377,7 @@ function createJellyfish(scene, def, shadowGen) {
   root.position.set(def.x, def.y, def.z ?? 0);
 
   const bell = BABYLON.MeshBuilder.CreateSphere(`${def.name}_bell`, {
-    diameter: 0.92,
+    diameter: 1.14,
     segments: 14,
   }, scene);
   bell.parent = root;
@@ -391,7 +391,7 @@ function createJellyfish(scene, def, shadowGen) {
   markHazard(bell);
 
   const silhouette = BABYLON.MeshBuilder.CreateDisc(`${def.name}_silhouette`, {
-    radius: 0.58,
+    radius: 0.72,
     tessellation: 28,
   }, scene);
   silhouette.parent = root;
@@ -400,7 +400,7 @@ function createJellyfish(scene, def, shadowGen) {
   const silhouetteMat = new BABYLON.StandardMaterial(`${def.name}_silhouetteMat`, scene);
   silhouetteMat.diffuseColor = new BABYLON.Color3(0.04, 0.09, 0.14);
   silhouetteMat.emissiveColor = new BABYLON.Color3(0.04, 0.10, 0.12);
-  silhouetteMat.alpha = 0.30;
+  silhouetteMat.alpha = 0.38;
   silhouetteMat.specularColor = BABYLON.Color3.Black();
   silhouetteMat.backFaceCulling = false;
   silhouetteMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -408,7 +408,7 @@ function createJellyfish(scene, def, shadowGen) {
   markHazard(silhouette);
 
   const core = BABYLON.MeshBuilder.CreateSphere(`${def.name}_core`, {
-    diameter: 0.34,
+    diameter: 0.44,
     segments: 8,
   }, scene);
   core.parent = root;
