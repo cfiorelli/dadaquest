@@ -195,6 +195,7 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
       walkables: false,
       colliders: false,
@@ -385,6 +386,160 @@ test('capture Level 5 restart proof screenshots', async ({ page }) => {
   await captureProof('docs/screenshots/level5-restart-collision-overlay.png');
 
   await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
+      walkables: false,
+      colliders: false,
+      hazards: false,
+      respawnAnchors: false,
+    });
+  });
+});
+
+test('capture Level 5 composition-pass proof screenshots', async ({ page }) => {
+  test.setTimeout(300_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-composition-pass', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-composition-pass/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1800);
+  await hideGameplayUi(page);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
+      walkables: false,
+      colliders: false,
+      hazards: false,
+      respawnAnchors: false,
+    });
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -41.2,
+      y: 1.28,
+      z: -4.8,
+      yaw: 0.18,
+      cameraYaw: 0.18,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-start',
+      position: { x: -41.2, y: 2.2, z: -3.0 },
+      target: { x: -34.6, y: 2.1, z: 0.8 },
+      fov: 0.64,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-composition-start.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -22.8,
+      y: 1.16,
+      z: 6.8,
+      yaw: 1.12,
+      cameraYaw: 1.12,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-public',
+      position: { x: -19.6, y: 2.2, z: 8.2 },
+      target: { x: -18.0, y: 2.2, z: 17.8 },
+      fov: 0.58,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-composition-public.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -23.4,
+      y: 1.08,
+      z: -8.6,
+      yaw: 0.18,
+      cameraYaw: 0.18,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-service',
+      position: { x: -20.6, y: 2.1, z: -8.2 },
+      target: { x: -17.8, y: 2.0, z: -2.4 },
+      fov: 0.58,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-composition-service.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: -9.8,
+      y: 1.20,
+      z: 0.8,
+      yaw: 0.92,
+      cameraYaw: 0.92,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-hero',
+      position: { x: -6.4, y: 2.4, z: 3.0 },
+      target: { x: 2.8, y: 2.4, z: 14.0 },
+      fov: 0.60,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-composition-hero-chamber.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 20.0,
+      y: 1.34,
+      z: -5.4,
+      yaw: 0.20,
+      cameraYaw: 0.20,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-hazard',
+      position: { x: 22.0, y: 2.1, z: -4.2 },
+      target: { x: 28.0, y: 1.9, z: -1.0 },
+      fov: 0.60,
+    });
+  });
+  await page.waitForFunction(() => {
+    const rails = window.__DADA_DEBUG__?.era5LevelState?.eelRails ?? [];
+    return rails.some((hazard) => hazard.name === 'eel_spill_gate' && hazard.state === 'active');
+  }, { timeout: 8_000 });
+  await page.waitForTimeout(800);
+  await captureProof('docs/screenshots/level5-composition-hazard-room.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({
+      x: 39.4,
+      y: 1.28,
+      z: 2.8,
+      yaw: 0.86,
+      cameraYaw: 0.86,
+    });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-comp-goal',
+      position: { x: 41.4, y: 2.2, z: 3.6 },
+      target: { x: 46.2, y: 2.0, z: 8.0 },
+      fov: 0.58,
+    });
+  });
+  await page.waitForTimeout(1000);
+  await captureProof('docs/screenshots/level5-composition-goal-room.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
       walkables: false,
       colliders: false,
