@@ -7,14 +7,6 @@ const LEVEL_CASES = [
   { id: 2, url: 'http://127.0.0.1:4173/?level=2&debug=1' },
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
-const LEVEL5_REQUIRED_SECTORS = [
-  'Start',
-  'Public Hall',
-  'Service Elbow',
-  'Hero Tank Chamber',
-  'Filtration Hazard Room',
-  'Nursery Goal Room',
-];
 const ERA5_CONTROL_POSES = {
   6: { x: 40.0, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 },
   7: { x: 14.0, y: 1.42, z: -2.8, yaw: 1.32, cameraYaw: 1.32 },
@@ -383,218 +375,158 @@ test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is 
   }
 });
 
-test('@level5 @era5 runtime: level 5 uses classic Doom arrow movement, turn, and strafe semantics with modern aliases', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell truth with no fade pop while turning', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
-
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
   await focusGameplay(page);
-  const basePose = { x: -21.0, y: 1.46, z: -14.0, yaw: 0.0, cameraYaw: 0.0 };
+  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
+  const truth = await page.evaluate(() => window.__DADA_DEBUG__?.level5TruthReport?.() ?? null);
+  const collision = await page.evaluate(() => window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null);
+  const walkable = await page.evaluate(() => window.__DADA_DEBUG__?.level5WalkableReport?.() ?? null);
+  const respawn = await page.evaluate(() => window.__DADA_DEBUG__?.level5RespawnReport?.() ?? null);
+  test.skip(!topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
+  expect(topology).not.toBeNull();
+  expect(truth).not.toBeNull();
+  expect(collision).not.toBeNull();
+  expect(walkable).not.toBeNull();
+  expect(respawn).not.toBeNull();
+  expect(topology.sectorCount).toBe(1);
+  expect(topology.connectorCount).toBe(0);
+  expect(topology.topology?.hasCycle).toBe(false);
+  expect((topology.topology?.routeChoices ?? []).length).toBe(0);
+  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBe(1);
+  expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
+  expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
+  expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
+  expect(topology.walkableReport?.unclassifiedWalkables ?? []).toEqual([]);
+  expect(truth?.disableDecorOcclusionFade).toBe(true);
+  expect(truth?.fadeableShells ?? []).toEqual([]);
+  expect(truth?.cullRiskShells ?? []).toEqual([]);
+  expect(collision?.unownedBlockers ?? []).toEqual([]);
+  expect(collision?.invisibleBlockers ?? []).toEqual([]);
+  expect(collision?.roomVolumeShells ?? []).toEqual([]);
+  expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
+  expect(walkable?.suspiciousFloorLikeDecor ?? []).toEqual([]);
+  expect(respawn?.anchorCount ?? 0).toBe(1);
+  expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
+  const room = topology.sectors?.[0] ?? null;
+  expect(room?.label).toBe('Starter Room');
+  expect(Number(room?.w?.toFixed?.(2) ?? room?.w)).toBe(24);
+  expect(Number(room?.d?.toFixed?.(2) ?? room?.d)).toBe(18);
 
-  await resetEra5Pose(page, basePose);
-  const beforeTurn = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  expect(beforeTurn.playerPos).not.toBeNull();
-  expect(beforeTurn.playerYaw).not.toBeNull();
+  await resetEra5Pose(page, { x: 12.0, y: 0.42, z: 9.0, yaw: 0.0, cameraYaw: 0.0 });
+  const fadedSamples = [];
+  await page.keyboard.down('ArrowRight');
+  for (let i = 0; i < 10; i += 1) {
+    await page.waitForTimeout(90);
+    const report = await page.evaluate(() => window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 6 }) ?? null);
+    fadedSamples.push(report?.counts?.fadedMeshes ?? null);
+  }
+  await page.keyboard.up('ArrowRight');
+  expect(fadedSamples.every((value) => value === 0)).toBe(true);
+});
 
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
-  await page.waitForTimeout(520);
-  const afterTurn = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    yawVel: window.__DADA_DEBUG__?.yawVel ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
-  expect(afterTurn.playerYaw).not.toBeNull();
-  expect(afterTurn.yawVel).not.toBeNull();
-  expect(afterTurn.playerYaw).toBeGreaterThan(beforeTurn.playerYaw + 0.05);
-  expect(afterTurn.playerYaw - beforeTurn.playerYaw).toBeLessThan(2.4);
-  expect(afterTurn.yawVel).toBeGreaterThan(0.08);
-  expect(afterTurn.cameraYaw).toBeGreaterThan(beforeTurn.cameraYaw - 0.02);
-  expect(Math.hypot(
-    afterTurn.playerPos.x - beforeTurn.playerPos.x,
-    afterTurn.playerPos.z - beforeTurn.playerPos.z,
-  )).toBeLessThan(0.08);
+test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible exit blocker keeps the player inside the room', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
 
-  await resetEra5Pose(page, basePose);
-  const beforeForward = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerVelocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  expect(beforeForward.playerPos).not.toBeNull();
-  expect(beforeForward.playerForward).not.toBeNull();
+  for (const sample of [
+    { x: 1.5, z: 1.5 },
+    { x: 22.5, z: 1.5 },
+    { x: 22.5, z: 16.5 },
+    { x: 1.5, z: 16.5 },
+    { x: 12.0, z: 9.0 },
+  ]) {
+    await resetEra5Pose(page, {
+      x: sample.x,
+      y: 0.42,
+      z: sample.z,
+      yaw: Math.PI * 0.5,
+      cameraYaw: Math.PI * 0.5,
+    });
+    await page.waitForTimeout(280);
+    const state = await page.evaluate(() => ({
+      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+      pos: window.__DADA_DEBUG__?.playerPos ?? null,
+    }));
+    expect(state.sceneKey).toBe('CribScene');
+    expect(state.pos).not.toBeNull();
+    expect(state.pos.y).toBeGreaterThan(0.35);
+    expect(state.pos.y).toBeLessThan(0.6);
+  }
 
+  const blocker = await page.evaluate(() => {
+    const report = window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null;
+    return (report?.blockers ?? []).find((entry) => entry.sourceName === 'future_exit_blocker') ?? null;
+  });
+  expect(blocker).not.toBeNull();
+  expect(blocker.visibleOwnerCount).toBeGreaterThan(0);
+
+  await resetEra5Pose(page, {
+    x: 20.0,
+    y: 0.42,
+    z: 9.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-  await page.waitForTimeout(620);
-  const duringForward = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerVelocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerFacingYaw: window.__DADA_DEBUG__?.playerFacingYaw ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-  }));
+  await page.waitForTimeout(1400);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
-  const afterForward = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  const blockedState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
   }));
-  expect(duringForward.playerPos).not.toBeNull();
-  expect(duringForward.playerVelocity).not.toBeNull();
-  expect(duringForward.playerForward).not.toBeNull();
-  const forwardDelta = {
-    x: duringForward.playerPos.x - beforeForward.playerPos.x,
-    z: duringForward.playerPos.z - beforeForward.playerPos.z,
-  };
-  const forwardDot = dotXZ(forwardDelta, beforeForward.playerForward);
-  expect(forwardDot).toBeGreaterThan(0.03);
-  expect(Math.abs((afterForward.cameraYaw ?? 0) - (beforeForward.cameraYaw ?? 0))).toBeLessThan(0.18);
-  expect(Math.hypot(duringForward.playerVelocity.x, duringForward.playerVelocity.z)).toBeGreaterThan(0.08);
-  const yawDelta = wrapDelta((duringForward.playerFacingYaw ?? 0), (duringForward.playerYaw ?? 0));
-  expect(Math.abs(yawDelta)).toBeLessThan(0.12);
+  expect(blockedState.sceneKey).toBe('CribScene');
+  expect(blockedState.pos).not.toBeNull();
+  expect(blockedState.pos.x).toBeLessThan(23.5);
+});
 
-  await resetEra5Pose(page, basePose);
-  const beforeBackward = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowDown', key: 'ArrowDown' });
-  await page.waitForTimeout(620);
-  const duringBackward = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowDown', key: 'ArrowDown' });
-  const backwardDelta = {
-    x: duringBackward.playerPos.x - beforeBackward.playerPos.x,
-    z: duringBackward.playerPos.z - beforeBackward.playerPos.z,
-  };
-  expect(dotXZ(backwardDelta, beforeBackward.playerForward)).toBeLessThan(-0.03);
-  expect(Math.abs((duringBackward.playerYaw ?? 0) - (beforeBackward.playerYaw ?? 0))).toBeLessThan(0.06);
-  expect(Math.abs((duringBackward.cameraYaw ?? 0) - (beforeBackward.cameraYaw ?? 0))).toBeLessThan(0.10);
+test('@level5 @era5 runtime: level 5 respawn returns to the starter-room spawn anchor', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
 
-  await resetEra5Pose(page, basePose);
-  const beforeAltStrafe = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
+  await resetEra5Pose(page, {
+    x: 18.0,
+    y: 0.42,
+    z: 14.0,
+    yaw: 0.24,
+    cameraYaw: 0.24,
+  });
+  const resetState = await page.evaluate(() => ({
+    resetTriggered: window.__DADA_DEBUG__?.gameplayHotkey?.('KeyR') ?? false,
+    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? null,
   }));
-  await dispatchHeldKey(page, 'keydown', { code: 'AltLeft', key: 'Alt', altKey: true });
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight', altKey: true });
-  await page.waitForTimeout(560);
-  const duringAltStrafe = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight', altKey: true });
-  await dispatchHeldKey(page, 'keyup', { code: 'AltLeft', key: 'Alt' });
-  const playerRight = getRightFromForward(beforeAltStrafe.playerForward);
-  const altStrafeDelta = {
-    x: duringAltStrafe.playerPos.x - beforeAltStrafe.playerPos.x,
-    z: duringAltStrafe.playerPos.z - beforeAltStrafe.playerPos.z,
-  };
-  expect(dotXZ(altStrafeDelta, playerRight)).toBeGreaterThan(0.04);
-  expect(Math.abs((duringAltStrafe.playerYaw ?? 0) - (beforeAltStrafe.playerYaw ?? 0))).toBeLessThan(0.06);
-  expect(Math.abs((duringAltStrafe.cameraYaw ?? 0) - (beforeAltStrafe.cameraYaw ?? 0))).toBeLessThan(0.10);
+  expect(resetState.resetTriggered).toBe(true);
+  expect(resetState.lastRespawnReason).toBe('manual_reset');
 
-  await resetEra5Pose(page, basePose);
-  const beforeCommaStrafe = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-  }));
-  await dispatchHeldKey(page, 'keydown', { code: 'Comma', key: ',' });
-  await page.waitForTimeout(560);
-  const duringCommaStrafe = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'Comma', key: ',' });
-  const commaRight = getRightFromForward(beforeCommaStrafe.playerForward);
-  const commaDelta = {
-    x: duringCommaStrafe.playerPos.x - beforeCommaStrafe.playerPos.x,
-    z: duringCommaStrafe.playerPos.z - beforeCommaStrafe.playerPos.z,
-  };
-  expect(dotXZ(commaDelta, commaRight)).toBeLessThan(-0.03);
-  expect(Math.abs((duringCommaStrafe.playerYaw ?? 0) - (beforeCommaStrafe.playerYaw ?? 0))).toBeLessThan(0.06);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnAnchor ?? null),
+    { timeout: 6_000 },
+  ).toMatchObject({
+    id: 'level5_spawn_anchor',
+    spaceId: 'starter_room',
+  });
 
-  await resetEra5Pose(page, basePose);
-  const beforeWAlias = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
+  const finalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+    anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
   }));
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyW', key: 'w' });
-  await page.waitForTimeout(620);
-  const duringWAlias = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyW', key: 'w' });
-  const wDelta = {
-    x: duringWAlias.playerPos.x - beforeWAlias.playerPos.x,
-    z: duringWAlias.playerPos.z - beforeWAlias.playerPos.z,
-  };
-  expect(dotXZ(wDelta, beforeWAlias.playerForward)).toBeGreaterThan(0.03);
-  expect(Math.abs((duringWAlias.playerYaw ?? 0) - (beforeWAlias.playerYaw ?? 0))).toBeLessThan(0.06);
-
-  await resetEra5Pose(page, basePose);
-  const beforeDAlias = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-  }));
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyD', key: 'd' });
-  await page.waitForTimeout(560);
-  const duringDAlias = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyD', key: 'd' });
-  const dDelta = {
-    x: duringDAlias.playerPos.x - beforeDAlias.playerPos.x,
-    z: duringDAlias.playerPos.z - beforeDAlias.playerPos.z,
-  };
-  expect(dotXZ(dDelta, getRightFromForward(beforeDAlias.playerForward))).toBeGreaterThan(0.04);
-  expect(Math.abs((duringDAlias.playerYaw ?? 0) - (beforeDAlias.playerYaw ?? 0))).toBeLessThan(0.06);
-
-  await resetEra5Pose(page, basePose);
-  const beforeDiagonal = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-    playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-  }));
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyD', key: 'd' });
-  await page.waitForTimeout(680);
-  const duringDiagonal = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyD', key: 'd' });
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
-  const diagonalDelta = {
-    x: duringDiagonal.playerPos.x - beforeDiagonal.playerPos.x,
-    z: duringDiagonal.playerPos.z - beforeDiagonal.playerPos.z,
-  };
-  const diagonalRight = getRightFromForward(beforeDiagonal.playerForward);
-  expect(dotXZ(diagonalDelta, beforeDiagonal.playerForward)).toBeGreaterThan(0.03);
-  expect(dotXZ(diagonalDelta, diagonalRight)).toBeGreaterThan(0.03);
-  expect(Math.abs((duringDiagonal.playerYaw ?? 0) - (beforeDiagonal.playerYaw ?? 0))).toBeLessThan(0.06);
+  expect(finalState.pos).not.toBeNull();
+  expect(finalState.anchor?.id).toBe('level5_spawn_anchor');
+  expect(Math.abs(finalState.pos.x - 4.0)).toBeLessThan(0.35);
+  expect(Math.abs(finalState.pos.z - 9.0)).toBeLessThan(0.35);
+  expect(finalState.pos.y).toBeGreaterThan(0.35);
+  expect(finalState.pos.y).toBeLessThan(0.6);
 });
 
 for (const levelId of [6, 7, 8, 9]) {
@@ -680,388 +612,6 @@ for (const levelId of [6, 7, 8, 9]) {
     expect(Math.abs(wrapDelta(duringStrafe.cameraYaw ?? 0, beforeStrafe.cameraYaw ?? 0))).toBeLessThan(0.12);
   });
 }
-
-test('@level5 @era5 runtime: level 5 bracket keys rotate the camera in the expected directions', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const startYaw = await page.evaluate(() => window.__DADA_DEBUG__?.cameraDesiredYaw ?? null);
-  await dispatchHeldKey(page, 'keydown', { code: 'BracketRight', key: ']' });
-  await page.waitForTimeout(320);
-  const duringRight = await page.evaluate(() => ({
-    cameraYaw: window.__DADA_DEBUG__?.cameraDesiredYaw ?? null,
-    cameraYawVel: window.__DADA_DEBUG__?.cameraYawVel ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'BracketRight', key: ']' });
-  expect(duringRight.cameraYaw).not.toBeNull();
-  expect(duringRight.cameraYawVel).not.toBeNull();
-  expect(duringRight.cameraYaw).toBeGreaterThan(startYaw + 0.03);
-  // With direct camera tracking (era5CameraYaw = era5CameraDesiredYaw every frame), velocity is
-  // always zeroed. Camera still rotates correctly — verified by the cameraYaw check above.
-  expect(duringRight.cameraYawVel).toBeGreaterThanOrEqual(0);
-
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const resetYaw = await page.evaluate(() => window.__DADA_DEBUG__?.cameraDesiredYaw ?? null);
-  await dispatchHeldKey(page, 'keydown', { code: 'BracketLeft', key: '[' });
-  await page.waitForTimeout(420);
-  const duringLeft = await page.evaluate(() => ({
-    cameraYaw: window.__DADA_DEBUG__?.cameraDesiredYaw ?? null,
-    cameraYawVel: window.__DADA_DEBUG__?.cameraYawVel ?? null,
-  }));
-  await dispatchHeldKey(page, 'keyup', { code: 'BracketLeft', key: '[' });
-  expect(duringLeft.cameraYaw).not.toBeNull();
-  expect(duringLeft.cameraYaw).toBeLessThan(resetYaw - 0.04);
-});
-
-test('@fast @level5 @era5 runtime: level 5 inventory opens, oxygen HUD renders, Bubble Wand fires with F, and music is running', async ({ page }) => {
-  test.setTimeout(240_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await expect(page.locator('[data-era5-oxygen]')).toBeVisible();
-  await expect(page.locator('[data-era5-oxygen-copy]')).toContainText('/ 20.0s');
-  await expect(page.locator('[data-era5-weapon-help]')).toContainText('Fire Bubble Wand: F / Ctrl / Enter / Click');
-  await expect(page.locator('[data-era5-tool-help]')).toContainText('Scuba Tank: Space ascend, C descend in deep pockets');
-
-  await page.keyboard.press('I');
-  await expect(page.locator('.dada-era5-inventory.open')).toBeVisible();
-  await page.keyboard.press('I');
-  await expect(page.locator('.dada-era5-inventory.open')).toHaveCount(0);
-
-  const projectileCountBefore = await page.evaluate(() => window.__DADA_DEBUG__?.l5ProjectileCount ?? 0);
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyF', key: 'f' });
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyF', key: 'f' });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.l5ProjectileCount ?? 0),
-    { timeout: 5_000 },
-  ).toBeGreaterThan(projectileCountBefore);
-
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.l5ProjectileCount ?? 0),
-    { timeout: 5_000 },
-  ).toBe(0);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 2.0,
-      y: 2.24,
-      z: -3.0,
-      yaw: 1.04,
-      cameraYaw: 1.04,
-    });
-    const forward = window.__DADA_DEBUG__?.playerForward ?? { x: 1, z: 0 };
-    window.__DADA_DEBUG__?.placeLevel5DebugJellyfish?.(forward);
-  });
-  await page.waitForTimeout(120);
-  const enemyReport = await page.evaluate(() => window.__DADA_DEBUG__?.era5EnemyReport?.() ?? null);
-  expect(enemyReport?.count ?? 0).toBeGreaterThan(0);
-  expect((enemyReport?.enemies ?? []).some((enemy) => enemy.kind === 'jellyfish')).toBe(true);
-  const stunProbe = await page.evaluate(() => window.__DADA_DEBUG__?.testLevel5BubbleStun?.() ?? null);
-  expect(stunProbe?.hit?.hit ?? false).toBe(true);
-  expect(Math.max(0, ...(stunProbe?.enemies ?? []).map((enemy) => enemy?.stunnedMs ?? 0))).toBeGreaterThan(1000);
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.musicLevelId ?? null),
-    { timeout: 5_000 },
-  ).toBe(5);
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.musicRunning ?? false),
-    { timeout: 5_000 },
-  ).toBe(true);
-});
-
-test('@level5 @era5 runtime: level 5 exposes authored topology, coherent truth reports, clean walkable-surface validation, and smooth camera yaw while turning', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
-  const truth = await page.evaluate(() => window.__DADA_DEBUG__?.level5TruthReport?.() ?? null);
-  const collision = await page.evaluate(() => window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null);
-  const walkable = await page.evaluate(() => window.__DADA_DEBUG__?.level5WalkableReport?.() ?? null);
-  const respawn = await page.evaluate(() => window.__DADA_DEBUG__?.level5RespawnReport?.() ?? null);
-  test.skip(!topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
-  expect(topology).not.toBeNull();
-  expect(truth).not.toBeNull();
-  expect(collision).not.toBeNull();
-  expect(walkable).not.toBeNull();
-  expect(respawn).not.toBeNull();
-  expect(topology.sectorCount).toBeGreaterThanOrEqual(6);
-  expect(topology.connectorCount).toBeGreaterThanOrEqual(6);
-  expect(topology.topology?.hasCycle).toBe(true);
-  expect((topology.topology?.routeChoices ?? []).length).toBeGreaterThanOrEqual(2);
-  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBeGreaterThanOrEqual(20);
-  expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
-  expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
-  expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
-  expect(topology.walkableReport?.unclassifiedWalkables ?? []).toEqual([]);
-  expect(truth?.disableDecorOcclusionFade).toBe(true);
-  expect(truth?.fadeableShells ?? []).toEqual([]);
-  expect(truth?.cullRiskShells ?? []).toEqual([]);
-  expect(collision?.unownedBlockers ?? []).toEqual([]);
-  expect(collision?.invisibleBlockers ?? []).toEqual([]);
-  expect(collision?.roomVolumeShells ?? []).toEqual([]);
-  expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
-  expect(respawn?.anchorCount ?? 0).toBeGreaterThanOrEqual(3);
-  expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
-
-  const labels = (topology.sectors ?? []).map((sector) => sector.label);
-  expect(labels).toEqual(expect.arrayContaining(LEVEL5_REQUIRED_SECTORS));
-
-  for (const sample of [
-    { x: -44.0, y: 1.46, z: -18.0, yaw: 0.12, minY: 1.02 },
-    { x: -28.0, y: 1.48, z: -4.0, yaw: 0.20, minY: 1.06 },
-    { x: 2.0, y: 1.52, z: 8.2, yaw: 0.24, minY: 1.10 },
-    { x: 30.8, y: 1.42, z: 8.4, yaw: 0.18, minY: 1.10 },
-    { x: 50.0, y: 1.60, z: 2.0, yaw: 0.16, minY: 1.12 },
-  ]) {
-    await page.evaluate((pose) => {
-      window.__DADA_DEBUG__?.setEra5Pose?.({
-        x: pose.x,
-        y: pose.y,
-        z: pose.z,
-        yaw: pose.yaw,
-        cameraYaw: pose.yaw,
-      });
-    }, sample);
-    await page.waitForTimeout(420);
-    const surfaceHold = await page.evaluate(() => ({
-      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
-      y: window.__DADA_DEBUG__?.playerPos?.y ?? null,
-    }));
-    expect(surfaceHold.sceneKey).toBe('CribScene');
-    expect(surfaceHold.y).not.toBeNull();
-    expect(surfaceHold.y).toBeGreaterThan(sample.minY);
-  }
-
-  await page.keyboard.down('ArrowRight');
-  const yawSamples = [];
-  for (let i = 0; i < 16; i++) {
-    await page.waitForTimeout(60);
-    yawSamples.push(await page.evaluate(() => window.__DADA_DEBUG__?.cameraYaw ?? null));
-  }
-  await page.keyboard.up('ArrowRight');
-  const deltas = yawSamples
-    .map((value, index) => (
-      index === 0
-        ? null
-        : Math.atan2(
-          Math.sin(value - yawSamples[index - 1]),
-          Math.cos(value - yawSamples[index - 1]),
-        )
-    ))
-    .filter((value) => Number.isFinite(value));
-  expect(deltas.length).toBeGreaterThan(8);
-  expect(Math.max(...deltas)).toBeLessThan(0.32);
-  expect(Math.min(...deltas)).toBeGreaterThan(-0.08);
-});
-
-test('@level5 @era5 runtime: level 5 hazard death respawns to explicit authored anchors instead of roof or hidden geometry', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 30.8,
-      y: 1.36,
-      z: 8.4,
-      yaw: 0.20,
-      cameraYaw: 0.20,
-    });
-  });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.checkpointIndex ?? 0),
-    { timeout: 5_000 },
-  ).toBeGreaterThanOrEqual(2);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 1, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 25.2,
-      y: 1.28,
-      z: 6.8,
-      yaw: 0.20,
-      cameraYaw: 0.20,
-    });
-    window.__DADA_DEBUG__?.forceEra5Damage?.('eel_rail', { x: 1, z: 0 }, { invulnMs: 0 });
-  });
-
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getEra5LastDamage?.() ?? null),
-    { timeout: 3_000 },
-  ).toMatchObject({
-    source: 'eel_rail',
-    category: 'hazard',
-    shielded: false,
-  });
-
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.lastRespawnAnchor ?? null),
-    { timeout: 6_000 },
-  ).toMatchObject({
-    id: 'cp_filtration_core',
-    spaceId: 'filtration_hazard_room',
-  });
-
-  await expect.poll(
-    async () => page.evaluate(() => ({
-      pos: window.__DADA_DEBUG__?.playerPos ?? null,
-      anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
-      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
-    })),
-    { timeout: 6_000 },
-  ).toMatchObject({
-    sceneKey: 'CribScene',
-    anchor: {
-      id: 'cp_filtration_core',
-    },
-  });
-
-  const finalState = await page.evaluate(() => ({
-    pos: window.__DADA_DEBUG__?.playerPos ?? null,
-    anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
-  }));
-  expect(finalState.pos).not.toBeNull();
-  expect(finalState.pos.y).toBeGreaterThan(1.0);
-  expect(finalState.pos.y).toBeLessThan(2.0);
-  expect(Math.abs(finalState.pos.x - 30.8)).toBeLessThan(2.5);
-  expect(Math.abs(finalState.pos.z - 8.4)).toBeLessThan(2.5);
-  expect(finalState.anchor?.id).toBe('cp_filtration_core');
-});
-
-test('@level5 @era5 runtime: level 5 float mode supports deliberate Space ascent and C descent with no release drift', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 20 });
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 2.0,
-      y: 2.30,
-      z: -3.0,
-      yaw: 0.68,
-      cameraYaw: 0.68,
-    });
-  });
-  await page.waitForTimeout(120);
-
-  const beforeAscend = await snapshotEra5Pose(page);
-  await dispatchHeldKey(page, 'keydown', { code: 'Space', key: ' ' });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.y ?? null),
-    { timeout: 2_000 },
-  ).toBeGreaterThan(beforeAscend.y + 0.10);
-  const duringAscend = await snapshotEra5Pose(page);
-  await dispatchHeldKey(page, 'keyup', { code: 'Space', key: ' ' });
-  expect(duringAscend.y).toBeGreaterThan(beforeAscend.y + 0.10);
-
-  await page.waitForTimeout(180);
-  const releaseA = await snapshotEra5Pose(page);
-  await page.waitForTimeout(180);
-  const releaseB = await snapshotEra5Pose(page);
-  expect(Math.abs(releaseB.y - releaseA.y)).toBeLessThan(0.08);
-
-  await dispatchHeldKey(page, 'keydown', { code: 'KeyC', key: 'c' });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.y ?? null),
-    { timeout: 2_000 },
-  ).toBeLessThan(releaseB.y - 0.10);
-  const duringDescend = await snapshotEra5Pose(page);
-  await dispatchHeldKey(page, 'keyup', { code: 'KeyC', key: 'c' });
-  expect(duringDescend.y).toBeLessThan(releaseB.y - 0.10);
-});
-
-test('@level5 @era5 runtime: level 5 damage feedback distinguishes enemy hits from environmental hazards', async ({ page }) => {
-  test.setTimeout(240_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 3, shield: 1, oxygen: 20 });
-  });
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('jellyfish');
-  });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getEra5LastDamage?.() ?? null),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    source: 'jellyfish',
-    category: 'enemy',
-    shielded: true,
-  });
-  await expect(page.locator('.dada-status')).toContainText('Jellyfish');
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Vitals?.({ hp: 3, shield: 0, oxygen: 20, clearInvuln: true, clearLastDamage: true });
-  });
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 25.2,
-      y: 1.28,
-      z: 6.8,
-      yaw: 0.20,
-      cameraYaw: 0.20,
-    });
-    window.__DADA_DEBUG__?.triggerLevel5Hazard?.('eel_spill_gate');
-  });
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getEra5LastDamage?.() ?? null),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    source: 'eel_rail',
-    category: 'hazard',
-    shielded: false,
-  });
-  await expect(page.locator('.dada-status')).toContainText('Eel rail');
-});
-
-test('@level5 @era5 runtime: level 5 binky magnet collects on a near miss instead of requiring exact overlap', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const targetCoin = await page.evaluate(() => {
-    const candidates = window.__DADA_DEBUG__?.collectibles?.() ?? [];
-    return candidates.find((coin) => !coin.collected) ?? null;
-  });
-  expect(targetCoin).not.toBeNull();
-
-  const coinsBefore = await page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0);
-  await page.evaluate((coin) => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(coin.x + 0.72, coin.y + 0.55, coin.z + 0.04);
-  }, targetCoin);
-
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.coinsCollected ?? 0),
-    { timeout: 5_000 },
-  ).toBe(coinsBefore + 1);
-});
 
 test('@fast @era5 @progression runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
   test.setTimeout(120_000);

@@ -1370,6 +1370,15 @@ function createCampEnvironmentFx(scene, {
 }
 
 export function createThemeEnvironmentFx(scene, theme, options = {}) {
+  if (theme === 'neutral') {
+    const root = new BABYLON.TransformNode('neutralEnvFx', scene);
+    markEnvNode(root, { era5EnvTheme: 'neutral', era5EnvKind: 'root' });
+    return {
+      root,
+      update() {},
+      reset() {},
+    };
+  }
   if (theme === 'factory') return createFactoryEnvironmentFx(scene, options);
   if (theme === 'storm') return createStormEnvironmentFx(scene, options);
   if (theme === 'library') return createLibraryEnvironmentFx(scene, options);

@@ -62,6 +62,15 @@ const THEME_PALETTES = {
     accent: [255, 188, 104],
     goalOutfit: 'level1',
   },
+  neutral: {
+    slab: [144, 146, 150],
+    rim: [110, 112, 116],
+    glow: [244, 246, 240],
+    line: [228, 230, 224],
+    enemy: [204, 206, 210],
+    accent: [216, 218, 212],
+    goalOutfit: 'level1',
+  },
 };
 
 const THEME_SCENE_LOOKS = {
@@ -129,6 +138,19 @@ const THEME_SCENE_LOOKS = {
     hemiGround: [0.05, 0.04, 0.05],
     rimOffset: [-12, 15, -10],
     rimIntensity: 0.96,          // was 0.82
+  },
+  neutral: {
+    clear: [208, 212, 214, 255],
+    fog: [192, 196, 198],
+    fogStart: 60,
+    fogEnd: 220,
+    keyDir: [-0.12, -1.0, 0.08],
+    keyIntensity: 0.98,
+    hemiIntensity: 0.82,
+    hemiColor: [236, 238, 232],
+    hemiGround: [0.08, 0.08, 0.08],
+    rimOffset: [-18, 14, -12],
+    rimIntensity: 0.10,
   },
 };
 
@@ -1683,6 +1705,7 @@ function createThemeCheckpointFrame(scene, name, checkpoint, theme, shadowGen) {
 function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   const palette = THEME_PALETTES[theme] || THEME_PALETTES.factory;
   const aquariumTheme = theme === 'aquarium';
+  const neutralTheme = theme === 'neutral';
   const aquariumSurfaceProfile = aquariumTheme ? getAquariumSurfaceProfile(def) : null;
   const roomSurface = def.roomSurface === true || def.walkableClassification === 'room-floor';
   const flatAquariumRoomFloor = aquariumTheme
@@ -1726,8 +1749,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       grainScale: theme === 'library' ? 4 : theme === 'storm' ? 5 : 3,
     })
     : createGlowMaterial(scene, `${name}_slabMat`, aquariumSurfaceProfile?.slabRgb || palette.slab, {
-      emissive: aquariumSurfaceProfile?.slabEmissive ?? (aquariumTheme ? 0.24 : theme === 'storm' ? 0.18 : 0.28),
-      roughness: aquariumSurfaceProfile?.slabRoughness ?? (aquariumTheme ? 0.30 : theme === 'storm' ? 0.42 : 0.26),
+      emissive: aquariumSurfaceProfile?.slabEmissive ?? (aquariumTheme ? 0.24 : neutralTheme ? 0.01 : theme === 'storm' ? 0.18 : 0.28),
+      roughness: aquariumSurfaceProfile?.slabRoughness ?? (aquariumTheme ? 0.30 : neutralTheme ? 0.96 : theme === 'storm' ? 0.42 : 0.26),
     });
   if (slab.material.emissiveColor) {
     slab.material.emissiveColor = toColor3(
@@ -1738,6 +1761,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
           : 0.08
         : aquariumTheme
           ? 0.10
+          : neutralTheme
+            ? 0.01
           : theme === 'storm'
             ? 0.08
             : theme === 'library'
@@ -1750,6 +1775,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
   slab.enableEdgesRendering();
   slab.edgesWidth = flatAquariumRoomFloor
     ? 0.10
+    : neutralTheme
+      ? 0.8
     : aquariumSurfaceProfile?.roomSurface
       ? 0.84
     : aquariumTheme
@@ -1761,6 +1788,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     aquariumSurfaceProfile?.glowRgb || palette.glow,
     flatAquariumRoomFloor
       ? 0.01
+      : neutralTheme
+        ? 0.12
       : aquariumSurfaceProfile?.edgeAlpha ?? (aquariumTheme ? 0.66 : theme === 'storm' ? 0.70 : theme === 'library' ? 0.44 : theme === 'camp' ? 0.40 : 0.58),
   );
   slab.receiveShadows = true;
@@ -1783,13 +1812,13 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
         grainScale: theme === 'storm' ? 5 : 4,
       })
       : createGlowMaterial(scene, `${name}_rimMat`, aquariumSurfaceProfile?.rimRgb || palette.rim, {
-        emissive: aquariumSurfaceProfile?.rimEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.14 : 0.18),
-        roughness: aquariumSurfaceProfile?.rimRoughness ?? (aquariumTheme ? 0.42 : 0.54),
+        emissive: aquariumSurfaceProfile?.rimEmissive ?? (aquariumTheme ? 0.14 : neutralTheme ? 0.01 : theme === 'storm' ? 0.14 : 0.18),
+        roughness: aquariumSurfaceProfile?.rimRoughness ?? (aquariumTheme ? 0.42 : neutralTheme ? 0.96 : 0.54),
       });
     if (rim.material.emissiveColor) {
       rim.material.emissiveColor = toColor3(
         aquariumSurfaceProfile?.rimRgb || palette.rim,
-        aquariumSurfaceProfile ? 0.04 : aquariumTheme ? 0.06 : theme === 'storm' ? 0.08 : 0.04,
+        aquariumSurfaceProfile ? 0.04 : aquariumTheme ? 0.06 : neutralTheme ? 0.01 : theme === 'storm' ? 0.08 : 0.04,
       );
     }
     markGameplaySurface(rim);
@@ -1807,6 +1836,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
     ? toColor3(aquariumSurfaceProfile.topRgb)
     : aquariumTheme
     ? new BABYLON.Color3(0.10, 0.24, 0.30)
+    : neutralTheme
+    ? new BABYLON.Color3(0.52, 0.52, 0.52)
     : theme === 'storm'
     ? new BABYLON.Color3(0.40, 0.38, 0.32)
     : theme === 'library'
@@ -1816,7 +1847,7 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
         : new BABYLON.Color3(0.14, 0.16, 0.18);  // factory: dark steel grey
   topMat.emissiveColor = toColor3(
     aquariumSurfaceProfile?.glowRgb || palette.glow,
-    aquariumSurfaceProfile?.topEmissive ?? (aquariumTheme ? 0.14 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10),
+    aquariumSurfaceProfile?.topEmissive ?? (aquariumTheme ? 0.14 : neutralTheme ? 0.02 : theme === 'storm' ? 0.08 : theme === 'library' ? 0.06 : theme === 'camp' ? 0.05 : 0.10),
   );
   topMat.alpha = aquariumSurfaceProfile
     ? roomSurface
@@ -1824,6 +1855,8 @@ function createStyledPlatform(scene, name, def, shadowGen, theme = 'factory') {
       : aquariumSurfaceProfile.topAlpha
     : aquariumTheme
       ? 0.62
+      : neutralTheme
+        ? 0.16
       : theme === 'storm'
         ? 0.82
         : theme === 'library'
