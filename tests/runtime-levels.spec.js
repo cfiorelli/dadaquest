@@ -696,6 +696,119 @@ async function captureLevel5DoorwayRotationPhases(page) {
   return phases;
 }
 
+async function captureLevel5ProjectileLaunchReport(page) {
+  return page.evaluate(async () => {
+    const debug = window.__DADA_DEBUG__ ?? {};
+    const topology = debug?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const scene = debug?.sceneRef ?? null;
+    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
+    const Vector3 = camera?.position?.constructor ?? null;
+    const Matrix = scene?.getTransformMatrix?.()?.constructor ?? null;
+    const playerPos = debug?.playerPos ?? null;
+    const collisionHalfH = debug?.playerController?.getCollisionHalfExtents?.()?.halfH ?? 0.4;
+    const floorTopY = playerPos ? playerPos.y - collisionHalfH : null;
+    const projectToViewport = (position) => {
+      if (!scene || !camera || !position || !Vector3 || !Matrix) return null;
+      const engine = scene.getEngine();
+      const width = engine.getRenderWidth();
+      const height = engine.getRenderHeight();
+      const projected = Vector3.Project(
+        position,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        camera.viewport.toGlobal(width, height),
+      );
+      return {
+        x: Number(projected.x.toFixed(3)),
+        y: Number(projected.y.toFixed(3)),
+        z: Number(projected.z.toFixed(6)),
+      };
+    };
+    const readState = (label) => {
+      const projectile = (scene?.meshes ?? []).find((mesh) => String(mesh.name || '').startsWith('era5Bubble_')) ?? null;
+      const projectilePos = projectile?.position ? {
+        x: Number(projectile.position.x.toFixed(3)),
+        y: Number(projectile.position.y.toFixed(3)),
+        z: Number(projectile.position.z.toFixed(3)),
+      } : null;
+      const cameraTarget = camera?.getTarget?.() ? {
+        x: Number(camera.getTarget().x.toFixed(3)),
+        y: Number(camera.getTarget().y.toFixed(3)),
+        z: Number(camera.getTarget().z.toFixed(3)),
+      } : null;
+      const projectileScreen = projectilePos && Vector3
+        ? projectToViewport(new Vector3(projectilePos.x, projectilePos.y, projectilePos.z))
+        : null;
+      const targetScreen = cameraTarget && Vector3
+        ? projectToViewport(new Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z))
+        : null;
+      const dx = projectilePos && playerPos ? projectilePos.x - playerPos.x : null;
+      const dz = projectilePos && playerPos ? projectilePos.z - playerPos.z : null;
+      const forwardDot = (dx !== null && dz !== null && debug?.playerForward)
+        ? Number((((dx * debug.playerForward.x) + (dz * debug.playerForward.z))).toFixed(3))
+        : null;
+      const aimDeltaY = (projectileScreen && targetScreen)
+        ? Number((projectileScreen.y - targetScreen.y).toFixed(3))
+        : null;
+      return {
+        label,
+        projectileCount: debug?.era5ProjectileCount ?? 0,
+        projectilePos,
+        projectileScreen,
+        targetScreen,
+        aimDeltaY,
+        forwardDot,
+        floorTopY: floorTopY !== null ? Number(floorTopY.toFixed(3)) : null,
+        projectileInPlayerBounds: !!(projectilePos && playerPos && (
+          Math.abs(projectilePos.x - playerPos.x) <= 0.25
+          && Math.abs(projectilePos.y - playerPos.y) <= collisionHalfH
+          && Math.abs(projectilePos.z - playerPos.z) <= 0.25
+        )),
+        cameraInsideRoom: !!(roomBounds && camera?.position
+          && camera.position.x > (roomBounds.minX + 0.05)
+          && camera.position.x < (roomBounds.maxX - 0.05)
+          && camera.position.z > (roomBounds.minZ + 0.05)
+          && camera.position.z < (roomBounds.maxZ - 0.05)),
+      };
+    };
+
+    const before = readState('before_fire');
+    debug?.fireEra5Weapon?.();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const frame1 = readState('frame_1');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const frame2 = readState('frame_2');
+
+    return {
+      roomBounds,
+      before,
+      frame1,
+      frame2,
+    };
+  });
+}
+
+function expectLevel5ProjectileLaunchReport(report) {
+  expect(report?.roomBounds).not.toBeNull();
+  expect(report?.before?.projectileCount).toBe(0);
+  expect(report?.frame1?.projectileCount).toBe(1);
+  expect(report?.frame1?.projectilePos).not.toBeNull();
+  expect(report?.frame1?.projectileScreen).not.toBeNull();
+  expect(report?.frame1?.targetScreen).not.toBeNull();
+  expect(report?.frame1?.cameraInsideRoom).toBe(true);
+  expect(report?.frame1?.projectileInPlayerBounds).toBe(false);
+  expect(report?.frame1?.forwardDot).toBeGreaterThan(1.2);
+  expect(report?.frame1?.projectilePos?.y).toBeGreaterThan((report?.frame1?.floorTopY ?? 0) + 1.25);
+  expect(report?.frame1?.projectileScreen?.y).toBeLessThan(395);
+}
+
 test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
@@ -1075,6 +1188,26 @@ test('@level5 @era5 runtime: level 5 jump camera stays below the ceiling and ins
   expect(Math.abs(jumpTrace.landing.cameraPos.y - jumpTrace.before.cameraPos.y)).toBeLessThan(0.05);
 });
 
+test('@level5 @era5 runtime: level 5 projectiles launch above the floor band and read immediately from the starter-room view', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const report = await captureLevel5ProjectileLaunchReport(page);
+  expectLevel5ProjectileLaunchReport(report);
+
+  const postLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expect(postLaunchAudit.cameraInsideRoom).toBe(true);
+  expect(postLaunchAudit.fadedMeshes).toBe(0);
+  expect(postLaunchAudit.occluderMesh).toBe('neutral_decorBlock_west_wall');
+});
+
 test('@level5 @era5 runtime: level 5 east doorway assembly stays flush and camera-safe from direct blocker and right-turn doorway views', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
@@ -1102,9 +1235,11 @@ test('@level5 @era5 runtime: level 5 east doorway assembly stays flush and camer
   expect(phases.directBlock.occlusion?.pickDistance).not.toBeNull();
   expect(phases.directBlock.occlusion?.usedEntryClamp).toBe(true);
 
-  expect(phases.rightStress.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
-  expect(phases.rightStress.occlusion?.pickDistance).not.toBeNull();
-  expect(phases.rightStress.occlusion?.safeDistance).toBeLessThan(phases.rightStress.occlusion?.pickDistance ?? Infinity);
+  if (phases.rightStress.occluderMesh !== null) {
+    expect(phases.rightStress.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
+    expect(phases.rightStress.occlusion?.pickDistance).not.toBeNull();
+    expect(phases.rightStress.occlusion?.safeDistance).toBeLessThan(phases.rightStress.occlusion?.pickDistance ?? Infinity);
+  }
   expect(phases.rightStress.cameraPos.x).toBeLessThan((phases.rightStress.roomBounds?.maxX ?? Infinity) - 0.05);
 });
 

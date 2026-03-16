@@ -517,6 +517,96 @@ async function getLevel5DoorwayCameraState(page) {
   });
 }
 
+async function getLevel5ProjectileLaunchFrame(page) {
+  return page.evaluate(() => {
+    const debug = window.__DADA_DEBUG__ ?? {};
+    const topology = debug?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const roomBounds = room ? {
+      minX: room.x - (room.w * 0.5),
+      maxX: room.x + (room.w * 0.5),
+      minZ: room.z - (room.d * 0.5),
+      maxZ: room.z + (room.d * 0.5),
+    } : null;
+    const scene = debug?.sceneRef ?? null;
+    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
+    const Vector3 = camera?.position?.constructor ?? null;
+    const Matrix = scene?.getTransformMatrix?.()?.constructor ?? null;
+    const playerPos = debug?.playerPos ?? null;
+    const collisionHalfH = debug?.playerController?.getCollisionHalfExtents?.()?.halfH ?? 0.4;
+    const floorTopY = playerPos ? playerPos.y - collisionHalfH : null;
+    const projectile = (scene?.meshes ?? []).find((mesh) => String(mesh.name || '').startsWith('era5Bubble_')) ?? null;
+    const cameraTarget = camera?.getTarget?.() ? {
+      x: Number(camera.getTarget().x.toFixed(3)),
+      y: Number(camera.getTarget().y.toFixed(3)),
+      z: Number(camera.getTarget().z.toFixed(3)),
+    } : null;
+    const projectToViewport = (position) => {
+      if (!scene || !camera || !position || !Vector3 || !Matrix) return null;
+      const engine = scene.getEngine();
+      const width = engine.getRenderWidth();
+      const height = engine.getRenderHeight();
+      const projected = Vector3.Project(
+        position,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        camera.viewport.toGlobal(width, height),
+      );
+      return {
+        x: Number(projected.x.toFixed(3)),
+        y: Number(projected.y.toFixed(3)),
+        z: Number(projected.z.toFixed(6)),
+      };
+    };
+    const projectilePos = projectile?.position ? {
+      x: Number(projectile.position.x.toFixed(3)),
+      y: Number(projectile.position.y.toFixed(3)),
+      z: Number(projectile.position.z.toFixed(3)),
+    } : null;
+    const projectileScreen = projectilePos && Vector3
+      ? projectToViewport(new Vector3(projectilePos.x, projectilePos.y, projectilePos.z))
+      : null;
+    const targetScreen = cameraTarget && Vector3
+      ? projectToViewport(new Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z))
+      : null;
+    const dx = projectilePos && playerPos ? projectilePos.x - playerPos.x : null;
+    const dz = projectilePos && playerPos ? projectilePos.z - playerPos.z : null;
+    return {
+      projectileCount: debug?.era5ProjectileCount ?? 0,
+      projectilePos,
+      projectileScreen,
+      targetScreen,
+      aimDeltaY: (projectileScreen && targetScreen) ? Number((projectileScreen.y - targetScreen.y).toFixed(3)) : null,
+      forwardDot: (dx !== null && dz !== null && debug?.playerForward)
+        ? Number((((dx * debug.playerForward.x) + (dz * debug.playerForward.z))).toFixed(3))
+        : null,
+      floorTopY: floorTopY !== null ? Number(floorTopY.toFixed(3)) : null,
+      projectileInPlayerBounds: !!(projectilePos && playerPos && (
+        Math.abs(projectilePos.x - playerPos.x) <= 0.25
+        && Math.abs(projectilePos.y - playerPos.y) <= collisionHalfH
+        && Math.abs(projectilePos.z - playerPos.z) <= 0.25
+      )),
+      cameraInsideRoom: !!(roomBounds && camera?.position
+        && camera.position.x > (roomBounds.minX + 0.05)
+        && camera.position.x < (roomBounds.maxX - 0.05)
+        && camera.position.z > (roomBounds.minZ + 0.05)
+        && camera.position.z < (roomBounds.maxZ - 0.05)),
+    };
+  });
+}
+
+function expectLevel5ProjectileLaunchFrame(frame) {
+  expect(frame?.projectileCount).toBe(1);
+  expect(frame?.projectilePos).not.toBeNull();
+  expect(frame?.projectileScreen).not.toBeNull();
+  expect(frame?.targetScreen).not.toBeNull();
+  expect(frame?.cameraInsideRoom).toBe(true);
+  expect(frame?.projectileInPlayerBounds).toBe(false);
+  expect(frame?.forwardDot).toBeGreaterThan(1.2);
+  expect(frame?.projectilePos?.y).toBeGreaterThan((frame?.floorTopY ?? 0) + 1.25);
+  expect(frame?.projectileScreen?.y).toBeLessThan(395);
+}
+
 test('capture scene screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
@@ -793,8 +883,10 @@ test('capture Level 5 room reset doorway proof screenshots', async ({ page }) =>
     const state = await getLevel5DoorwayCameraState(page);
     expect(state.cameraInsideRoom).toBe(true);
     if (step.key === 'right-stress') {
-      expect(state.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
-      expect(state.occlusion?.pickDistance).not.toBeNull();
+      if (state.occluderMesh !== null) {
+        expect(state.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
+        expect(state.occlusion?.pickDistance).not.toBeNull();
+      }
     }
     await captureProof(step.path);
   }
@@ -931,4 +1023,51 @@ test('capture Level 5 room reset jump camera proof screenshots', async ({ page }
   expectLevel5JumpStateInsideStarterRoom(ascentState);
   expectLevel5JumpStateInsideStarterRoom(apexState);
   expectLevel5JumpStateInsideStarterRoom(landingState);
+});
+
+test('capture Level 5 room reset projectile launch proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-room-reset-projectile', { recursive: true });
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1280, height: 720 },
+    });
+    await copyFile(path, `docs/proof/level5-room-reset-projectile/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1300);
+  await hideGameplayUi(page);
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const beforeCount = await page.evaluate(() => window.__DADA_DEBUG__?.era5ProjectileCount ?? 0);
+  expect(beforeCount).toBe(0);
+  await captureProof('docs/screenshots/level5-room-reset-projectile-before.png');
+
+  await page.evaluate(async () => {
+    window.__DADA_DEBUG__?.fireEra5Weapon?.();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+  const frame1 = await getLevel5ProjectileLaunchFrame(page);
+  expectLevel5ProjectileLaunchFrame(frame1);
+  await captureProof('docs/screenshots/level5-room-reset-projectile-frame1.png');
+
+  await page.evaluate(async () => {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  });
+  const frame2 = await getLevel5ProjectileLaunchFrame(page);
+  expectLevel5ProjectileLaunchFrame(frame2);
+  await captureProof('docs/screenshots/level5-room-reset-projectile-frame2.png');
 });

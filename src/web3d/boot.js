@@ -3471,6 +3471,49 @@ export async function boot(options = {}) {
     player.setEra5YawState(era5PlayerYaw, era5PlayerYawVel);
   }
 
+  function getEra5ProjectileLaunchState() {
+    const forward = getEra5PlayerForward();
+    const preset = getEra5CameraPreset();
+    const cameraTarget = camera?.getTarget?.() ?? null;
+    const { halfH, halfD } = player.getCollisionHalfExtents();
+    const floorTopY = player.mesh.position.y - halfH;
+    const muzzleForward = Math.max(1.05, halfD + 0.8);
+    const muzzleHeight = Math.max(
+      floorTopY + 1.12,
+      player.mesh.position.y + 0.86,
+      (cameraTarget?.y ?? (player.mesh.position.y + 0.98)) - 0.12,
+    );
+    const origin = new BABYLON.Vector3(
+      player.mesh.position.x + (forward.x * muzzleForward),
+      muzzleHeight,
+      player.mesh.position.z + (forward.z * muzzleForward),
+    );
+    const aimLead = Math.max(2.6, (preset?.lookAhead ?? 2.2) + 0.8);
+    const aimTarget = cameraTarget
+      ? new BABYLON.Vector3(
+        cameraTarget.x + (forward.x * aimLead),
+        Math.max(muzzleHeight + 0.04, cameraTarget.y + 0.06),
+        cameraTarget.z + (forward.z * aimLead),
+      )
+      : new BABYLON.Vector3(
+        origin.x + (forward.x * aimLead),
+        muzzleHeight + 0.08,
+        origin.z + (forward.z * aimLead),
+      );
+    const direction = aimTarget.subtract(origin);
+    if (direction.lengthSquared() <= 0.0001) {
+      direction.copyFromFloats(forward.x, 0.08, forward.z);
+    }
+    direction.normalize();
+    return {
+      origin,
+      direction,
+      forward,
+      aimTarget,
+      floorTopY,
+    };
+  }
+
   function spawnEra5Projectile(position, direction) {
     const projectile = BABYLON.MeshBuilder.CreateSphere(`era5Bubble_${performance.now().toFixed(0)}`, {
       diameter: 0.24,
@@ -3484,7 +3527,7 @@ export async function boot(options = {}) {
     mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     projectile.material = mat;
     projectile.metadata = { cameraIgnore: true, decor: true };
-    era5Projectiles.push({
+    const projectileState = {
       mesh: projectile,
       position: projectile.position,
       velocity: direction.scale(era5State.stats.weaponProjectileSpeed ?? 11.5),
@@ -3496,15 +3539,17 @@ export async function boot(options = {}) {
       returning: false,
       returnSpeed: Math.max(0, era5State.stats.weaponReturnSpeed ?? 0),
       origin: position.clone(),
-    });
+    };
+    era5Projectiles.push(projectileState);
+    return projectileState;
   }
 
   function fireEra5Weapon() {
     if (!isEra5Level || state !== 'gameplay' || era5WeaponCooldownMs > 0) return false;
     const weaponDef = getEquippedEra5WeaponDef();
     if (!weaponDef) return false;
-    const forward = getEra5PlayerForward();
-    const spawnPos = player.mesh.position.add(new BABYLON.Vector3(forward.x * 0.8, 0.7, forward.z * 0.8));
+    const launchState = getEra5ProjectileLaunchState();
+    const { forward } = launchState;
     if (weaponDef.defId === 'kite_string_whip') {
       const hitResult = world.era5Level?.tryHitByWeapon?.({
         mode: 'arc',
@@ -3518,8 +3563,7 @@ export async function boot(options = {}) {
         ui.showStatus('Spark stunned!', 550);
       }
     } else {
-      spawnEra5Projectile(spawnPos, forward);
-      const projectile = era5Projectiles[era5Projectiles.length - 1];
+      const projectile = spawnEra5Projectile(launchState.origin, launchState.direction);
       if (projectile) {
         projectile.weaponId = weaponDef.defId;
         if (weaponDef.defId === 'foam_blaster') {
