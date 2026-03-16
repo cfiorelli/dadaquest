@@ -3956,17 +3956,20 @@ export async function boot(options = {}) {
       if (travelDistance > 0.001 && !projectile.returning) {
         const travelDir = projectile.mesh.position.subtract(previousPos).normalize();
         const wallRay = new BABYLON.Ray(previousPos, travelDir, travelDistance + projectile.radius);
-        const wallPick = scene.pickWithRay(wallRay, (mesh) => (
-          mesh !== projectile.mesh
-          && !String(mesh.name || '').startsWith('era5Bubble_')
-          && !String(mesh.name || '').startsWith('jelly')
-          && !String(mesh.name || '').startsWith('player')
-          && !String(mesh.name || '').startsWith('baby')
-          && !String(mesh.name || '').startsWith('blobShadow')
-          && !String(mesh.name || '').startsWith('impact_')
-          && mesh.isPickable !== false
-          && (mesh.visibility ?? 1) > 0.08
-        ));
+        const wallPick = scene.pickWithRay(wallRay, (mesh) => {
+          if (mesh === projectile.mesh) return false;
+          const n = String(mesh.name || '');
+          if (n.startsWith('era5Bubble_') || n.startsWith('jelly') || n.startsWith('player')
+            || n.startsWith('baby') || n.startsWith('blobShadow') || n.startsWith('impact_')
+            || n.startsWith('weapon_')) return false;
+          const md = mesh.metadata || {};
+          // Accept solid blocker colliders (invisible, isPickable=true)
+          if (md.gameplayBlocker === true) return true;
+          // Accept visible geometry that is not purely decor or walkable floor
+          if (md.decor || md.cameraIgnore) return false;
+          if (md.truthRole === 'walkable') return false;
+          return (mesh.visibility ?? 1) > 0.08;
+        });
         if (wallPick?.hit && wallPick.pickedPoint) {
           spawnEra5ImpactEffect(wallPick.pickedPoint, projectile.weaponId);
           projectile.mesh.dispose();

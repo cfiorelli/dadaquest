@@ -225,6 +225,8 @@ function makeInvisibleCollider(scene, name, def) {
 
 function makeSolidBlockerCollider(scene, name, def, metadata = {}) {
   const mesh = makeInvisibleCollider(scene, name, def);
+  // Blocker colliders must be pickable so projectile raycasts can detect wall hits
+  mesh.isPickable = true;
   mesh.metadata = {
     ...(mesh.metadata || {}),
     truthRole: 'blocker',
