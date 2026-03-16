@@ -3196,6 +3196,7 @@ export async function boot(options = {}) {
 
   function updateBuffHud() {
     ui.hideBuffContainer();
+    if (isEra5Level) return;
     let onesiePhase = 'IDLE';
     let onesieDisplayMs = 0;
     let onesieDisplayTotal = onesieMaxDurationMs;

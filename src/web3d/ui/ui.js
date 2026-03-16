@@ -2535,15 +2535,11 @@ export function createUI(uiRoot, options = {}) {
     } = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
-      if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = hasShield ? '' : 'none';
-      if (hasShield) renderPips(era5ShieldsEl, shield, shieldMax, 'dada-era5-shield', '◈');
-      if (era5OxygenRowEl) era5OxygenRowEl.style.display = hasTool ? '' : 'none';
-      const oxygenPct = oxygenMax > 0 ? Math.max(0, Math.min(100, (oxygen / oxygenMax) * 100)) : 0;
-      era5OxygenFillEl.style.width = `${oxygenPct}%`;
-      era5OxygenCopyEl.textContent = oxygenMax > 0
-        ? `${oxygen.toFixed(1)} / ${oxygenMax.toFixed(1)}s`
-        : '';
-      era5ToolLabelEl.textContent = toolLabel;
+      if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = 'none';
+      if (era5OxygenRowEl) era5OxygenRowEl.style.display = 'none';
+      if (era5WeaponHelpEl) era5WeaponHelpEl.style.display = 'none';
+      if (era5ToolHelpEl) era5ToolHelpEl.style.display = 'none';
+      era5HintEl.style.display = 'none';
       const weaponPct = weaponCooldownMaxMs > 0
         ? Math.max(0, Math.min(100, 100 - ((weaponCooldownMs / weaponCooldownMaxMs) * 100)))
         : 100;
@@ -2552,12 +2548,6 @@ export function createUI(uiRoot, options = {}) {
       era5WeaponCopyEl.textContent = weaponCooldownMs > 0
         ? `${(weaponCooldownMs / 1000).toFixed(2)}s`
         : 'READY';
-      if (era5WeaponHelpEl) era5WeaponHelpEl.style.display = 'none';
-      if (era5ToolHelpEl) {
-        era5ToolHelpEl.style.display = hasTool ? '' : 'none';
-        if (hasTool) era5ToolHelpEl.textContent = toolHelp;
-      }
-      era5HintEl.textContent = inventoryHint;
       if (era5WeaponStripEl && weaponSlots.length > 0) {
         era5WeaponStripEl.innerHTML = weaponSlots.map((slot, i) => `
           <div class="dada-era5-weapon-pip${slot.active ? ' active' : ''}${!slot.name ? ' empty' : ''}">
