@@ -3263,7 +3263,7 @@ export async function boot(options = {}) {
     const meterMax = getEra5MeterMax(toolDef);
     const inventoryHint = [
       era5InventoryOpen ? 'I Close' : 'I Inventory',
-      progression.windGlideUnlocked ? 'G Wind Glide' : '',
+      progression.windGlideUnlocked ? 'G Glide' : '',
     ].filter(Boolean).join(' • ');
     const weaponInstances = era5State.inventory.filter((item) => {
       const def = getItemDef(item.defId);
@@ -3527,7 +3527,7 @@ export async function boot(options = {}) {
     windGlideActiveMs = WIND_GLIDE_DURATION_MS;
     player.capeFloatTimerMs = Math.max(player.capeFloatTimerMs, 140);
     player.vy = Math.max(player.vy, -1.4);
-    ui.showStatus('Wind Glide!', 850);
+    ui.showStatus('Glide!', 850);
     updateBuffHud();
     syncEra5Ui();
     return true;
@@ -4365,7 +4365,7 @@ export async function boot(options = {}) {
       ui.showEra5Teaser(3600);
     }
     if (completionResult.windGlideUnlockedNow && !progression.unlocksShown?.windGlide) {
-      maybeShowUnlockBanner('WIND GLIDE INSTALLED!', 'Press G in air for one emergency glide per run.', 'windGlide', 3000);
+      maybeShowUnlockBanner('GLIDE INSTALLED!', 'Press G while airborne to slow your fall.', 'windGlide', 3000);
     }
     state = 'end';
     player.setWinAnimationActive(false);

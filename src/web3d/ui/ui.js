@@ -1384,7 +1384,7 @@ export function createUI(uiRoot, options = {}) {
         <div><span>\\</span> Recenter camera</div>
         <div><span>I</span> Inventory</div>
         <div><span>R</span> Reset checkpoint</div>
-        <div><span>G</span> Wind Glide save (when unlocked)</div>
+        <div><span>G</span> Glide (when unlocked)</div>
         <div><span>M</span> Mute</div>
         <div><span>ESC</span> Menu</div>
       `;
@@ -1824,7 +1824,7 @@ export function createUI(uiRoot, options = {}) {
       <div class="dada-buff-card" data-buff="wind">
         <div class="dada-buff-icon cape">WND</div>
         <div class="dada-buff-copy">
-          <div class="dada-buff-label">Wind Glide <span class="dada-buff-state">LOCKED</span></div>
+          <div class="dada-buff-label">Glide <span class="dada-buff-state">LOCKED</span></div>
           <div class="dada-buff-track"><div class="dada-buff-fill cape" style="width:0%"></div></div>
           <div class="dada-buff-note">Locked. Beat Level 7 to unlock</div>
         </div>
@@ -2484,10 +2484,10 @@ export function createUI(uiRoot, options = {}) {
       windFill.style.width = active ? `${pct}%` : '100%';
       if (active) {
         windState.textContent = `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
-        if (windNote) windNote.textContent = 'Stable glide active';
+        if (windNote) windNote.textContent = 'Glide active';
       } else {
         windState.textContent = 'READY';
-        if (windNote) windNote.textContent = 'Press Space in air for a 3s emergency glide';
+        if (windNote) windNote.textContent = 'Press G while airborne to slow your fall';
       }
     },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
@@ -2552,8 +2552,11 @@ export function createUI(uiRoot, options = {}) {
       era5WeaponCopyEl.textContent = weaponCooldownMs > 0
         ? `${(weaponCooldownMs / 1000).toFixed(2)}s`
         : 'READY';
-      if (era5WeaponHelpEl) era5WeaponHelpEl.textContent = weaponHelp;
-      if (era5ToolHelpEl) era5ToolHelpEl.textContent = toolHelp;
+      if (era5WeaponHelpEl) era5WeaponHelpEl.style.display = 'none';
+      if (era5ToolHelpEl) {
+        era5ToolHelpEl.style.display = hasTool ? '' : 'none';
+        if (hasTool) era5ToolHelpEl.textContent = toolHelp;
+      }
       era5HintEl.textContent = inventoryHint;
       if (era5WeaponStripEl && weaponSlots.length > 0) {
         era5WeaponStripEl.innerHTML = weaponSlots.map((slot, i) => `
