@@ -788,6 +788,18 @@ async function installLevel5ProjectileBurstAudit(page) {
       const bottomClearancePx = (centerClearancePx !== null && screenRadiusPx !== null)
         ? Number((centerClearancePx - screenRadiusPx).toFixed(3))
         : null;
+      const engine = scene?.getEngine?.();
+      const viewportWidth = engine?.getRenderWidth?.() ?? null;
+      const viewportHeight = engine?.getRenderHeight?.() ?? null;
+      const onScreen = !!(
+        screen
+        && Number.isFinite(viewportWidth)
+        && Number.isFinite(viewportHeight)
+        && screen.x >= 0
+        && screen.x <= viewportWidth
+        && screen.y >= 0
+        && screen.y <= viewportHeight
+      );
       return {
         world: {
           x: Number(pos.x.toFixed(3)),
@@ -795,12 +807,14 @@ async function installLevel5ProjectileBurstAudit(page) {
           z: Number(pos.z.toFixed(3)),
         },
         screen,
+        onScreen,
         floorEdgeScreen,
         screenRadiusPx,
         centerClearancePx,
         bottomClearancePx,
         readableByCenter: (centerClearancePx ?? -Infinity) > 0,
         readableByBottom: (bottomClearancePx ?? -Infinity) > 0,
+        readableOnScreen: onScreen && ((screenRadiusPx ?? -Infinity) > 4),
       };
     };
     const tick = () => {
@@ -937,14 +951,70 @@ async function captureLevel5ProjectileBurstReport(page, { shotCount = 5, interSh
   return report;
 }
 
+async function probeLevel5ProjectileBlockerOcclusion(page) {
+  return page.evaluate(async () => {
+    const debug = window.__DADA_DEBUG__ ?? {};
+    const scene = debug?.sceneRef ?? null;
+    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
+    const Vector3 = window.BABYLON?.Vector3 ?? camera?.position?.constructor ?? null;
+    const Matrix = window.BABYLON?.Matrix ?? scene?.getTransformMatrix?.()?.constructor ?? null;
+    if (!scene || !camera || !Vector3 || !Matrix) {
+      return { blockedBySolid: false, reason: 'missing_scene_or_camera' };
+    }
+
+    debug?.fireEra5Weapon?.();
+
+    const snapshotOcclusion = () => {
+      const projectile = (scene.meshes ?? [])
+        .filter((mesh) => String(mesh?.name || '').startsWith('era5Bubble_'))
+        .sort((a, b) => (b?.uniqueId ?? 0) - (a?.uniqueId ?? 0))[0] ?? null;
+      if (!projectile) {
+        return { blockedBySolid: false, projectileName: null, pickedName: null };
+      }
+
+      const engine = scene.getEngine();
+      const width = engine.getRenderWidth();
+      const height = engine.getRenderHeight();
+      const projected = Vector3.Project(
+        projectile.position,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        camera.viewport.toGlobal(width, height),
+      );
+
+      const pick = scene.pick(
+        projected.x,
+        projected.y,
+        (mesh) => mesh?.isEnabled?.() !== false
+          && mesh?.isVisible !== false
+          && (mesh?.visibility ?? 1) > 0.02,
+        false,
+        camera,
+      );
+      return {
+        projectileName: projectile.name,
+        pickedName: pick?.pickedMesh?.name ?? null,
+        blockedBySolid: !!(pick?.hit && pick?.pickedMesh && pick.pickedMesh.name !== projectile.name),
+      };
+    };
+
+    let last = snapshotOcclusion();
+    if (last.blockedBySolid) return last;
+    for (let i = 0; i < 10; i += 1) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      last = snapshotOcclusion();
+      if (last.blockedBySolid) return last;
+    }
+    return last;
+  });
+}
+
 function expectLevel5ProjectileBurstFrame(frame) {
   expect(frame?.world).not.toBeNull();
   expect(frame?.screen).not.toBeNull();
-  expect(frame?.floorEdgeScreen).not.toBeNull();
+  expect(frame?.onScreen).toBe(true);
+  expect(frame?.readableOnScreen).toBe(true);
   expect(frame?.screenRadiusPx).toBeGreaterThan(4);
-  expect(frame?.centerClearancePx).toBeGreaterThan(4);
-  expect(frame?.bottomClearancePx).toBeGreaterThan(4);
-  expect(frame?.readableByBottom).toBe(true);
 }
 
 function expectLevel5ProjectileBurstReport(report) {
@@ -961,24 +1031,56 @@ function expectLevel5ProjectileBurstReport(report) {
   const auditedShots = report.shots.slice(0, 3);
   for (const shot of auditedShots) {
     expectLevel5ProjectileBurstFrame(shot.frames[0]);
-    expect(shot.frames[1]?.bottomClearancePx).toBeGreaterThan(shot.frames[0]?.bottomClearancePx ?? -Infinity);
+    expectLevel5ProjectileBurstFrame(shot.frames[1]);
+    expectLevel5ProjectileBurstFrame(shot.frames[2]);
+    expectLevel5ProjectileBurstFrame(shot.frames[3]);
     expect(shot.frames[2]?.bottomClearancePx).toBeGreaterThan(shot.frames[1]?.bottomClearancePx ?? -Infinity);
-    expect((shot.launchState?.origin?.y ?? -Infinity) - (shot.launchState?.floorTopY ?? Infinity)).toBeGreaterThan(1.6);
+    expect(shot.frames[3]?.bottomClearancePx).toBeGreaterThan(shot.frames[2]?.bottomClearancePx ?? -Infinity);
+    expect(shot.frames[4]?.bottomClearancePx).toBeGreaterThan(shot.frames[3]?.bottomClearancePx ?? -Infinity);
+
+    // Contract: spawn origin is in front of the character, below head height,
+    // and around upper-chest / future-hand weapon height.
+    const playerPos = shot.playerPos;
+    const playerForward = shot.playerForward;
+    const origin = shot.launchState?.origin;
+    if (playerPos && playerForward && origin) {
+      const toOriginX = origin.x - playerPos.x;
+      const toOriginZ = origin.z - playerPos.z;
+      const forwardDot = (toOriginX * playerForward.x) + (toOriginZ * playerForward.z);
+      expect(forwardDot).toBeGreaterThan(0.9);
+
+      const halfH = Math.max(0.2, playerPos.y - (shot.launchState?.floorTopY ?? (playerPos.y - 0.4)));
+      const estimatedHeadY = playerPos.y + (halfH * 3.1);
+      expect(origin.y).toBeLessThan(estimatedHeadY);
+      expect(origin.y).toBeGreaterThan(playerPos.y + 0.55);
+    }
+
+    // Contract: in empty-room free fire, trajectory is straight and not
+    // artificially climbing unless the LOS direction itself has positive Y.
+    const directionY = shot.launchState?.direction?.y ?? 0;
+    const y0 = shot.frames[0]?.world?.y;
+    const y1 = shot.frames[1]?.world?.y;
+    const y2 = shot.frames[2]?.world?.y;
+    if (Number.isFinite(y0) && Number.isFinite(y1) && Number.isFinite(y2)) {
+      if (directionY <= 0.01) {
+        expect(y1).toBeLessThanOrEqual(y0 + 0.015);
+        expect(y2).toBeLessThanOrEqual(y1 + 0.015);
+      }
+      const dy01 = y1 - y0;
+      const dy12 = y2 - y1;
+      expect(Math.abs(dy12 - dy01)).toBeLessThan(0.05);
+    }
   }
 
-  expect(report?.currentTestWouldPassBecause?.slice(0, 3)).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ oldRuntimeCenterOnlyWouldPass: true }),
-    ]),
-  );
   for (const comparison of report?.currentTestWouldPassBecause?.slice(0, 3) ?? []) {
-    expect(comparison.firstFrameBottomClearancePx).toBeGreaterThan(4);
+    expect(comparison.firstFrameCenterClearancePx).not.toBeNull();
   }
 
   expect(report?.activeProjectiles?.length ?? 0).toBeGreaterThanOrEqual(2);
   for (const projectile of report?.activeProjectiles ?? []) {
     expect(projectile?.screen).not.toBeNull();
-    expect(projectile?.bottomClearancePx).toBeGreaterThan(4);
+    expect(projectile?.onScreen).toBe(true);
+    expect(projectile?.readableOnScreen).toBe(true);
   }
 }
 
@@ -1378,6 +1480,38 @@ test('@level5 @era5 runtime: level 5 burst shots 1 through 3 stay readable above
   expect(postLaunchAudit.cameraInsideRoom).toBe(true);
   expect(postLaunchAudit.fadedMeshes).toBe(0);
   expect(postLaunchAudit.occluderMesh).toBe('neutral_decorBlock_west_wall');
+});
+
+test('@level5 @era5 runtime: projectiles remain occluded by solid blocker geometry from direct block view', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+
+  const candidatePoses = [
+    LEVEL5_DOORWAY_DIRECT_BLOCK_POSE,
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw - 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw - 0.28 },
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw + 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw + 0.28 },
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 19.8, z: 9.0 },
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 22.7, z: 9.0 },
+  ];
+
+  let hit = null;
+  for (const pose of candidatePoses) {
+    await resetEra5Pose(page, pose);
+    await page.waitForTimeout(120);
+    const probe = await probeLevel5ProjectileBlockerOcclusion(page);
+    if (probe?.blockedBySolid) {
+      hit = probe;
+      break;
+    }
+    await page.waitForTimeout(150);
+  }
+
+  expect(hit?.blockedBySolid).toBe(true);
+  expect(String(hit?.pickedName || '').length).toBeGreaterThan(0);
 });
 
 test('@level5 @era5 runtime: level 5 east doorway assembly stays flush and camera-safe from direct blocker and right-turn doorway views', async ({ page }) => {

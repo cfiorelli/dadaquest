@@ -3478,10 +3478,13 @@ export async function boot(options = {}) {
     const { halfH, halfD } = player.getCollisionHalfExtents();
     const floorTopY = player.mesh.position.y - halfH;
     const muzzleForward = Math.max(1.18, halfD + 0.94);
+    const desiredMuzzleHeight = Math.min(
+      player.mesh.position.y + 0.92,
+      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) - 0.18,
+    );
     const muzzleHeight = Math.max(
-      floorTopY + 1.62,
-      player.mesh.position.y + 1.32,
-      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) + 0.52,
+      floorTopY + 1.18,
+      desiredMuzzleHeight,
     );
     const origin = new BABYLON.Vector3(
       player.mesh.position.x + (forward.x * muzzleForward),
@@ -3489,22 +3492,28 @@ export async function boot(options = {}) {
       player.mesh.position.z + (forward.z * muzzleForward),
     );
     const aimLead = Math.max(2.05, (preset?.lookAhead ?? 2.2) + 0.28);
-    const aimTarget = cameraTarget
+    const sightOrigin = new BABYLON.Vector3(
+      player.mesh.position.x,
+      cameraTarget?.y ?? (player.mesh.position.y + 1.16),
+      player.mesh.position.z,
+    );
+    const sightTarget = cameraTarget
       ? new BABYLON.Vector3(
         cameraTarget.x + (forward.x * aimLead),
-        Math.max(muzzleHeight + 0.74, cameraTarget.y + 1.12),
+        cameraTarget.y,
         cameraTarget.z + (forward.z * aimLead),
       )
       : new BABYLON.Vector3(
-        origin.x + (forward.x * aimLead),
-        muzzleHeight + 0.82,
-        origin.z + (forward.z * aimLead),
+        sightOrigin.x + (forward.x * aimLead),
+        sightOrigin.y,
+        sightOrigin.z + (forward.z * aimLead),
       );
-    const direction = aimTarget.subtract(origin);
+    const direction = sightTarget.subtract(sightOrigin);
     if (direction.lengthSquared() <= 0.0001) {
-      direction.copyFromFloats(forward.x, 0.08, forward.z);
+      direction.copyFromFloats(forward.x, 0.0, forward.z);
     }
     direction.normalize();
+    const aimTarget = origin.add(direction.scale(aimLead));
     return {
       origin,
       direction,
@@ -3741,7 +3750,6 @@ export async function boot(options = {}) {
       }
       const previousPos = projectile.mesh.position.clone();
       projectile.mesh.position.addInPlace(projectile.velocity.scale(dt));
-      projectile.mesh.position.y += dt * 0.24;
       const scale = 0.94 + ((projectile.lifeMs / Math.max(1, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000)) * 0.16);
       projectile.mesh.scaling.set(scale, scale, scale);
       const travelDistance = BABYLON.Vector3.Distance(previousPos, projectile.mesh.position);
