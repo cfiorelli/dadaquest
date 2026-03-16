@@ -3324,39 +3324,42 @@ export async function boot(options = {}) {
       return mat;
     }
 
+    // Scale: weapons are 2× actual size so they're visible at the 16-unit camera distance
+    const S = 2.0;
+
     if (defId === 'bubble_wand') {
       const wand = BABYLON.MeshBuilder.CreateCylinder(`${defId}_wand`, {
-        height: 0.28, diameterTop: 0.025, diameterBottom: 0.03, tessellation: 8,
+        height: 0.28 * S, diameterTop: 0.025 * S, diameterBottom: 0.03 * S, tessellation: 8,
       }, scene);
       wand.parent = root;
       wand.rotation.z = Math.PI * 0.5;
       wand.material = solidMat(`${defId}_mat`, 0.72, 0.48, 0.92);
-      const orb = BABYLON.MeshBuilder.CreateSphere(`${defId}_orb`, { diameter: 0.065, segments: 6 }, scene);
+      const orb = BABYLON.MeshBuilder.CreateSphere(`${defId}_orb`, { diameter: 0.08 * S, segments: 6 }, scene);
       orb.parent = root;
-      orb.position.x = 0.16;
+      orb.position.x = 0.16 * S;
       const orbMat = new BABYLON.StandardMaterial(`${defId}_orbmat`, scene);
       orbMat.diffuseColor = new BABYLON.Color3(0.7, 0.96, 1.0);
-      orbMat.emissiveColor = new BABYLON.Color3(0.1, 0.3, 0.4);
+      orbMat.emissiveColor = new BABYLON.Color3(0.14, 0.38, 0.50);
       orbMat.alpha = 0.88;
       orbMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
       orb.material = orbMat;
     } else if (defId === 'foam_blaster') {
       const body = BABYLON.MeshBuilder.CreateBox(`${defId}_body`, {
-        width: 0.20, height: 0.07, depth: 0.06,
+        width: 0.20 * S, height: 0.07 * S, depth: 0.06 * S,
       }, scene);
       body.parent = root;
-      body.position.x = 0.05;
+      body.position.x = 0.05 * S;
       body.material = solidMat(`${defId}_mat`, 0.2, 0.72, 0.68);
       const barrel = BABYLON.MeshBuilder.CreateCylinder(`${defId}_barrel`, {
-        height: 0.14, diameterTop: 0.024, diameterBottom: 0.028, tessellation: 8,
+        height: 0.14 * S, diameterTop: 0.024 * S, diameterBottom: 0.028 * S, tessellation: 8,
       }, scene);
       barrel.parent = root;
       barrel.rotation.z = Math.PI * 0.5;
-      barrel.position.x = 0.17;
+      barrel.position.x = 0.17 * S;
       barrel.material = solidMat(`${defId}_bmat`, 0.14, 0.48, 0.46);
     } else if (defId === 'paper_fan') {
       const handle = BABYLON.MeshBuilder.CreateCylinder(`${defId}_handle`, {
-        height: 0.14, diameterTop: 0.022, diameterBottom: 0.026, tessellation: 8,
+        height: 0.14 * S, diameterTop: 0.022 * S, diameterBottom: 0.026 * S, tessellation: 8,
       }, scene);
       handle.parent = root;
       handle.rotation.z = Math.PI * 0.5;
@@ -3364,15 +3367,15 @@ export async function boot(options = {}) {
       const fanMat = solidMat(`${defId}_fmat`, 0.98, 0.52, 0.72, 0.3);
       fanMat.backFaceCulling = false;
       for (let f = 0; f < 4; f += 1) {
-        const petal = BABYLON.MeshBuilder.CreatePlane(`${defId}_petal${f}`, { width: 0.10, height: 0.07 }, scene);
+        const petal = BABYLON.MeshBuilder.CreatePlane(`${defId}_petal${f}`, { width: 0.10 * S, height: 0.07 * S }, scene);
         petal.parent = root;
-        petal.position.x = 0.11;
+        petal.position.x = 0.11 * S;
         petal.rotation.x = (f * Math.PI * 0.5);
         petal.material = fanMat;
       }
     } else if (defId === 'bookmark_boomerang') {
       const disk = BABYLON.MeshBuilder.CreateCylinder(`${defId}_disk`, {
-        height: 0.018, diameter: 0.22, tessellation: 20,
+        height: 0.018 * S, diameter: 0.22 * S, tessellation: 20,
       }, scene);
       disk.parent = root;
       disk.rotation.z = Math.PI * 0.5;
@@ -3380,19 +3383,19 @@ export async function boot(options = {}) {
       disk.material = solidMat(`${defId}_mat`, 0.84, 0.70, 0.42);
     } else if (defId === 'kite_string_whip') {
       const barrel = BABYLON.MeshBuilder.CreateCylinder(`${defId}_barrel`, {
-        height: 0.22, diameterTop: 0.044, diameterBottom: 0.052, tessellation: 10,
+        height: 0.22 * S, diameterTop: 0.044 * S, diameterBottom: 0.052 * S, tessellation: 10,
       }, scene);
       barrel.parent = root;
       barrel.rotation.z = Math.PI * 0.5;
-      barrel.position.x = 0.06;
+      barrel.position.x = 0.06 * S;
       barrel.material = solidMat(`${defId}_mat`, 0.58, 0.62, 0.30);
       const finMat = solidMat(`${defId}_fmat`, 0.42, 0.46, 0.22);
       const finOffsets = [
-        [0, 0.04], [0, -0.04], [0.04, 0], [-0.04, 0],
+        [0, 0.04 * S], [0, -0.04 * S], [0.04 * S, 0], [-0.04 * S, 0],
       ];
       for (let f = 0; f < finOffsets.length; f += 1) {
         const fin = BABYLON.MeshBuilder.CreateBox(`${defId}_fin${f}`, {
-          width: 0.04, height: 0.08, depth: 0.01,
+          width: 0.04 * S, height: 0.08 * S, depth: 0.012 * S,
         }, scene);
         fin.parent = barrel;
         fin.position.set(finOffsets[f][0], finOffsets[f][1], 0);
@@ -3405,6 +3408,7 @@ export async function boot(options = {}) {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
       mesh.renderingGroupId = 0;
+      mesh.alwaysSelectAsActiveMesh = true;
     });
     return root;
   }

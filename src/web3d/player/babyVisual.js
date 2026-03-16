@@ -263,7 +263,7 @@ export function createBabyVisual(scene) {
   // Weapon anchor: child of armRPivot at right-hand tip, facing forward (-Z)
   const weaponAnchor = new BABYLON.TransformNode('weaponAnchor', scene);
   weaponAnchor.parent = armRPivot;
-  weaponAnchor.position.set(0.26, -0.04, -0.08);
+  weaponAnchor.position.set(0.32, -0.04, -0.04);
 
   const shadowMeshes = [
     body, tummy, neck, head, hairCap, earL, earR,
