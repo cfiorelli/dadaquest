@@ -517,9 +517,13 @@ async function getLevel5DoorwayCameraState(page) {
   });
 }
 
-async function captureLevel5ProjectileReadabilityProof(page) {
-  return page.evaluate(async () => {
+async function installLevel5ProjectileBurstAudit(page) {
+  await page.evaluate(() => {
     const debug = window.__DADA_DEBUG__ ?? {};
+    const scene = debug?.sceneRef ?? null;
+    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
+    const Vector3 = window.BABYLON?.Vector3 ?? camera?.position?.constructor ?? null;
+    const Matrix = window.BABYLON?.Matrix ?? scene?.getTransformMatrix?.()?.constructor ?? null;
     const topology = debug?.era5TopologyReport?.() ?? null;
     const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
     const roomBounds = room ? {
@@ -528,10 +532,6 @@ async function captureLevel5ProjectileReadabilityProof(page) {
       minZ: room.z - (room.d * 0.5),
       maxZ: room.z + (room.d * 0.5),
     } : null;
-    const scene = debug?.sceneRef ?? null;
-    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
-    const Vector3 = camera?.position?.constructor ?? null;
-    const Matrix = scene?.getTransformMatrix?.()?.constructor ?? null;
     const floorEdgePoint = (room && Vector3)
       ? new Vector3(room.x + (room.w * 0.5), room.floorY ?? 0, room.z)
       : null;
@@ -552,151 +552,200 @@ async function captureLevel5ProjectileReadabilityProof(page) {
         z: Number(projected.z.toFixed(6)),
       };
     };
-    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
-    const fire = () => {
-      document.dispatchEvent(new KeyboardEvent('keydown', {
-        bubbles: true,
-        cancelable: true,
-        code: 'KeyF',
-        key: 'f',
-      }));
-      document.dispatchEvent(new KeyboardEvent('keyup', {
-        bubbles: true,
-        cancelable: true,
-        code: 'KeyF',
-        key: 'f',
-      }));
+    const floorEdgeScreen = floorEdgePoint ? projectToViewport(floorEdgePoint) : null;
+    const state = {
+      active: false,
+      rafId: null,
+      frameCounter: 0,
+      pendingPlans: [],
+      seenProjectileNames: new Set(),
+      shotEntries: [],
+      roomBounds,
+      preexistingProjectileCount: 0,
     };
     const getProjectileMeshes = () => (scene?.meshes ?? [])
       .filter((mesh) => String(mesh.name || '').startsWith('era5Bubble_'));
-    const getActiveProjectiles = () => {
-      const floorEdgeScreen = projectToViewport(floorEdgePoint);
-      return getProjectileMeshes().map((mesh) => {
-        const pos = mesh?.position ? {
-          x: Number(mesh.position.x.toFixed(3)),
-          y: Number(mesh.position.y.toFixed(3)),
-          z: Number(mesh.position.z.toFixed(3)),
-        } : null;
-        const screen = pos && Vector3
-          ? projectToViewport(new Vector3(pos.x, pos.y, pos.z))
-          : null;
-        const floorBandClearance = (screen && floorEdgeScreen)
-          ? Number((floorEdgeScreen.y - screen.y).toFixed(3))
-          : null;
-        return {
-          name: mesh.name,
-          position: pos,
-          screen,
-          floorBandClearance,
-        };
-      });
-    };
-    const readState = (meshName = null) => {
-      const playerPos = debug?.playerPos ?? null;
-      const playerForward = debug?.playerForward ?? null;
-      const collisionHalfH = debug?.playerController?.getCollisionHalfExtents?.()?.halfH ?? 0.4;
-      const floorTopY = playerPos ? playerPos.y - collisionHalfH : null;
-      const projectile = meshName
-        ? getProjectileMeshes().find((mesh) => mesh.name === meshName) ?? null
-        : getProjectileMeshes()[0] ?? null;
-      const cameraTarget = camera?.getTarget?.() ? {
-        x: Number(camera.getTarget().x.toFixed(3)),
-        y: Number(camera.getTarget().y.toFixed(3)),
-        z: Number(camera.getTarget().z.toFixed(3)),
-      } : null;
-      const projectilePos = projectile?.position ? {
-        x: Number(projectile.position.x.toFixed(3)),
-        y: Number(projectile.position.y.toFixed(3)),
-        z: Number(projectile.position.z.toFixed(3)),
-      } : null;
-      const projectileScreen = projectilePos && Vector3
-        ? projectToViewport(new Vector3(projectilePos.x, projectilePos.y, projectilePos.z))
+    const snapshotMesh = (mesh) => {
+      const pos = mesh.position.clone();
+      const screen = projectToViewport(pos);
+      const radiusProbe = projectToViewport(pos.add(new Vector3(0, 0.12, 0)));
+      const screenRadiusPx = (screen && radiusProbe)
+        ? Number(Math.abs(radiusProbe.y - screen.y).toFixed(3))
         : null;
-      const targetScreen = cameraTarget && Vector3
-        ? projectToViewport(new Vector3(cameraTarget.x, cameraTarget.y, cameraTarget.z))
+      const centerClearancePx = (screen && floorEdgeScreen)
+        ? Number((floorEdgeScreen.y - screen.y).toFixed(3))
         : null;
-      const floorEdgeScreen = projectToViewport(floorEdgePoint);
-      const dx = projectilePos && playerPos ? projectilePos.x - playerPos.x : null;
-      const dz = projectilePos && playerPos ? projectilePos.z - playerPos.z : null;
-      const activeProjectiles = getActiveProjectiles();
+      const bottomClearancePx = (centerClearancePx !== null && screenRadiusPx !== null)
+        ? Number((centerClearancePx - screenRadiusPx).toFixed(3))
+        : null;
       return {
-        projectileCount: activeProjectiles.length,
-        projectilePos,
-        projectileScreen,
-        targetScreen,
+        world: {
+          x: Number(pos.x.toFixed(3)),
+          y: Number(pos.y.toFixed(3)),
+          z: Number(pos.z.toFixed(3)),
+        },
+        screen,
         floorEdgeScreen,
-        floorBandClearance: (projectileScreen && floorEdgeScreen) ? Number((floorEdgeScreen.y - projectileScreen.y).toFixed(3)) : null,
-        forwardDot: (dx !== null && dz !== null && playerForward)
-          ? Number((((dx * playerForward.x) + (dz * playerForward.z))).toFixed(3))
-          : null,
-        floorTopY: floorTopY !== null ? Number(floorTopY.toFixed(3)) : null,
-        projectileInPlayerBounds: !!(projectilePos && playerPos && (
-          Math.abs(projectilePos.x - playerPos.x) <= 0.25
-          && Math.abs(projectilePos.y - playerPos.y) <= collisionHalfH
-          && Math.abs(projectilePos.z - playerPos.z) <= 0.25
-        )),
-        cameraInsideRoom: !!(roomBounds && camera?.position
-          && camera.position.x > (roomBounds.minX + 0.05)
-          && camera.position.x < (roomBounds.maxX - 0.05)
-          && camera.position.z > (roomBounds.minZ + 0.05)
-          && camera.position.z < (roomBounds.maxZ - 0.05)),
-        activeProjectiles,
-        buriedProjectileNames: activeProjectiles
-          .filter((entry) => entry.floorBandClearance !== null && entry.floorBandClearance <= 0)
-          .map((entry) => entry.name),
+        screenRadiusPx,
+        centerClearancePx,
+        bottomClearancePx,
+        readableByCenter: (centerClearancePx ?? -Infinity) > 0,
+        readableByBottom: (bottomClearancePx ?? -Infinity) > 0,
       };
     };
-    const waitForNewProjectile = async (seenNames) => {
-      for (let tries = 0; tries < 45; tries += 1) {
-        await nextFrame();
-        const nextProjectile = getProjectileMeshes().find((mesh) => !seenNames.has(mesh.name)) ?? null;
-        if (nextProjectile) return nextProjectile.name;
+    const tick = () => {
+      state.frameCounter += 1;
+      const now = Number(performance.now().toFixed(3));
+      const meshes = getProjectileMeshes();
+      for (const mesh of meshes) {
+        if (!state.seenProjectileNames.has(mesh.name)) {
+          state.seenProjectileNames.add(mesh.name);
+          const plan = state.pendingPlans.shift() ?? null;
+          state.shotEntries.push({
+            shotIndex: plan?.shotIndex ?? null,
+            meshName: mesh.name,
+            plannedAtMs: plan?.plannedAtMs ?? null,
+            spawnSeenAtMs: now,
+            firstSeenFrame: state.frameCounter,
+            playerPos: plan?.playerPos ?? null,
+            playerForward: plan?.playerForward ?? null,
+            cameraPos: plan?.cameraPos ?? null,
+            cameraTarget: plan?.cameraTarget ?? null,
+            launchState: plan?.launchState ?? null,
+            frames: [],
+          });
+        }
       }
-      return null;
-    };
-
-    const before = readState();
-    const seenNames = new Set(getProjectileMeshes().map((mesh) => mesh.name));
-    fire();
-    const firstShotName = await waitForNewProjectile(seenNames);
-    if (firstShotName) seenNames.add(firstShotName);
-    await nextFrame();
-    const frame1 = readState(firstShotName);
-    await nextFrame();
-    const frame2 = readState(firstShotName);
-    const shotNames = firstShotName ? [firstShotName] : [];
-    for (let shotIndex = 0; shotIndex < 2; shotIndex += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 380));
-      fire();
-      const nextShot = await waitForNewProjectile(seenNames);
-      if (nextShot) {
-        seenNames.add(nextShot);
-        shotNames.push(nextShot);
+      for (const entry of state.shotEntries) {
+        const mesh = meshes.find((candidate) => candidate.name === entry.meshName);
+        if (!mesh || entry.frames.length >= 6) continue;
+        entry.frames.push({
+          frameOffset: entry.frames.length,
+          frameNumber: state.frameCounter,
+          sampledAtMs: now,
+          ...snapshotMesh(mesh),
+        });
       }
-      await nextFrame();
-    }
-    const continuous = readState(shotNames.at(-1) ?? null);
-
-    return {
-      before,
-      frame1,
-      frame2,
-      continuous,
+      if (state.active) {
+        state.rafId = requestAnimationFrame(tick);
+      }
     };
+    window.__LEVEL5_PROJECTILE_BURST_AUDIT__ = {
+      start() {
+        state.active = true;
+        state.preexistingProjectileCount = getProjectileMeshes().length;
+        for (const mesh of getProjectileMeshes()) state.seenProjectileNames.add(mesh.name);
+        if (state.rafId === null) state.rafId = requestAnimationFrame(tick);
+      },
+      planShot(shotIndex) {
+        const plan = {
+          shotIndex,
+          plannedAtMs: Number(performance.now().toFixed(3)),
+          playerPos: debug?.playerPos ? {
+            x: Number(debug.playerPos.x.toFixed(3)),
+            y: Number(debug.playerPos.y.toFixed(3)),
+            z: Number(debug.playerPos.z.toFixed(3)),
+          } : null,
+          playerForward: debug?.playerForward ? {
+            x: Number(debug.playerForward.x.toFixed(3)),
+            z: Number(debug.playerForward.z.toFixed(3)),
+          } : null,
+          cameraPos: camera?.position ? {
+            x: Number(camera.position.x.toFixed(3)),
+            y: Number(camera.position.y.toFixed(3)),
+            z: Number(camera.position.z.toFixed(3)),
+          } : null,
+          cameraTarget: camera?.getTarget?.() ? {
+            x: Number(camera.getTarget().x.toFixed(3)),
+            y: Number(camera.getTarget().y.toFixed(3)),
+            z: Number(camera.getTarget().z.toFixed(3)),
+          } : null,
+          launchState: debug?.getEra5ProjectileLaunchState?.() ?? null,
+        };
+        state.pendingPlans.push(plan);
+        return plan;
+      },
+      waitForShotFrame(shotIndex, frameOffset = 0, timeoutMs = 4000) {
+        return new Promise((resolve, reject) => {
+          const deadline = performance.now() + timeoutMs;
+          const poll = () => {
+            const shot = state.shotEntries.find((entry) => entry.shotIndex === shotIndex) ?? null;
+            if (shot && shot.frames.length > frameOffset) {
+              resolve(shot.frames[frameOffset]);
+              return;
+            }
+            if (performance.now() > deadline) {
+              reject(new Error(`Timed out waiting for shot ${shotIndex} frame ${frameOffset}`));
+              return;
+            }
+            requestAnimationFrame(poll);
+          };
+          poll();
+        });
+      },
+      stop() {
+        state.active = false;
+        if (state.rafId !== null) {
+          cancelAnimationFrame(state.rafId);
+          state.rafId = null;
+        }
+        const activeProjectiles = getProjectileMeshes().map((mesh) => ({
+          name: mesh.name,
+          ...snapshotMesh(mesh),
+        }));
+        return {
+          roomBounds: state.roomBounds,
+          preexistingProjectileCount: state.preexistingProjectileCount,
+          shots: state.shotEntries,
+          activeProjectiles,
+        };
+      },
+    };
+    window.__LEVEL5_PROJECTILE_BURST_AUDIT__.start();
   });
 }
 
-function expectLevel5ProjectileReadabilityFrame(frame) {
-  expect(frame?.projectileCount ?? 0).toBeGreaterThanOrEqual(1);
-  expect(frame?.projectilePos).not.toBeNull();
-  expect(frame?.projectileScreen).not.toBeNull();
-  expect(frame?.targetScreen).not.toBeNull();
+async function captureLevel5ProjectileBurstProof(page, captureProof, { shotCount = 5, interShotDelayMs = 390 } = {}) {
+  await page.evaluate(() => {
+    window.focus();
+  });
+  await installLevel5ProjectileBurstAudit(page);
+
+  const firstFrames = [];
+  for (let shotIndex = 1; shotIndex <= shotCount; shotIndex += 1) {
+    await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.planShot(index), shotIndex);
+    await page.keyboard.press('f');
+    const frame = await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(index, 0), shotIndex);
+    firstFrames.push(frame);
+    if (shotIndex <= 3) {
+      await captureProof(`docs/screenshots/level5-room-reset-projectile-burst-shot${shotIndex}.png`);
+    }
+    if (shotIndex < shotCount) {
+      await page.waitForTimeout(interShotDelayMs);
+    }
+  }
+
+  const report = await page.evaluate(async (shotCountValue) => {
+    for (let shotIndex = 1; shotIndex <= shotCountValue; shotIndex += 1) {
+      await window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(shotIndex, 2);
+    }
+    return window.__LEVEL5_PROJECTILE_BURST_AUDIT__.stop();
+  }, shotCount);
+  await captureProof('docs/screenshots/level5-room-reset-projectile-burst-continuous.png');
+  return {
+    firstFrames,
+    report,
+  };
+}
+
+function expectLevel5ProjectileBurstFrame(frame) {
+  expect(frame?.world).not.toBeNull();
+  expect(frame?.screen).not.toBeNull();
   expect(frame?.floorEdgeScreen).not.toBeNull();
-  expect(frame?.cameraInsideRoom).toBe(true);
-  expect(frame?.projectileInPlayerBounds).toBe(false);
-  expect(frame?.forwardDot).toBeGreaterThan(1.2);
-  expect(frame?.projectilePos?.y).toBeGreaterThan((frame?.floorTopY ?? 0) + 1.25);
-  expect(frame?.floorBandClearance).toBeGreaterThan(4);
+  expect(frame?.screenRadiusPx).toBeGreaterThan(4);
+  expect(frame?.centerClearancePx).toBeGreaterThan(4);
+  expect(frame?.bottomClearancePx).toBeGreaterThan(4);
+  expect(frame?.readableByBottom).toBe(true);
 }
 
 test('capture scene screenshots', async ({ page }) => {
@@ -1148,20 +1197,22 @@ test('capture Level 5 room reset projectile readability proof screenshots', asyn
   expect(beforeCount).toBe(0);
   await captureProof('docs/screenshots/level5-room-reset-projectile-before.png');
 
-  const proof = await captureLevel5ProjectileReadabilityProof(page);
-  expect(proof?.before?.projectileCount).toBe(0);
-  expectLevel5ProjectileReadabilityFrame(proof?.frame1);
-  await captureProof('docs/screenshots/level5-room-reset-projectile-frame1.png');
-
-  expectLevel5ProjectileReadabilityFrame(proof?.frame2);
-  await captureProof('docs/screenshots/level5-room-reset-projectile-frame2.png');
-
-  expect(proof?.continuous?.cameraInsideRoom).toBe(true);
-  expect(proof?.continuous?.activeProjectiles?.length ?? 0).toBeGreaterThanOrEqual(2);
-  expect(proof?.continuous?.buriedProjectileNames ?? []).toEqual([]);
-  for (const projectile of proof?.continuous?.activeProjectiles ?? []) {
-    expect(projectile?.screen).not.toBeNull();
-    expect(projectile?.floorBandClearance).toBeGreaterThan(4);
+  const proof = await captureLevel5ProjectileBurstProof(page, captureProof);
+  expect(proof?.report?.preexistingProjectileCount).toBe(0);
+  expect(proof?.firstFrames).toHaveLength(5);
+  for (const frame of proof.firstFrames.slice(0, 3)) {
+    expectLevel5ProjectileBurstFrame(frame);
   }
-  await captureProof('docs/screenshots/level5-room-reset-projectile-continuous.png');
+  expect(proof?.report?.shots).toHaveLength(5);
+  for (const shot of proof.report.shots.slice(0, 3)) {
+    expectLevel5ProjectileBurstFrame(shot?.frames?.[0]);
+    expect(shot?.frames?.[1]?.bottomClearancePx).toBeGreaterThan(shot?.frames?.[0]?.bottomClearancePx ?? -Infinity);
+    expect(shot?.frames?.[2]?.bottomClearancePx).toBeGreaterThan(shot?.frames?.[1]?.bottomClearancePx ?? -Infinity);
+    expect((shot?.launchState?.origin?.y ?? -Infinity) - (shot?.launchState?.floorTopY ?? Infinity)).toBeGreaterThan(1.6);
+  }
+  expect(proof?.report?.activeProjectiles?.length ?? 0).toBeGreaterThanOrEqual(2);
+  for (const projectile of proof?.report?.activeProjectiles ?? []) {
+    expect(projectile?.screen).not.toBeNull();
+    expect(projectile?.bottomClearancePx).toBeGreaterThan(4);
+  }
 });

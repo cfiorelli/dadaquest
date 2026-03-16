@@ -3477,27 +3477,27 @@ export async function boot(options = {}) {
     const cameraTarget = camera?.getTarget?.() ?? null;
     const { halfH, halfD } = player.getCollisionHalfExtents();
     const floorTopY = player.mesh.position.y - halfH;
-    const muzzleForward = Math.max(1.05, halfD + 0.8);
+    const muzzleForward = Math.max(1.18, halfD + 0.94);
     const muzzleHeight = Math.max(
-      floorTopY + 1.40,
-      player.mesh.position.y + 1.10,
-      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) + 0.18,
+      floorTopY + 1.62,
+      player.mesh.position.y + 1.32,
+      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) + 0.52,
     );
     const origin = new BABYLON.Vector3(
       player.mesh.position.x + (forward.x * muzzleForward),
       muzzleHeight,
       player.mesh.position.z + (forward.z * muzzleForward),
     );
-    const aimLead = Math.max(2.35, (preset?.lookAhead ?? 2.2) + 0.55);
+    const aimLead = Math.max(2.05, (preset?.lookAhead ?? 2.2) + 0.28);
     const aimTarget = cameraTarget
       ? new BABYLON.Vector3(
         cameraTarget.x + (forward.x * aimLead),
-        Math.max(muzzleHeight + 0.42, cameraTarget.y + 0.72),
+        Math.max(muzzleHeight + 0.74, cameraTarget.y + 1.12),
         cameraTarget.z + (forward.z * aimLead),
       )
       : new BABYLON.Vector3(
         origin.x + (forward.x * aimLead),
-        muzzleHeight + 0.48,
+        muzzleHeight + 0.82,
         origin.z + (forward.z * aimLead),
       );
     const direction = aimTarget.subtract(origin);
@@ -4776,6 +4776,27 @@ export async function boot(options = {}) {
       };
     };
     window.__DADA_DEBUG__.fireEra5Weapon = () => fireEra5Weapon();
+    window.__DADA_DEBUG__.getEra5ProjectileLaunchState = () => {
+      const launchState = getEra5ProjectileLaunchState();
+      return {
+        origin: {
+          x: Number(launchState.origin.x.toFixed(3)),
+          y: Number(launchState.origin.y.toFixed(3)),
+          z: Number(launchState.origin.z.toFixed(3)),
+        },
+        direction: {
+          x: Number(launchState.direction.x.toFixed(3)),
+          y: Number(launchState.direction.y.toFixed(3)),
+          z: Number(launchState.direction.z.toFixed(3)),
+        },
+        aimTarget: {
+          x: Number(launchState.aimTarget.x.toFixed(3)),
+          y: Number(launchState.aimTarget.y.toFixed(3)),
+          z: Number(launchState.aimTarget.z.toFixed(3)),
+        },
+        floorTopY: Number(launchState.floorTopY.toFixed(3)),
+      };
+    };
     window.__DADA_DEBUG__.toggleEra5Tool = () => toggleEra5Tool();
     window.__DADA_DEBUG__.useWindGlide = () => useWindGlide();
     window.__DADA_DEBUG__.setEra5Vitals = ({ hp, shield, oxygen, clearInvuln = false, clearLastDamage = false } = {}) => {
