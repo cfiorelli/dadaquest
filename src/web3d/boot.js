@@ -3477,15 +3477,10 @@ export async function boot(options = {}) {
     const cameraTarget = camera?.getTarget?.() ?? null;
     const { halfH, halfD } = player.getCollisionHalfExtents();
     const floorTopY = player.mesh.position.y - halfH;
-    const muzzleForward = Math.max(1.18, halfD + 0.94);
-    const desiredMuzzleHeight = Math.min(
-      player.mesh.position.y + 0.92,
-      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) - 0.18,
-    );
-    const muzzleHeight = Math.max(
-      floorTopY + 1.18,
-      desiredMuzzleHeight,
-    );
+    // Weapon muzzle anchor: just past character front face, upper-chest height.
+    // halfH * 2 = full player height (0.8). 0.72 × height ≈ upper chest, below head.
+    const muzzleForward = halfD + 0.3;
+    const muzzleHeight = floorTopY + (halfH * 2 * 0.72);
     const origin = new BABYLON.Vector3(
       player.mesh.position.x + (forward.x * muzzleForward),
       muzzleHeight,

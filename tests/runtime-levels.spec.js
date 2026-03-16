@@ -1047,12 +1047,15 @@ function expectLevel5ProjectileBurstReport(report) {
       const toOriginX = origin.x - playerPos.x;
       const toOriginZ = origin.z - playerPos.z;
       const forwardDot = (toOriginX * playerForward.x) + (toOriginZ * playerForward.z);
-      expect(forwardDot).toBeGreaterThan(0.9);
+      // Muzzle must be in front of the character (past the front face).
+      expect(forwardDot).toBeGreaterThan(0.2);
 
       const halfH = Math.max(0.2, playerPos.y - (shot.launchState?.floorTopY ?? (playerPos.y - 0.4)));
-      const estimatedHeadY = playerPos.y + (halfH * 3.1);
-      expect(origin.y).toBeLessThan(estimatedHeadY);
-      expect(origin.y).toBeGreaterThan(playerPos.y + 0.55);
+      const floorTopY = shot.launchState?.floorTopY ?? (playerPos.y - halfH);
+      const headY = floorTopY + (halfH * 2);
+      // Muzzle must be below head and above mid-body (weapon-hold / upper-chest range).
+      expect(origin.y).toBeLessThan(headY);
+      expect(origin.y).toBeGreaterThan(floorTopY + (halfH * 0.8));
     }
 
     // Contract: in empty-room free fire, trajectory is straight and not

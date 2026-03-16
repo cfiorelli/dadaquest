@@ -117,6 +117,104 @@ Use the packet system in:
 - `docs/process/PHASE_GATES.md`
 - `docs/process/templates/`
 
+---
+
+## Engineering Execution Discipline
+
+### 1. Scope discipline
+
+- Fix the smallest proven cause first.
+- Do not broaden the task unless the current root cause proves a broader change is required.
+- Prefer local fixes over shared runtime changes.
+- When a bug is about one level, one room, one weapon, one UI state, or one camera path, stay inside that slice.
+
+### 2. Repro-first rule
+
+- Reproduce the exact current bug before editing code.
+- State the exact repro path being used.
+- Current live behavior and current user screenshots outrank prior green tests, prior proofs, and prior self-reports.
+
+### 3. Test cost control
+
+**Tier 1 — local iteration:**
+- Use only the cheapest proof that answers the current question.
+- Prefer one targeted Playwright test, one temporary debug script, or one manual built-preview repro.
+- Do not run broad suites during small iteration.
+
+**Tier 2 — task validation:**
+- When the fix appears visually correct, run only the narrow regression slice relevant to the changed code path.
+
+**Tier 3 — pre-commit validation:**
+- Run the broader level/regression slice only once the behavior is visually correct and ready to land.
+- Do not run whole-game or unrelated suites unless the changed code path clearly affects them.
+
+### 4. Shared code caution
+
+- Editing shared runtime code requires explicit justification.
+- Before changing shared code, state which levels/systems may be affected.
+- If shared code is changed for a local bug, widen validation only at the end, not on every edit.
+
+### 5. Truth standard
+
+A fix is **not done** because:
+- telemetry looks right
+- an entity exists
+- one favorable screenshot passed
+- one narrow test passed
+
+A fix is **done only when:**
+- the real gameplay path matches the expected player-visible result
+- the latest live repro or screenshot is resolved
+- the relevant narrow regression slice passes
+
+### 6. Push behavior
+
+- When asked to push, do not automatically run preview servers, full builds, or broad validation unless explicitly requested.
+- Run only the requested git action unless a required precondition is missing.
+- State what command will be run before running anything broader than the git action itself.
+
+### 7. Reporting format
+
+For each meaningful task, report:
+- exact root cause
+- exact files changed
+- exact validation run
+- what was not retested
+- remaining risks
+
+### 8. Temporary debug artifacts
+
+- Temporary test files and debug scripts must be deleted before final commit unless explicitly requested to keep them.
+
+### 9. Small bug policy
+
+For small visual/gameplay bugs, default to:
+
+1. reproduce
+2. isolate
+3. patch
+4. run one targeted test
+5. visually verify
+6. widen validation only after that
+
+### 10. DadaQuest / Level 5 cost-control rule
+
+- For Era5 / Level 5 rebuild work, do not run the full game suite on every edit.
+- Default to one targeted Level 5 repro while iterating.
+- Run broader Level 5 regression only before commit.
+- Run Levels 1–4 only if the changed shared code plausibly affects them.
+
+### 11. Contradiction rule
+
+- If live behavior contradicts a passing test or prior proof artifact, treat the live behavior as authoritative.
+- Stop claiming success.
+- Audit why the test passed incorrectly before making more fixes.
+
+### 12. Ownership rule
+
+- Do not wait for the user to prescribe basic engineering hygiene.
+- Default to scope control, cheapest valid repro, narrow iteration, and explicit risk reporting.
+
 <!-- BEGIN BEADS INTEGRATION -->
 ## Issue Tracking with bd (beads)
 
