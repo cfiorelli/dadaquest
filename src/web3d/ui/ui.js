@@ -1,10 +1,14 @@
 import {
   LEVEL_ORDER,
+  getLevelConstructionLabel as getMetaLevelConstructionLabel,
+  getLevelConstructionMessage as getMetaLevelConstructionMessage,
   getLevelDescriptor as getMetaLevelDescriptor,
   getLevelMechanic as getMetaLevelMechanic,
   getLevelSubtitle as getMetaLevelSubtitle,
   getLevelTheme as getMetaLevelTheme,
   getLevelTitle as getMetaLevelTitle,
+  isLevelLaunchable as getMetaIsLevelLaunchable,
+  isLevelUnderConstruction as getMetaIsLevelUnderConstruction,
 } from '../world/levelMeta.js';
 
 const CSS = `
@@ -140,6 +144,8 @@ const CSS = `
   margin-top: 18px;
 }
 .dada-level-btn {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
@@ -179,6 +185,33 @@ const CSS = `
 .dada-level-btn.locked:hover {
   background: rgba(72, 62, 52, 0.08);
   transform: none;
+}
+.dada-level-btn-band {
+  position: absolute;
+  left: -22%;
+  top: 50%;
+  width: 150%;
+  height: 24px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, rgba(151, 15, 20, 0.94), rgba(217, 40, 46, 0.98), rgba(151, 15, 20, 0.94));
+  border-top: 1px solid rgba(255, 216, 216, 0.55);
+  border-bottom: 1px solid rgba(63, 0, 0, 0.48);
+  box-shadow: 0 8px 16px rgba(76, 8, 10, 0.28);
+  color: #fff4f4;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  pointer-events: none;
+  text-transform: uppercase;
+  transform: translateY(-50%) rotate(-17deg);
+  text-shadow: 0 1px 0 rgba(70, 8, 10, 0.42);
+  z-index: 2;
+}
+.dada-level-btn.under-construction .dada-level-btn-band {
+  display: flex;
 }
 .dada-level-kicker {
   font-size: 11px;
@@ -239,6 +272,9 @@ const CSS = `
 }
 .dada-level-preview-state.locked {
   color: #7a5a26;
+}
+.dada-level-preview-state.construction {
+  color: #9c1d1d;
 }
 .dada-level-preview-title {
   margin-top: 6px;
@@ -1115,6 +1151,12 @@ export function createUI(uiRoot, options = {}) {
     8: true,
     9: true,
   };
+  let underConstructionLevels = Object.fromEntries(
+    LEVEL_ORDER.map((id) => [id, getMetaIsLevelUnderConstruction(id)]),
+  );
+  let blockedLevels = Object.fromEntries(
+    LEVEL_ORDER.map((id) => [id, underConstructionLevels[id] && !getMetaIsLevelLaunchable(id)]),
+  );
   let lockMessages = {
     4: 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.',
     5: 'Locked. Beat Super Sourdough (Level 4) to unlock.',
@@ -1123,6 +1165,11 @@ export function createUI(uiRoot, options = {}) {
     8: 'Locked. Beat Storm Cliffs (Level 7) to unlock.',
     9: 'Locked. Beat Haunted Library (Level 8) to unlock.',
   };
+  let constructionMessages = Object.fromEntries(
+    LEVEL_ORDER
+      .map((id) => [id, getMetaLevelConstructionMessage(id)])
+      .filter(([, message]) => !!message),
+  );
 
   function getLevelSubtitle(id) {
     return getMetaLevelSubtitle(id);
@@ -1144,11 +1191,16 @@ export function createUI(uiRoot, options = {}) {
     return getMetaLevelMechanic(id);
   }
 
+  function getLevelConstructionLabel(id) {
+    return getMetaLevelConstructionLabel(id);
+  }
+
   function getLevelCardMarkup(id, { menu = false } = {}) {
     const tag = menu ? 'a' : 'button';
     const href = menu ? ` href="${id === 1 ? window.location.pathname : `${window.location.pathname}?level=${id}`}"` : '';
     return `
-      <${tag} class="dada-level-btn${_selectedLevel === id ? ' active' : ''}" id="${menu ? `menuLevelBtn${id}` : `levelBtn${id}`}" tabindex="-1"${href}>
+      <${tag} class="dada-level-btn${_selectedLevel === id ? ' active' : ''}${underConstructionLevels[id] ? ' under-construction' : ''}" id="${menu ? `menuLevelBtn${id}` : `levelBtn${id}`}" tabindex="-1"${href}>
+        <span class="dada-level-btn-band" aria-hidden="true">Under Construction</span>
         <span class="dada-level-kicker">Level ${id}</span>
         <span class="dada-level-title">${getLevelTitle(id)}</span>
         <span class="dada-level-copy">${getLevelDescriptor(id)}</span>
@@ -1242,6 +1294,17 @@ export function createUI(uiRoot, options = {}) {
     return lockMessages[id] || '';
   }
 
+  function getLevelConstructionMessage(id) {
+    if (!underConstructionLevels[id]) return '';
+    return constructionMessages[id] || '';
+  }
+
+  function getLevelStatusMessage(id) {
+    if (lockedLevels[id]) return getLevelLockMessage(id);
+    if (underConstructionLevels[id]) return getLevelConstructionMessage(id);
+    return '';
+  }
+
   function isEra5UiLevel(levelId) {
     return Number(levelId) >= 5;
   }
@@ -1315,8 +1378,15 @@ export function createUI(uiRoot, options = {}) {
     if (kickerEl) kickerEl.textContent = `Level ${levelId} Preview`;
     if (stateEl) {
       const locked = !!lockedLevels[levelId];
-      stateEl.textContent = locked ? 'Locked' : 'Unlocked';
+      const underConstruction = !!underConstructionLevels[levelId];
+      const launchBlocked = !!blockedLevels[levelId];
+      stateEl.textContent = underConstruction
+        ? (launchBlocked ? 'Under Construction' : getLevelConstructionLabel(levelId) || 'Under Construction')
+        : locked
+          ? 'Locked'
+          : 'Unlocked';
       stateEl.classList.toggle('locked', locked);
+      stateEl.classList.toggle('construction', underConstruction);
     }
     if (previewTitleEl) previewTitleEl.textContent = getLevelTitle(levelId);
     if (themeEl) themeEl.textContent = getLevelTheme(levelId);
@@ -1325,7 +1395,7 @@ export function createUI(uiRoot, options = {}) {
 
   function resetTitleCopy() {
     if (titleSubEl) titleSubEl.textContent = getLevelSubtitle(_selectedLevel);
-    if (titleLevelLockEl) titleLevelLockEl.textContent = getLevelLockMessage(_selectedLevel);
+    if (titleLevelLockEl) titleLevelLockEl.textContent = getLevelStatusMessage(_selectedLevel);
     updateLevelPreview({
       levelId: _selectedLevel,
       kickerEl: titlePreviewKickerEl,
@@ -1339,6 +1409,8 @@ export function createUI(uiRoot, options = {}) {
       titleHintEl.style.animation = '';
       titleHintEl.textContent = lockedLevels[_selectedLevel]
         ? getLevelLockMessage(_selectedLevel)
+        : blockedLevels[_selectedLevel]
+          ? getLevelConstructionMessage(_selectedLevel)
         : 'Press SPACE or ENTER to start';
     }
   }
@@ -1347,7 +1419,7 @@ export function createUI(uiRoot, options = {}) {
     if (menuSubEl) {
       menuSubEl.textContent = `Selected: ${getLevelSubtitle(levelId)}`;
     }
-    if (menuLockEl) menuLockEl.textContent = getLevelLockMessage(levelId);
+    if (menuLockEl) menuLockEl.textContent = getLevelStatusMessage(levelId);
     if (menuLegendEl) menuLegendEl.innerHTML = getGameplayLegendMarkup(levelId);
     updateLevelPreview({
       levelId,
@@ -1374,6 +1446,11 @@ export function createUI(uiRoot, options = {}) {
     button.toggleAttribute('aria-disabled', !!locked);
   }
 
+  function applyConstructionState(button, underConstruction) {
+    if (!button) return;
+    button.classList.toggle('under-construction', !!underConstruction);
+  }
+
   function refreshLockState() {
     applyLockState(btn1, lockedLevels[1]);
     applyLockState(btn2, lockedLevels[2]);
@@ -1393,6 +1470,24 @@ export function createUI(uiRoot, options = {}) {
     applyLockState(menuBtn7, lockedLevels[7]);
     applyLockState(menuBtn8, lockedLevels[8]);
     applyLockState(menuBtn9, lockedLevels[9]);
+    applyConstructionState(btn1, underConstructionLevels[1]);
+    applyConstructionState(btn2, underConstructionLevels[2]);
+    applyConstructionState(btn3, underConstructionLevels[3]);
+    applyConstructionState(btn4, underConstructionLevels[4]);
+    applyConstructionState(btn5, underConstructionLevels[5]);
+    applyConstructionState(btn6, underConstructionLevels[6]);
+    applyConstructionState(btn7, underConstructionLevels[7]);
+    applyConstructionState(btn8, underConstructionLevels[8]);
+    applyConstructionState(btn9, underConstructionLevels[9]);
+    applyConstructionState(menuBtn1, underConstructionLevels[1]);
+    applyConstructionState(menuBtn2, underConstructionLevels[2]);
+    applyConstructionState(menuBtn3, underConstructionLevels[3]);
+    applyConstructionState(menuBtn4, underConstructionLevels[4]);
+    applyConstructionState(menuBtn5, underConstructionLevels[5]);
+    applyConstructionState(menuBtn6, underConstructionLevels[6]);
+    applyConstructionState(menuBtn7, underConstructionLevels[7]);
+    applyConstructionState(menuBtn8, underConstructionLevels[8]);
+    applyConstructionState(menuBtn9, underConstructionLevels[9]);
     resetTitleCopy();
     updateMenuCopy(_selectedLevel);
   }
@@ -1418,6 +1513,10 @@ export function createUI(uiRoot, options = {}) {
       titleHintEl.style.color = '#7a5a26';
       titleHintEl.style.animation = 'none';
       titleHintEl.textContent = getLevelLockMessage(id);
+    } else if (blockedLevels[id] && titleHintEl) {
+      titleHintEl.style.color = '#9c1d1d';
+      titleHintEl.style.animation = 'none';
+      titleHintEl.textContent = getLevelConstructionMessage(id);
     }
     if (typeof levelSelectHandler === 'function') levelSelectHandler(id);
   }
@@ -1534,6 +1633,11 @@ export function createUI(uiRoot, options = {}) {
       selectLevel(6);
       return;
     }
+    if (blockedLevels[6]) {
+      selectLevel(6);
+      if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(6);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(6);
   });
   menuBtn7?.addEventListener('click', (ev) => {
@@ -1542,6 +1646,11 @@ export function createUI(uiRoot, options = {}) {
     ev.currentTarget.blur();
     if (lockedLevels[7]) {
       selectLevel(7);
+      return;
+    }
+    if (blockedLevels[7]) {
+      selectLevel(7);
+      if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(7);
       return;
     }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(7);
@@ -1554,6 +1663,11 @@ export function createUI(uiRoot, options = {}) {
       selectLevel(8);
       return;
     }
+    if (blockedLevels[8]) {
+      selectLevel(8);
+      if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(8);
+      return;
+    }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(8);
   });
   menuBtn9?.addEventListener('click', (ev) => {
@@ -1562,6 +1676,11 @@ export function createUI(uiRoot, options = {}) {
     ev.currentTarget.blur();
     if (lockedLevels[9]) {
       selectLevel(9);
+      return;
+    }
+    if (blockedLevels[9]) {
+      selectLevel(9);
+      if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(9);
       return;
     }
     if (typeof gameplayMenuHandler === 'function') gameplayMenuHandler(9);
@@ -2094,6 +2213,21 @@ export function createUI(uiRoot, options = {}) {
       lockMessages = {
         ...lockMessages,
         ...nextLockMessages,
+      };
+      refreshLockState();
+    },
+    setUnderConstructionLevels(nextUnderConstructionLevels = {}, nextMessages = {}, nextBlockedLevels = {}) {
+      underConstructionLevels = {
+        ...underConstructionLevels,
+        ...nextUnderConstructionLevels,
+      };
+      constructionMessages = {
+        ...constructionMessages,
+        ...nextMessages,
+      };
+      blockedLevels = {
+        ...blockedLevels,
+        ...nextBlockedLevels,
       };
       refreshLockState();
     },

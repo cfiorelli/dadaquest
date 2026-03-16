@@ -7,12 +7,6 @@ const LEVEL_CASES = [
   { id: 2, url: 'http://127.0.0.1:4173/?level=2&debug=1' },
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
-const ERA5_CONTROL_POSES = {
-  6: { x: 40.0, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 },
-  7: { x: 14.0, y: 1.42, z: -2.8, yaw: 1.32, cameraYaw: 1.32 },
-  8: { x: 18.0, y: 1.56, z: 2.5, yaw: 1.30, cameraYaw: 1.30 },
-  9: { x: 58.0, y: 1.56, z: 3.0, yaw: 1.28, cameraYaw: 1.28 },
-};
 
 async function installCleanStorage(page) {
   await page.addInitScript((progressKey) => {
@@ -48,6 +42,36 @@ async function startDebugLevel(page, levelId) {
     sceneKey: 'CribScene',
     lastRuntimeError: null,
   });
+}
+
+async function getUnderConstructionReport(page) {
+  return page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+    musicRunning: !!window.__DADA_DEBUG__?.musicRunning,
+    underConstructionLevelId: window.__DADA_DEBUG__?.underConstructionLevelId ?? null,
+    topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
+    enemies: window.__DADA_DEBUG__?.era5EnemyReport?.()?.enemies ?? [],
+    hint: document.getElementById('titleHint')?.textContent ?? '',
+    lockText: document.getElementById('titleLevelLock')?.textContent ?? '',
+    menuLockState: window.__DADA_DEBUG__?.getMenuLockState?.() ?? null,
+  }));
+}
+
+function expectUnderConstructionReport(report, levelId, { requirePlaceholderLevel = true } = {}) {
+  expect(report).not.toBeNull();
+  expect(report.sceneKey).toBe('TitleScene');
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.musicLevelId).not.toBe(levelId);
+  expect(report.musicRunning).toBe(false);
+  if (requirePlaceholderLevel) {
+    expect(report.underConstructionLevelId).toBe(levelId);
+    expect(report.topology).toBeNull();
+    expect(report.enemies).toEqual([]);
+  }
+  expect(report.hint.toLowerCase()).toContain('under construction');
+  expect(report.lockText.toLowerCase()).toContain('under construction');
 }
 
 async function focusGameplay(page) {
@@ -990,433 +1014,60 @@ test('@level5 @era5 runtime: level 5 respawn returns to the starter-room spawn a
   expect(finalState.pos.y).toBeLessThan(0.6);
 });
 
-for (const levelId of [6, 7, 8, 9]) {
-  test(`@era5 runtime: level ${levelId} uses the shared classic Doom movement mapping`, async ({ page }) => {
-    test.setTimeout(120_000);
-    await gotoDebugLevel(page, levelId);
-    await unlockThroughLevel(page, levelId - 1);
-    await startDebugLevel(page, levelId);
-    await page.waitForTimeout(1200);
-    await focusGameplay(page);
-    await resetEra5Pose(page, ERA5_CONTROL_POSES[levelId]);
-
-    const beforeTurn = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    expect(beforeTurn.playerPos).not.toBeNull();
-    expect(beforeTurn.playerYaw).not.toBeNull();
-    expect(beforeTurn.playerForward).not.toBeNull();
-
-    await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
-    await page.waitForTimeout(420);
-    const afterTurn = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
-    expect(afterTurn.playerYaw).toBeGreaterThan(beforeTurn.playerYaw + 0.02);
-    expect(Math.hypot(
-      afterTurn.playerPos.x - beforeTurn.playerPos.x,
-      afterTurn.playerPos.z - beforeTurn.playerPos.z,
-    )).toBeLessThan(0.1);
-    await page.waitForTimeout(320);
-
-    const beforeForward = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-    await page.waitForTimeout(420);
-    const duringForward = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
-    const forwardDelta = {
-      x: duringForward.playerPos.x - beforeForward.playerPos.x,
-      z: duringForward.playerPos.z - beforeForward.playerPos.z,
-    };
-    expect(dotXZ(forwardDelta, beforeForward.playerForward)).toBeGreaterThan(0.03);
-    expect(Math.abs(wrapDelta(duringForward.playerYaw ?? 0, beforeForward.playerYaw ?? 0))).toBeLessThan(0.08);
-    expect(Math.abs(wrapDelta(duringForward.cameraYaw ?? 0, beforeForward.cameraYaw ?? 0))).toBeLessThan(0.26);
-    await page.waitForTimeout(260);
-
-    const beforeStrafe = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      playerForward: window.__DADA_DEBUG__?.playerForward ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    await dispatchHeldKey(page, 'keydown', { code: 'AltLeft', key: 'Alt', altKey: true });
-    await dispatchHeldKey(page, 'keydown', { code: 'ArrowLeft', key: 'ArrowLeft', altKey: true });
-    await page.waitForTimeout(420);
-    const duringStrafe = await page.evaluate(() => ({
-      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-      playerYaw: window.__DADA_DEBUG__?.playerYaw ?? null,
-      cameraYaw: window.__DADA_DEBUG__?.cameraYaw ?? null,
-    }));
-    await dispatchHeldKey(page, 'keyup', { code: 'ArrowLeft', key: 'ArrowLeft', altKey: true });
-    await dispatchHeldKey(page, 'keyup', { code: 'AltLeft', key: 'Alt' });
-    const leftDelta = {
-      x: duringStrafe.playerPos.x - beforeStrafe.playerPos.x,
-      z: duringStrafe.playerPos.z - beforeStrafe.playerPos.z,
-    };
-    expect(dotXZ(leftDelta, getRightFromForward(beforeStrafe.playerForward))).toBeLessThan(-0.02);
-    expect(Math.abs(wrapDelta(duringStrafe.playerYaw ?? 0, beforeStrafe.playerYaw ?? 0))).toBeLessThan(0.08);
-    expect(Math.abs(wrapDelta(duringStrafe.cameraYaw ?? 0, beforeStrafe.cameraYaw ?? 0))).toBeLessThan(0.12);
-  });
-}
-
-test('@fast @era5 @progression runtime: levels 6 through 9 appear as locked placeholders in the title menu', async ({ page }) => {
+test('@fast @era5 @progression runtime: levels 5 through 9 show under-construction overlays in the title menu', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 1);
 
   const lockState = await page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null);
   expect(lockState).not.toBeNull();
-  expect(lockState[6]).toBe(true);
-  expect(lockState[7]).toBe(true);
-  expect(lockState[8]).toBe(true);
-  expect(lockState[9]).toBe(true);
-
-  await page.click('#levelBtn6');
-  await expect(page.locator('#titleHint')).toContainText('Beat Aquarium Drift');
-  await page.click('#levelBtn9');
-  await expect(page.locator('#titleHint')).toContainText('Beat Haunted Library');
-});
-
-test('@era5 @progression runtime: levels 6 through 9 unlock sequentially from completed-level progress', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 1);
-  await page.waitForTimeout(300);
-
-  const initialLocks = await page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null);
-  expect(initialLocks).not.toBeNull();
-  expect(initialLocks[6]).toBe(true);
-  expect(initialLocks[7]).toBe(true);
-  expect(initialLocks[8]).toBe(true);
-  expect(initialLocks[9]).toBe(true);
-
-  await unlockThroughLevel(page, 5);
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    6: false,
+  expect(lockState.underConstruction).toMatchObject({
+    5: true,
+    6: true,
     7: true,
     8: true,
     9: true,
   });
+  expect(lockState[6]).toBe(false);
+  expect(lockState[7]).toBe(false);
+  expect(lockState[8]).toBe(false);
+  expect(lockState[9]).toBe(false);
 
-  await unlockThroughLevel(page, 6);
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    6: false,
-    7: false,
-    8: true,
-    9: true,
-  });
+  await page.click('#levelBtn6');
+  await expect(page.locator('#titleHint')).toContainText('under construction');
+  await page.click('#levelBtn9');
+  await expect(page.locator('#titleHint')).toContainText('under construction');
+});
 
-  await unlockThroughLevel(page, 7);
-  await expect.poll(
-    () => page.evaluate(() => ({
-      locks: window.__DADA_DEBUG__?.getMenuLockState?.() ?? null,
-      windGlideUnlocked: !!window.__DADA_DEBUG__?.progressState?.windGlideUnlocked,
-    })),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    locks: {
-      6: false,
-      7: false,
-      8: false,
-      9: true,
-    },
-    windGlideUnlocked: true,
-  });
-
-  await unlockThroughLevel(page, 8);
-  await expect.poll(
-    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null),
-    { timeout: 5_000 },
-  ).toMatchObject({
-    6: false,
-    7: false,
-    8: false,
-    9: false,
-  });
+test('@era5 @progression runtime: title click plus start for level 6 stays in the safe under-construction state', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+  await page.click('#levelBtn6');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(250);
+  const report = await getUnderConstructionReport(page);
+  expectUnderConstructionReport(report, 6, { requirePlaceholderLevel: false });
 });
 
 for (const levelId of [6, 7, 8, 9]) {
-  test(`@era5 runtime: level ${levelId} starts, keeps Era 5 HUD active, and runs cleanly for 10 seconds`, async ({ page }) => {
-    test.setTimeout(120_000);
-    const consoleErrors = [];
-    const pageErrors = [];
-
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
-    });
-    page.on('pageerror', (err) => {
-      pageErrors.push(err.message);
-    });
-
-    await gotoDebugLevel(page, levelId);
-    await unlockThroughLevel(page, levelId - 1);
-    await startDebugLevel(page, levelId);
-    await page.waitForTimeout(10_000);
-
-    await expect(page.locator('[data-era5-hud]')).toBeVisible();
-    await expect(page.locator('[data-era5-hearts]')).toBeVisible();
-    await expect(page.locator('[data-era5-shields]')).toBeVisible();
-
-    const runtimeState = await page.evaluate(() => ({
-      sceneKey: window.__DADA_DEBUG__?.sceneKey,
-      lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
-      musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
-      musicRunning: !!window.__DADA_DEBUG__?.musicRunning,
-    }));
-    expect(runtimeState.sceneKey).toBe('CribScene');
-    expect(runtimeState.lastRuntimeError).toBeNull();
-    expect(runtimeState.musicLevelId).toBe(levelId);
-    expect(runtimeState.musicRunning).toBe(true);
-
-    if (pageErrors.length > 0) {
-      throw new Error(`Page errors on level ${levelId}: ${pageErrors.join('\n')}`);
-    }
-    if (consoleErrors.length > 0) {
-      throw new Error(`Console errors on level ${levelId}: ${consoleErrors.join('\n')}`);
-    }
-  });
-
-  test(`@era5 runtime: level ${levelId} exposes visible gameplay surfaces and front-facing environment landmarks`, async ({ page }) => {
+  test(`@era5 @progression runtime: level ${levelId} direct debug start stays in the under-construction placeholder state`, async ({ page }) => {
     test.setTimeout(120_000);
     await gotoDebugLevel(page, levelId);
-    await unlockThroughLevel(page, levelId - 1);
-    await startDebugLevel(page, levelId);
-    await page.waitForTimeout(1200);
-
-    const report = await page.evaluate(() => window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 8 }) ?? null);
-    expect(report).not.toBeNull();
-    expect(report.counts.gameplayMeshes).toBeGreaterThan(10);
-    expect(report.counts.envMeshes).toBeGreaterThan(30);
-
-    const visibleLandmarks = report.largestEnvironmentMeshes.filter((mesh) => (
-      mesh.enabled !== false
-      && mesh.visible !== false
-      && (mesh.alpha ?? 1) > 0.1
-      && (mesh.viewFacing ?? 0) >= 0.9
-      && Math.max(mesh.size?.x ?? 0, mesh.size?.y ?? 0, mesh.size?.z ?? 0) >= 24
-    ));
-    expect(visibleLandmarks.length).toBeGreaterThanOrEqual(2);
+    await page.evaluate((targetLevelId) => {
+      window.__DADA_DEBUG__?.startLevel?.(targetLevelId);
+    }, levelId);
+    await page.waitForTimeout(250);
+    const report = await getUnderConstructionReport(page);
+    expectUnderConstructionReport(report, levelId);
   });
 }
 
-test('@era5 runtime: level 6 conveyor zones push the player and expose conveyor debug state', async ({ page }) => {
+test('@era5 @progression runtime: direct auto-start for level 6 remains blocked in the under-construction title state', async ({ page }) => {
   test.setTimeout(120_000);
-  await gotoDebugLevel(page, 6);
-  await unlockThroughLevel(page, 5);
-  await startDebugLevel(page, 6);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(-8.0, 1.45, -0.4);
-  });
-  const before = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos ?? null);
+  await page.goto('http://127.0.0.1:4173/?level=6&debug=1&start=1');
+  await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
   await page.waitForTimeout(1200);
-  const after = await page.evaluate(() => ({
-    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
-    velocity: window.__DADA_DEBUG__?.playerVelocity ?? null,
-    levelState: window.__DADA_DEBUG__?.era5LevelState ?? null,
-  }));
-
-  expect(before).not.toBeNull();
-  expect(after.playerPos).not.toBeNull();
-  expect(after.velocity).not.toBeNull();
-  expect(after.levelState?.lastConveyorPush ?? 0).toBeGreaterThan(0.1);
-  expect(Math.hypot(
-    after.velocity.x ?? 0,
-    after.velocity.z ?? 0,
-  )).toBeGreaterThan(0.01);
-});
-
-test('@era5 runtime: level 6 exposes authored topology and clean walkable-surface validation', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 6);
-  await unlockThroughLevel(page, 5);
-  await startDebugLevel(page, 6);
-  await page.waitForTimeout(1200);
-
-  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
-  if (!topology) return;
-  expect(topology.sectorCount).toBeGreaterThanOrEqual(5);
-  expect(topology.connectorCount).toBeGreaterThanOrEqual(6);
-  expect(topology.topology?.hasCycle).toBe(true);
-  expect((topology.topology?.routeChoices ?? []).length).toBeGreaterThanOrEqual(2);
-  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBeGreaterThanOrEqual(20);
-  expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
-  expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
-  expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
-
-  const labels = (topology.sectors ?? []).map((sector) => sector.label);
-  expect(labels).toEqual(expect.arrayContaining([
-    'Loading Bay',
-    'Machine Hall',
-    'Service Loop',
-    'Furnace Bridge',
-    'Crane Bay',
-    'Control Room',
-  ]));
-});
-
-test('@era5 runtime: level 6 authored spaces keep turn and strafe camera behavior stable', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 6);
-  await unlockThroughLevel(page, 5);
-  await startDebugLevel(page, 6);
-  await focusGameplay(page);
-
-  const pose = { x: 40, y: 1.64, z: -0.8, yaw: 1.36, cameraYaw: 1.36 };
-  await resetEra5Pose(page, pose);
-  await focusGameplay(page);
-  const beforeTurn = await snapshotEra5Pose(page);
-  await page.keyboard.down('ArrowRight');
-  await page.waitForTimeout(420);
-  await page.keyboard.up('ArrowRight');
-  await expect.poll(
-    async () => {
-      const poseAfterTurn = await snapshotEra5Pose(page);
-      return poseAfterTurn.yaw - beforeTurn.yaw;
-    },
-    { timeout: 1500 },
-  ).toBeGreaterThan(0.08);
-  await expect.poll(
-    async () => {
-      const poseAfterTurn = await snapshotEra5Pose(page);
-      return poseAfterTurn.cameraYaw - beforeTurn.cameraYaw;
-    },
-    { timeout: 1500 },
-  ).toBeGreaterThan(0.08);
-  const afterTurn = await snapshotEra5Pose(page);
-
-  expect(afterTurn.yaw).toBeGreaterThan(beforeTurn.yaw + 0.08);
-  expect(afterTurn.cameraYaw).toBeGreaterThan(beforeTurn.cameraYaw + 0.08);
-  expect(Math.abs(wrapDelta(afterTurn.cameraYaw, afterTurn.yaw))).toBeLessThan(0.06);
-
-  await resetEra5Pose(page, pose);
-  await focusGameplay(page);
-  const beforeStrafe = await snapshotEra5Pose(page);
-  await page.keyboard.down('d');
-  await page.waitForTimeout(380);
-  await page.keyboard.up('d');
-  const afterStrafe = await snapshotEra5Pose(page);
-
-  expect(Math.abs(wrapDelta(afterStrafe.yaw, beforeStrafe.yaw))).toBeLessThan(0.03);
-  const delta = {
-    x: afterStrafe.x - beforeStrafe.x,
-    z: afterStrafe.z - beforeStrafe.z,
-  };
-  const facing = {
-    x: Math.sin(beforeStrafe.yaw),
-    z: Math.cos(beforeStrafe.yaw),
-  };
-  const right = getRightFromForward(facing);
-  expect(dotXZ(delta, right)).toBeGreaterThan(0.05);
-});
-test('@era5 runtime: level 7 lightning hazards visibly cycle from warn to active', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 7);
-  await unlockThroughLevel(page, 6);
-  await startDebugLevel(page, 7);
-
-  await expect.poll(
-    () => page.evaluate(() => {
-      const lightning = window.__DADA_DEBUG__?.era5LevelState?.lightning ?? [];
-      return lightning.some((hazard) => hazard.state === 'warn');
-    }),
-    { timeout: 6_000 },
-  ).toBe(true);
-
-  await expect.poll(
-    () => page.evaluate(() => {
-      const lightning = window.__DADA_DEBUG__?.era5LevelState?.lightning ?? [];
-      return lightning.some((hazard) => hazard.state === 'active');
-    }),
-    { timeout: 6_000 },
-  ).toBe(true);
-});
-
-test('@era5 runtime: level 8 lantern tool reveals a hidden bridge', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 8);
-  await unlockThroughLevel(page, 7);
-  await startDebugLevel(page, 8);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(-13.5, 1.7, 0.0);
-  });
-  await page.waitForTimeout(700);
-
-  const initiallyVisible = await page.evaluate(() => {
-    const bridges = window.__DADA_DEBUG__?.era5LevelState?.hiddenBridges ?? [];
-    return bridges.find((bridge) => bridge.name === 'hiddenA')?.visible ?? null;
-  });
-  expect(initiallyVisible).toBe(false);
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.teleportPlayer?.(25.0, 1.7, -4.9);
-    window.__DADA_DEBUG__?.toggleEra5Tool?.();
-  });
-
-  await expect.poll(
-    () => page.evaluate(() => {
-      const bridges = window.__DADA_DEBUG__?.era5LevelState?.hiddenBridges ?? [];
-      return bridges.find((bridge) => bridge.name === 'hiddenA')?.visible ?? false;
-    }),
-    { timeout: 5_000 },
-  ).toBe(true);
-});
-
-test('@era5 runtime: level 9 puppet sweep exposes a moving warning band during its active window', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 9);
-  await unlockThroughLevel(page, 8);
-  await startDebugLevel(page, 9);
-
-  await expect.poll(
-    () => page.evaluate(() => {
-      const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
-      return sweeps.find((hazard) => hazard.name === 'puppetA')?.state ?? null;
-    }),
-    { timeout: 6_000 },
-  ).toBe('warn');
-
-  await expect.poll(
-    () => page.evaluate(() => {
-      const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
-      return sweeps.find((hazard) => hazard.name === 'puppetA')?.state ?? null;
-    }),
-    { timeout: 6_000 },
-  ).toBe('active');
-
-  const firstBandX = await page.evaluate(() => {
-    const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
-    return sweeps.find((hazard) => hazard.name === 'puppetA')?.bandX ?? null;
-  });
-  await page.waitForTimeout(300);
-  const secondBandX = await page.evaluate(() => {
-    const sweeps = window.__DADA_DEBUG__?.era5LevelState?.sweepers ?? [];
-    return sweeps.find((hazard) => hazard.name === 'puppetA')?.bandX ?? null;
-  });
-
-  expect(firstBandX).not.toBeNull();
-  expect(secondBandX).not.toBeNull();
-  expect(Math.abs(secondBandX - firstBandX)).toBeGreaterThan(0.2);
+  const report = await getUnderConstructionReport(page);
+  expectUnderConstructionReport(report, 6);
 });
 
 test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {

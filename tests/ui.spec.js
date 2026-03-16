@@ -44,6 +44,12 @@ test('ui: title menu exposes Era 5 level names and preview details without enter
   await expect(page.locator('#levelBtn5')).toContainText('Aquarium Drift');
   await expect(page.locator('#levelBtn7')).toContainText('Storm Cliffs');
   await expect(page.locator('#levelBtn9')).toContainText('Lantern Camp');
+  await expect(page.locator('#levelBtn5')).toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn6')).toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn7')).toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn8')).toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn9')).toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn6 .dada-level-btn-band')).toHaveText('Under Construction');
 
   await page.click('#levelBtn8');
   await expect(page.locator('#titlePreviewTitle')).toHaveText('Haunted Library');

@@ -1,4 +1,6 @@
 export const LEVEL_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export const UNDER_CONSTRUCTION_LEVEL_IDS = new Set([5, 6, 7, 8, 9]);
+export const NON_PLAYABLE_LEVEL_IDS = new Set([6, 7, 8, 9]);
 
 export const LEVEL_META = {
   1: {
@@ -74,6 +76,30 @@ export const LEVEL_META = {
     mechanic: 'Light-safe pockets, puppet sweeps, and branching finale navigation.',
   },
 };
+
+export function isLevelUnderConstruction(levelId) {
+  return UNDER_CONSTRUCTION_LEVEL_IDS.has(Number(levelId));
+}
+
+export function isLevelLaunchable(levelId) {
+  const id = Number(levelId);
+  return LEVEL_ORDER.includes(id) && !NON_PLAYABLE_LEVEL_IDS.has(id);
+}
+
+export function getLevelConstructionLabel(levelId) {
+  const id = Number(levelId);
+  if (!isLevelUnderConstruction(id)) return '';
+  return id === 5 ? 'Rebuild Target' : 'Under Construction';
+}
+
+export function getLevelConstructionMessage(levelId) {
+  const id = Number(levelId);
+  if (!isLevelUnderConstruction(id)) return '';
+  if (id === 5) {
+    return 'Level 5 is under construction, but this rebuild target remains playable.';
+  }
+  return `Level ${id} is under construction. This follow-on Era 5 slice is temporarily unavailable.`;
+}
 
 export function getLevelMeta(levelId) {
   return LEVEL_META[levelId] || LEVEL_META[1];

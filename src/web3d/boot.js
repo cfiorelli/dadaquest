@@ -4,10 +4,7 @@ import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
 import { buildWorld4 } from './world/buildWorld4.js';
 import { buildWorld5 } from './world/buildWorld5.js';
-import { buildWorld6 } from './world/buildWorld6.js';
-import { buildWorld7 } from './world/buildWorld7.js';
-import { buildWorld8 } from './world/buildWorld8.js';
-import { buildWorld9 } from './world/buildWorld9.js';
+import { buildUnderConstructionWorld } from './world/buildUnderConstructionWorld.js';
 import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
 import { InputManager } from './util/input.js';
@@ -32,10 +29,10 @@ import { LEVEL2 } from './world/level2.js';
 import { LEVEL3 } from './world/level3.js';
 import { LEVEL4 } from './world/level4.js';
 import { LEVEL5 } from './world/level5.js';
-import { LEVEL6 } from './world/level6.js';
-import { LEVEL7 } from './world/level7.js';
-import { LEVEL8 } from './world/level8.js';
-import { LEVEL9 } from './world/level9.js';
+import {
+  getLevelConstructionMessage,
+  isLevelLaunchable,
+} from './world/levelMeta.js';
 import {
   addItemToEra5State,
   deriveEra5Stats,
@@ -108,8 +105,6 @@ const CAPE_FLOAT_DURATION_MS = 4000;
 const WIND_GLIDE_DURATION_MS = 3000;
 const FLOOR_PENALTY_PICKUP_COOLDOWN_MS = 1200;
 const BUBBLE_SHIELD_GRACE_MS = 900;
-const PLAYABLE_LEVEL_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-
 function easeOutCubic(t) {
   const v = Math.max(0, Math.min(1, t));
   return 1 - ((1 - v) ** 3);
@@ -1097,12 +1092,13 @@ export async function boot(options = {}) {
     3: getLevelCollectibleTotal(LEVEL3),
     4: getLevelCollectibleTotal(LEVEL4),
     5: getLevelCollectibleTotal(LEVEL5),
-    6: getLevelCollectibleTotal(LEVEL6),
-    7: getLevelCollectibleTotal(LEVEL7),
-    8: getLevelCollectibleTotal(LEVEL8),
-    9: getLevelCollectibleTotal(LEVEL9),
+    6: 0,
+    7: 0,
+    8: 0,
+    9: 0,
   };
   const isEra5Level = levelId >= 5;
+  const isLaunchableLevel = isLevelLaunchable(levelId);
   const getLockedMessage = (targetLevelId, state = progression) => {
     if (targetLevelId === 4) {
       return 'Locked. Collect all binkies in Levels 1–3 to unlock Super Sourdough.';
@@ -1124,23 +1120,39 @@ export async function boot(options = {}) {
     }
     return `Level ${targetLevelId} is locked.`;
   };
+  const getConstructionMessage = (targetLevelId) => getLevelConstructionMessage(targetLevelId);
   let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
   const syncProgressState = (nextProgress) => {
     progression = ensureProgressTotals(nextProgress, levelTotals);
     ui.setLockedLevels({
       4: !isLevelUnlocked(progression, 4),
       5: !isLevelUnlocked(progression, 5),
-      6: !isLevelUnlocked(progression, 6),
-      7: !isLevelUnlocked(progression, 7),
-      8: !isLevelUnlocked(progression, 8),
-      9: !isLevelUnlocked(progression, 9),
+      6: false,
+      7: false,
+      8: false,
+      9: false,
     }, {
       4: getLockedMessage(4, progression),
       5: getLockedMessage(5, progression),
-      6: getLockedMessage(6, progression),
-      7: getLockedMessage(7, progression),
-      8: getLockedMessage(8, progression),
-      9: getLockedMessage(9, progression),
+    });
+    ui.setUnderConstructionLevels({
+      5: true,
+      6: true,
+      7: true,
+      8: true,
+      9: true,
+    }, {
+      5: getConstructionMessage(5),
+      6: getConstructionMessage(6),
+      7: getConstructionMessage(7),
+      8: getConstructionMessage(8),
+      9: getConstructionMessage(9),
+    }, {
+      5: false,
+      6: true,
+      7: true,
+      8: true,
+      9: true,
     });
     window.__DADA_DEBUG__.progressState = progression;
   };
@@ -1252,14 +1264,8 @@ export async function boot(options = {}) {
   // Build the diorama world (route by level)
   let world;
   try {
-    world = levelId === 9
-      ? buildWorld9(scene, { animateGoal: !shotMode })
-      : levelId === 8
-      ? buildWorld8(scene, { animateGoal: !shotMode })
-      : levelId === 7
-      ? buildWorld7(scene, { animateGoal: !shotMode })
-      : levelId === 6
-      ? buildWorld6(scene, { animateGoal: !shotMode })
+    world = !isLaunchableLevel
+      ? buildUnderConstructionWorld(scene, levelId)
       : levelId === 5
       ? buildWorld5(scene, { animateGoal: !shotMode })
       : levelId === 4
@@ -4254,14 +4260,18 @@ export async function boot(options = {}) {
     return getLockedMessage(targetLevelId, progression);
   }
 
+  function getBlockedLevelMessage(targetLevelId) {
+    return getConstructionMessage(targetLevelId) || 'This level is under construction.';
+  }
+
   function requestStart(targetLevelId) {
     if (state !== 'title') return; // already loading or playing
-    if (!isLevelUnlocked(progression, targetLevelId)) {
-      ui.showStartError(getLockedLevelMessage(targetLevelId));
+    if (!isLevelLaunchable(targetLevelId)) {
+      ui.showStartError(getBlockedLevelMessage(targetLevelId));
       return;
     }
-    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
-      ui.showStartError('Coming soon. This level is not playable yet.');
+    if (!isLevelUnlocked(progression, targetLevelId)) {
+      ui.showStartError(getLockedLevelMessage(targetLevelId));
       return;
     }
     if (targetLevelId !== levelId) {
@@ -4364,12 +4374,12 @@ export async function boot(options = {}) {
   }
 
   function switchLevelFromGameplayMenu(targetLevelId) {
-    if (!isLevelUnlocked(progression, targetLevelId)) {
-      ui.showStatus(getLockedLevelMessage(targetLevelId), 1600);
+    if (!isLevelLaunchable(targetLevelId)) {
+      ui.showStatus(getBlockedLevelMessage(targetLevelId), 1800);
       return false;
     }
-    if (!PLAYABLE_LEVEL_IDS.has(targetLevelId)) {
-      ui.showStatus('Coming soon. This level is not playable yet.', 1600);
+    if (!isLevelUnlocked(progression, targetLevelId)) {
+      ui.showStatus(getLockedLevelMessage(targetLevelId), 1600);
       return false;
     }
     selectedLevelId = targetLevelId;
@@ -4718,9 +4728,17 @@ export async function boot(options = {}) {
       7: document.getElementById('levelBtn7')?.hasAttribute('aria-disabled') ?? false,
       8: document.getElementById('levelBtn8')?.hasAttribute('aria-disabled') ?? false,
       9: document.getElementById('levelBtn9')?.hasAttribute('aria-disabled') ?? false,
+      underConstruction: {
+        5: document.getElementById('levelBtn5')?.classList.contains('under-construction') ?? false,
+        6: document.getElementById('levelBtn6')?.classList.contains('under-construction') ?? false,
+        7: document.getElementById('levelBtn7')?.classList.contains('under-construction') ?? false,
+        8: document.getElementById('levelBtn8')?.classList.contains('under-construction') ?? false,
+        9: document.getElementById('levelBtn9')?.classList.contains('under-construction') ?? false,
+      },
       titleLock: document.getElementById('titleLevelLock')?.textContent ?? '',
       titleHint: document.getElementById('titleHint')?.textContent ?? '',
     });
+    window.__DADA_DEBUG__.underConstructionLevelId = world.underConstructionLevelId ?? null;
   }
 
   // Single unconditional keydown handler on window — fires regardless of which
@@ -4866,7 +4884,9 @@ export async function boot(options = {}) {
   if (autoStartAfterLoad) {
     finishBootLoading();
     setTimeout(() => {
-      if (state === 'title' && isLevelUnlocked(progression, levelId)) {
+      if (!isLevelLaunchable(levelId)) {
+        ui.showStartError(getBlockedLevelMessage(levelId));
+      } else if (state === 'title' && isLevelUnlocked(progression, levelId)) {
         startLoadedLevelWithProgress(levelId, { unlockAudio: false });
       } else if (!isLevelUnlocked(progression, levelId)) {
         ui.showStartError(getLockedLevelMessage(levelId));
