@@ -63,7 +63,7 @@ const GOAL_MODEL_SLOT_Y = -0.56;
 const CAMERA_FOLLOW_Z = -13.2;
 const ERA5_DEFAULT_PLAYER_YAW = Math.PI * 0.5;
 const ERA5_CAMERA_DISTANCE = 16.6;
-const ERA5_CAMERA_HEIGHT = 5.6;
+const ERA5_CAMERA_HEIGHT = 5.1;
 const ERA5_CAMERA_FOCUS_HEIGHT = 1.30;
 const ERA5_CAMERA_LOOK_AHEAD = 6.4;
 const ERA5_CAMERA_FOV = 0.98;
@@ -3187,14 +3187,15 @@ export async function boot(options = {}) {
 
   function getEra5WeaponHelpText(weaponDef = getEquippedEra5WeaponDef()) {
     const weaponId = weaponDef?.defId || '';
-    if (weaponId === 'paper_fan') return 'Fire Petal Blaster: F / Ctrl / Enter / Click';
-    if (weaponId === 'bookmark_boomerang') return 'Throw Bookmark Boomerang: F / Ctrl / Enter / Click';
-    if (weaponId === 'kite_string_whip') return 'Fire Sock Rocket: F / Ctrl / Enter / Click';
-    if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: F / Ctrl / Enter / Click';
-    return 'Fire Bubble Wand: F / Ctrl / Enter / Click';
+    if (weaponId === 'paper_fan') return 'Fire Paper Fan: Click / F';
+    if (weaponId === 'bookmark_boomerang') return 'Throw Boomerang: Click / F';
+    if (weaponId === 'kite_string_whip') return 'Fire Sock Rocket: Click / F';
+    if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: Click / F';
+    return 'Fire Bubble Wand: Click / F';
   }
 
   function updateBuffHud() {
+    ui.hideBuffContainer();
     let onesiePhase = 'IDLE';
     let onesieDisplayMs = 0;
     let onesieDisplayTotal = onesieMaxDurationMs;
@@ -3275,11 +3276,12 @@ export async function boot(options = {}) {
       const abbr = name.split(' ')[0].slice(0, 5);
       return { name, abbr, active: item.instanceId === era5State.equipped?.weaponPrimary };
     });
+    const shieldMax = Math.round(era5State.stats.shieldMax ?? 1);
     ui.updateEra5Hud({
       hp: era5Hp,
       hpMax: Math.round(era5State.stats.hpMax ?? 3),
       shield: era5Shield,
-      shieldMax: Math.round(era5State.stats.shieldMax ?? 1),
+      shieldMax,
       oxygen: era5Oxygen,
       oxygenMax: meterMax,
       toolLabel: toolDef?.name || 'No Tool',
@@ -3290,6 +3292,8 @@ export async function boot(options = {}) {
       weaponHelp: getEra5WeaponHelpText(weaponDef),
       toolHelp: getEra5ToolHelpText(toolDef),
       weaponSlots,
+      hasTool: meterMax > 0,
+      hasShield: shieldMax > 0,
     });
     window.__DADA_DEBUG__.era5Vitals = {
       hp: era5Hp,
@@ -3594,11 +3598,15 @@ export async function boot(options = {}) {
     if (!starterRoom || !Number.isFinite(starterRoom.x) || !Number.isFinite(starterRoom.z) || !Number.isFinite(starterRoom.w) || !Number.isFinite(starterRoom.d)) {
       return null;
     }
+    const ceilingWorldY = Number.isFinite(starterRoom.ceilingY) ? starterRoom.ceilingY : 6.0;
+    const floorWorldY = Number.isFinite(starterRoom.floorY) ? starterRoom.floorY : 0.0;
     return {
       minX: (starterRoom.x - (starterRoom.w * 0.5)) + 0.08,
       maxX: (starterRoom.x + (starterRoom.w * 0.5)) - 0.08,
       minZ: (starterRoom.z - (starterRoom.d * 0.5)) + 0.08,
       maxZ: (starterRoom.z + (starterRoom.d * 0.5)) - 0.08,
+      maxY: ceilingWorldY - 0.35,
+      minY: floorWorldY + 1.0,
     };
   }
 
@@ -3607,7 +3615,7 @@ export async function boot(options = {}) {
     if (!bounds || !(position instanceof BABYLON.Vector3)) return position;
     return new BABYLON.Vector3(
       clamp(position.x, bounds.minX, bounds.maxX),
-      position.y,
+      clamp(position.y, bounds.minY ?? -Infinity, bounds.maxY ?? Infinity),
       clamp(position.z, bounds.minZ, bounds.maxZ),
     );
   }
@@ -4694,13 +4702,7 @@ export async function boot(options = {}) {
     if (code === 'KeyI') {
       return toggleEra5Inventory();
     }
-    if (
-      code === 'Enter'
-      || code === 'NumpadEnter'
-      || code === 'ControlLeft'
-      || code === 'ControlRight'
-      || code === 'PointerMain'
-    ) {
+    if (code === 'PointerMain') {
       return fireEra5Weapon();
     }
     return false;
@@ -5904,6 +5906,11 @@ export async function boot(options = {}) {
         }
         if (isEra5Level) {
           prepareEra5ToolMotion(dt, { jumpHeld });
+        }
+        if (isEra5Level && jumpJustPressed && player.canTriggerAirFlip()) {
+          player.triggerBackflip();
+          window.__DADA_DEBUG__.backflip = player.getBackflipState();
+          updateBuffHud();
         }
         const { halfH } = player.getCollisionHalfExtents();
         player.update(dt, moveX, jumpJustPressed, playerJumpHeld, jumpPress.pressId, {

@@ -3755,6 +3755,8 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
           d: sector.d,
           floorSurfaceType: sector.floorSurfaceType,
           wallLanguage: sector.wallLanguage,
+          ceilingY: sector.ceilingY ?? null,
+          floorY: sector.floorY ?? null,
         })),
         connectors: (layout.authoredMap.connectors || []).map((connector) => ({
           id: connector.id,

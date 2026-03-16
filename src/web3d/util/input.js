@@ -157,10 +157,6 @@ export class InputManager {
 
   consumeAttackPress() {
     return this.consumeAbilityPress('KeyF')
-      || this.consumeAbilityPress('Enter')
-      || this.consumeAbilityPress('NumpadEnter')
-      || this.consumeAbilityPress('ControlLeft')
-      || this.consumeAbilityPress('ControlRight')
       || this.consumeAbilityPress('PointerMain');
   }
 

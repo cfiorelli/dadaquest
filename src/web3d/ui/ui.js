@@ -577,7 +577,7 @@ const CSS = `
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: rgba(255, 242, 225, 0.78);
+  color: rgba(255, 250, 238, 1.0);
 }
 .dada-buff-note {
   font-size: 11px;
@@ -1351,11 +1351,11 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function getEra5WeaponHelp(levelId) {
-    if (levelId === 9) return 'Fire Paper Fan: F / Ctrl / Enter / Click';
-    if (levelId === 8) return 'Throw Bookmark Boomerang: F / Ctrl / Enter / Click';
-    if (levelId === 7) return 'Crack Kite String Whip: F / Ctrl / Enter / Click';
-    if (levelId === 6) return 'Fire Foam Blaster: F / Ctrl / Enter / Click';
-    return 'Fire Bubble Wand: F / Ctrl / Enter / Click';
+    if (levelId === 9) return 'Fire Paper Fan: Click / F';
+    if (levelId === 8) return 'Throw Boomerang: Click / F';
+    if (levelId === 7) return 'Fire Sock Rocket: Click / F';
+    if (levelId === 6) return 'Fire Foam Blaster: Click / F';
+    return 'Fire Bubble Wand: Click / F';
   }
 
   function getEra5ToolHelp(levelId) {
@@ -1403,7 +1403,7 @@ export function createUI(uiRoot, options = {}) {
 
   function getControlHintMarkup(era5 = false, levelId = 1) {
     if (era5) {
-      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>F</span>/<span>Ctrl</span>/<span>Enter</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
+      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Click</span>/<span>F</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
@@ -1903,7 +1903,7 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-label">Weapon</div>
           <div class="dada-era5-weapon-track" data-era5-weapon><div class="dada-era5-weapon-fill" data-era5-weapon-fill></div></div>
           <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
-          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: F / Ctrl / Enter / Click</div>
+          <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: Click / F</div>
           <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank: Space ascend, C descend in deep pockets</div>
           <div class="dada-era5-weapon-strip" data-era5-weapon-strip></div>
         </div>
@@ -1914,8 +1914,10 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.appendChild(era5HudEl);
   const era5HeartsEl = era5HudEl.querySelector('[data-era5-hearts]');
   const era5ShieldsEl = era5HudEl.querySelector('[data-era5-shields]');
+  const era5ShieldBlockEl = era5ShieldsEl?.closest('.dada-era5-block') ?? null;
   const era5OxygenFillEl = era5HudEl.querySelector('[data-era5-oxygen-fill]');
   const era5OxygenCopyEl = era5HudEl.querySelector('[data-era5-oxygen-copy]');
+  const era5OxygenRowEl = era5OxygenFillEl?.closest('.dada-era5-row') ?? null;
   const era5ToolLabelEl = era5HudEl.querySelector('[data-era5-tool-label]');
   const era5WeaponFillEl = era5HudEl.querySelector('[data-era5-weapon-fill]');
   const era5WeaponLabelEl = era5HudEl.querySelector('[data-era5-weapon-label]');
@@ -2419,6 +2421,11 @@ export function createUI(uiRoot, options = {}) {
 
     /** Update onesie buff bar. phase: 'IDLE' | 'ACTIVE' | 'RECHARGING' */
     updateBuff(remainingMs, totalMs, phase = 'IDLE') {
+      if (phase === 'IDLE') {
+        onesieCard.style.display = 'none';
+        return;
+      }
+      onesieCard.style.display = '';
       buffEl.style.display = 'block';
       const isActiveOrRecharge = phase === 'ACTIVE' || phase === 'RECHARGING';
       onesieCard.classList.toggle('active', isActiveOrRecharge);
@@ -2434,60 +2441,53 @@ export function createUI(uiRoot, options = {}) {
       buffFill.classList.toggle('recharging', phase === 'RECHARGING');
       buffCue.style.display = phase === 'ACTIVE' ? 'inline-block' : 'none';
     },
+    hideBuffContainer() {
+      buffEl.style.display = 'none';
+    },
     updateDoubleJumpCue(available) {
       buffCue.style.display = available ? 'inline-block' : 'none';
     },
     updateCapeBuff({ unlocked = false, active = false, remainingMs = 0, totalMs = 4000, used = false } = {}) {
+      if (!unlocked || !active) {
+        capeCard.style.display = 'none';
+        return;
+      }
+      capeCard.style.display = '';
       buffEl.style.display = 'block';
       const pct = totalMs > 0 ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
       capeFill.style.width = `${pct}%`;
-      capeCard.classList.toggle('active', active || unlocked);
-      if (!unlocked) {
-        capeState.textContent = 'LOCKED';
-        if (capeNote) capeNote.textContent = 'Locked. Collect all binkies in Level 1 to unlock';
-      } else if (active) {
-        capeState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
-        if (capeNote) capeNote.textContent = 'Float mode active';
-      } else if (used) {
-        capeState.textContent = 'USED';
-        if (capeNote) capeNote.textContent = 'Restart level to restore cape use';
-      } else {
-        capeState.textContent = 'READY';
-        if (capeNote) capeNote.textContent = 'Press F while airborne to float';
-      }
+      capeCard.classList.toggle('active', true);
+      capeState.textContent = `${Math.ceil(remainingMs / 1000)}s`;
+      if (capeNote) capeNote.textContent = 'Float mode active';
     },
     updateBubbleShieldBuff({ unlocked = false, used = false } = {}) {
-      buffEl.style.display = 'block';
-      shieldCard.classList.toggle('active', !!unlocked && !used);
-      shieldFill.style.width = unlocked && !used ? '100%' : '0%';
-      if (!unlocked) {
-        shieldState.textContent = 'LOCKED';
-        if (shieldNote) shieldNote.textContent = 'Locked. Beat Level 5 to unlock';
-      } else if (used) {
-        shieldState.textContent = 'USED';
-        if (shieldNote) shieldNote.textContent = 'Popped. Restart level to restore shield';
-      } else {
-        shieldState.textContent = 'READY';
-        if (shieldNote) shieldNote.textContent = 'Auto-pops on the first hazard hit each run';
+      if (!unlocked || used) {
+        shieldCard.style.display = 'none';
+        return;
       }
+      shieldCard.style.display = '';
+      buffEl.style.display = 'block';
+      shieldCard.classList.toggle('active', true);
+      shieldFill.style.width = '100%';
+      shieldState.textContent = 'READY';
+      if (shieldNote) shieldNote.textContent = 'Auto-pops on the first hazard hit each run';
     },
     updateWindGlideBuff({ unlocked = false, used = false, active = false, remainingMs = 0, totalMs = 3000 } = {}) {
+      if (!unlocked || (used && !active)) {
+        windCard.style.display = 'none';
+        return;
+      }
+      windCard.style.display = '';
       buffEl.style.display = 'block';
       const pct = totalMs > 0 ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
-      windCard.classList.toggle('active', !!unlocked && (!used || active));
-      windFill.style.width = active ? `${pct}%` : unlocked && !used ? '100%' : '0%';
-      if (!unlocked) {
-        windState.textContent = 'LOCKED';
-        if (windNote) windNote.textContent = 'Locked. Beat Level 7 to unlock';
-      } else if (active) {
+      windCard.classList.toggle('active', !used || active);
+      windFill.style.width = active ? `${pct}%` : '100%';
+      if (active) {
         windState.textContent = `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
         if (windNote) windNote.textContent = 'Stable glide active';
-      } else if (used) {
-        windState.textContent = 'USED';
-        if (windNote) windNote.textContent = 'Restart level to restore Wind Glide';
       } else {
         windState.textContent = 'READY';
-        if (windNote) windNote.textContent = 'Press F in air for a 3s emergency glide';
+        if (windNote) windNote.textContent = 'Press Space in air for a 3s emergency glide';
       }
     },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
@@ -2527,18 +2527,22 @@ export function createUI(uiRoot, options = {}) {
       weaponCooldownMs = 0,
       weaponCooldownMaxMs = 350,
       inventoryHint = 'I Inventory',
-      weaponHelp = 'Fire Bubble Wand: F / Ctrl / Enter / Click',
+      weaponHelp = 'Fire Bubble Wand: Click / F',
       toolHelp = 'Scuba Tank: Space ascend, C descend in deep pockets',
       weaponSlots = [],
+      hasTool = false,
+      hasShield = false,
     } = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
-      renderPips(era5ShieldsEl, shield, shieldMax, 'dada-era5-shield', '◈');
+      if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = hasShield ? '' : 'none';
+      if (hasShield) renderPips(era5ShieldsEl, shield, shieldMax, 'dada-era5-shield', '◈');
+      if (era5OxygenRowEl) era5OxygenRowEl.style.display = hasTool ? '' : 'none';
       const oxygenPct = oxygenMax > 0 ? Math.max(0, Math.min(100, (oxygen / oxygenMax) * 100)) : 0;
       era5OxygenFillEl.style.width = `${oxygenPct}%`;
       era5OxygenCopyEl.textContent = oxygenMax > 0
         ? `${oxygen.toFixed(1)} / ${oxygenMax.toFixed(1)}s`
-        : 'No tool equipped';
+        : '';
       era5ToolLabelEl.textContent = toolLabel;
       const weaponPct = weaponCooldownMaxMs > 0
         ? Math.max(0, Math.min(100, 100 - ((weaponCooldownMs / weaponCooldownMaxMs) * 100)))
