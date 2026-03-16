@@ -3403,11 +3403,14 @@ export async function boot(options = {}) {
       }
     }
 
-    // Apply to all meshes in tree
+    // Apply to all meshes in tree.
+    // Group 2 matches the world geometry group so depth testing is shared with
+    // floor/walls — prevents the floor (group 2, fresh depth pass) from painting
+    // over the weapon (which was group 0 and thus rendered before the depth clear).
     root.getChildMeshes().forEach((mesh) => {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
-      mesh.renderingGroupId = 0;
+      mesh.renderingGroupId = 2;
       mesh.alwaysSelectAsActiveMesh = true;
     });
     return root;
