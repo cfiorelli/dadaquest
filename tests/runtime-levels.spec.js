@@ -7,6 +7,25 @@ const LEVEL_CASES = [
   { id: 2, url: 'http://127.0.0.1:4173/?level=2&debug=1' },
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
+const LEVEL5_DOORWAY_START_POSE = {
+  x: 21.4,
+  y: 0.42,
+  z: 9.0,
+  yaw: Math.PI * 0.5,
+  cameraYaw: Math.PI * 0.5,
+};
+const LEVEL5_DOORWAY_DIRECT_BLOCK_POSE = {
+  x: 21.4,
+  y: 0.42,
+  z: 9.0,
+  yaw: -Math.PI * 0.5,
+  cameraYaw: -Math.PI * 0.5,
+};
+const LEVEL5_DOORWAY_RIGHT_TURN_STEPS = [
+  { key: 'slightRight', holdMs: 160 },
+  { key: 'right90', holdMs: 1300 },
+  { key: 'rightStress', holdMs: 2200 },
+];
 
 async function installCleanStorage(page) {
   await page.addInitScript((progressKey) => {
@@ -535,6 +554,148 @@ async function captureLevel5JumpCameraTrace(page) {
   });
 }
 
+async function getLevel5DoorwayAssemblyReport(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const getMesh = (sourceName) => scene?.meshes?.find((mesh) => mesh?.metadata?.sourceName === sourceName) ?? null;
+    const getBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox ?? null;
+      return box ? {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      } : null;
+    };
+    const meshInfo = (sourceName) => {
+      const mesh = getMesh(sourceName);
+      return mesh ? {
+        sourceName,
+        cameraIgnore: mesh.metadata?.cameraIgnore ?? null,
+        cameraBlocker: mesh.metadata?.cameraBlocker ?? null,
+        bounds: getBounds(mesh),
+      } : null;
+    };
+    const north = meshInfo('east_wall_north');
+    const south = meshInfo('east_wall_south');
+    const header = meshInfo('east_wall_header');
+    const blocker = meshInfo('future_exit_blocker');
+    const delta = (left, right) => Number(((left ?? 0) - (right ?? 0)).toFixed(3));
+    return {
+      mapId: topology?.mapId ?? null,
+      roomBounds: room ? {
+        minX: Number((room.x - (room.w * 0.5)).toFixed(3)),
+        maxX: Number((room.x + (room.w * 0.5)).toFixed(3)),
+        minZ: Number((room.z - (room.d * 0.5)).toFixed(3)),
+        maxZ: Number((room.z + (room.d * 0.5)).toFixed(3)),
+      } : null,
+      eastWallNorth: north,
+      eastWallSouth: south,
+      eastWallHeader: header,
+      futureExitBlocker: blocker,
+      alignment: {
+        blockerMinXDelta: delta(blocker?.bounds?.minX, header?.bounds?.minX),
+        blockerMaxXDelta: delta(blocker?.bounds?.maxX, header?.bounds?.maxX),
+        northSeamDelta: delta(blocker?.bounds?.minZ, north?.bounds?.maxZ),
+        southSeamDelta: delta(south?.bounds?.minZ, blocker?.bounds?.maxZ),
+        floorDelta: delta(blocker?.bounds?.minY, 0.0),
+      },
+    };
+  });
+}
+
+function expectLevel5DoorwayAssemblyReport(report) {
+  expect(report?.mapId).toBe('level5-room-reset');
+  expect(report?.roomBounds).not.toBeNull();
+  expect(report?.eastWallNorth?.bounds).not.toBeNull();
+  expect(report?.eastWallSouth?.bounds).not.toBeNull();
+  expect(report?.eastWallHeader?.bounds).not.toBeNull();
+  expect(report?.futureExitBlocker?.bounds).not.toBeNull();
+  expect(report.futureExitBlocker.cameraIgnore).toBe(false);
+  expect(report.futureExitBlocker.cameraBlocker).toBe(true);
+  expect(report.alignment).toEqual({
+    blockerMinXDelta: 0,
+    blockerMaxXDelta: 0,
+    northSeamDelta: 0,
+    southSeamDelta: 0,
+    floorDelta: 0,
+  });
+}
+
+async function getLevel5DoorwayCameraState(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const camera = scene?.activeCamera ?? null;
+    const target = camera?.getTarget?.() ?? null;
+    const cameraPos = camera?.position ?? null;
+    const roomBounds = room ? {
+      minX: Number((room.x - (room.w * 0.5)).toFixed(3)),
+      maxX: Number((room.x + (room.w * 0.5)).toFixed(3)),
+      minZ: Number((room.z - (room.d * 0.5)).toFixed(3)),
+      maxZ: Number((room.z + (room.d * 0.5)).toFixed(3)),
+    } : null;
+    return {
+      roomBounds,
+      playerPos: window.__DADA_DEBUG__?.playerPos ? {
+        x: Number(window.__DADA_DEBUG__.playerPos.x.toFixed(3)),
+        y: Number(window.__DADA_DEBUG__.playerPos.y.toFixed(3)),
+        z: Number(window.__DADA_DEBUG__.playerPos.z.toFixed(3)),
+      } : null,
+      playerYaw: Number((window.__DADA_DEBUG__?.playerYaw ?? 0).toFixed(3)),
+      cameraYaw: Number((window.__DADA_DEBUG__?.cameraYaw ?? 0).toFixed(3)),
+      cameraDesiredYaw: Number((window.__DADA_DEBUG__?.cameraDesiredYaw ?? 0).toFixed(3)),
+      cameraPos: cameraPos ? {
+        x: Number(cameraPos.x.toFixed(3)),
+        y: Number(cameraPos.y.toFixed(3)),
+        z: Number(cameraPos.z.toFixed(3)),
+      } : null,
+      cameraTarget: target ? {
+        x: Number(target.x.toFixed(3)),
+        y: Number(target.y.toFixed(3)),
+        z: Number(target.z.toFixed(3)),
+      } : null,
+      occluderMesh: window.__DADA_DEBUG__?.occluderMesh ?? null,
+      occlusion: window.__DADA_DEBUG__?.cameraOcclusion ?? null,
+      cameraInsideRoom: !!(roomBounds && cameraPos
+        && cameraPos.x > (roomBounds.minX + 0.05)
+        && cameraPos.x < (roomBounds.maxX - 0.05)
+        && cameraPos.z > (roomBounds.minZ + 0.05)
+        && cameraPos.z < (roomBounds.maxZ - 0.05)),
+    };
+  });
+}
+
+async function captureLevel5DoorwayRotationPhases(page) {
+  const phases = {};
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+  });
+  await resetEra5Pose(page, LEVEL5_DOORWAY_START_POSE);
+  await page.waitForTimeout(260);
+  phases.straight = await getLevel5DoorwayCameraState(page);
+
+  await resetEra5Pose(page, LEVEL5_DOORWAY_DIRECT_BLOCK_POSE);
+  await page.waitForTimeout(260);
+  phases.directBlock = await getLevel5DoorwayCameraState(page);
+
+  await resetEra5Pose(page, LEVEL5_DOORWAY_START_POSE);
+  await page.waitForTimeout(220);
+  for (const step of LEVEL5_DOORWAY_RIGHT_TURN_STEPS) {
+    await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
+    await page.waitForTimeout(step.holdMs);
+    await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
+    await page.waitForTimeout(280);
+    phases[step.key] = await getLevel5DoorwayCameraState(page);
+  }
+  return phases;
+}
+
 test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
@@ -912,6 +1073,39 @@ test('@level5 @era5 runtime: level 5 jump camera stays below the ceiling and ins
   expect(jumpTrace.apex.occlusion?.safeDistance).toBeLessThan(jumpTrace.apex.occlusion?.pickDistance ?? Infinity);
   expect(jumpTrace.landing.grounded).toBe(true);
   expect(Math.abs(jumpTrace.landing.cameraPos.y - jumpTrace.before.cameraPos.y)).toBeLessThan(0.05);
+});
+
+test('@level5 @era5 runtime: level 5 east doorway assembly stays flush and camera-safe from direct blocker and right-turn doorway views', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const assemblyReport = await getLevel5DoorwayAssemblyReport(page);
+  expectLevel5DoorwayAssemblyReport(assemblyReport);
+
+  const phases = await captureLevel5DoorwayRotationPhases(page);
+  for (const phase of Object.values(phases)) {
+    expect(phase?.roomBounds).not.toBeNull();
+    expect(phase?.cameraPos).not.toBeNull();
+    expect(phase?.cameraTarget).not.toBeNull();
+    expect(phase?.cameraInsideRoom).toBe(true);
+  }
+
+  expect(phases.directBlock.occluderMesh).toBe('neutral_decorBlock_future_exit_blocker');
+  expect(phases.directBlock.occlusion?.pickDistance).not.toBeNull();
+  expect(phases.directBlock.occlusion?.usedEntryClamp).toBe(true);
+
+  expect(phases.rightStress.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
+  expect(phases.rightStress.occlusion?.pickDistance).not.toBeNull();
+  expect(phases.rightStress.occlusion?.safeDistance).toBeLessThan(phases.rightStress.occlusion?.pickDistance ?? Infinity);
+  expect(phases.rightStress.cameraPos.x).toBeLessThan((phases.rightStress.roomBounds?.maxX ?? Infinity) - 0.05);
 });
 
 test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible exit blocker keeps the player inside the room', async ({ page }) => {

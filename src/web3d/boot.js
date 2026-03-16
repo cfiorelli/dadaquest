@@ -3439,6 +3439,32 @@ export async function boot(options = {}) {
     return getYawRightXZ(era5PlayerYaw).normalize();
   }
 
+  function getLevel5StarterRoomCameraClampBounds() {
+    if (!isEra5Level || levelId !== 5) return null;
+    const topology = world?.era5Level?.getTopologyReport?.() ?? null;
+    if (topology?.mapId !== 'level5-room-reset') return null;
+    const starterRoom = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    if (!starterRoom || !Number.isFinite(starterRoom.x) || !Number.isFinite(starterRoom.z) || !Number.isFinite(starterRoom.w) || !Number.isFinite(starterRoom.d)) {
+      return null;
+    }
+    return {
+      minX: (starterRoom.x - (starterRoom.w * 0.5)) + 0.08,
+      maxX: (starterRoom.x + (starterRoom.w * 0.5)) - 0.08,
+      minZ: (starterRoom.z - (starterRoom.d * 0.5)) + 0.08,
+      maxZ: (starterRoom.z + (starterRoom.d * 0.5)) - 0.08,
+    };
+  }
+
+  function constrainEra5CameraToStarterRoom(position) {
+    const bounds = getLevel5StarterRoomCameraClampBounds();
+    if (!bounds || !(position instanceof BABYLON.Vector3)) return position;
+    return new BABYLON.Vector3(
+      clamp(position.x, bounds.minX, bounds.maxX),
+      position.y,
+      clamp(position.z, bounds.minZ, bounds.maxZ),
+    );
+  }
+
   function applyEra5FacingState() {
     if (!isEra5Level) return;
     player.visual.rotation.y = era5PlayerYaw + Math.PI;
@@ -5763,7 +5789,7 @@ export async function boot(options = {}) {
           const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
           era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
           era5CurrentOcclusionInfo = occlusion.info || null;
-          camera.position.copyFrom(occlusion.correctedPos);
+          camera.position.copyFrom(constrainEra5CameraToStarterRoom(occlusion.correctedPos));
           camera.setTarget(desiredTarget);
           camera.fov = preset.fov;
           updateEra5DecorOcclusion(dt, focusPos, camera.position);

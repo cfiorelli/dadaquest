@@ -7,6 +7,25 @@ const SHOT_SCENES = [
   { scene: 'crib', key: 'CribScene', file: 'crib' },
   { scene: 'end', key: 'EndScene', file: 'end' },
 ];
+const LEVEL5_DOORWAY_START_POSE = {
+  x: 21.4,
+  y: 0.42,
+  z: 9.0,
+  yaw: Math.PI * 0.5,
+  cameraYaw: Math.PI * 0.5,
+};
+const LEVEL5_DOORWAY_DIRECT_BLOCK_POSE = {
+  x: 21.4,
+  y: 0.42,
+  z: 9.0,
+  yaw: -Math.PI * 0.5,
+  cameraYaw: -Math.PI * 0.5,
+};
+const LEVEL5_DOORWAY_RIGHT_TURN_STEPS = [
+  { key: 'slight-right', holdMs: 160, path: 'docs/screenshots/level5-room-reset-doorway-slight-right.png' },
+  { key: 'right-90', holdMs: 1300, path: 'docs/screenshots/level5-room-reset-doorway-right-90.png' },
+  { key: 'right-stress', holdMs: 2200, path: 'docs/screenshots/level5-room-reset-doorway-right-stress.png' },
+];
 
 async function gotoDebugLevel(page, levelId) {
   await page.goto(`http://127.0.0.1:4173/?level=${levelId}&debug=1`);
@@ -392,6 +411,112 @@ async function getLevel5JumpCameraState(page) {
   });
 }
 
+async function getLevel5DoorwayAssemblyReport(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const getMesh = (sourceName) => scene?.meshes?.find((mesh) => mesh?.metadata?.sourceName === sourceName) ?? null;
+    const getBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox ?? null;
+      return box ? {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      } : null;
+    };
+    const meshInfo = (sourceName) => {
+      const mesh = getMesh(sourceName);
+      return mesh ? {
+        sourceName,
+        cameraIgnore: mesh.metadata?.cameraIgnore ?? null,
+        cameraBlocker: mesh.metadata?.cameraBlocker ?? null,
+        bounds: getBounds(mesh),
+      } : null;
+    };
+    const north = meshInfo('east_wall_north');
+    const south = meshInfo('east_wall_south');
+    const header = meshInfo('east_wall_header');
+    const blocker = meshInfo('future_exit_blocker');
+    const delta = (left, right) => Number(((left ?? 0) - (right ?? 0)).toFixed(3));
+    return {
+      mapId: topology?.mapId ?? null,
+      roomBounds: room ? {
+        minX: Number((room.x - (room.w * 0.5)).toFixed(3)),
+        maxX: Number((room.x + (room.w * 0.5)).toFixed(3)),
+        minZ: Number((room.z - (room.d * 0.5)).toFixed(3)),
+        maxZ: Number((room.z + (room.d * 0.5)).toFixed(3)),
+      } : null,
+      futureExitBlocker: blocker,
+      alignment: {
+        blockerMinXDelta: delta(blocker?.bounds?.minX, header?.bounds?.minX),
+        blockerMaxXDelta: delta(blocker?.bounds?.maxX, header?.bounds?.maxX),
+        northSeamDelta: delta(blocker?.bounds?.minZ, north?.bounds?.maxZ),
+        southSeamDelta: delta(south?.bounds?.minZ, blocker?.bounds?.maxZ),
+        floorDelta: delta(blocker?.bounds?.minY, 0.0),
+      },
+    };
+  });
+}
+
+function expectLevel5DoorwayAssemblyReport(report) {
+  expect(report?.mapId).toBe('level5-room-reset');
+  expect(report?.roomBounds).not.toBeNull();
+  expect(report?.futureExitBlocker?.bounds).not.toBeNull();
+  expect(report.futureExitBlocker.cameraIgnore).toBe(false);
+  expect(report.futureExitBlocker.cameraBlocker).toBe(true);
+  expect(report.alignment).toEqual({
+    blockerMinXDelta: 0,
+    blockerMaxXDelta: 0,
+    northSeamDelta: 0,
+    southSeamDelta: 0,
+    floorDelta: 0,
+  });
+}
+
+async function getLevel5DoorwayCameraState(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const room = topology?.sectors?.find((sector) => sector.id === 'starter_room') ?? topology?.sectors?.[0] ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const camera = scene?.activeCamera ?? null;
+    const target = camera?.getTarget?.() ?? null;
+    const cameraPos = camera?.position ?? null;
+    const roomBounds = room ? {
+      minX: Number((room.x - (room.w * 0.5)).toFixed(3)),
+      maxX: Number((room.x + (room.w * 0.5)).toFixed(3)),
+      minZ: Number((room.z - (room.d * 0.5)).toFixed(3)),
+      maxZ: Number((room.z + (room.d * 0.5)).toFixed(3)),
+    } : null;
+    return {
+      roomBounds,
+      cameraPos: cameraPos ? {
+        x: Number(cameraPos.x.toFixed(3)),
+        y: Number(cameraPos.y.toFixed(3)),
+        z: Number(cameraPos.z.toFixed(3)),
+      } : null,
+      cameraTarget: target ? {
+        x: Number(target.x.toFixed(3)),
+        y: Number(target.y.toFixed(3)),
+        z: Number(target.z.toFixed(3)),
+      } : null,
+      playerYaw: Number((window.__DADA_DEBUG__?.playerYaw ?? 0).toFixed(3)),
+      cameraYaw: Number((window.__DADA_DEBUG__?.cameraYaw ?? 0).toFixed(3)),
+      cameraDesiredYaw: Number((window.__DADA_DEBUG__?.cameraDesiredYaw ?? 0).toFixed(3)),
+      occluderMesh: window.__DADA_DEBUG__?.occluderMesh ?? null,
+      occlusion: window.__DADA_DEBUG__?.cameraOcclusion ?? null,
+      cameraInsideRoom: !!(roomBounds && cameraPos
+        && cameraPos.x > (roomBounds.minX + 0.05)
+        && cameraPos.x < (roomBounds.maxX - 0.05)
+        && cameraPos.z > (roomBounds.minZ + 0.05)
+        && cameraPos.z < (roomBounds.maxZ - 0.05)),
+    };
+  });
+}
+
 test('capture scene screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
@@ -601,6 +726,94 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
       hazards: false,
       respawnAnchors: false,
     });
+  });
+});
+
+test('capture Level 5 room reset doorway proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-room-reset-doorway', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-room-reset-doorway/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+  await hideGameplayUi(page);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+  });
+
+  const starterAudit = await getLevel5StarterRoomAudit(page);
+  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
+  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
+
+  const assemblyReport = await getLevel5DoorwayAssemblyReport(page);
+  expectLevel5DoorwayAssemblyReport(assemblyReport);
+
+  await page.evaluate((pose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
+  }, LEVEL5_DOORWAY_START_POSE);
+  await page.waitForTimeout(320);
+  const straightState = await getLevel5DoorwayCameraState(page);
+  expect(straightState.cameraInsideRoom).toBe(true);
+  await captureProof('docs/screenshots/level5-room-reset-doorway-straight.png');
+
+  await page.evaluate((pose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
+  }, LEVEL5_DOORWAY_DIRECT_BLOCK_POSE);
+  await page.waitForTimeout(320);
+  const directBlockState = await getLevel5DoorwayCameraState(page);
+  expect(directBlockState.cameraInsideRoom).toBe(true);
+  expect(directBlockState.occluderMesh).toBe('neutral_decorBlock_future_exit_blocker');
+
+  await page.evaluate((pose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
+  }, LEVEL5_DOORWAY_START_POSE);
+  await page.waitForTimeout(220);
+
+  for (const step of LEVEL5_DOORWAY_RIGHT_TURN_STEPS) {
+    await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
+    await page.waitForTimeout(step.holdMs);
+    await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
+    await page.waitForTimeout(280);
+    const state = await getLevel5DoorwayCameraState(page);
+    expect(state.cameraInsideRoom).toBe(true);
+    if (step.key === 'right-stress') {
+      expect(state.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
+      expect(state.occlusion?.pickDistance).not.toBeNull();
+    }
+    await captureProof(step.path);
+  }
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-room-reset-doorway-floor-seam',
+      position: { x: 21.3, y: 0.68, z: 11.55 },
+      target: { x: 24.18, y: 0.26, z: 10.45 },
+      fov: 0.52,
+    });
+  });
+  await page.waitForTimeout(420);
+  const seamState = await getLevel5DoorwayAssemblyReport(page);
+  expectLevel5DoorwayAssemblyReport(seamState);
+  await captureProof('docs/screenshots/level5-room-reset-doorway-floor-seam.png');
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
   });
 });
 
