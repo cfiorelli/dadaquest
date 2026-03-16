@@ -3479,25 +3479,25 @@ export async function boot(options = {}) {
     const floorTopY = player.mesh.position.y - halfH;
     const muzzleForward = Math.max(1.05, halfD + 0.8);
     const muzzleHeight = Math.max(
-      floorTopY + 1.12,
-      player.mesh.position.y + 0.86,
-      (cameraTarget?.y ?? (player.mesh.position.y + 0.98)) - 0.12,
+      floorTopY + 1.40,
+      player.mesh.position.y + 1.10,
+      (cameraTarget?.y ?? (player.mesh.position.y + 1.16)) + 0.18,
     );
     const origin = new BABYLON.Vector3(
       player.mesh.position.x + (forward.x * muzzleForward),
       muzzleHeight,
       player.mesh.position.z + (forward.z * muzzleForward),
     );
-    const aimLead = Math.max(2.6, (preset?.lookAhead ?? 2.2) + 0.8);
+    const aimLead = Math.max(2.35, (preset?.lookAhead ?? 2.2) + 0.55);
     const aimTarget = cameraTarget
       ? new BABYLON.Vector3(
         cameraTarget.x + (forward.x * aimLead),
-        Math.max(muzzleHeight + 0.04, cameraTarget.y + 0.06),
+        Math.max(muzzleHeight + 0.42, cameraTarget.y + 0.72),
         cameraTarget.z + (forward.z * aimLead),
       )
       : new BABYLON.Vector3(
         origin.x + (forward.x * aimLead),
-        muzzleHeight + 0.08,
+        muzzleHeight + 0.48,
         origin.z + (forward.z * aimLead),
       );
     const direction = aimTarget.subtract(origin);
