@@ -168,6 +168,13 @@ export class InputManager {
     return this.consumeAbilityPress('Backslash');
   }
 
+  consumeWeaponSlotPress() {
+    for (let slot = 1; slot <= 5; slot += 1) {
+      if (this.consumeAbilityPress(`Digit${slot}`)) return slot;
+    }
+    return null;
+  }
+
   consumeAll() {
     if (isDebugMode()) {
       console.log('[INPUT-DEBUG] consumeAll() called - clearing all press IDs');

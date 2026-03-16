@@ -493,13 +493,32 @@ function createJellyfish(scene, def, shadowGen) {
     mover,
     nearMissCooldownMs: 0,
     stunnedMs: 0,
+    hp: (def.hpMax ?? 3),
+    hpMax: (def.hpMax ?? 3),
+    alive: true,
     stun(durationMs = 1500) {
+      if (!this.alive) return false;
       this.stunnedMs = Math.max(this.stunnedMs, durationMs);
       applyMaterialLook();
       return true;
     },
     isStunned() {
       return this.stunnedMs > 0;
+    },
+    takeDamage(amount = 1) {
+      if (!this.alive) return false;
+      this.hp = Math.max(0, this.hp - amount);
+      if (this.hp <= 0) {
+        this.kill();
+        return 'killed';
+      }
+      return 'damaged';
+    },
+    kill() {
+      if (!this.alive) return;
+      this.alive = false;
+      this.stunnedMs = 0;
+      root.setEnabled(false);
     },
     setDebugView({ showBounds = state.showBounds, highContrast = state.highContrast } = {}) {
       state.showBounds = !!showBounds;
@@ -532,7 +551,10 @@ function createJellyfish(scene, def, shadowGen) {
       mover.reset();
       this.nearMissCooldownMs = 0;
       this.stunnedMs = 0;
+      this.hp = this.hpMax;
+      this.alive = true;
       root.position.set(def.x, def.y, def.z ?? 0);
+      root.setEnabled(true);
       applyMaterialLook();
     },
   };
@@ -1153,14 +1175,16 @@ export function buildWorld5(scene, options = {}) {
     const attackPos = attack.position || BABYLON.Vector3.Zero();
     const radius = Number.isFinite(attack.radius) ? attack.radius : 0.82;
     const stunMs = Number.isFinite(attack.stunMs) ? attack.stunMs : 1500;
+    const damage = Number.isFinite(attack.damage) ? attack.damage : 1;
     for (const jelly of jellyfish) {
-      if (jelly.isStunned()) continue;
+      if (!jelly.alive) continue;
       const dx = attackPos.x - jelly.root.position.x;
       const dy = attackPos.y - jelly.root.position.y;
       const dz = attackPos.z - jelly.root.position.z;
       if (((dx ** 2) + (dy ** 2) + (dz ** 2)) <= ((radius + 0.64) ** 2)) {
-        jelly.stun(stunMs);
-        return { hit: true, target: jelly.name };
+        const damageResult = jelly.takeDamage(damage);
+        if (damageResult !== 'killed') jelly.stun(stunMs);
+        return { hit: true, target: jelly.name, killed: damageResult === 'killed' };
       }
     }
     return { hit: false };
@@ -1176,6 +1200,9 @@ export function buildWorld5(scene, options = {}) {
         y: Number(jelly.root.position.y.toFixed(3)),
         z: Number(jelly.root.position.z.toFixed(3)),
         stunnedMs: Math.round(jelly.stunnedMs),
+        hp: jelly.hp,
+        hpMax: jelly.hpMax,
+        alive: jelly.alive,
         visible: jelly.root.isEnabled(),
       })),
     };
@@ -1312,6 +1339,7 @@ export function buildWorld5(scene, options = {}) {
         position: projectile.position,
         radius: projectile.radius,
         stunMs: projectile.stunMs,
+        damage: projectile.damage ?? 1,
       });
     },
     placeDebugEnemy(pos, forward = { x: 1, z: 0 }) {

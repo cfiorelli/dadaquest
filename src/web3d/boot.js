@@ -2644,6 +2644,7 @@ export async function boot(options = {}) {
   let era5ToolActive = false;
   let era5InventoryOpen = false;
   let era5Projectiles = [];
+  let activeWeaponMesh = null;
   let windGlideUsedThisRun = false;
   let windGlideActiveMs = 0;
   let goalCarryStartPos = null;
@@ -3186,9 +3187,9 @@ export async function boot(options = {}) {
 
   function getEra5WeaponHelpText(weaponDef = getEquippedEra5WeaponDef()) {
     const weaponId = weaponDef?.defId || '';
-    if (weaponId === 'paper_fan') return 'Fire Paper Fan: F / Ctrl / Enter / Click';
+    if (weaponId === 'paper_fan') return 'Fire Petal Blaster: F / Ctrl / Enter / Click';
     if (weaponId === 'bookmark_boomerang') return 'Throw Bookmark Boomerang: F / Ctrl / Enter / Click';
-    if (weaponId === 'kite_string_whip') return 'Crack Kite String Whip: F / Ctrl / Enter / Click';
+    if (weaponId === 'kite_string_whip') return 'Fire Sock Rocket: F / Ctrl / Enter / Click';
     if (weaponId === 'foam_blaster') return 'Fire Foam Blaster: F / Ctrl / Enter / Click';
     return 'Fire Bubble Wand: F / Ctrl / Enter / Click';
   }
@@ -3263,6 +3264,17 @@ export async function boot(options = {}) {
       era5InventoryOpen ? 'I Close' : 'I Inventory',
       progression.windGlideUnlocked ? 'G Wind Glide' : '',
     ].filter(Boolean).join(' • ');
+    const weaponInstances = era5State.inventory.filter((item) => {
+      const def = getItemDef(item.defId);
+      return def?.slot === 'weaponPrimary' || def?.slot === 'weaponSecondary';
+    });
+    const weaponSlots = weaponInstances.slice(0, 5).map((item) => {
+      const def = getItemDef(item.defId);
+      const name = def?.name ?? item.defId;
+      // Abbreviate: first word or up to 5 chars
+      const abbr = name.split(' ')[0].slice(0, 5);
+      return { name, abbr, active: item.instanceId === era5State.equipped?.weaponPrimary };
+    });
     ui.updateEra5Hud({
       hp: era5Hp,
       hpMax: Math.round(era5State.stats.hpMax ?? 3),
@@ -3277,6 +3289,7 @@ export async function boot(options = {}) {
       inventoryHint,
       weaponHelp: getEra5WeaponHelpText(weaponDef),
       toolHelp: getEra5ToolHelpText(toolDef),
+      weaponSlots,
     });
     window.__DADA_DEBUG__.era5Vitals = {
       hp: era5Hp,
@@ -3300,6 +3313,114 @@ export async function boot(options = {}) {
     persistProgressState(updated);
   }
 
+  function createEra5WeaponMesh(defId) {
+    const root = new BABYLON.TransformNode(`weapon_${defId}`, scene);
+
+    function solidMat(name, r, g, b, emissiveMult = 0.22) {
+      const mat = new BABYLON.StandardMaterial(name, scene);
+      mat.diffuseColor = new BABYLON.Color3(r, g, b);
+      mat.emissiveColor = new BABYLON.Color3(r * emissiveMult, g * emissiveMult, b * emissiveMult);
+      mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+      return mat;
+    }
+
+    if (defId === 'bubble_wand') {
+      const wand = BABYLON.MeshBuilder.CreateCylinder(`${defId}_wand`, {
+        height: 0.28, diameterTop: 0.025, diameterBottom: 0.03, tessellation: 8,
+      }, scene);
+      wand.parent = root;
+      wand.rotation.z = Math.PI * 0.5;
+      wand.material = solidMat(`${defId}_mat`, 0.72, 0.48, 0.92);
+      const orb = BABYLON.MeshBuilder.CreateSphere(`${defId}_orb`, { diameter: 0.065, segments: 6 }, scene);
+      orb.parent = root;
+      orb.position.x = 0.16;
+      const orbMat = new BABYLON.StandardMaterial(`${defId}_orbmat`, scene);
+      orbMat.diffuseColor = new BABYLON.Color3(0.7, 0.96, 1.0);
+      orbMat.emissiveColor = new BABYLON.Color3(0.1, 0.3, 0.4);
+      orbMat.alpha = 0.88;
+      orbMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      orb.material = orbMat;
+    } else if (defId === 'foam_blaster') {
+      const body = BABYLON.MeshBuilder.CreateBox(`${defId}_body`, {
+        width: 0.20, height: 0.07, depth: 0.06,
+      }, scene);
+      body.parent = root;
+      body.position.x = 0.05;
+      body.material = solidMat(`${defId}_mat`, 0.2, 0.72, 0.68);
+      const barrel = BABYLON.MeshBuilder.CreateCylinder(`${defId}_barrel`, {
+        height: 0.14, diameterTop: 0.024, diameterBottom: 0.028, tessellation: 8,
+      }, scene);
+      barrel.parent = root;
+      barrel.rotation.z = Math.PI * 0.5;
+      barrel.position.x = 0.17;
+      barrel.material = solidMat(`${defId}_bmat`, 0.14, 0.48, 0.46);
+    } else if (defId === 'paper_fan') {
+      const handle = BABYLON.MeshBuilder.CreateCylinder(`${defId}_handle`, {
+        height: 0.14, diameterTop: 0.022, diameterBottom: 0.026, tessellation: 8,
+      }, scene);
+      handle.parent = root;
+      handle.rotation.z = Math.PI * 0.5;
+      handle.material = solidMat(`${defId}_hmat`, 0.62, 0.36, 0.24);
+      const fanMat = solidMat(`${defId}_fmat`, 0.98, 0.52, 0.72, 0.3);
+      fanMat.backFaceCulling = false;
+      for (let f = 0; f < 4; f += 1) {
+        const petal = BABYLON.MeshBuilder.CreatePlane(`${defId}_petal${f}`, { width: 0.10, height: 0.07 }, scene);
+        petal.parent = root;
+        petal.position.x = 0.11;
+        petal.rotation.x = (f * Math.PI * 0.5);
+        petal.material = fanMat;
+      }
+    } else if (defId === 'bookmark_boomerang') {
+      const disk = BABYLON.MeshBuilder.CreateCylinder(`${defId}_disk`, {
+        height: 0.018, diameter: 0.22, tessellation: 20,
+      }, scene);
+      disk.parent = root;
+      disk.rotation.z = Math.PI * 0.5;
+      disk.scaling.z = 0.38;
+      disk.material = solidMat(`${defId}_mat`, 0.84, 0.70, 0.42);
+    } else if (defId === 'kite_string_whip') {
+      const barrel = BABYLON.MeshBuilder.CreateCylinder(`${defId}_barrel`, {
+        height: 0.22, diameterTop: 0.044, diameterBottom: 0.052, tessellation: 10,
+      }, scene);
+      barrel.parent = root;
+      barrel.rotation.z = Math.PI * 0.5;
+      barrel.position.x = 0.06;
+      barrel.material = solidMat(`${defId}_mat`, 0.58, 0.62, 0.30);
+      const finMat = solidMat(`${defId}_fmat`, 0.42, 0.46, 0.22);
+      const finOffsets = [
+        [0, 0.04], [0, -0.04], [0.04, 0], [-0.04, 0],
+      ];
+      for (let f = 0; f < finOffsets.length; f += 1) {
+        const fin = BABYLON.MeshBuilder.CreateBox(`${defId}_fin${f}`, {
+          width: 0.04, height: 0.08, depth: 0.01,
+        }, scene);
+        fin.parent = barrel;
+        fin.position.set(finOffsets[f][0], finOffsets[f][1], 0);
+        fin.material = finMat;
+      }
+    }
+
+    // Apply to all meshes in tree
+    root.getChildMeshes().forEach((mesh) => {
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+      mesh.renderingGroupId = 0;
+    });
+    return root;
+  }
+
+  function updateEra5WeaponMesh(defId) {
+    if (activeWeaponMesh) {
+      activeWeaponMesh.getChildMeshes().forEach((m) => m.dispose());
+      activeWeaponMesh.dispose();
+      activeWeaponMesh = null;
+    }
+    if (!isEra5Level || !defId || !player?.babyRig?.weaponAnchor) return;
+    activeWeaponMesh = createEra5WeaponMesh(defId);
+    activeWeaponMesh.parent = player.babyRig.weaponAnchor;
+    activeWeaponMesh.position.setAll(0);
+  }
+
   function equipEra5Item(instanceId) {
     const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
     const def = getItemDef(instance?.defId);
@@ -3309,8 +3430,24 @@ export async function boot(options = {}) {
     nextEra5.stats = deriveEra5Stats(nextEra5);
     persistEra5State(nextEra5);
     restoreEra5Vitals();
+    if (def.slot === 'weaponPrimary' || def.slot === 'weaponSecondary') {
+      updateEra5WeaponMesh(def.defId);
+    }
     syncEra5Ui();
     return true;
+  }
+
+  function switchToEra5WeaponBySlot(slotIndex) {
+    // slotIndex is 0-based. Collect all weapon instances in inventory order.
+    const weaponInstances = era5State.inventory.filter((item) => {
+      const def = getItemDef(item.defId);
+      return def?.slot === 'weaponPrimary' || def?.slot === 'weaponSecondary';
+    });
+    const target = weaponInstances[slotIndex];
+    if (target) {
+      equipEra5Item(target.instanceId);
+      ui.showStatus(getItemDef(target.defId)?.name ?? 'Weapon', 450);
+    }
   }
 
   function unequipEra5Slot(slotId) {
@@ -3320,6 +3457,9 @@ export async function boot(options = {}) {
     nextEra5.stats = deriveEra5Stats(nextEra5);
     persistEra5State(nextEra5);
     restoreEra5Vitals();
+    if (slotId === 'weaponPrimary' || slotId === 'weaponSecondary') {
+      updateEra5WeaponMesh(null);
+    }
     syncEra5Ui();
     return true;
   }
@@ -3518,39 +3658,63 @@ export async function boot(options = {}) {
     };
   }
 
-  function spawnEra5Projectile(position, direction) {
-    const projectile = BABYLON.MeshBuilder.CreateSphere(`era5Bubble_${performance.now().toFixed(0)}`, {
-      diameter: 0.24,
-      segments: 6,
-    }, scene);
-    projectile.position.copyFrom(position);
-    const mat = new BABYLON.StandardMaterial(`${projectile.name}_mat`, scene);
-    mat.diffuseColor = new BABYLON.Color3(0.76, 0.98, 1.0);
-    mat.emissiveColor = new BABYLON.Color3(0.12, 0.24, 0.30);
-    mat.alpha = 0.76;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  function spawnEra5Projectile(position, direction, weaponId) {
+    const wId = weaponId ?? getEquippedEra5WeaponDef()?.defId ?? 'bubble_wand';
+    const name = `era5Bubble_${performance.now().toFixed(0)}_${Math.random().toString(36).slice(2, 6)}`;
+
+    // Per-weapon visual parameters
+    const WEAPON_VISUALS = {
+      bubble_wand:       { diameter: 0.22, r: 0.76, g: 0.98, b: 1.0,  er: 0.12, eg: 0.24, eb: 0.30, alpha: 0.76, radius: 0.24 },
+      foam_blaster:      { diameter: 0.14, r: 1.0,  g: 0.96, b: 0.60, er: 0.30, eg: 0.28, eb: 0.00, alpha: 0.92, radius: 0.18 },
+      paper_fan:         { diameter: 0.11, r: 1.0,  g: 0.55, b: 0.72, er: 0.30, eg: 0.05, eb: 0.15, alpha: 0.90, radius: 0.15 },
+      bookmark_boomerang:{ diameter: 0.22, r: 0.85, g: 0.72, b: 0.45, er: 0.20, eg: 0.15, eb: 0.00, alpha: 1.00, radius: 0.24, disk: true },
+      kite_string_whip:  { diameter: 0.32, r: 1.0,  g: 0.55, b: 0.10, er: 0.40, eg: 0.15, eb: 0.00, alpha: 0.96, radius: 0.34 },
+    };
+    const vis = WEAPON_VISUALS[wId] ?? WEAPON_VISUALS.bubble_wand;
+
+    let mesh;
+    if (vis.disk) {
+      mesh = BABYLON.MeshBuilder.CreateCylinder(name, {
+        height: 0.045, diameter: vis.diameter, tessellation: 16,
+      }, scene);
+      mesh.rotation.z = Math.PI * 0.5;
+    } else {
+      mesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: vis.diameter, segments: 6 }, scene);
+    }
+    mesh.position.copyFrom(position);
+
+    const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+    mat.diffuseColor = new BABYLON.Color3(vis.r, vis.g, vis.b);
+    mat.emissiveColor = new BABYLON.Color3(vis.er, vis.eg, vis.eb);
+    mat.alpha = vis.alpha;
+    if (vis.alpha < 1) {
+      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    }
     mat.needDepthPrePass = true;
     mat.forceDepthWrite = true;
     mat.backFaceCulling = false;
-    projectile.material = mat;
-    projectile.renderingGroupId = 3;
-    projectile.alphaIndex = 1000;
-    projectile.alwaysSelectAsActiveMesh = true;
-    projectile.checkCollisions = false;
-    projectile.isPickable = false;
-    projectile.metadata = { cameraIgnore: true, decor: true };
+    mesh.material = mat;
+    mesh.renderingGroupId = 3;
+    mesh.alphaIndex = 1000;
+    mesh.alwaysSelectAsActiveMesh = true;
+    mesh.checkCollisions = false;
+    mesh.isPickable = false;
+    mesh.metadata = { cameraIgnore: true, decor: true };
+
     const projectileState = {
-      mesh: projectile,
-      position: projectile.position,
+      mesh,
+      position: mesh.position,
       velocity: direction.scale(era5State.stats.weaponProjectileSpeed ?? 11.5),
-      radius: 0.26,
+      radius: vis.radius,
       lifeMs: Math.max(400, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000),
       stunMs: Math.max(200, (era5State.stats.weaponStunSec ?? 1.5) * 1000),
       mode: 'projectile',
-      weaponId: getEquippedEra5WeaponDef()?.defId || 'bubble_wand',
+      weaponId: wId,
+      damage: era5State.stats.weaponDamage ?? 1,
       returning: false,
       returnSpeed: Math.max(0, era5State.stats.weaponReturnSpeed ?? 0),
       origin: position.clone(),
+      spinDisk: !!vis.disk,
     };
     era5Projectiles.push(projectileState);
     return projectileState;
@@ -3562,33 +3726,28 @@ export async function boot(options = {}) {
     if (!weaponDef) return false;
     const launchState = getEra5ProjectileLaunchState();
     const { forward } = launchState;
-    if (weaponDef.defId === 'kite_string_whip') {
-      const hitResult = world.era5Level?.tryHitByWeapon?.({
-        mode: 'arc',
-        position: player.mesh.position.add(new BABYLON.Vector3(forward.x * 1.1, 0.7, forward.z * 1.1)),
-        direction: forward,
-        radius: Math.max(1.8, era5State.stats.weaponArcRange ?? 2.2),
-        stunMs: Math.max(400, (era5State.stats.weaponStunSec ?? 1.0) * 1000),
-      }) ?? { hit: false };
-      if (hitResult.hit) {
-        audio.playCue(levelId, 'nearMiss');
-        ui.showStatus('Spark stunned!', 550);
+    const pelletCount = (weaponDef.defId === 'paper_fan')
+      ? Math.max(1, era5State.stats.weaponPellets ?? 4)
+      : 1;
+    const spreadRad = (weaponDef.defId === 'paper_fan')
+      ? (era5State.stats.weaponSpreadRad ?? 0.18)
+      : 0;
+    for (let pellet = 0; pellet < pelletCount; pellet += 1) {
+      let pelletDirection = launchState.direction.clone();
+      if (spreadRad > 0 && pelletCount > 1) {
+        const spreadYaw = (pellet / (pelletCount - 1) - 0.5) * spreadRad * 2;
+        const cosY = Math.cos(spreadYaw);
+        const sinY = Math.sin(spreadYaw);
+        pelletDirection = new BABYLON.Vector3(
+          (pelletDirection.x * cosY) - (pelletDirection.z * sinY),
+          pelletDirection.y,
+          (pelletDirection.x * sinY) + (pelletDirection.z * cosY),
+        ).normalize();
       }
-    } else {
-      const projectile = spawnEra5Projectile(launchState.origin, launchState.direction);
-      if (projectile) {
-        projectile.weaponId = weaponDef.defId;
-        if (weaponDef.defId === 'foam_blaster') {
-          projectile.mesh.scaling.setAll(0.82);
-          projectile.radius = 0.32;
-        } else if (weaponDef.defId === 'bookmark_boomerang') {
-          projectile.mesh.scaling.setAll(1.08);
-          projectile.returning = true;
-          projectile.returnSpeed = Math.max(8, era5State.stats.weaponReturnSpeed ?? 10.5);
-        } else if (weaponDef.defId === 'paper_fan') {
-          projectile.mesh.scaling.setAll(0.94);
-          projectile.radius = 0.44;
-        }
+      const projectile = spawnEra5Projectile(launchState.origin, pelletDirection, weaponDef.defId);
+      if (projectile && weaponDef.defId === 'bookmark_boomerang') {
+        projectile.returning = true;
+        projectile.returnSpeed = Math.max(8, era5State.stats.weaponReturnSpeed ?? 10.5);
       }
     }
     era5WeaponCooldownMs = Math.max(100, (era5State.stats.weaponCooldown ?? 0.35) * 1000);
@@ -3709,6 +3868,7 @@ export async function boot(options = {}) {
   }
 
   function resolveEra5ProjectileHit(projectile, samplePosition = projectile.mesh.position) {
+    const damage = projectile.damage ?? (era5State.stats.weaponDamage ?? 1);
     const sharedHitResult = world.era5Level?.tryHitByWeapon?.({
       mode: projectile.mode,
       position: samplePosition,
@@ -3716,11 +3876,13 @@ export async function boot(options = {}) {
       radius: projectile.radius,
       stunMs: projectile.stunMs,
       weaponId: projectile.weaponId,
+      damage,
     }) ?? null;
     const level5HitResult = world.level5?.tryHitByBubble?.({
       position: samplePosition,
       radius: projectile.radius,
       stunMs: projectile.stunMs,
+      damage,
     }) ?? null;
     return sharedHitResult?.hit
       ? sharedHitResult
@@ -3729,6 +3891,45 @@ export async function boot(options = {}) {
         : sharedHitResult
           ?? level5HitResult
           ?? { hit: false };
+  }
+
+  function spawnEra5ImpactEffect(point, weaponId) {
+    const weaponDef = getItemDef?.(weaponId) ?? getEquippedEra5WeaponDef();
+    const style = weaponDef?.stats?.weaponImpactStyle ?? 'puff';
+    const diameter = style === 'splash' ? 0.60 : style === 'crack' ? 0.30 : 0.22;
+    const color = style === 'splash'
+      ? new BABYLON.Color3(1.0, 0.55, 0.1)
+      : style === 'crack'
+        ? new BABYLON.Color3(0.5, 0.9, 1.0)
+        : new BABYLON.Color3(0.95, 0.95, 0.95);
+    const burst = BABYLON.MeshBuilder.CreateSphere(`impact_${performance.now().toFixed(0)}`, {
+      diameter,
+      segments: 4,
+    }, scene);
+    burst.position.copyFrom(point);
+    burst.isPickable = false;
+    burst.checkCollisions = false;
+    burst.renderingGroupId = 3;
+    const mat = new BABYLON.StandardMaterial(`${burst.name}_mat`, scene);
+    mat.diffuseColor = color;
+    mat.emissiveColor = color.scale(0.5);
+    mat.alpha = 0.82;
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    mat.backFaceCulling = false;
+    burst.material = mat;
+    let elapsed = 0;
+    const totalMs = style === 'splash' ? 260 : 180;
+    const impactObs = scene.onBeforeRenderObservable.add(() => {
+      elapsed += scene.getEngine().getDeltaTime();
+      const t = Math.min(1, elapsed / totalMs);
+      const scale = 0.2 + (t * 1.8);
+      burst.scaling.setAll(scale);
+      mat.alpha = 0.82 * (1 - t);
+      if (t >= 1) {
+        scene.onBeforeRenderObservable.remove(impactObs);
+        burst.dispose();
+      }
+    });
   }
 
   function updateEra5Projectiles(dt) {
@@ -3747,7 +3948,32 @@ export async function boot(options = {}) {
       projectile.mesh.position.addInPlace(projectile.velocity.scale(dt));
       const scale = 0.94 + ((projectile.lifeMs / Math.max(1, (era5State.stats.weaponProjectileLife ?? 1.6) * 1000)) * 0.16);
       projectile.mesh.scaling.set(scale, scale, scale);
+      if (projectile.spinDisk) {
+        projectile.mesh.rotation.y += dt * 9;
+      }
       const travelDistance = BABYLON.Vector3.Distance(previousPos, projectile.mesh.position);
+      // Wall collision: ray from previous to current position
+      if (travelDistance > 0.001 && !projectile.returning) {
+        const travelDir = projectile.mesh.position.subtract(previousPos).normalize();
+        const wallRay = new BABYLON.Ray(previousPos, travelDir, travelDistance + projectile.radius);
+        const wallPick = scene.pickWithRay(wallRay, (mesh) => (
+          mesh !== projectile.mesh
+          && !String(mesh.name || '').startsWith('era5Bubble_')
+          && !String(mesh.name || '').startsWith('jelly')
+          && !String(mesh.name || '').startsWith('player')
+          && !String(mesh.name || '').startsWith('baby')
+          && !String(mesh.name || '').startsWith('blobShadow')
+          && !String(mesh.name || '').startsWith('impact_')
+          && mesh.isPickable !== false
+          && (mesh.visibility ?? 1) > 0.08
+        ));
+        if (wallPick?.hit && wallPick.pickedPoint) {
+          spawnEra5ImpactEffect(wallPick.pickedPoint, projectile.weaponId);
+          projectile.mesh.dispose();
+          era5Projectiles.splice(i, 1);
+          continue;
+        }
+      }
       const hitStepCount = Math.max(1, Math.min(10, Math.ceil(travelDistance / 0.42)));
       let hitResult = { hit: false };
       for (let step = 1; step <= hitStepCount; step += 1) {
@@ -3758,7 +3984,7 @@ export async function boot(options = {}) {
       }
       if (hitResult.hit) {
         audio.playCue(levelId, 'nearMiss');
-        ui.showStatus('Target stunned!', 600);
+        ui.showStatus(hitResult.killed ? 'Target eliminated!' : 'Target stunned!', 700);
         projectile.mesh.dispose();
         era5Projectiles.splice(i, 1);
         continue;
@@ -4306,8 +4532,24 @@ export async function boot(options = {}) {
     ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: isEra5Level, levelId });
     if (isEra5Level) {
       console.log('Era5ControllerV2 active');
+      // Auto-grant all weapons for testing so number key switcher is usable
+      const allWeaponIds = ['bubble_wand', 'foam_blaster', 'paper_fan', 'bookmark_boomerang', 'kite_string_whip'];
+      let weaponGrantChanged = false;
+      let autoGrantState = era5State;
+      for (const wid of allWeaponIds) {
+        const result = addItemToEra5State(autoGrantState, wid, { autoEquip: false });
+        if (result.added) {
+          autoGrantState = result.state;
+          weaponGrantChanged = true;
+        }
+      }
+      if (weaponGrantChanged) {
+        persistEra5State(autoGrantState);
+        restoreEra5Vitals();
+      }
       ui.showEra5Hud();
       syncEra5Ui();
+      updateEra5WeaponMesh(getEquippedEra5WeaponDef()?.defId ?? null);
     }
     applyCapeVisualState();
     updateBuffHud();
@@ -5663,6 +5905,12 @@ export async function boot(options = {}) {
         });
         if (attackPressed) {
           fireEra5Weapon();
+        }
+        if (isEra5Level && state === 'gameplay' && !idleSuppressed) {
+          const slotKey = input.consumeWeaponSlotPress();
+          if (slotKey !== null) {
+            switchToEra5WeaponBySlot(slotKey - 1);
+          }
         }
         if (world.era5Level) {
           world.era5Level.update(dt, {

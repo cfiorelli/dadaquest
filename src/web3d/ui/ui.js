@@ -933,6 +933,47 @@ const CSS = `
   color: rgba(204, 248, 255, 0.84);
   text-align: right;
 }
+.dada-era5-weapon-strip {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+.dada-era5-weapon-pip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 36px;
+  padding: 3px 2px;
+  border-radius: 4px;
+  border: 1px solid rgba(120, 200, 255, 0.22);
+  background: rgba(0, 30, 60, 0.45);
+  font-size: 10px;
+  color: rgba(180, 220, 255, 0.7);
+  transition: border-color 0.1s, background 0.1s;
+  opacity: 0.55;
+}
+.dada-era5-weapon-pip.active {
+  border-color: rgba(120, 220, 255, 0.85);
+  background: rgba(0, 70, 120, 0.65);
+  color: #c8f0ff;
+  opacity: 1;
+}
+.dada-era5-weapon-pip.empty {
+  opacity: 0.2;
+}
+.dada-era5-weapon-pip-num {
+  font-size: 9px;
+  opacity: 0.7;
+  margin-bottom: 1px;
+}
+.dada-era5-weapon-pip-name {
+  font-size: 9px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34px;
+}
 .dada-era5-inventory {
   position: absolute;
   inset: 0;
@@ -1864,6 +1905,7 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-weapon-copy"><span data-era5-weapon-label>Bubble Wand</span><span data-era5-weapon-copy>READY</span></div>
           <div class="dada-era5-weapon-help" data-era5-weapon-help>Fire Bubble Wand: F / Ctrl / Enter / Click</div>
           <div class="dada-era5-weapon-help" data-era5-tool-help>Scuba Tank: Space ascend, C descend in deep pockets</div>
+          <div class="dada-era5-weapon-strip" data-era5-weapon-strip></div>
         </div>
         <div class="dada-era5-hint" data-era5-hint>I Inventory</div>
       </div>
@@ -1881,6 +1923,7 @@ export function createUI(uiRoot, options = {}) {
   const era5WeaponHelpEl = era5HudEl.querySelector('[data-era5-weapon-help]');
   const era5ToolHelpEl = era5HudEl.querySelector('[data-era5-tool-help]');
   const era5HintEl = era5HudEl.querySelector('[data-era5-hint]');
+  const era5WeaponStripEl = era5HudEl.querySelector('[data-era5-weapon-strip]');
 
   const era5ReticleEl = document.createElement('div');
   era5ReticleEl.className = 'dada-era5-reticle';
@@ -2486,6 +2529,7 @@ export function createUI(uiRoot, options = {}) {
       inventoryHint = 'I Inventory',
       weaponHelp = 'Fire Bubble Wand: F / Ctrl / Enter / Click',
       toolHelp = 'Scuba Tank: Space ascend, C descend in deep pockets',
+      weaponSlots = [],
     } = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
@@ -2507,6 +2551,14 @@ export function createUI(uiRoot, options = {}) {
       if (era5WeaponHelpEl) era5WeaponHelpEl.textContent = weaponHelp;
       if (era5ToolHelpEl) era5ToolHelpEl.textContent = toolHelp;
       era5HintEl.textContent = inventoryHint;
+      if (era5WeaponStripEl && weaponSlots.length > 0) {
+        era5WeaponStripEl.innerHTML = weaponSlots.map((slot, i) => `
+          <div class="dada-era5-weapon-pip${slot.active ? ' active' : ''}${!slot.name ? ' empty' : ''}">
+            <div class="dada-era5-weapon-pip-num">${i + 1}</div>
+            <div class="dada-era5-weapon-pip-name">${slot.abbr || ''}</div>
+          </div>
+        `).join('');
+      }
     },
     setEra5InventoryHandlers({
       onEquip = null,
