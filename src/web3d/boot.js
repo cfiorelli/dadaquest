@@ -6142,15 +6142,27 @@ export async function boot(options = {}) {
           era5CameraYawVel = 0;
           const cameraForward = getEra5CameraForward();
           const lookForward = getEra5PlayerForward();
-          const focusPos = new BABYLON.Vector3(px, py + preset.focusHeight, player.mesh.position.z);
+          // When the desired camera Y would exceed the ceiling clamp, freeze
+          // vertical tracking rather than letting the clamp press the camera
+          // into the ceiling every frame. This preserves constant pitch angle
+          // while the player finishes the jump arc. X/Z and yaw track normally.
+          const cameraClampBounds = getLevel5StarterRoomCameraClampBounds();
+          const rawCameraY = py + preset.height;
+          const ceilingClamped = cameraClampBounds !== null && rawCameraY > cameraClampBounds.maxY;
+          const effectiveCameraY = ceilingClamped ? cameraClampBounds.maxY : rawCameraY;
+          // Freeze focus/target Y to preserve pitch angle when ceiling-constrained.
+          const effectiveFocusY = ceilingClamped
+            ? cameraClampBounds.maxY - preset.height + preset.focusHeight
+            : py + preset.focusHeight;
+          const focusPos = new BABYLON.Vector3(px, effectiveFocusY, player.mesh.position.z);
           const desiredTarget = new BABYLON.Vector3(
             px + (lookForward.x * preset.lookAhead),
-            py + preset.focusHeight,
+            effectiveFocusY,
             player.mesh.position.z + (lookForward.z * preset.lookAhead),
           );
           const desiredCameraPos = new BABYLON.Vector3(
             px - (cameraForward.x * preset.distance),
-            py + preset.height,
+            effectiveCameraY,
             player.mesh.position.z - (cameraForward.z * preset.distance),
           );
           const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
