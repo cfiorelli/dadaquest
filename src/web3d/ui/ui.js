@@ -2558,6 +2558,7 @@ export function createUI(uiRoot, options = {}) {
       shieldMax = 1,
       oxygen = 0,
       oxygenMax = 0,
+      showOxygen = false,
       toolLabel = 'Scuba Tank',
       weaponLabel = 'Bubble Wand',
       weaponCooldownMs = 0,
@@ -2572,7 +2573,16 @@ export function createUI(uiRoot, options = {}) {
       era5HudEl.style.display = 'block';
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
       if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = 'none';
-      if (era5OxygenRowEl) era5OxygenRowEl.style.display = 'none';
+      if (era5OxygenRowEl) {
+        era5OxygenRowEl.style.display = showOxygen ? 'block' : 'none';
+        if (showOxygen && era5OxygenFillEl) {
+          const oxyPct = oxygenMax > 0 ? Math.max(0, Math.min(100, (oxygen / oxygenMax) * 100)) : 0;
+          era5OxygenFillEl.style.width = `${oxyPct}%`;
+        }
+        if (showOxygen && era5OxygenCopyEl) {
+          era5OxygenCopyEl.textContent = `${Math.ceil(oxygen)} / ${Math.round(oxygenMax)}`;
+        }
+      }
       if (era5WeaponHelpEl) era5WeaponHelpEl.style.display = 'none';
       if (era5ToolHelpEl) era5ToolHelpEl.style.display = 'none';
       era5HintEl.style.display = 'none';

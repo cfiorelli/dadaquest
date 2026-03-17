@@ -2650,6 +2650,7 @@ export async function boot(options = {}) {
   let era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
   let era5Oxygen = Math.max(0, era5State.stats.toolMeterMax || era5State.stats.oxygenMax || 0);
   let era5OxygenDamageTimer = 0;
+  let era5OxygenHideTimer = 0;
   let era5WasInDeepWater = false;
   let era5WaterEntryCooldownMs = 0;
   let era5WeaponCooldownMs = 0;
@@ -3183,9 +3184,7 @@ export async function boot(options = {}) {
   }
 
   function getEra5MeterMax(toolDef = getEquippedEra5ToolDef()) {
-    if (!toolDef) return 0;
-    if (toolDef.defId === 'scuba_tank') return Math.max(0, era5State.stats.oxygenMax ?? 0);
-    return Math.max(0, era5State.stats.toolMeterMax ?? 0);
+    return Math.max(0, era5State.stats.oxygenMax ?? 0);
   }
 
   function getEra5ToolHelpText(toolDef = getEquippedEra5ToolDef()) {
@@ -3296,7 +3295,8 @@ export async function boot(options = {}) {
       shield: era5Shield,
       shieldMax,
       oxygen: era5Oxygen,
-      oxygenMax: meterMax,
+      oxygenMax: Math.max(0, era5State.stats.oxygenMax ?? 0),
+      showOxygen: era5OxygenHideTimer > 0,
       toolLabel: toolDef?.name || 'No Tool',
       weaponLabel: weaponDef?.name || 'No Weapon',
       weaponCooldownMs: era5WeaponCooldownMs,
@@ -4092,23 +4092,19 @@ export async function boot(options = {}) {
 
   function updateEra5Oxygen(dt) {
     if (!isEra5Level) return;
-    const toolDef = getEquippedEra5ToolDef();
-    const toolId = toolDef?.defId || '';
-    const oxygenMax = Math.max(0, getEra5MeterMax(toolDef));
+    const oxygenMax = Math.max(0, getEra5MeterMax());
     if (oxygenMax <= 0) {
       era5Oxygen = 0;
       era5OxygenDamageTimer = 0;
+      era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
       return;
     }
-    if (toolId !== 'scuba_tank') {
-      era5OxygenDamageTimer = 0;
-      return;
-    }
-    const inDeepWater = !!world.level5?.isInDeepWater?.(player.mesh.position) || !!world.era5Level?.isInDeepWater?.(player.mesh.position);
+    const inDeepWater = !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position));
     if (inDeepWater) {
       const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
       const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
+      era5OxygenHideTimer = 1.5;
       if (era5Oxygen <= 0.001) {
         era5OxygenDamageTimer += dt;
         const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
@@ -4124,6 +4120,7 @@ export async function boot(options = {}) {
     const refillPerSec = Math.max(0, era5State.stats.oxygenRefillRate ?? 0);
     era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
     era5OxygenDamageTimer = 0;
+    era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
   }
   ui.setEra5InventoryHandlers({
     onEquip: (instanceId) => equipEra5Item(instanceId),

@@ -19,7 +19,7 @@ export const ITEM_DEFS = [
     slot: 'tool',
     rarity: 'starter',
     stats: {
-      oxygenMax: 20,
+      oxygenMax: 80,
       oxygenRefillRate: 6.5,
       oxygenDrainRate: 1,
       oxygenDamageInterval: 2,
@@ -382,7 +382,7 @@ export function deriveEra5Stats(era5State) {
   const stats = {
     hpMax: 3,
     shieldMax: 1,
-    oxygenMax: 0,
+    oxygenMax: 8,
     oxygenRefillRate: 5.5,
     oxygenDrainRate: 1,
     oxygenDamageInterval: 2,
