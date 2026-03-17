@@ -182,6 +182,7 @@ async function getLevel5StarterRoomAudit(page) {
       minZ: room.z - (room.d * 0.5),
       maxZ: room.z + (room.d * 0.5),
     } : null;
+    /** @type {any[]} */
     const meshes = scene?.meshes ?? [];
     const isVisibleMesh = (mesh) => mesh?.isEnabled?.() !== false
       && mesh?.isVisible !== false
@@ -1009,6 +1010,204 @@ async function probeLevel5ProjectileBlockerOcclusion(page) {
   });
 }
 
+/** @param {import('@playwright/test').Page} page */
+async function getLevel5PoolAudit(page) {
+  return page.evaluate(() => {
+    /** @type {any} */
+    const anyWindow = window;
+    const debug = anyWindow.__DADA_DEBUG__ ?? null;
+    const scene = debug?.sceneRef ?? null;
+    const camera = scene?.activeCamera ?? null;
+    const engine = scene?.getEngine?.() ?? null;
+    const BabylonNs = anyWindow.BABYLON ?? null;
+    const Vector3 = BabylonNs?.Vector3 ?? null;
+    const Matrix = BabylonNs?.Matrix ?? null;
+    const meshes = scene?.meshes ?? [];
+    const width = engine?.getRenderWidth?.() ?? null;
+    const height = engine?.getRenderHeight?.() ?? null;
+
+    /** @param {any} mesh */
+    const getBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox ?? null;
+      if (!box) return null;
+      return {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      };
+    };
+
+    /** @param {any} mesh */
+    const getCenter = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox ?? null;
+      return box?.centerWorld?.clone?.() ?? null;
+    };
+
+    /** @param {any} point */
+    const projectPoint = (point) => {
+      if (!point || !camera || !scene || !Vector3 || !Matrix || !Number.isFinite(width) || !Number.isFinite(height)) {
+        return null;
+      }
+      const projected = Vector3.Project(
+        point,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        camera.viewport.toGlobal(width, height),
+      );
+      return {
+        x: Number(projected.x.toFixed(2)),
+        y: Number(projected.y.toFixed(2)),
+      };
+    };
+
+    /** @param {any} screen */
+    const isOnScreen = (screen) => !!(
+      screen
+      && Number.isFinite(width)
+      && Number.isFinite(height)
+      && screen.x >= 0
+      && screen.x <= width
+      && screen.y >= 0
+      && screen.y <= height
+    );
+
+    /** @param {any} mesh */
+    const summarizeMesh = (mesh) => {
+      if (!mesh) return null;
+      const center = getCenter(mesh);
+      const screen = projectPoint(center);
+      return {
+        name: mesh.name,
+        bounds: getBounds(mesh),
+        screen,
+        onScreen: isOnScreen(screen),
+        renderingGroupId: mesh.renderingGroupId ?? null,
+        alphaIndex: mesh.alphaIndex ?? null,
+        materialAlpha: typeof mesh.material?.alpha === 'number' ? Number(mesh.material.alpha.toFixed(3)) : null,
+        transparencyMode: mesh.material?.transparencyMode ?? null,
+      };
+    };
+
+    /** @param {string} name */
+    const getMesh = (name) => meshes.find((/** @type {any} */ mesh) => mesh?.name === name) ?? null;
+    /** @param {string} prefix */
+    const getMeshesByPrefix = (prefix) => meshes.filter((/** @type {any} */ mesh) => String(mesh?.name || '').startsWith(prefix));
+
+    const weaponMeshes = meshes.filter((/** @type {any} */ mesh) => {
+      let node = mesh;
+      while (node) {
+        if (String(node.name || '').startsWith('weapon_')) return true;
+        node = node.parent || null;
+      }
+      return false;
+    });
+    const weaponCandidate = weaponMeshes
+      .map((/** @type {any} */ mesh) => ({
+        mesh,
+        bounds: getBounds(mesh),
+      }))
+      .filter((/** @type {any} */ entry) => entry.bounds)
+      .sort((/** @type {any} */ a, /** @type {any} */ b) => {
+        const av = (a.bounds.maxX - a.bounds.minX) * (a.bounds.maxY - a.bounds.minY) * (a.bounds.maxZ - a.bounds.minZ);
+        const bv = (b.bounds.maxX - b.bounds.minX) * (b.bounds.maxY - b.bounds.minY) * (b.bounds.maxZ - b.bounds.minZ);
+        return bv - av;
+      })[0]?.mesh ?? null;
+    const weaponSummary = summarizeMesh(weaponCandidate);
+    const weaponPick = weaponSummary?.screen && scene && camera
+      ? scene.pick(
+        weaponSummary.screen.x,
+        weaponSummary.screen.y,
+        (/** @type {any} */ mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02,
+        false,
+        camera,
+      )
+      : null;
+    const pickedIsWeapon = !!(() => {
+      let node = weaponPick?.pickedMesh ?? null;
+      while (node) {
+        if (String(node.name || '').startsWith('weapon_')) return true;
+        node = node.parent || null;
+      }
+      return false;
+    })();
+
+    return {
+      floor: summarizeMesh(getMesh('water_se_pool_floor')),
+      lane: summarizeMesh(getMesh('water_se_pool_lane')),
+      water: summarizeMesh(getMesh('water_se_pool_water')),
+      walls: [
+        summarizeMesh(getMesh('water_se_pool_north_wall')),
+        summarizeMesh(getMesh('water_se_pool_south_wall')),
+        summarizeMesh(getMesh('water_se_pool_east_wall')),
+        summarizeMesh(getMesh('water_se_pool_west_wall')),
+      ].filter(Boolean),
+      coping: [
+        summarizeMesh(getMesh('water_se_pool_cope_north')),
+        summarizeMesh(getMesh('water_se_pool_cope_south')),
+        summarizeMesh(getMesh('water_se_pool_cope_east')),
+        summarizeMesh(getMesh('water_se_pool_cope_west')),
+      ].filter(Boolean),
+      waterline: getMeshesByPrefix('water_se_pool_waterline_').map((/** @type {any} */ mesh) => summarizeMesh(mesh)),
+      ladderRails: getMeshesByPrefix('water_se_pool_rail').map((/** @type {any} */ mesh) => summarizeMesh(mesh)),
+      ladderRungs: getMeshesByPrefix('water_se_pool_rung').map((/** @type {any} */ mesh) => summarizeMesh(mesh)),
+      weapon: {
+        meshName: weaponSummary?.name ?? null,
+        screen: weaponSummary?.screen ?? null,
+        onScreen: weaponSummary?.onScreen ?? false,
+        pickedName: weaponPick?.pickedMesh?.name ?? null,
+        pickedIsWeapon,
+      },
+      oxygen: debug?.era5Vitals?.oxygen ?? null,
+    };
+  });
+}
+
+/** @param {any} audit */
+function expectLevel5PoolAudit(audit) {
+  expect(audit?.floor?.bounds).not.toBeNull();
+  expect(audit?.lane?.bounds).not.toBeNull();
+  expect(audit?.water?.bounds).not.toBeNull();
+  expect(audit?.walls).toHaveLength(4);
+  expect(audit?.coping).toHaveLength(4);
+  expect(audit?.waterline).toHaveLength(4);
+  expect(audit?.ladderRails).toHaveLength(2);
+  expect(audit?.ladderRungs).toHaveLength(4);
+
+  expect(audit.water.renderingGroupId).toBe(3);
+  expect(audit.water.materialAlpha).toBeGreaterThanOrEqual(0.58);
+  expect(audit.water.materialAlpha).toBeLessThanOrEqual(0.70);
+
+  const floorTopY = audit.floor.bounds.maxY;
+  const waterTopY = audit.water.bounds.maxY;
+  const waterBottomY = audit.water.bounds.minY;
+  expect(floorTopY).toBeLessThanOrEqual(-1.44);
+  expect(waterTopY).toBeLessThan(-0.03);
+  expect(waterBottomY).toBeLessThan(-0.04);
+
+  for (const wall of audit.walls) {
+    expect(wall.bounds.minY).toBeLessThanOrEqual(-1.49);
+    expect(wall.bounds.maxY).toBeGreaterThanOrEqual(-0.01);
+  }
+
+  for (const coping of audit.coping) {
+    expect(coping.bounds.minY).toBeGreaterThanOrEqual(0);
+    expect(coping.bounds.maxY).toBeLessThanOrEqual(0.021);
+  }
+
+  for (const band of audit.waterline) {
+    expect(band.bounds.maxY).toBeLessThan(0);
+    expect(band.bounds.minY).toBeGreaterThan(-0.2);
+  }
+
+  expect(audit.water.onScreen).toBe(true);
+  expect(audit.floor.onScreen).toBe(true);
+  expect(audit.walls.some((/** @type {any} */ wall) => wall.onScreen)).toBe(true);
+  expect(audit.coping.some((/** @type {any} */ coping) => coping.onScreen)).toBe(true);
+}
+
 function expectLevel5ProjectileBurstFrame(frame) {
   expect(frame?.world).not.toBeNull();
   expect(frame?.screen).not.toBeNull();
@@ -1463,6 +1662,69 @@ test('@level5 @era5 runtime: level 5 jump camera stays below the ceiling and ins
   expect(jumpTrace.apex.occlusion?.safeDistance).toBeLessThan(jumpTrace.apex.occlusion?.pickDistance ?? Infinity);
   expect(jumpTrace.landing.grounded).toBe(true);
   expect(Math.abs(jumpTrace.landing.cameraPos.y - jumpTrace.before.cameraPos.y)).toBeLessThan(0.05);
+});
+
+test('@level5 @era5 runtime: southeast pool reads as a recessed commercial basin and still preserves weapon visibility plus water trigger behavior', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+
+  await resetEra5Pose(page, {
+    x: 27.4,
+    y: 0.42,
+    z: 30.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  await page.waitForTimeout(180);
+
+  await page.evaluate(() => {
+    /** @type {any} */
+    const anyWindow = window;
+    anyWindow.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 5, clearInvuln: true, clearLastDamage: true });
+  });
+  await page.waitForTimeout(450);
+  const edgeOxygen = await page.evaluate(() => {
+    /** @type {any} */
+    const anyWindow = window;
+    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
+  });
+  const poolAudit = await getLevel5PoolAudit(page);
+  expectLevel5PoolAudit(poolAudit);
+  expect(poolAudit.weapon.onScreen).toBe(true);
+  expect(poolAudit.weapon.pickedIsWeapon).toBe(true);
+  expect(edgeOxygen).not.toBeNull();
+  expect(Math.abs(edgeOxygen - 5)).toBeLessThan(0.15);
+
+  await resetEra5Pose(page, {
+    x: 36.0,
+    y: 0.42,
+    z: 30.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  await page.waitForTimeout(180);
+
+  const insideBefore = await page.evaluate(() => {
+    /** @type {any} */
+    const anyWindow = window;
+    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
+  });
+  await page.waitForTimeout(900);
+  const insideAfter = await page.evaluate(() => {
+    /** @type {any} */
+    const anyWindow = window;
+    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
+  });
+  const insideAudit = await getLevel5PoolAudit(page);
+  expect(insideBefore).not.toBeNull();
+  expect(insideAfter).not.toBeNull();
+  expect(insideAfter).toBeLessThan(insideBefore);
+  expect(insideAudit.weapon.onScreen).toBe(true);
+  expect(insideAudit.weapon.pickedIsWeapon).toBe(true);
 });
 
 test('@level5 @era5 runtime: level 5 burst shots 1 through 3 stay readable above the far floor band from the gameplay camera', async ({ page }) => {
