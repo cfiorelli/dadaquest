@@ -33,7 +33,7 @@ export const ITEM_DEFS = [
     slot: 'weaponPrimary',
     rarity: 'starter',
     archetype: 'pistol',
-    description: 'Accurate single-shot. 3 hits to kill.',
+    description: 'Accurate single-shot.',
     stats: {
       weaponCooldown: 0.38,
       weaponProjectileSpeed: 12,
@@ -89,7 +89,7 @@ export const ITEM_DEFS = [
     slot: 'weaponPrimary',
     rarity: 'factory',
     archetype: 'smg',
-    description: 'Fast fire rate. Short range. 3 hits to kill.',
+    description: 'Fast close-range spray.',
     stats: {
       weaponCooldown: 0.14,
       weaponProjectileSpeed: 16,
@@ -119,6 +119,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'backpack',
     rarity: 'factory',
+    hidden: true,
     stats: {
       moveSpeed: 0.02,
       inventoryCapacity: 4,
@@ -149,7 +150,7 @@ export const ITEM_DEFS = [
     slot: 'weaponPrimary',
     rarity: 'storm',
     archetype: 'launcher',
-    description: 'Slow heavy projectile. 1 hit kill. Big splash on impact.',
+    description: 'Heavy splash shot.',
     stats: {
       weaponCooldown: 0.9,
       weaponProjectileSpeed: 8,
@@ -209,7 +210,7 @@ export const ITEM_DEFS = [
     slot: 'weaponPrimary',
     rarity: 'library',
     archetype: 'bouncer',
-    description: 'Returns to player. 2 damage per hit. Punishes at range.',
+    description: 'Returning ranged throw.',
     stats: {
       weaponCooldown: 0.65,
       weaponProjectileSpeed: 11,
@@ -267,7 +268,7 @@ export const ITEM_DEFS = [
     slot: 'weaponPrimary',
     rarity: 'finale',
     archetype: 'shotgun',
-    description: '4 pellets per shot. Lethal at close range. Each pellet deals 1 damage.',
+    description: 'Wide pellet spread.',
     stats: {
       weaponCooldown: 0.55,
       weaponProjectileSpeed: 13,

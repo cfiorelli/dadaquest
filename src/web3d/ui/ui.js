@@ -1966,7 +1966,6 @@ export function createUI(uiRoot, options = {}) {
       <div class="dada-era5-sheet-head">
         <div>
           <div class="dada-era5-sheet-title">Inventory</div>
-          <div class="dada-era5-sheet-sub">Equip gear for Era 5 runs.</div>
         </div>
         <button class="dada-era5-close" data-era5-close>Close</button>
       </div>
@@ -1976,6 +1975,7 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-slots" data-era5-slots></div>
         </div>
         <div class="dada-era5-card">
+          <div class="dada-era5-section-title">Backpack</div>
           <div class="dada-era5-item-grid" data-era5-items></div>
         </div>
       </div>

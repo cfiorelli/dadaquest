@@ -1182,19 +1182,21 @@ export async function boot(options = {}) {
   const buildEra5InventoryUiState = () => {
     const ALWAYS_VISIBLE_SLOTS = new Set(['weaponPrimary', 'tool']);
     const equippedValues = new Set(Object.values(era5State.equipped || {}));
+    const HIDDEN_SLOTS = new Set(['weaponSecondary', 'backpack']);
     const slots = getItemSlots()
-      .filter((slotId) => slotId !== 'weaponSecondary')
+      .filter((slotId) => !HIDDEN_SLOTS.has(slotId))
       .map((slotId) => {
         const instanceId = era5State.equipped?.[slotId] || null;
         const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
         const def = getItemDef(instance?.defId);
+        const isWearable = def?.type === 'armor';
         return {
           slotId,
           label: formatSlotLabel(slotId),
           instanceId,
           itemName: def?.name || '',
           archetype: def?.archetype || '',
-          canUnequip: slotId === 'tool' && !!instanceId,
+          canUnequip: (slotId === 'tool' || isWearable) && !!instanceId,
         };
       })
       .filter((slot) => ALWAYS_VISIBLE_SLOTS.has(slot.slotId) || slot.instanceId !== null);
