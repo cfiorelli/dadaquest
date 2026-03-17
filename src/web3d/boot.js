@@ -2650,6 +2650,8 @@ export async function boot(options = {}) {
   let era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
   let era5Oxygen = Math.max(0, era5State.stats.toolMeterMax || era5State.stats.oxygenMax || 0);
   let era5OxygenDamageTimer = 0;
+  let era5WasInDeepWater = false;
+  let era5WaterEntryCooldownMs = 0;
   let era5WeaponCooldownMs = 0;
   let era5ToolActive = false;
   let era5InventoryOpen = false;
@@ -4048,6 +4050,44 @@ export async function boot(options = {}) {
         era5Projectiles.splice(i, 1);
       }
     }
+  }
+
+  function spawnEra5WaterRipple(pos) {
+    const ripple = BABYLON.MeshBuilder.CreateDisc('era5Ripple', { radius: 0.18, tessellation: 20 }, scene);
+    ripple.position.set(pos.x, pos.y + 0.12, pos.z);
+    ripple.rotation.x = Math.PI * 0.5;
+    ripple.renderingGroupId = 3;
+    ripple.isPickable = false;
+    const mat = new BABYLON.StandardMaterial('era5RippleMat', scene);
+    mat.diffuseColor = new BABYLON.Color3(0.55, 0.88, 1.0);
+    mat.emissiveColor = new BABYLON.Color3(0.18, 0.42, 0.60);
+    mat.alpha = 0.72;
+    mat.backFaceCulling = false;
+    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    ripple.material = mat;
+    let elapsed = 0;
+    const observer = scene.onBeforeRenderObservable.add(() => {
+      elapsed += scene.getEngine().getDeltaTime() * 0.001;
+      const t = Math.min(1, elapsed / 0.32);
+      const scale = 0.35 + t * 2.2;
+      ripple.scaling.setAll(scale);
+      mat.alpha = 0.72 * (1 - t);
+      if (t >= 1) {
+        scene.onBeforeRenderObservable.remove(observer);
+        ripple.dispose();
+      }
+    });
+  }
+
+  function updateEra5WaterEntry(dt) {
+    if (!isEra5Level) return;
+    const inDeepWater = !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position));
+    era5WaterEntryCooldownMs = Math.max(0, era5WaterEntryCooldownMs - (dt * 1000));
+    if (inDeepWater && !era5WasInDeepWater && era5WaterEntryCooldownMs <= 0) {
+      spawnEra5WaterRipple(player.mesh.position);
+      era5WaterEntryCooldownMs = 600;
+    }
+    era5WasInDeepWater = inDeepWater;
   }
 
   function updateEra5Oxygen(dt) {
@@ -5981,6 +6021,7 @@ export async function boot(options = {}) {
           });
           updateEra5Projectiles(dt);
           updateEra5Oxygen(dt);
+          updateEra5WaterEntry(dt);
           if (debugMode) {
             window.__DADA_DEBUG__.era5LevelState = world.era5Level.getDebugState?.() ?? null;
             if (levelId === 5) {
