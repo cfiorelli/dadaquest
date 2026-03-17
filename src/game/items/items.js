@@ -366,11 +366,12 @@ export function normalizeItemInstance(raw) {
   };
 }
 
-function autoEquipAvailableItems(inventory, equipped) {
+function autoEquipAvailableItems(inventory, equipped, explicitlyCleared = new Set()) {
   const nextEquipped = { ...equipped };
   for (const slotId of SLOT_IDS) {
     const current = nextEquipped[slotId];
     if (current && inventory.some((item) => item.instanceId === current)) continue;
+    if (explicitlyCleared.has(slotId)) continue;
     const candidate = inventory.find((item) => getItemDef(item.defId)?.slot === slotId);
     nextEquipped[slotId] = candidate?.instanceId || null;
   }
@@ -521,17 +522,21 @@ export function normalizeEra5State(rawEra5, { unlocked = false } = {}) {
 
   const equipped = emptyEquipped();
   const rawEquipped = isObject(raw.equipped) ? raw.equipped : {};
+  const explicitlyCleared = new Set();
   for (const slotId of SLOT_IDS) {
     const instanceId = typeof rawEquipped[slotId] === 'string' ? rawEquipped[slotId] : null;
     const instance = inventory.find((item) => item.instanceId === instanceId);
     const def = getItemDef(instance?.defId);
     equipped[slotId] = def?.slot === slotId ? instanceId : null;
+    if (Object.prototype.hasOwnProperty.call(rawEquipped, slotId) && rawEquipped[slotId] === null) {
+      explicitlyCleared.add(slotId);
+    }
   }
 
   const normalized = {
     unlocked: !!(raw.unlocked || unlocked),
     inventory,
-    equipped: autoEquipAvailableItems(inventory, equipped),
+    equipped: autoEquipAvailableItems(inventory, equipped, explicitlyCleared),
     stats: {},
     currency: Number.isFinite(raw.currency) ? Math.max(0, Math.floor(raw.currency)) : 0,
   };
