@@ -3428,13 +3428,13 @@ export async function boot(options = {}) {
     }
 
     // Apply to all meshes in tree.
-    // Group 2 matches the world geometry group so depth testing is shared with
-    // floor/walls — prevents the floor (group 2, fresh depth pass) from painting
-    // over the weapon (which was group 0 and thus rendered before the depth clear).
+    // Group 3: same pass as player body + pool surface so the weapon depth-sorts
+    // correctly against the transparent water surface (which starts group 3 with a
+    // fresh depth clear; group 2 weapon pixels would be painted over by the water alpha).
     root.getChildMeshes().forEach((mesh) => {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
-      mesh.renderingGroupId = 2;
+      mesh.renderingGroupId = 3;
       mesh.alwaysSelectAsActiveMesh = true;
     });
     return root;
