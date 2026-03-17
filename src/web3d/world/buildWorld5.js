@@ -162,28 +162,33 @@ function createDeepWaterPocket(scene, def) {
   const root = new BABYLON.TransformNode(def.name, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
 
+  // Thin water-surface slab sitting at the bottom of the logical volume (floor level).
+  // The logical contains() volume is unchanged; only the visual is repositioned.
+  const surfaceBaseY = -(def.h * 0.5) + 0.03;
   const volume = BABYLON.MeshBuilder.CreateBox(`${def.name}_volume`, {
     width: def.w,
-    height: def.h,
+    height: 0.06,
     depth: def.d,
   }, scene);
   volume.parent = root;
+  volume.position.y = surfaceBaseY;
   const volumeMat = new BABYLON.StandardMaterial(`${def.name}_volumeMat`, scene);
   volumeMat.diffuseColor = new BABYLON.Color3(0.08, 0.34, 0.52);
   volumeMat.emissiveColor = new BABYLON.Color3(0.04, 0.18, 0.28);
-  volumeMat.alpha = 0.14;
+  volumeMat.alpha = 0.38;
   volumeMat.backFaceCulling = false;
   volumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   volume.material = volumeMat;
   markHazard(volume);
 
+  // Rim border sits at floor level as the pool edge marker.
   const rim = BABYLON.MeshBuilder.CreateBox(`${def.name}_rim`, {
     width: def.w + 0.08,
     height: 0.08,
     depth: def.d + 0.08,
   }, scene);
   rim.parent = root;
-  rim.position.y = (def.h * 0.5) - 0.03;
+  rim.position.y = -(def.h * 0.5) + 0.01;
   const rimMat = new BABYLON.StandardMaterial(`${def.name}_rimMat`, scene);
   rimMat.diffuseColor = new BABYLON.Color3(0.62, 0.96, 1.0);
   rimMat.emissiveColor = new BABYLON.Color3(0.18, 0.34, 0.42);
@@ -207,8 +212,8 @@ function createDeepWaterPocket(scene, def) {
     },
     update(time) {
       rimMat.alpha = 0.40 + (Math.sin((time * 1.6) + this.x * 0.04) * 0.12);
-      volumeMat.alpha = 0.10 + (Math.sin((time * 0.9) + this.y) * 0.04);
-      volume.position.y = Math.sin((time * 0.7) + this.x * 0.03) * 0.06;
+      volumeMat.alpha = 0.30 + (Math.sin((time * 0.9) + this.y) * 0.12);
+      volume.position.y = surfaceBaseY + (Math.sin((time * 0.7) + this.x * 0.03) * 0.04);
     },
   };
 }
@@ -387,6 +392,8 @@ function createJellyfish(scene, def, shadowGen) {
     alpha: 0.48,
     roughness: 0.16,
   });
+  bell.material.needDepthPrePass = true;
+  bell.renderingGroupId = 3;
   shadowGen.addShadowCaster(bell);
   markHazard(bell);
 
@@ -405,6 +412,7 @@ function createJellyfish(scene, def, shadowGen) {
   silhouetteMat.backFaceCulling = false;
   silhouetteMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   silhouette.material = silhouetteMat;
+  silhouette.renderingGroupId = 3;
   markHazard(silhouette);
 
   const core = BABYLON.MeshBuilder.CreateSphere(`${def.name}_core`, {
@@ -417,6 +425,7 @@ function createJellyfish(scene, def, shadowGen) {
     emissive: 0.46,
     roughness: 0.12,
   });
+  core.renderingGroupId = 3;
   markHazard(core);
 
   const tentacles = [];
@@ -437,6 +446,7 @@ function createJellyfish(scene, def, shadowGen) {
       alpha: 0.42,
       roughness: 0.24,
     });
+    tentacle.renderingGroupId = 3;
     tentacles.push(tentacle);
     markHazard(tentacle);
   }
