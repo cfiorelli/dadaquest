@@ -3379,13 +3379,20 @@ export async function boot(options = {}) {
         petal.material = fanMat;
       }
     } else if (defId === 'bookmark_boomerang') {
-      const disk = BABYLON.MeshBuilder.CreateCylinder(`${defId}_disk`, {
-        height: 0.018 * S, diameter: 0.22 * S, tessellation: 20,
+      // Bookmark: tall narrow card with a tapered top
+      const card = BABYLON.MeshBuilder.CreateBox(`${defId}_card`, {
+        width: 0.055 * S, height: 0.30 * S, depth: 0.009 * S,
       }, scene);
-      disk.parent = root;
-      disk.rotation.z = Math.PI * 0.5;
-      disk.scaling.z = 0.38;
-      disk.material = solidMat(`${defId}_mat`, 0.84, 0.70, 0.42);
+      card.parent = root;
+      card.material = solidMat(`${defId}_mat`, 0.84, 0.70, 0.42);
+      // Small triangle tip to distinguish from plain rectangle
+      const tip = BABYLON.MeshBuilder.CreateCylinder(`${defId}_tip`, {
+        diameterTop: 0.0, diameterBottom: 0.055 * S, height: 0.045 * S, tessellation: 4,
+      }, scene);
+      tip.parent = root;
+      tip.position.y = (0.30 * S * 0.5) + (0.045 * S * 0.5);
+      tip.rotation.y = Math.PI * 0.25;
+      tip.material = solidMat(`${defId}_tip_mat`, 0.72, 0.58, 0.32);
     } else if (defId === 'kite_string_whip') {
       const barrel = BABYLON.MeshBuilder.CreateCylinder(`${defId}_barrel`, {
         height: 0.22 * S, diameterTop: 0.044 * S, diameterBottom: 0.052 * S, tessellation: 10,
@@ -3683,13 +3690,18 @@ export async function boot(options = {}) {
       bubble_wand:       { diameter: 0.22, r: 0.76, g: 0.98, b: 1.0,  er: 0.12, eg: 0.24, eb: 0.30, alpha: 0.76, radius: 0.24 },
       foam_blaster:      { diameter: 0.14, r: 1.0,  g: 0.96, b: 0.60, er: 0.30, eg: 0.28, eb: 0.00, alpha: 0.92, radius: 0.18 },
       paper_fan:         { diameter: 0.11, r: 1.0,  g: 0.55, b: 0.72, er: 0.30, eg: 0.05, eb: 0.15, alpha: 0.90, radius: 0.15 },
-      bookmark_boomerang:{ diameter: 0.22, r: 0.85, g: 0.72, b: 0.45, er: 0.20, eg: 0.15, eb: 0.00, alpha: 1.00, radius: 0.24, disk: true },
+      bookmark_boomerang:{ diameter: 0.22, r: 0.85, g: 0.72, b: 0.45, er: 0.20, eg: 0.15, eb: 0.00, alpha: 1.00, radius: 0.24, card: true },
       kite_string_whip:  { diameter: 0.32, r: 1.0,  g: 0.55, b: 0.10, er: 0.40, eg: 0.15, eb: 0.00, alpha: 0.96, radius: 0.34 },
     };
     const vis = WEAPON_VISUALS[wId] ?? WEAPON_VISUALS.bubble_wand;
 
     let mesh;
-    if (vis.disk) {
+    if (vis.card) {
+      // Thin rectangular card tumbling end-over-end (bookmark)
+      mesh = BABYLON.MeshBuilder.CreateBox(name, {
+        width: vis.diameter, height: 0.042, depth: 0.007,
+      }, scene);
+    } else if (vis.disk) {
       mesh = BABYLON.MeshBuilder.CreateCylinder(name, {
         height: 0.045, diameter: vis.diameter, tessellation: 16,
       }, scene);
@@ -3731,6 +3743,7 @@ export async function boot(options = {}) {
       returnSpeed: Math.max(0, era5State.stats.weaponReturnSpeed ?? 0),
       origin: position.clone(),
       spinDisk: !!vis.disk,
+      spinCard: !!vis.card,
     };
     era5Projectiles.push(projectileState);
     return projectileState;
@@ -3953,11 +3966,13 @@ export async function boot(options = {}) {
     for (let i = era5Projectiles.length - 1; i >= 0; i--) {
       const projectile = era5Projectiles[i];
       projectile.lifeMs = Math.max(0, projectile.lifeMs - (dt * 1000));
-      if (projectile.returning && projectile.lifeMs < Math.max(350, (era5State.stats.weaponProjectileLife ?? 1.6) * 500)) {
+      const lifeThreshold = Math.max(350, (era5State.stats.weaponProjectileLife ?? 1.6) * 500);
+      const isReturnPhase = projectile.returning && projectile.lifeMs < lifeThreshold;
+      if (isReturnPhase) {
         const toPlayer = player.mesh.position.add(new BABYLON.Vector3(0, 0.6, 0)).subtract(projectile.mesh.position);
         if (toPlayer.lengthSquared() > 0.001) {
           toPlayer.normalize();
-          projectile.velocity = BABYLON.Vector3.Lerp(projectile.velocity, toPlayer.scale(projectile.returnSpeed), Math.min(1, dt * 3.2));
+          projectile.velocity = BABYLON.Vector3.Lerp(projectile.velocity, toPlayer.scale(projectile.returnSpeed), Math.min(1, dt * 8.0));
         }
       }
       const previousPos = projectile.mesh.position.clone();
@@ -3967,9 +3982,19 @@ export async function boot(options = {}) {
       if (projectile.spinDisk) {
         projectile.mesh.rotation.y += dt * 9;
       }
+      if (projectile.spinCard) {
+        // End-over-end tumble on Z axis (bookmark flying)
+        projectile.mesh.rotation.z += dt * 14;
+      }
+      // Boomerang player-catch: dispose cleanly when it returns to the player
+      if (isReturnPhase && BABYLON.Vector3.Distance(projectile.mesh.position, player.mesh.position) < 1.4) {
+        projectile.mesh.dispose();
+        era5Projectiles.splice(i, 1);
+        continue;
+      }
       const travelDistance = BABYLON.Vector3.Distance(previousPos, projectile.mesh.position);
-      // Wall collision: ray from previous to current position
-      if (travelDistance > 0.001 && !projectile.returning) {
+      // Wall collision: skip only during active return phase (boomerang phases through on way back)
+      if (travelDistance > 0.001 && !isReturnPhase) {
         const travelDir = projectile.mesh.position.subtract(previousPos).normalize();
         const wallRay = new BABYLON.Ray(previousPos, travelDir, travelDistance + projectile.radius);
         const wallPick = scene.pickWithRay(wallRay, (mesh) => {
