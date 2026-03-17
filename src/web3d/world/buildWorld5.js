@@ -162,39 +162,38 @@ function createDeepWaterPocket(scene, def) {
   const root = new BABYLON.TransformNode(def.name, scene);
   root.position.set(def.x, def.y, def.z ?? 0);
 
-  // Thin water-surface slab sitting at the bottom of the logical volume (floor level).
-  // The logical contains() volume is unchanged; only the visual is repositioned.
-  const surfaceBaseY = -(def.h * 0.5) + 0.03;
+  // Water surface slab at floor level — semi-opaque blue so the grey floor reads as pool bottom.
+  const surfaceBaseY = -(def.h * 0.5) + 0.08;
   const volume = BABYLON.MeshBuilder.CreateBox(`${def.name}_volume`, {
     width: def.w,
-    height: 0.06,
+    height: 0.10,
     depth: def.d,
   }, scene);
   volume.parent = root;
   volume.position.y = surfaceBaseY;
+  volume.renderingGroupId = 3;
   const volumeMat = new BABYLON.StandardMaterial(`${def.name}_volumeMat`, scene);
   volumeMat.diffuseColor = new BABYLON.Color3(0.08, 0.34, 0.52);
   volumeMat.emissiveColor = new BABYLON.Color3(0.04, 0.18, 0.28);
-  volumeMat.alpha = 0.38;
+  volumeMat.alpha = 0.62;
   volumeMat.backFaceCulling = false;
   volumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   volume.material = volumeMat;
   markHazard(volume);
 
-  // Rim border sits at floor level as the pool edge marker.
+  // Concrete coping rim — opaque grey, frames pool as an inset in the floor.
   const rim = BABYLON.MeshBuilder.CreateBox(`${def.name}_rim`, {
     width: def.w + 0.08,
-    height: 0.08,
+    height: 0.12,
     depth: def.d + 0.08,
   }, scene);
   rim.parent = root;
-  rim.position.y = -(def.h * 0.5) + 0.01;
+  rim.position.y = -(def.h * 0.5) + 0.02;
+  rim.renderingGroupId = 3;
   const rimMat = new BABYLON.StandardMaterial(`${def.name}_rimMat`, scene);
-  rimMat.diffuseColor = new BABYLON.Color3(0.62, 0.96, 1.0);
-  rimMat.emissiveColor = new BABYLON.Color3(0.18, 0.34, 0.42);
-  rimMat.alpha = 0.52;
-  rimMat.backFaceCulling = false;
-  rimMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  rimMat.diffuseColor = new BABYLON.Color3(0.78, 0.80, 0.82);
+  rimMat.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
+  rimMat.alpha = 1.0;
   rim.material = rimMat;
   markHazard(rim);
 
@@ -211,9 +210,8 @@ function createDeepWaterPocket(scene, def) {
         && pos.z <= ((this.z ?? 0) + (this.d * 0.5));
     },
     update(time) {
-      rimMat.alpha = 0.40 + (Math.sin((time * 1.6) + this.x * 0.04) * 0.12);
-      volumeMat.alpha = 0.30 + (Math.sin((time * 0.9) + this.y) * 0.12);
-      volume.position.y = surfaceBaseY + (Math.sin((time * 0.7) + this.x * 0.03) * 0.04);
+      volumeMat.alpha = 0.58 + (Math.sin((time * 0.9) + this.y) * 0.06);
+      volume.position.y = surfaceBaseY + (Math.sin((time * 0.7) + this.x * 0.03) * 0.02);
     },
   };
 }
