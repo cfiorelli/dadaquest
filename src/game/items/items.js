@@ -65,7 +65,7 @@ export const ITEM_DEFS = [
     hidden: true,
     stats: {
       moveSpeed: 0.12,
-      waterMoveSpeed: 0.18,
+      waterMoveSpeed: 0.60,
     },
     visualTag: 'fins',
   },
@@ -391,7 +391,7 @@ export function deriveEra5Stats(era5State) {
     toolMeterDrainRate: 1,
     toolDamageInterval: 2,
     moveSpeed: 1,
-    waterMoveSpeed: 1,
+    waterMoveSpeed: 0,
     jumpMultiplier: 1,
     gravityScale: 1,
     glideMoveSpeed: 1,

@@ -5634,8 +5634,9 @@ export async function boot(options = {}) {
     let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
     const sprinting = input.isSprintHeld();
     if (isEra5Level && (world.level5?.isInDeepWater?.(pos) || world.era5Level?.isInDeepWater?.(pos))) {
-      speedMultiplier *= Math.max(0.72, era5State.stats.waterMoveSpeed ?? 1);
-      accelBonusMultiplier *= 0.94;
+      const waterMoveSpeed = era5State.stats.waterMoveSpeed ?? 0;
+      speedMultiplier *= 0.73 + waterMoveSpeed;
+      accelBonusMultiplier *= waterMoveSpeed > 0 ? 0.85 : 0.52;
     }
     if (sprinting) {
       if (isEra5Level) {
@@ -5944,15 +5945,15 @@ export async function boot(options = {}) {
         let moveX = rawMoveX;
         let moveZ = 0;
         const era5ToolDef = isEra5Level ? getEquippedEra5ToolDef() : null;
-        const scubaFloatActive = !!(
-          isEra5Level
-          && era5ToolDef?.defId === 'scuba_tank'
-          && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position))
-        );
+        const era5InDeepWater = !!(isEra5Level && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)));
+        const era5HasScuba = era5ToolDef?.defId === 'scuba_tank';
+        const era5HasFins = (era5State.stats.waterMoveSpeed ?? 0) > 0;
+        const scubaFloatActive = !!(isEra5Level && era5InDeepWater && (era5HasScuba || era5HasFins));
+        const swimYScale = era5HasScuba ? 1.0 : era5HasFins ? 0.53 : 0;
         const jumpJustPressed = scubaFloatActive ? false : jumpPress.edge;
         const playerJumpHeld = scubaFloatActive ? false : jumpHeld;
         const era5FloatMoveY = scubaFloatActive
-          ? clamp((jumpHeld ? 1 : 0) + (descendHeld ? -1 : 0), -1, 1)
+          ? clamp(((jumpHeld ? 1 : 0) + (descendHeld ? -1 : 0)) * swimYScale, -1, 1)
           : 0;
         if (isEra5Level) {
           era5PlayerYawVel = rawTurnAxis * ERA5_TURN_MAX_SPEED;
