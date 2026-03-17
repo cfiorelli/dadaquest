@@ -47,8 +47,8 @@ const LEVEL5_CAMERA_PRESETS = {
   },
 };
 
-const ROOM_WIDTH = 24.0;
-const ROOM_DEPTH = 18.0;
+const ROOM_WIDTH = 48.0;
+const ROOM_DEPTH = 36.0;
 const ROOM_HEIGHT = 6.0;
 const WALL_THICKNESS = 0.5;
 const FLOOR_THICKNESS = 0.75;
@@ -74,7 +74,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
   spawnYaw: Math.PI * 0.5,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
-  spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 9.0 },
+  spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: ROOM_CENTER_Z },
   goal: { x: 80.0, y: PLAYER_SPAWN_Y, z: 9.0 },
   goalPresentation: 'trigger-only',
   theme: 'neutral',
@@ -87,7 +87,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
       label: 'Start',
       x: 4.0,
       y: PLAYER_SPAWN_Y,
-      z: 9.0,
+      z: ROOM_CENTER_Z,
       spaceId: 'starter_room',
       allowedReason: 'spawn',
     },

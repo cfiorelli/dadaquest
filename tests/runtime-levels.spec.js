@@ -8,16 +8,16 @@ const LEVEL_CASES = [
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
 const LEVEL5_DOORWAY_START_POSE = {
-  x: 21.4,
+  x: 45.4,
   y: 0.42,
-  z: 9.0,
+  z: 18.0,
   yaw: Math.PI * 0.5,
   cameraYaw: Math.PI * 0.5,
 };
 const LEVEL5_DOORWAY_DIRECT_BLOCK_POSE = {
-  x: 21.4,
+  x: 45.4,
   y: 0.42,
-  z: 9.0,
+  z: 18.0,
   yaw: -Math.PI * 0.5,
   cameraYaw: -Math.PI * 0.5,
 };
@@ -1374,8 +1374,8 @@ test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell t
   expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
   const room = topology.sectors?.[0] ?? null;
   expect(room?.label).toBe('Starter Room');
-  expect(Number(room?.w?.toFixed?.(2) ?? room?.w)).toBe(24);
-  expect(Number(room?.d?.toFixed?.(2) ?? room?.d)).toBe(18);
+  expect(Number(room?.w?.toFixed?.(2) ?? room?.w)).toBe(48);
+  expect(Number(room?.d?.toFixed?.(2) ?? room?.d)).toBe(36);
   const audit = await getLevel5StarterRoomAudit(page);
   expect(audit.structuralCeilingShells).toHaveLength(1);
   expect(audit.transparentShells).toEqual([]);
@@ -1387,7 +1387,7 @@ test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell t
   const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
   expectLevel5StarterRoomLaunchAudit(audit, launchAudit);
 
-  await resetEra5Pose(page, { x: 12.0, y: 0.42, z: 9.0, yaw: 0.0, cameraYaw: 0.0 });
+  await resetEra5Pose(page, { x: 24.0, y: 0.42, z: 18.0, yaw: 0.0, cameraYaw: 0.0 });
   const sweepSamples = [];
   const allowedOccluders = new Set([
     null,
@@ -1396,9 +1396,9 @@ test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell t
   for (let i = 0; i < 16; i += 1) {
     const yaw = (i / 16) * Math.PI * 2;
     await resetEra5Pose(page, {
-      x: 12.0,
+      x: 24.0,
       y: 0.42,
-      z: 9.0,
+      z: 18.0,
       yaw,
       cameraYaw: yaw,
     });
@@ -1497,8 +1497,8 @@ test('@level5 @era5 runtime: projectiles remain occluded by solid blocker geomet
     LEVEL5_DOORWAY_DIRECT_BLOCK_POSE,
     { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw - 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw - 0.28 },
     { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw + 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw + 0.28 },
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 19.8, z: 9.0 },
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 22.7, z: 9.0 },
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 43.8, z: 18.0 },
+    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 46.7, z: 18.0 },
   ];
 
   let hit = null;
@@ -1562,10 +1562,10 @@ test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible 
 
   for (const sample of [
     { x: 1.5, z: 1.5 },
-    { x: 22.5, z: 1.5 },
-    { x: 22.5, z: 16.5 },
-    { x: 1.5, z: 16.5 },
-    { x: 12.0, z: 9.0 },
+    { x: 46.5, z: 1.5 },
+    { x: 46.5, z: 34.5 },
+    { x: 1.5, z: 34.5 },
+    { x: 24.0, z: 18.0 },
   ]) {
     await resetEra5Pose(page, {
       x: sample.x,
@@ -1593,9 +1593,9 @@ test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible 
   expect(blocker.visibleOwnerCount).toBeGreaterThan(0);
 
   await resetEra5Pose(page, {
-    x: 20.0,
+    x: 44.0,
     y: 0.42,
-    z: 9.0,
+    z: 18.0,
     yaw: Math.PI * 0.5,
     cameraYaw: Math.PI * 0.5,
   });
@@ -1608,7 +1608,7 @@ test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible 
   }));
   expect(blockedState.sceneKey).toBe('CribScene');
   expect(blockedState.pos).not.toBeNull();
-  expect(blockedState.pos.x).toBeLessThan(23.5);
+  expect(blockedState.pos.x).toBeLessThan(47.5);
 });
 
 test('@level5 @era5 runtime: level 5 respawn returns to the starter-room spawn anchor', async ({ page }) => {

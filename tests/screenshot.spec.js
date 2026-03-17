@@ -8,16 +8,16 @@ const SHOT_SCENES = [
   { scene: 'end', key: 'EndScene', file: 'end' },
 ];
 const LEVEL5_DOORWAY_START_POSE = {
-  x: 21.4,
+  x: 45.4,
   y: 0.42,
-  z: 9.0,
+  z: 18.0,
   yaw: Math.PI * 0.5,
   cameraYaw: Math.PI * 0.5,
 };
 const LEVEL5_DOORWAY_DIRECT_BLOCK_POSE = {
-  x: 21.4,
+  x: 45.4,
   y: 0.42,
-  z: 9.0,
+  z: 18.0,
   yaw: -Math.PI * 0.5,
   cameraYaw: -Math.PI * 0.5,
 };
@@ -851,14 +851,14 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
       x: 4.0,
       y: 0.42,
-      z: 9.0,
+      z: 18.0,
       yaw: Math.PI * 0.5,
       cameraYaw: Math.PI * 0.5,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
       label: 'l5-room-reset-start',
-      position: { x: 2.1, y: 2.1, z: 13.4 },
-      target: { x: 20.6, y: 1.6, z: 9.0 },
+      position: { x: 2.1, y: 2.1, z: 22.4 },
+      target: { x: 36.0, y: 1.6, z: 18.0 },
       fov: 0.44,
     });
   });
@@ -867,16 +867,16 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 20.0,
+      x: 40.0,
       y: 0.42,
-      z: 9.0,
+      z: 18.0,
       yaw: -Math.PI * 0.5,
       cameraYaw: -Math.PI * 0.5,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
       label: 'l5-room-reset-looking-back',
-      position: { x: 21.2, y: 2.1, z: 12.8 },
-      target: { x: 4.2, y: 1.6, z: 9.0 },
+      position: { x: 41.2, y: 2.1, z: 21.8 },
+      target: { x: 4.2, y: 1.6, z: 18.0 },
       fov: 0.44,
     });
   });
@@ -885,16 +885,16 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 15.0,
+      x: 39.0,
       y: 0.42,
-      z: 9.0,
+      z: 18.0,
       yaw: Math.PI * 0.5,
       cameraYaw: Math.PI * 0.5,
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
       label: 'l5-room-reset-doorway',
-      position: { x: 14.2, y: 2.0, z: 11.2 },
-      target: { x: 23.9, y: 1.6, z: 9.0 },
+      position: { x: 38.2, y: 2.0, z: 20.2 },
+      target: { x: 47.9, y: 1.6, z: 18.0 },
       fov: 0.36,
     });
   });
@@ -941,8 +941,8 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
     });
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
       label: 'l5-room-reset-collision',
-      position: { x: 7.4, y: 4.6, z: 15.4 },
-      target: { x: 22.4, y: 1.2, z: 8.8 },
+      position: { x: 8.0, y: 6.0, z: 28.0 },
+      target: { x: 44.0, y: 1.2, z: 18.0 },
       fov: 0.72,
     });
   });
@@ -1035,8 +1035,8 @@ test('capture Level 5 room reset doorway proof screenshots', async ({ page }) =>
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
       label: 'l5-room-reset-doorway-floor-seam',
-      position: { x: 21.3, y: 0.68, z: 11.55 },
-      target: { x: 24.18, y: 0.26, z: 10.45 },
+      position: { x: 45.3, y: 0.68, z: 19.55 },
+      target: { x: 48.18, y: 0.26, z: 18.45 },
       fov: 0.52,
     });
   });
