@@ -181,21 +181,38 @@ function createDeepWaterPocket(scene, def) {
   volume.material = volumeMat;
   markHazard(volume);
 
-  // Concrete coping rim — opaque grey, frames pool as an inset in the floor.
+  // Concrete coping rim — tall walls framing the basin. Bottom at floor (world Y=0),
+  // top at 0.50 above floor so the near/far wall faces are visible from camera angle.
   const rim = BABYLON.MeshBuilder.CreateBox(`${def.name}_rim`, {
-    width: def.w + 0.08,
-    height: 0.12,
-    depth: def.d + 0.08,
+    width: def.w + 0.30,
+    height: 0.50,
+    depth: def.d + 0.30,
   }, scene);
   rim.parent = root;
-  rim.position.y = -(def.h * 0.5) + 0.02;
+  // Root is at world Y=0.5; center rim at world Y=0.25 → local Y = -0.25
+  rim.position.y = -0.25;
   rim.renderingGroupId = 3;
   const rimMat = new BABYLON.StandardMaterial(`${def.name}_rimMat`, scene);
-  rimMat.diffuseColor = new BABYLON.Color3(0.78, 0.80, 0.82);
+  rimMat.diffuseColor = new BABYLON.Color3(0.72, 0.74, 0.76);
   rimMat.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
   rimMat.alpha = 1.0;
   rim.material = rimMat;
   markHazard(rim);
+
+  // Dark pool floor visible through water — tinted teal so it reads as pool bottom not room floor.
+  const poolFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor`, {
+    width: def.w - 0.24,
+    height: 0.02,
+    depth: def.d - 0.24,
+  }, scene);
+  poolFloor.parent = root;
+  poolFloor.position.y = -(def.h * 0.5) + 0.01;
+  poolFloor.renderingGroupId = 2;
+  const poolFloorMat = new BABYLON.StandardMaterial(`${def.name}_floorMat`, scene);
+  poolFloorMat.diffuseColor = new BABYLON.Color3(0.06, 0.14, 0.20);
+  poolFloorMat.emissiveColor = new BABYLON.Color3(0.02, 0.06, 0.10);
+  poolFloor.material = poolFloorMat;
+  markHazard(poolFloor);
 
   return {
     ...def,
