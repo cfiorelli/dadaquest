@@ -4099,6 +4099,8 @@ export async function boot(options = {}) {
     if (inDeepWater && !era5WasInDeepWater && era5WaterEntryCooldownMs <= 0) {
       spawnEra5WaterRipple(player.mesh.position);
       era5WaterEntryCooldownMs = 600;
+      // Show swim controls for 8 seconds on each water entry.
+      ui.showStatus('Space ↑ swim up  ·  C ↓ dive down', 8000);
     }
     era5WasInDeepWater = inDeepWater;
   }
@@ -4132,11 +4134,18 @@ export async function boot(options = {}) {
       const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
       if (era5Oxygen <= 0.001) {
-        era5OxygenDamageTimer += dt;
-        const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
-        if (era5OxygenDamageTimer >= interval) {
-          era5OxygenDamageTimer = Math.max(0, era5OxygenDamageTimer - interval);
-          applyEra5Damage('oxygen', { x: 0, z: 0 }, { invulnMs: 850, element: 'water', resist: era5State.stats.waterResist ?? 0 });
+        if (hasScubaTank && !respawnState) {
+          // Scuba tank empty: hazard-reset to pool edge instead of damage cycling.
+          player.invulnTimerMs = 0;
+          const exitSpawn = world.level5?.getPoolExitSpawn?.(player.mesh.position) || null;
+          triggerReset('scuba_empty', 0, exitSpawn);
+        } else {
+          era5OxygenDamageTimer += dt;
+          const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
+          if (era5OxygenDamageTimer >= interval) {
+            era5OxygenDamageTimer = Math.max(0, era5OxygenDamageTimer - interval);
+            applyEra5Damage('oxygen', { x: 0, z: 0 }, { invulnMs: 850, element: 'water', resist: era5State.stats.waterResist ?? 0 });
+          }
         }
       } else {
         era5OxygenDamageTimer = 0;

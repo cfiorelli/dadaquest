@@ -91,6 +91,15 @@ export const LEVEL5 = compileAuthoredEraLayout({
       spaceId: 'starter_room',
       allowedReason: 'spawn',
     },
+    {
+      id: 'pool_edge',
+      label: 'Pool Edge',
+      x: 27.0,
+      y: PLAYER_SPAWN_Y,
+      z: 30.0,
+      spaceId: 'starter_room',
+      allowedReason: 'pool_hazard',
+    },
   ],
   acts: [
     { id: 'A', label: 'Starter Room', range: [0, ROOM_WIDTH] },
@@ -114,11 +123,25 @@ export const LEVEL5 = compileAuthoredEraLayout({
         landmarks: ['future exit'],
         shell: false,
         surfaces: [
-          surface('starter_floor', 0.0, 0.0, ROOM_WIDTH, ROOM_DEPTH, 'starter_room_floor', {
-            floorY: 0.0,
-            h: FLOOR_THICKNESS,
-            walkableClassification: 'room-floor',
-            roomSurface: true,
+          // ── Deck floor (4 sections carved around pool footprint x=[28,44] z=[26,34]) ──
+          surface('floor_north', 0, -5, ROOM_WIDTH, 26, 'starter_room_floor', {
+            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          }),
+          surface('floor_south', 0, 17, ROOM_WIDTH, 2, 'starter_room_floor', {
+            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          }),
+          surface('floor_west', -10, 12, 28, 8, 'starter_room_floor', {
+            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          }),
+          surface('floor_east', 22, 12, 4, 8, 'starter_room_floor', {
+            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          }),
+          // ── Pool basin floors (shallow end -0.55, deep end -2.25) ──────────────────
+          surface('pool_shallow_floor', 8, 12, 8, 8, 'pool_floor', {
+            floorY: -0.55, h: FLOOR_THICKNESS, walkableClassification: 'pool-floor',
+          }),
+          surface('pool_deep_floor', 16, 12, 8, 8, 'pool_floor', {
+            floorY: -2.25, h: FLOOR_THICKNESS, walkableClassification: 'pool-floor',
           }),
         ],
         decorBlocks: [
@@ -249,16 +272,16 @@ export const LEVEL5 = compileAuthoredEraLayout({
     {
       name: 'water_se_pool',
       x: 36,
-      y: 0.5,
+      y: -1.125,
       z: 30,
       w: 16,
-      h: 1.0,
+      h: 2.25,
       d: 8,
     },
   ],
   airBubblePickups: [
-    { name: 'bubble_se_01', x: 32, y: 0.7, z: 29, radius: 0.9 },
-    { name: 'bubble_se_02', x: 40, y: 0.7, z: 31, radius: 0.9 },
+    { name: 'bubble_se_01', x: 32, y: -0.35, z: 29, radius: 0.9 },
+    { name: 'bubble_se_02', x: 40, y: -1.0, z: 31, radius: 0.9 },
   ],
   eelRails: [],
   vents: [],

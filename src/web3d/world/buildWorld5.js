@@ -423,15 +423,23 @@ function createDeepWaterPocket(scene, def) {
     tagPoolVisual(rung);
   }
 
-  return {
-    ...def,
-    root,
-    contains(pos) {
-      return getWaterStateAtPosition(pos, pos.y).inDeepWater;
-    },
-    getWaterState(pos, headY = pos.y) {
-      return getWaterStateAtPosition(pos, headY);
-    },
+    return {
+      ...def,
+      root,
+      contains(pos) {
+        return getWaterStateAtPosition(pos, pos.y).inDeepWater;
+      },
+      getWaterState(pos, headY = pos.y) {
+        return getWaterStateAtPosition(pos, headY);
+      },
+      getExitSpawn() {
+        // West edge of pool (shallow end), standing on the coping at deck level.
+        return {
+          x: def.x - (def.w * 0.5) - 0.6,
+          y: def.y + (def.h * 0.5) + 0.42,
+          z: def.z ?? 0,
+        };
+      },
     update(time) {
       waterMat.alpha = 0.62 + (Math.sin((time * 0.80) + this.x * 0.04) * 0.05);
       water.position.y = waterBaseY + (Math.sin((time * 0.55) + this.x * 0.02) * 0.008);
@@ -1212,9 +1220,15 @@ export function buildWorld5(scene, options = {}) {
 
   function resolveRespawnPosition(baseSpawn = {}) {
     const requestedSpawn = baseSpawn?.baseSpawn || baseSpawn || {};
+    const reason = baseSpawn?.reason || null;
     let anchor = null;
     let selectedBy = 'fallback';
-    if (requestedSpawn.anchorId && respawnAnchorMap.has(requestedSpawn.anchorId)) {
+    // Pool drowning: always route to pool-edge anchor regardless of other logic.
+    if (reason === 'scuba_empty' && respawnAnchorMap.has('pool_edge')) {
+      anchor = respawnAnchorMap.get('pool_edge');
+      selectedBy = 'scuba_empty';
+    }
+    if (!anchor && requestedSpawn.anchorId && respawnAnchorMap.has(requestedSpawn.anchorId)) {
       anchor = respawnAnchorMap.get(requestedSpawn.anchorId);
       selectedBy = 'anchorId';
     }
@@ -1559,6 +1573,16 @@ export function buildWorld5(scene, options = {}) {
     },
     isInDeepWater(pos) {
       return deepWaterPockets.some((pocket) => pocket.contains(pos));
+    },
+    getPoolExitSpawn(pos) {
+      for (const pocket of deepWaterPockets) {
+        if (typeof pocket.getExitSpawn !== 'function') continue;
+        const state = pocket.getWaterState(pos, pos.y);
+        if (state.inDeepWater || state.depthAtX !== null) {
+          return pocket.getExitSpawn();
+        }
+      }
+      return null;
     },
     getWaterState(pos, headY = pos.y) {
       for (const pocket of deepWaterPockets) {
