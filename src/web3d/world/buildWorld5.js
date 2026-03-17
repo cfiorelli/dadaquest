@@ -168,10 +168,11 @@ function createDeepWaterPocket(scene, def) {
   const D = def.d;
   const GRP = 3;
   const FLOOR_L = -def.y;
-  const BASIN_DEPTH = 1.5;
-  const BOTTOM_L = FLOOR_L - BASIN_DEPTH;
+  const SHALLOW_DEPTH = 0.55;
+  const DEEP_DEPTH = 2.25;
+  const BOTTOM_L = FLOOR_L - DEEP_DEPTH;
   const WATER_L = FLOOR_L - 0.05;
-  const WALL_H = BASIN_DEPTH;
+  const WALL_H = DEEP_DEPTH;
   const WALL_T = 0.12;
   const COPE_W = 0.15;
   const COPE_H = 0.02;
@@ -181,8 +182,53 @@ function createDeepWaterPocket(scene, def) {
   const WALL_CY = FLOOR_L - (WALL_H * 0.5);
   const WATERLINE_H = 0.12;
   const WATERLINE_CY = WATER_L - 0.03;
+  const INTERIOR_MIN_X = -(INTERIOR_W * 0.5);
+  const INTERIOR_MAX_X = INTERIOR_W * 0.5;
+  const SHALLOW_RUN = INTERIOR_W * 0.42;
+  const TRANSITION_RUN = Math.max(2.2, INTERIOR_W * 0.18);
+  const TRANSITION_MAX_X = Math.min(INTERIOR_MAX_X - 0.8, INTERIOR_MIN_X + SHALLOW_RUN + TRANSITION_RUN);
+  const SHALLOW_MAX_X = TRANSITION_MAX_X - TRANSITION_RUN;
+  const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
   const swimHalfW = Math.max(0.2, (INTERIOR_W * 0.5) - 0.04);
   const swimHalfD = Math.max(0.2, (INTERIOR_D * 0.5) - 0.04);
+
+  function getDepthAtWorldX(worldX) {
+    const localX = worldX - def.x;
+    if (localX <= SHALLOW_MAX_X) return SHALLOW_DEPTH;
+    if (localX >= TRANSITION_MAX_X) return DEEP_DEPTH;
+    const t = (localX - SHALLOW_MAX_X) / Math.max(0.0001, TRANSITION_MAX_X - SHALLOW_MAX_X);
+    const eased = t * t;
+    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * eased);
+  }
+
+  function inPocketXZ(pos) {
+    return pos.x >= (def.x - swimHalfW)
+      && pos.x <= (def.x + swimHalfW)
+      && pos.z >= ((def.z ?? 0) - swimHalfD)
+      && pos.z <= ((def.z ?? 0) + swimHalfD);
+  }
+
+  function getWaterStateAtPosition(pos, headY = pos.y) {
+    const waterSurfaceY = def.y + (def.h * 0.5);
+    if (!inPocketXZ(pos)) {
+      return {
+        inDeepWater: false,
+        headSubmerged: false,
+        waterSurfaceY,
+        depthAtX: null,
+      };
+    }
+    const depthAtX = getDepthAtWorldX(pos.x);
+    const inDeepWater = depthAtX >= DEEP_FLOAT_DEPTH_THRESHOLD
+      && pos.y >= (def.y - (def.h * 0.5))
+      && pos.y <= (def.y + (def.h * 0.5));
+    return {
+      inDeepWater,
+      headSubmerged: inDeepWater && headY <= (waterSurfaceY - 0.03),
+      waterSurfaceY,
+      depthAtX,
+    };
+  }
 
   function tagPoolVisual(mesh, { alphaIndex = null } = {}) {
     mesh.renderingGroupId = GRP;
@@ -194,7 +240,7 @@ function createDeepWaterPocket(scene, def) {
     return mesh;
   }
 
-  // ── 1. Basin floor (darker than walls so depth reads) ────────────────────
+  // ── 1. Basin floor profile (shallow shelf + transition + deep end) ──────
   const poolFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor`, {
     width: INTERIOR_W,
     height: 0.06,
@@ -209,14 +255,43 @@ function createDeepWaterPocket(scene, def) {
   poolFloor.material = poolFloorMat;
   tagPoolVisual(poolFloor);
 
+  const shallowFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_shallow_floor`, {
+    width: Math.max(1.8, SHALLOW_RUN),
+    height: 0.08,
+    depth: INTERIOR_D,
+  }, scene);
+  shallowFloor.parent = root;
+  shallowFloor.position.set(INTERIOR_MIN_X + (Math.max(1.8, SHALLOW_RUN) * 0.5), FLOOR_L - SHALLOW_DEPTH + 0.04, 0);
+  const shallowFloorMat = new BABYLON.StandardMaterial(`${def.name}_shallowFloorMat`, scene);
+  shallowFloorMat.diffuseColor = new BABYLON.Color3(0.33, 0.42, 0.48);
+  shallowFloorMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.10);
+  shallowFloorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+  shallowFloor.material = shallowFloorMat;
+  tagPoolVisual(shallowFloor);
+
+  const transitionFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_transition_floor`, {
+    width: TRANSITION_RUN,
+    height: 0.08,
+    depth: INTERIOR_D - 0.04,
+  }, scene);
+  transitionFloor.parent = root;
+  transitionFloor.position.set(
+    SHALLOW_MAX_X + (TRANSITION_RUN * 0.5),
+    FLOOR_L - ((SHALLOW_DEPTH + DEEP_DEPTH) * 0.5),
+    0,
+  );
+  transitionFloor.rotation.z = -Math.atan((DEEP_DEPTH - SHALLOW_DEPTH) / Math.max(0.001, TRANSITION_RUN));
+  transitionFloor.material = shallowFloorMat;
+  tagPoolVisual(transitionFloor);
+
   // ── 2. Lane stripe (one commercial cue) ───────────────────────────────────
   const laneStripe = BABYLON.MeshBuilder.CreateBox(`${def.name}_lane`, {
-    width: INTERIOR_W - 0.7,
+    width: Math.max(2.4, (INTERIOR_W - SHALLOW_RUN) - 0.8),
     height: 0.04,
     depth: 0.28,
   }, scene);
   laneStripe.parent = root;
-  laneStripe.position.set(0, BOTTOM_L + 0.05, 0);
+  laneStripe.position.set((SHALLOW_MAX_X + INTERIOR_MAX_X) * 0.5, BOTTOM_L + 0.05, 0);
   const laneMat = new BABYLON.StandardMaterial(`${def.name}_laneMat`, scene);
   laneMat.diffuseColor = new BABYLON.Color3(0.08, 0.14, 0.24);
   laneMat.emissiveColor = new BABYLON.Color3(0.01, 0.02, 0.05);
@@ -352,12 +427,10 @@ function createDeepWaterPocket(scene, def) {
     ...def,
     root,
     contains(pos) {
-      return pos.x >= (this.x - swimHalfW)
-        && pos.x <= (this.x + swimHalfW)
-        && pos.y >= (this.y - this.h * 0.5)
-        && pos.y <= (this.y + this.h * 0.5)
-        && pos.z >= ((this.z ?? 0) - swimHalfD)
-        && pos.z <= ((this.z ?? 0) + swimHalfD);
+      return getWaterStateAtPosition(pos, pos.y).inDeepWater;
+    },
+    getWaterState(pos, headY = pos.y) {
+      return getWaterStateAtPosition(pos, headY);
     },
     update(time) {
       waterMat.alpha = 0.62 + (Math.sin((time * 0.80) + this.x * 0.04) * 0.05);
@@ -1486,6 +1559,21 @@ export function buildWorld5(scene, options = {}) {
     },
     isInDeepWater(pos) {
       return deepWaterPockets.some((pocket) => pocket.contains(pos));
+    },
+    getWaterState(pos, headY = pos.y) {
+      for (const pocket of deepWaterPockets) {
+        if (typeof pocket.getWaterState !== 'function') continue;
+        const state = pocket.getWaterState(pos, headY);
+        if (state?.inDeepWater || state?.depthAtX !== null) {
+          return state;
+        }
+      }
+      return {
+        inDeepWater: false,
+        headSubmerged: false,
+        waterSurfaceY: null,
+        depthAtX: null,
+      };
     },
     tryHitByWeapon(attack = {}) {
       const hitResult = hitJellyfish(attack);

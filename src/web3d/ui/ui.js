@@ -2571,6 +2571,8 @@ export function createUI(uiRoot, options = {}) {
       hasShield = false,
     } = {}) {
       era5HudEl.style.display = 'block';
+      if (era5ToolLabelEl) era5ToolLabelEl.textContent = toolLabel;
+      if (era5ToolHelpEl) era5ToolHelpEl.textContent = toolHelp;
       renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
       if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = 'none';
       if (era5OxygenRowEl) {

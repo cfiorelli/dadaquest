@@ -3187,13 +3187,18 @@ export async function boot(options = {}) {
     return Math.max(0, era5State.stats.oxygenMax ?? 0);
   }
 
+  function getEra5BreathLabel(toolDef = getEquippedEra5ToolDef()) {
+    return toolDef?.defId === 'scuba_tank' ? 'Scuba Tank' : 'Air';
+  }
+
   function getEra5ToolHelpText(toolDef = getEquippedEra5ToolDef()) {
     const toolId = toolDef?.defId || '';
     if (toolId === 'camp_lantern') return 'Camp Lantern boost: E';
     if (toolId === 'lantern') return 'Lantern reveal / boost: E';
     if (toolId === 'kite_rig') return 'Hold Jump in air to glide';
     if (toolId === 'conveyor_boots') return 'Conveyor Boots traction: passive';
-    return 'Scuba Tank: Space ascend, C descend in deep pockets';
+    if (toolId === 'scuba_tank') return 'Scuba Tank: Space ascend, C descend in deep water';
+    return 'Air only: Space/C swim in deep water';
   }
 
   function getEra5WeaponHelpText(weaponDef = getEquippedEra5WeaponDef()) {
@@ -3297,7 +3302,7 @@ export async function boot(options = {}) {
       oxygen: era5Oxygen,
       oxygenMax: Math.max(0, era5State.stats.oxygenMax ?? 0),
       showOxygen: era5OxygenHideTimer > 0,
-      toolLabel: toolDef?.name || 'No Tool',
+      toolLabel: getEra5BreathLabel(toolDef),
       weaponLabel: weaponDef?.name || 'No Weapon',
       weaponCooldownMs: era5WeaponCooldownMs,
       weaponCooldownMaxMs: Math.max(1, (era5State.stats.weaponCooldown ?? 0.35) * 1000),
@@ -4081,7 +4086,15 @@ export async function boot(options = {}) {
 
   function updateEra5WaterEntry(dt) {
     if (!isEra5Level) return;
-    const inDeepWater = !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position));
+    const { halfH } = player.getCollisionHalfExtents();
+    const headY = player.mesh.position.y + (halfH * 0.92);
+    const waterState = world.level5?.getWaterState?.(player.mesh.position, headY)
+      || world.era5Level?.getWaterState?.(player.mesh.position, headY)
+      || {
+        inDeepWater: !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)),
+        headSubmerged: false,
+      };
+    const inDeepWater = !!waterState.inDeepWater;
     era5WaterEntryCooldownMs = Math.max(0, era5WaterEntryCooldownMs - (dt * 1000));
     if (inDeepWater && !era5WasInDeepWater && era5WaterEntryCooldownMs <= 0) {
       spawnEra5WaterRipple(player.mesh.position);
@@ -4093,18 +4106,31 @@ export async function boot(options = {}) {
   function updateEra5Oxygen(dt) {
     if (!isEra5Level) return;
     const oxygenMax = Math.max(0, getEra5MeterMax());
+    const toolDef = getEquippedEra5ToolDef();
+    const hasScubaTank = toolDef?.defId === 'scuba_tank';
     if (oxygenMax <= 0) {
       era5Oxygen = 0;
       era5OxygenDamageTimer = 0;
       era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
       return;
     }
-    const inDeepWater = !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position));
+    const { halfH } = player.getCollisionHalfExtents();
+    const headY = player.mesh.position.y + (halfH * 0.92);
+    const waterState = world.level5?.getWaterState?.(player.mesh.position, headY)
+      || world.era5Level?.getWaterState?.(player.mesh.position, headY)
+      || {
+        inDeepWater: !!(world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)),
+        headSubmerged: false,
+      };
+    const inDeepWater = !!waterState.inDeepWater;
+    const headSubmerged = !!waterState.headSubmerged;
     if (inDeepWater) {
+      era5OxygenHideTimer = 1.5;
+    }
+    if (headSubmerged) {
       const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
       const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
-      era5OxygenHideTimer = 1.5;
       if (era5Oxygen <= 0.001) {
         era5OxygenDamageTimer += dt;
         const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
@@ -4117,8 +4143,12 @@ export async function boot(options = {}) {
       }
       return;
     }
-    const refillPerSec = Math.max(0, era5State.stats.oxygenRefillRate ?? 0);
-    era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
+    if (hasScubaTank) {
+      const refillPerSec = 8;
+      era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
+    } else {
+      era5Oxygen = oxygenMax;
+    }
     era5OxygenDamageTimer = 0;
     era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
   }
@@ -5945,8 +5975,8 @@ export async function boot(options = {}) {
         const era5InDeepWater = !!(isEra5Level && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)));
         const era5HasScuba = era5ToolDef?.defId === 'scuba_tank';
         const era5HasFins = (era5State.stats.waterMoveSpeed ?? 0) > 0;
-        const scubaFloatActive = !!(isEra5Level && era5InDeepWater && (era5HasScuba || era5HasFins));
-        const swimYScale = era5HasScuba ? 1.0 : era5HasFins ? 0.53 : 0;
+        const scubaFloatActive = !!(isEra5Level && era5InDeepWater);
+        const swimYScale = era5HasScuba ? 1.0 : era5HasFins ? 0.62 : 0.48;
         const jumpJustPressed = scubaFloatActive ? false : jumpPress.edge;
         const playerJumpHeld = scubaFloatActive ? false : jumpHeld;
         const era5FloatMoveY = scubaFloatActive
