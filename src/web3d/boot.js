@@ -1157,9 +1157,20 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.progressState = progression;
   };
   syncProgressState(progression);
-  const formatSlotLabel = (slotId) => slotId
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (char) => char.toUpperCase());
+  const SLOT_DISPLAY_NAMES = {
+    weaponPrimary: 'Weapon',
+    tool: 'Tool',
+    head: 'Head',
+    chest: 'Chest',
+    backpack: 'Utility',
+    shoes: 'Shoes',
+    cape: 'Cape',
+    legs: 'Legs',
+    charm: 'Charm',
+  };
+  const formatSlotLabel = (slotId) =>
+    SLOT_DISPLAY_NAMES[slotId]
+    ?? slotId.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
   const cloneEra5State = (source = progression.era5) => ({
     unlocked: !!source?.unlocked,
     currency: Number.isFinite(source?.currency) ? source.currency : 0,
@@ -1169,42 +1180,39 @@ export async function boot(options = {}) {
   });
   let era5State = cloneEra5State(progression.era5);
   const buildEra5InventoryUiState = () => {
-    const slots = getItemSlots().map((slotId) => {
-      const instanceId = era5State.equipped?.[slotId] || null;
-      const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
-      const def = getItemDef(instance?.defId);
-      return {
-        slotId,
-        label: formatSlotLabel(slotId),
-        instanceId,
-        itemName: def?.name || '',
-      };
-    });
-    const items = era5State.inventory.map((instance) => {
-      const def = getItemDef(instance.defId);
-      const statsText = Object.entries(def?.stats || {})
-        .map(([key, value]) => `${key}: ${value}`)
-        .join(' · ');
-      return {
-        instanceId: instance.instanceId,
-        name: def?.name || instance.defId,
-        slot: def?.slot || '',
-        slotLabel: formatSlotLabel(def?.slot || 'item'),
-        rarity: def?.rarity || 'common',
-        type: def?.type || 'item',
-        statsText,
-        equipped: Object.values(era5State.equipped || {}).includes(instance.instanceId),
-      };
-    });
-    const stats = era5State.stats || {};
-    const statsLines = [
-      `HP ${stats.hpMax ?? 3} · Shield ${stats.shieldMax ?? 1}`,
-      `Tool meter ${(stats.toolMeterMax ?? 0).toFixed(1)} · Oxygen ${(stats.oxygenMax ?? 0).toFixed(1)}s`,
-      `Move x${(stats.moveSpeed ?? 1).toFixed(2)} · Jump x${(stats.jumpMultiplier ?? 1).toFixed(2)} · Water x${(stats.waterMoveSpeed ?? 1).toFixed(2)}`,
-      `Resists W ${(100 * (stats.waterResist ?? 0)).toFixed(0)}% · E ${(100 * (stats.electricResist ?? 0)).toFixed(0)}% · Wind ${(100 * (stats.windResist ?? 0)).toFixed(0)}% · Ink ${(100 * (stats.inkResist ?? 0)).toFixed(0)}% · Fire ${(100 * (stats.fireResist ?? 0)).toFixed(0)}%`,
-      `Weapon cooldown ${(stats.weaponCooldown ?? 0.35).toFixed(2)}s · Stun ${(stats.weaponStunSec ?? 1.5).toFixed(1)}s`,
-    ];
-    return { slots, items, statsLines };
+    const ALWAYS_VISIBLE_SLOTS = new Set(['weaponPrimary', 'tool']);
+    const equippedValues = new Set(Object.values(era5State.equipped || {}));
+    const slots = getItemSlots()
+      .filter((slotId) => slotId !== 'weaponSecondary')
+      .map((slotId) => {
+        const instanceId = era5State.equipped?.[slotId] || null;
+        const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
+        const def = getItemDef(instance?.defId);
+        return {
+          slotId,
+          label: formatSlotLabel(slotId),
+          instanceId,
+          itemName: def?.name || '',
+          archetype: def?.archetype || '',
+          canUnequip: slotId === 'tool' && !!instanceId,
+        };
+      })
+      .filter((slot) => ALWAYS_VISIBLE_SLOTS.has(slot.slotId) || slot.instanceId !== null);
+    const items = era5State.inventory
+      .filter((instance) => !getItemDef(instance.defId)?.hidden)
+      .map((instance) => {
+        const def = getItemDef(instance.defId);
+        return {
+          instanceId: instance.instanceId,
+          name: def?.name || instance.defId,
+          rarity: def?.rarity || 'common',
+          type: def?.type || 'item',
+          archetype: def?.archetype || '',
+          description: def?.description || '',
+          equipped: equippedValues.has(instance.instanceId),
+        };
+      });
+    return { slots, items };
   };
   const syncEra5RuntimeState = () => {
     era5State = cloneEra5State(progression.era5);

@@ -50,6 +50,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'chest',
     rarity: 'starter',
+    hidden: true,
     stats: {
       waterResist: 0.15,
     },
@@ -61,6 +62,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'shoes',
     rarity: 'starter',
+    hidden: true,
     stats: {
       moveSpeed: 0.12,
       waterMoveSpeed: 0.18,
@@ -105,6 +107,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'head',
     rarity: 'factory',
+    hidden: true,
     stats: {
       electricResist: 0.2,
     },
@@ -165,6 +168,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'chest',
     rarity: 'storm',
+    hidden: true,
     stats: {
       windResist: 0.2,
     },
@@ -176,6 +180,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'shoes',
     rarity: 'storm',
+    hidden: true,
     stats: {
       electricResist: 0.2,
       moveSpeed: 0.03,
@@ -222,6 +227,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'cape',
     rarity: 'library',
+    hidden: true,
     stats: {
       inkResist: 0.25,
     },
@@ -233,6 +239,7 @@ export const ITEM_DEFS = [
     type: 'armor',
     slot: 'head',
     rarity: 'library',
+    hidden: true,
     stats: {
       telegraphClarity: 1,
     },
@@ -305,8 +312,6 @@ const ITEM_DEF_MAP = new Map(ITEM_DEFS.map((def) => [def.defId, def]));
 const STARTER_ITEMS = [
   { instanceId: 'starter-scuba-tank', defId: 'scuba_tank', level: 1, seed: 501 },
   { instanceId: 'starter-bubble-wand', defId: 'bubble_wand', level: 1, seed: 502 },
-  { instanceId: 'starter-wetsuit', defId: 'wetsuit', level: 1, seed: 503 },
-  { instanceId: 'starter-fins', defId: 'fins', level: 1, seed: 504 },
 ];
 
 function isObject(value) {

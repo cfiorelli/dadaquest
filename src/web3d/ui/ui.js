@@ -1095,17 +1095,44 @@ const CSS = `
   font-weight: 800;
   color: #f0fbff;
 }
-.dada-era5-item-meta,
-.dada-era5-item-stats,
-.dada-era5-stats {
-  margin-top: 6px;
+.dada-era5-item-desc {
+  margin-top: 5px;
   font-size: 12px;
-  line-height: 1.5;
-  color: rgba(210, 242, 250, 0.78);
+  line-height: 1.45;
+  color: rgba(200, 238, 248, 0.72);
+}
+.dada-era5-item-badge {
+  margin-left: 7px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(61, 177, 224, 0.22);
+  border: 1px solid rgba(61, 177, 224, 0.38);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(160, 228, 248, 0.9);
+  vertical-align: middle;
+}
+.dada-era5-item-group {
+  margin-bottom: 18px;
+}
+.dada-era5-item-group:last-child {
+  margin-bottom: 0;
+}
+.dada-era5-item-group-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(172, 229, 242, 0.52);
+  margin-bottom: 8px;
 }
 .dada-era5-item-equipped {
-  color: #8cf0ff;
+  margin-top: 8px;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #8cf0ff;
 }
 .dada-era5-teaser {
   position: absolute;
@@ -1945,13 +1972,10 @@ export function createUI(uiRoot, options = {}) {
       </div>
       <div class="dada-era5-grid">
         <div class="dada-era5-card">
-          <div class="dada-era5-section-title">Equipment</div>
+          <div class="dada-era5-section-title">Equipped</div>
           <div class="dada-era5-slots" data-era5-slots></div>
-          <div class="dada-era5-section-title" style="margin-top:16px">Derived Stats</div>
-          <div class="dada-era5-stats" data-era5-stats></div>
         </div>
         <div class="dada-era5-card">
-          <div class="dada-era5-section-title">Items</div>
           <div class="dada-era5-item-grid" data-era5-items></div>
         </div>
       </div>
@@ -1960,7 +1984,6 @@ export function createUI(uiRoot, options = {}) {
   uiRoot.appendChild(era5InventoryEl);
   const era5SlotsEl = era5InventoryEl.querySelector('[data-era5-slots]');
   const era5ItemsEl = era5InventoryEl.querySelector('[data-era5-items]');
-  const era5StatsEl = era5InventoryEl.querySelector('[data-era5-stats]');
 
   const era5TeaserEl = document.createElement('div');
   era5TeaserEl.className = 'dada-era5-teaser';
@@ -1990,7 +2013,6 @@ export function createUI(uiRoot, options = {}) {
   let era5InventoryState = {
     slots: [],
     items: [],
-    statsLines: [],
   };
 
   function renderPips(targetEl, count, maxCount, filledClass, filledText) {
@@ -2005,23 +2027,37 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function renderEra5Inventory() {
-    if (!era5SlotsEl || !era5ItemsEl || !era5StatsEl) return;
+    if (!era5SlotsEl || !era5ItemsEl) return;
     era5SlotsEl.innerHTML = era5InventoryState.slots.map((slot) => `
       <div class="dada-era5-slot">
         <div class="dada-era5-slot-name">${slot.label}</div>
-        <div class="dada-era5-slot-item${slot.itemName ? '' : ' dada-era5-slot-empty'}">${slot.itemName || 'Empty'}</div>
-        ${slot.instanceId ? `<button class="dada-era5-slot-action" data-era5-unequip="${slot.slotId}">Unequip</button>` : ''}
+        <div class="dada-era5-slot-item${slot.itemName ? '' : ' dada-era5-slot-empty'}">
+          ${slot.itemName || 'Empty'}${slot.archetype ? `<span class="dada-era5-item-badge">${slot.archetype.toUpperCase()}</span>` : ''}
+        </div>
+        ${slot.canUnequip ? `<button class="dada-era5-slot-action" data-era5-unequip="${slot.slotId}">Unequip</button>` : ''}
       </div>
     `).join('');
-    era5ItemsEl.innerHTML = era5InventoryState.items.map((item) => `
-      <div class="dada-era5-item rarity-${item.rarity || 'common'}">
-        <div class="dada-era5-item-name">${item.name}</div>
-        <div class="dada-era5-item-meta">${item.slotLabel || item.slot || item.type || ''}</div>
-        <div class="dada-era5-item-stats">${item.statsText || ''}</div>
-        ${item.equipped ? '<div class="dada-era5-item-equipped">Equipped</div>' : `<button class="dada-era5-item-action" data-era5-equip="${item.instanceId}">Equip</button>`}
-      </div>
-    `).join('');
-    era5StatsEl.innerHTML = era5InventoryState.statsLines.join('<br>');
+    const BAG_GROUPS = [
+      { label: 'Weapons', type: 'weapon' },
+      { label: 'Tools', type: 'tool' },
+      { label: 'Wearables', type: 'armor' },
+    ];
+    era5ItemsEl.innerHTML = BAG_GROUPS.map(({ label, type }) => {
+      const groupItems = era5InventoryState.items.filter((item) => item.type === type);
+      if (groupItems.length === 0) return '';
+      const cards = groupItems.map((item) => `
+        <div class="dada-era5-item rarity-${item.rarity || 'common'}">
+          <div class="dada-era5-item-name">
+            ${item.name}${item.archetype ? `<span class="dada-era5-item-badge">${item.archetype.toUpperCase()}</span>` : ''}
+          </div>
+          ${item.description ? `<div class="dada-era5-item-desc">${item.description}</div>` : ''}
+          ${item.equipped
+            ? '<div class="dada-era5-item-equipped">Active</div>'
+            : `<button class="dada-era5-item-action" data-era5-equip="${item.instanceId}">Equip</button>`}
+        </div>
+      `).join('');
+      return `<div class="dada-era5-item-group"><div class="dada-era5-item-group-label">${label}</div>${cards}</div>`;
+    }).join('');
   }
 
   const canvasEl = document.getElementById('renderCanvas');
@@ -2569,9 +2605,8 @@ export function createUI(uiRoot, options = {}) {
     setEra5InventoryData({
       slots = [],
       items = [],
-      statsLines = [],
     } = {}) {
-      era5InventoryState = { slots, items, statsLines };
+      era5InventoryState = { slots, items };
       renderEra5Inventory();
     },
     showEra5Inventory() {
@@ -2615,7 +2650,7 @@ export function createUI(uiRoot, options = {}) {
       this.updateFlourPuff({ visible: false, remainingMs: 0, totalMs: 6000 });
       this.hideEra5Hud();
       this.hideEra5Inventory();
-      this.setEra5InventoryData({ slots: [], items: [], statsLines: [] });
+      this.setEra5InventoryData({ slots: [], items: [] });
       setEra5ReticleVisible(false);
     },
     showBanner,
