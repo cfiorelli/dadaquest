@@ -183,11 +183,6 @@ function createDeepWaterPocket(scene, def) {
   const SHALLOW_MAX_X = Math.min(INTERIOR_MAX_X - SLOPE_RUN, INTERIOR_MIN_X + SHALLOW_RUN);
   const SLOPE_MAX_X = SHALLOW_MAX_X + SLOPE_RUN;
   const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
-  const EGRESS_OPENING_D = 1.8;
-  const westWallSegmentD = Math.max(0.6, (D - EGRESS_OPENING_D) * 0.5);
-  const westWallSegOffset = (EGRESS_OPENING_D * 0.5) + (westWallSegmentD * 0.5);
-  const westColSegmentD = Math.max(0.4, (INTERIOR_D - EGRESS_OPENING_D) * 0.5);
-  const westColSegOffset = (EGRESS_OPENING_D * 0.5) + (westColSegmentD * 0.5);
 
   const visualMeshes = [];
   const collisionMeshes = [];
@@ -288,8 +283,7 @@ function createDeepWaterPocket(scene, def) {
     { name: 'north', x: 0, z: -(D * 0.5) + (WALL_T * 0.5), width: W, depth: WALL_T },
     { name: 'south', x: 0, z: +(D * 0.5) - (WALL_T * 0.5), width: W, depth: WALL_T },
     { name: 'east', x: +(W * 0.5) - (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
-    { name: 'west_north', x: -(W * 0.5) + (WALL_T * 0.5), z: -westWallSegOffset, width: WALL_T, depth: westWallSegmentD },
-    { name: 'west_south', x: -(W * 0.5) + (WALL_T * 0.5), z: +westWallSegOffset, width: WALL_T, depth: westWallSegmentD },
+    { name: 'west', x: -(W * 0.5) + (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
   ];
   for (const wall of basinWallDefs) {
     const mesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_basin_wall_${wall.name}_vis`, {
@@ -340,27 +334,6 @@ function createDeepWaterPocket(scene, def) {
   deepFloor.material = floorMat;
   tagPoolVisual(deepFloor);
 
-  const egressMat = new BABYLON.StandardMaterial(`${def.name}_egressMat`, scene);
-  egressMat.diffuseColor = new BABYLON.Color3(0.74, 0.82, 0.88);
-  egressMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
-  egressMat.specularColor = new BABYLON.Color3(0.06, 0.07, 0.09);
-  const egressStepDefs = [
-    { name: 'step1', x: INTERIOR_MIN_X + 1.00, y: DECK_Y - 0.40, w: 0.70, h: 0.24, d: EGRESS_OPENING_D - 0.12 },
-    { name: 'step2', x: INTERIOR_MIN_X + 0.62, y: DECK_Y - 0.24, w: 0.62, h: 0.24, d: EGRESS_OPENING_D - 0.12 },
-    { name: 'step3', x: INTERIOR_MIN_X + 0.28, y: DECK_Y - 0.08, w: 0.54, h: 0.24, d: EGRESS_OPENING_D - 0.12 },
-  ];
-  for (const step of egressStepDefs) {
-    const stepMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_egress_${step.name}_vis`, {
-      width: step.w,
-      height: step.h,
-      depth: step.d,
-    }, scene);
-    stepMesh.parent = root;
-    stepMesh.position.set(step.x, step.y, 0);
-    stepMesh.material = egressMat;
-    tagPoolVisual(stepMesh);
-  }
-
   const COPE_W = 0.14;
   const COPE_H = 0.02;
   const copeDefs = [
@@ -384,7 +357,7 @@ function createDeepWaterPocket(scene, def) {
   // 2) Collision geometry (invisible, truth-first)
   // Interior vertical walls: top at water surface so they block side penetration,
   // but never become standable at deck height.
-  const wallColTopY = DECK_Y + 0.65;
+  const wallColTopY = DECK_Y + 1.2;
   const wallColHeight = Math.max(0.2, wallColTopY - BASIN_BOTTOM_Y);
   const wallColCenterY = BASIN_BOTTOM_Y + (wallColHeight * 0.5);
   createPoolCollider(`${def.name}_wall_north_col`, {
@@ -405,23 +378,14 @@ function createDeepWaterPocket(scene, def) {
     y: wallColCenterY,
     z: INTERIOR_MAX_Z - (WALL_COL_T * 0.5),
   }, 'blocker');
-  createPoolCollider(`${def.name}_wall_west_north_col`, {
+  createPoolCollider(`${def.name}_wall_west_col`, {
     width: WALL_COL_T,
     height: wallColHeight,
-    depth: westColSegmentD,
+    depth: INTERIOR_D,
   }, {
     x: INTERIOR_MIN_X + (WALL_COL_T * 0.5),
     y: wallColCenterY,
-    z: -westColSegOffset,
-  }, 'blocker');
-  createPoolCollider(`${def.name}_wall_west_south_col`, {
-    width: WALL_COL_T,
-    height: wallColHeight,
-    depth: westColSegmentD,
-  }, {
-    x: INTERIOR_MIN_X + (WALL_COL_T * 0.5),
-    y: wallColCenterY,
-    z: +westColSegOffset,
+    z: 0,
   }, 'blocker');
   createPoolCollider(`${def.name}_wall_east_col`, {
     width: WALL_COL_T,
@@ -453,18 +417,6 @@ function createDeepWaterPocket(scene, def) {
     y: (DECK_Y - DEEP_DEPTH) + 0.04,
     z: 0,
   }, 'walkable');
-  for (const step of egressStepDefs) {
-    createPoolCollider(`${def.name}_egress_${step.name}_col`, {
-      width: step.w,
-      height: step.h,
-      depth: step.d,
-    }, {
-      x: step.x,
-      y: step.y,
-      z: 0,
-    }, 'walkable');
-  }
-
   // 4) Water surface visual (separate and non-solid)
   const water = BABYLON.MeshBuilder.CreateGround(`${def.name}_water_surface_vis`, {
     width: INTERIOR_W,
