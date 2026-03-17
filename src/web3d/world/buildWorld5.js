@@ -159,76 +159,32 @@ function createCurrentJet(scene, def) {
 }
 
 function createDeepWaterPocket(scene, def) {
-  // Commercial indoor pool — visual basin modelled below deck level while the gameplay
-  // water trigger stays aligned to the basin interior footprint.
   const root = new BABYLON.TransformNode(def.name, scene);
-  root.position.set(def.x, def.y, def.z ?? 0);
+  root.position.set(def.x, 0, def.z ?? 0);
 
   const W = def.w;
   const D = def.d;
   const GRP = 3;
-  const FLOOR_L = -def.y;
+  const DECK_Y = 0;
   const SHALLOW_DEPTH = 0.55;
   const DEEP_DEPTH = 2.25;
-  const BOTTOM_L = FLOOR_L - DEEP_DEPTH;
-  const WATER_L = FLOOR_L - 0.05;
-  const WALL_H = DEEP_DEPTH;
+  const WATER_SURFACE_Y = DECK_Y - 0.05;
+  const BASIN_BOTTOM_Y = DECK_Y - DEEP_DEPTH;
   const WALL_T = 0.12;
-  const COPE_W = 0.15;
-  const COPE_H = 0.02;
-  const COPE_CY = FLOOR_L + (COPE_H * 0.5);
   const INTERIOR_W = W - (WALL_T * 2);
   const INTERIOR_D = D - (WALL_T * 2);
-  const WALL_CY = FLOOR_L - (WALL_H * 0.5);
-  const WATERLINE_H = 0.12;
-  const WATERLINE_CY = WATER_L - 0.03;
   const INTERIOR_MIN_X = -(INTERIOR_W * 0.5);
   const INTERIOR_MAX_X = INTERIOR_W * 0.5;
-  const SHALLOW_RUN = INTERIOR_W * 0.42;
-  const TRANSITION_RUN = Math.max(2.2, INTERIOR_W * 0.18);
-  const TRANSITION_MAX_X = Math.min(INTERIOR_MAX_X - 0.8, INTERIOR_MIN_X + SHALLOW_RUN + TRANSITION_RUN);
-  const SHALLOW_MAX_X = TRANSITION_MAX_X - TRANSITION_RUN;
+  const INTERIOR_MIN_Z = -(INTERIOR_D * 0.5);
+  const INTERIOR_MAX_Z = INTERIOR_D * 0.5;
+  const SHALLOW_RUN = INTERIOR_W * 0.45;
+  const SLOPE_RUN = Math.max(2.1, INTERIOR_W * 0.2);
+  const SHALLOW_MAX_X = Math.min(INTERIOR_MAX_X - SLOPE_RUN, INTERIOR_MIN_X + SHALLOW_RUN);
+  const SLOPE_MAX_X = SHALLOW_MAX_X + SLOPE_RUN;
   const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
-  const swimHalfW = Math.max(0.2, (INTERIOR_W * 0.5) - 0.04);
-  const swimHalfD = Math.max(0.2, (INTERIOR_D * 0.5) - 0.04);
 
-  function getDepthAtWorldX(worldX) {
-    const localX = worldX - def.x;
-    if (localX <= SHALLOW_MAX_X) return SHALLOW_DEPTH;
-    if (localX >= TRANSITION_MAX_X) return DEEP_DEPTH;
-    const t = (localX - SHALLOW_MAX_X) / Math.max(0.0001, TRANSITION_MAX_X - SHALLOW_MAX_X);
-    const eased = t * t;
-    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * eased);
-  }
-
-  function inPocketXZ(pos) {
-    return pos.x >= (def.x - swimHalfW)
-      && pos.x <= (def.x + swimHalfW)
-      && pos.z >= ((def.z ?? 0) - swimHalfD)
-      && pos.z <= ((def.z ?? 0) + swimHalfD);
-  }
-
-  function getWaterStateAtPosition(pos, headY = pos.y) {
-    const waterSurfaceY = def.y + (def.h * 0.5);
-    if (!inPocketXZ(pos)) {
-      return {
-        inDeepWater: false,
-        headSubmerged: false,
-        waterSurfaceY,
-        depthAtX: null,
-      };
-    }
-    const depthAtX = getDepthAtWorldX(pos.x);
-    const inDeepWater = depthAtX >= DEEP_FLOAT_DEPTH_THRESHOLD
-      && pos.y >= (def.y - (def.h * 0.5))
-      && pos.y <= (def.y + (def.h * 0.5));
-    return {
-      inDeepWater,
-      headSubmerged: inDeepWater && headY <= (waterSurfaceY - 0.03),
-      waterSurfaceY,
-      depthAtX,
-    };
-  }
+  const visualMeshes = [];
+  const collisionMeshes = [];
 
   function tagPoolVisual(mesh, { alphaIndex = null } = {}) {
     mesh.renderingGroupId = GRP;
@@ -237,125 +193,148 @@ function createDeepWaterPocket(scene, def) {
     mesh.alwaysSelectAsActiveMesh = true;
     if (Number.isFinite(alphaIndex)) mesh.alphaIndex = alphaIndex;
     markDecor(mesh);
+    visualMeshes.push(mesh);
     return mesh;
   }
 
-  // ── 1. Basin floor profile (shallow shelf + transition + deep end) ──────
-  const poolFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor`, {
-    width: INTERIOR_W,
-    height: 0.06,
-    depth: INTERIOR_D,
-  }, scene);
-  poolFloor.parent = root;
-  poolFloor.position.y = BOTTOM_L + 0.03;
-  const poolFloorMat = new BABYLON.StandardMaterial(`${def.name}_floorMat`, scene);
-  poolFloorMat.diffuseColor = new BABYLON.Color3(0.22, 0.31, 0.38);
-  poolFloorMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
-  poolFloorMat.specularColor = new BABYLON.Color3(0.04, 0.05, 0.06);
-  poolFloor.material = poolFloorMat;
-  tagPoolVisual(poolFloor);
+  function createPoolCollider(name, dims, position, role = 'blocker') {
+    const mesh = BABYLON.MeshBuilder.CreateBox(name, {
+      width: Math.max(0.04, dims.width),
+      height: Math.max(0.04, dims.height),
+      depth: Math.max(0.04, dims.depth),
+    }, scene);
+    mesh.parent = root;
+    mesh.position.set(position.x, position.y, position.z);
+    mesh.visibility = 0;
+    mesh.isPickable = role === 'blocker';
+    mesh.checkCollisions = true;
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      gameplaySurface: role === 'walkable',
+      gameplayBlocker: role === 'blocker',
+      truthRole: role === 'walkable' ? 'walkable' : 'blocker',
+      colliderKind: role,
+      poolCollider: true,
+      poolName: def.name,
+    };
+    collisionMeshes.push(mesh);
+    return mesh;
+  }
 
-  const shallowFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_shallow_floor`, {
-    width: Math.max(1.8, SHALLOW_RUN),
-    height: 0.08,
+  function getDepthAtWorldX(worldX) {
+    const localX = worldX - def.x;
+    if (localX <= SHALLOW_MAX_X) return SHALLOW_DEPTH;
+    if (localX >= SLOPE_MAX_X) return DEEP_DEPTH;
+    const t = (localX - SHALLOW_MAX_X) / Math.max(0.0001, SLOPE_MAX_X - SHALLOW_MAX_X);
+    const eased = t * t;
+    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * eased);
+  }
+
+  function inBasinXZ(pos) {
+    const localX = pos.x - def.x;
+    const localZ = pos.z - (def.z ?? 0);
+    return localX >= INTERIOR_MIN_X
+      && localX <= INTERIOR_MAX_X
+      && localZ >= INTERIOR_MIN_Z
+      && localZ <= INTERIOR_MAX_Z;
+  }
+
+  function getWaterStateAtPosition(pos, headY = pos.y) {
+    if (!inBasinXZ(pos)) {
+      return {
+        inDeepWater: false,
+        headSubmerged: false,
+        waterSurfaceY: WATER_SURFACE_Y,
+        depthAtX: null,
+      };
+    }
+    const depthAtX = getDepthAtWorldX(pos.x);
+    const basinBottomAtX = DECK_Y - depthAtX;
+    const insideWaterColumn = pos.y >= basinBottomAtX && pos.y <= WATER_SURFACE_Y;
+    const inDeepWater = insideWaterColumn && depthAtX >= DEEP_FLOAT_DEPTH_THRESHOLD;
+    return {
+      inDeepWater,
+      headSubmerged: insideWaterColumn && headY <= (WATER_SURFACE_Y - 0.03),
+      waterSurfaceY: WATER_SURFACE_Y,
+      depthAtX,
+    };
+  }
+
+  // 1) Basin/deck visuals
+  const basinWallMat = new BABYLON.StandardMaterial(`${def.name}_basinWallMat`, scene);
+  basinWallMat.diffuseColor = new BABYLON.Color3(0.78, 0.85, 0.89);
+  basinWallMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.09);
+  basinWallMat.specularColor = new BABYLON.Color3(0.08, 0.10, 0.10);
+
+  const floorMat = new BABYLON.StandardMaterial(`${def.name}_basinFloorMat`, scene);
+  floorMat.diffuseColor = new BABYLON.Color3(0.27, 0.36, 0.43);
+  floorMat.emissiveColor = new BABYLON.Color3(0.03, 0.06, 0.08);
+  floorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+
+  const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
+  copeMat.diffuseColor = new BABYLON.Color3(0.88, 0.90, 0.92);
+  copeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
+  copeMat.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+
+  const wallHeightVisual = DEEP_DEPTH;
+  const wallCenterYVisual = DECK_Y - (wallHeightVisual * 0.5);
+  const basinWallDefs = [
+    { name: 'north', x: 0, z: -(D * 0.5) + (WALL_T * 0.5), width: W, depth: WALL_T },
+    { name: 'south', x: 0, z: +(D * 0.5) - (WALL_T * 0.5), width: W, depth: WALL_T },
+    { name: 'east', x: +(W * 0.5) - (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
+    { name: 'west', x: -(W * 0.5) + (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
+  ];
+  for (const wall of basinWallDefs) {
+    const mesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_basin_wall_${wall.name}_vis`, {
+      width: wall.width,
+      height: wallHeightVisual,
+      depth: wall.depth,
+    }, scene);
+    mesh.parent = root;
+    mesh.position.set(wall.x, wallCenterYVisual, wall.z);
+    mesh.material = basinWallMat;
+    tagPoolVisual(mesh);
+  }
+
+  const shallowFloorWidth = Math.max(1.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
+  const shallowFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_shallow_vis`, {
+    width: shallowFloorWidth,
+    height: 0.07,
     depth: INTERIOR_D,
   }, scene);
   shallowFloor.parent = root;
-  shallowFloor.position.set(INTERIOR_MIN_X + (Math.max(1.8, SHALLOW_RUN) * 0.5), FLOOR_L - SHALLOW_DEPTH + 0.04, 0);
-  const shallowFloorMat = new BABYLON.StandardMaterial(`${def.name}_shallowFloorMat`, scene);
-  shallowFloorMat.diffuseColor = new BABYLON.Color3(0.33, 0.42, 0.48);
-  shallowFloorMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.10);
-  shallowFloorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
-  shallowFloor.material = shallowFloorMat;
+  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH + 0.035, 0);
+  shallowFloor.material = floorMat;
   tagPoolVisual(shallowFloor);
 
-  const transitionFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_transition_floor`, {
-    width: TRANSITION_RUN,
-    height: 0.08,
+  const slopeFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_slope_vis`, {
+    width: SLOPE_RUN,
+    height: 0.07,
     depth: INTERIOR_D - 0.04,
   }, scene);
-  transitionFloor.parent = root;
-  transitionFloor.position.set(
-    SHALLOW_MAX_X + (TRANSITION_RUN * 0.5),
-    FLOOR_L - ((SHALLOW_DEPTH + DEEP_DEPTH) * 0.5),
+  slopeFloor.parent = root;
+  slopeFloor.position.set(
+    SHALLOW_MAX_X + (SLOPE_RUN * 0.5),
+    DECK_Y - ((SHALLOW_DEPTH + DEEP_DEPTH) * 0.5),
     0,
   );
-  transitionFloor.rotation.z = -Math.atan((DEEP_DEPTH - SHALLOW_DEPTH) / Math.max(0.001, TRANSITION_RUN));
-  transitionFloor.material = shallowFloorMat;
-  tagPoolVisual(transitionFloor);
+  slopeFloor.rotation.z = -Math.atan((DEEP_DEPTH - SHALLOW_DEPTH) / Math.max(0.001, SLOPE_RUN));
+  slopeFloor.material = floorMat;
+  tagPoolVisual(slopeFloor);
 
-  // ── 2. Lane stripe (one commercial cue) ───────────────────────────────────
-  const laneStripe = BABYLON.MeshBuilder.CreateBox(`${def.name}_lane`, {
-    width: Math.max(2.4, (INTERIOR_W - SHALLOW_RUN) - 0.8),
-    height: 0.04,
-    depth: 0.28,
+  const deepFloorWidth = Math.max(1.2, INTERIOR_MAX_X - SLOPE_MAX_X);
+  const deepFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_deep_vis`, {
+    width: deepFloorWidth,
+    height: 0.07,
+    depth: INTERIOR_D,
   }, scene);
-  laneStripe.parent = root;
-  laneStripe.position.set((SHALLOW_MAX_X + INTERIOR_MAX_X) * 0.5, BOTTOM_L + 0.05, 0);
-  const laneMat = new BABYLON.StandardMaterial(`${def.name}_laneMat`, scene);
-  laneMat.diffuseColor = new BABYLON.Color3(0.08, 0.14, 0.24);
-  laneMat.emissiveColor = new BABYLON.Color3(0.01, 0.02, 0.05);
-  laneStripe.material = laneMat;
-  tagPoolVisual(laneStripe);
+  deepFloor.parent = root;
+  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH + 0.035, 0);
+  deepFloor.material = floorMat;
+  tagPoolVisual(deepFloor);
 
-  // ── 3. Basin walls (pale pool plaster) ────────────────────────────────────
-  const wallMat = new BABYLON.StandardMaterial(`${def.name}_wallMat`, scene);
-  wallMat.diffuseColor = new BABYLON.Color3(0.78, 0.85, 0.89);
-  wallMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.09);
-  wallMat.specularColor = new BABYLON.Color3(0.08, 0.10, 0.10);
-  const wallDefs = [
-    { name: 'north_wall', x: 0, z: -(D * 0.5) + (WALL_T * 0.5), width: W, depth: WALL_T },
-    { name: 'south_wall', x: 0, z: +(D * 0.5) - (WALL_T * 0.5), width: W, depth: WALL_T },
-    { name: 'east_wall', x: +(W * 0.5) - (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
-    { name: 'west_wall', x: -(W * 0.5) + (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
-  ];
-  for (const wallDef of wallDefs) {
-    const wall = BABYLON.MeshBuilder.CreateBox(`${def.name}_${wallDef.name}`, {
-      width: wallDef.width,
-      height: WALL_H,
-      depth: wallDef.depth,
-    }, scene);
-    wall.parent = root;
-    wall.position.set(wallDef.x, WALL_CY, wallDef.z);
-    wall.material = wallMat;
-    tagPoolVisual(wall);
-  }
-
-  // ── 4. Waterline band (commercial pool cue) ───────────────────────────────
-  const wlMat = new BABYLON.StandardMaterial(`${def.name}_wlMat`, scene);
-  wlMat.diffuseColor = new BABYLON.Color3(0.17, 0.33, 0.55);
-  wlMat.emissiveColor = new BABYLON.Color3(0.03, 0.07, 0.12);
-  const bandDefs = [
-    {
-      name: 'north', x: 0, z: -(D * 0.5) + WALL_T + 0.025, width: INTERIOR_W - 0.06, depth: 0.05,
-    },
-    {
-      name: 'south', x: 0, z: +(D * 0.5) - WALL_T - 0.025, width: INTERIOR_W - 0.06, depth: 0.05,
-    },
-    {
-      name: 'east', x: +(W * 0.5) - WALL_T - 0.025, z: 0, width: 0.05, depth: INTERIOR_D - 0.06,
-    },
-    {
-      name: 'west', x: -(W * 0.5) + WALL_T + 0.025, z: 0, width: 0.05, depth: INTERIOR_D - 0.06,
-    },
-  ];
-  for (const bandDef of bandDefs) {
-    const band = BABYLON.MeshBuilder.CreateBox(`${def.name}_waterline_${bandDef.name}`, {
-      width: bandDef.width,
-      height: WATERLINE_H,
-      depth: bandDef.depth,
-    }, scene);
-    band.parent = root;
-    band.position.set(bandDef.x, WATERLINE_CY, bandDef.z);
-    band.material = wlMat;
-    tagPoolVisual(band);
-  }
-
-  // ── 5. Coping (flush institutional border at deck level) ─────────────────
-  const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
-  copeMat.diffuseColor = new BABYLON.Color3(0.87, 0.89, 0.91);
-  copeMat.emissiveColor = new BABYLON.Color3(0.04, 0.04, 0.04);
-  copeMat.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
+  const COPE_W = 0.14;
+  const COPE_H = 0.02;
   const copeDefs = [
     { name: 'north', x: 0, z: -(D * 0.5) - (COPE_W * 0.5), width: W + (COPE_W * 2), depth: COPE_W },
     { name: 'south', x: 0, z: +(D * 0.5) + (COPE_W * 0.5), width: W + (COPE_W * 2), depth: COPE_W },
@@ -363,86 +342,119 @@ function createDeepWaterPocket(scene, def) {
     { name: 'west', x: -(W * 0.5) - (COPE_W * 0.5), z: 0, width: COPE_W, depth: D },
   ];
   for (const copeDef of copeDefs) {
-    const cope = BABYLON.MeshBuilder.CreateBox(`${def.name}_cope_${copeDef.name}`, {
+    const cope = BABYLON.MeshBuilder.CreateBox(`${def.name}_cope_${copeDef.name}_vis`, {
       width: copeDef.width,
       height: COPE_H,
       depth: copeDef.depth,
     }, scene);
     cope.parent = root;
-    cope.position.set(copeDef.x, COPE_CY, copeDef.z);
+    cope.position.set(copeDef.x, DECK_Y + (COPE_H * 0.5), copeDef.z);
     cope.material = copeMat;
     tagPoolVisual(cope);
   }
 
-  // ── 6. Water surface (separate plane, slight motion only) ─────────────────
-  const waterBaseY = WATER_L;
-  const water = BABYLON.MeshBuilder.CreateGround(`${def.name}_water`, {
+  // 2) Collision geometry (invisible, truth-first)
+  // Interior vertical walls: top at water surface so they block side penetration,
+  // but never become standable at deck height.
+  const wallColHeight = Math.max(0.2, WATER_SURFACE_Y - BASIN_BOTTOM_Y);
+  const wallColCenterY = BASIN_BOTTOM_Y + (wallColHeight * 0.5);
+  createPoolCollider(`${def.name}_wall_north_col`, {
+    width: INTERIOR_W,
+    height: wallColHeight,
+    depth: WALL_T,
+  }, {
+    x: 0,
+    y: wallColCenterY,
+    z: INTERIOR_MIN_Z + (WALL_T * 0.5),
+  }, 'blocker');
+  createPoolCollider(`${def.name}_wall_south_col`, {
+    width: INTERIOR_W,
+    height: wallColHeight,
+    depth: WALL_T,
+  }, {
+    x: 0,
+    y: wallColCenterY,
+    z: INTERIOR_MAX_Z - (WALL_T * 0.5),
+  }, 'blocker');
+  createPoolCollider(`${def.name}_wall_west_col`, {
+    width: WALL_T,
+    height: wallColHeight,
+    depth: INTERIOR_D,
+  }, {
+    x: INTERIOR_MIN_X + (WALL_T * 0.5),
+    y: wallColCenterY,
+    z: 0,
+  }, 'blocker');
+  createPoolCollider(`${def.name}_wall_east_col`, {
+    width: WALL_T,
+    height: wallColHeight,
+    depth: INTERIOR_D,
+  }, {
+    x: INTERIOR_MAX_X - (WALL_T * 0.5),
+    y: wallColCenterY,
+    z: 0,
+  }, 'blocker');
+
+  const shallowColWidth = Math.max(0.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
+  createPoolCollider(`${def.name}_floor_shallow_col`, {
+    width: shallowColWidth,
+    height: 0.08,
+    depth: INTERIOR_D,
+  }, {
+    x: INTERIOR_MIN_X + (shallowColWidth * 0.5),
+    y: (DECK_Y - SHALLOW_DEPTH) + 0.04,
+    z: 0,
+  }, 'walkable');
+  const deepColWidth = Math.max(0.6, INTERIOR_MAX_X - SLOPE_MAX_X);
+  createPoolCollider(`${def.name}_floor_deep_col`, {
+    width: deepColWidth,
+    height: 0.08,
+    depth: INTERIOR_D,
+  }, {
+    x: SLOPE_MAX_X + (deepColWidth * 0.5),
+    y: (DECK_Y - DEEP_DEPTH) + 0.04,
+    z: 0,
+  }, 'walkable');
+
+  // 4) Water surface visual (separate and non-solid)
+  const water = BABYLON.MeshBuilder.CreateGround(`${def.name}_water_surface_vis`, {
     width: INTERIOR_W,
     height: INTERIOR_D,
     subdivisions: 1,
   }, scene);
   water.parent = root;
-  water.position.set(0, waterBaseY, 0);
+  water.position.set(0, WATER_SURFACE_Y, 0);
   const waterMat = new BABYLON.StandardMaterial(`${def.name}_waterMat`, scene);
   waterMat.diffuseColor = new BABYLON.Color3(0.14, 0.52, 0.66);
   waterMat.emissiveColor = new BABYLON.Color3(0.03, 0.12, 0.16);
-  waterMat.alpha = 0.65;
+  waterMat.alpha = 0.64;
   waterMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-  waterMat.specularColor = new BABYLON.Color3(0.18, 0.26, 0.30);
+  waterMat.specularColor = new BABYLON.Color3(0.16, 0.22, 0.28);
   waterMat.needDepthPrePass = true;
   water.material = waterMat;
   tagPoolVisual(water, { alphaIndex: 50 });
 
-  // ── 7. Ladder (second commercial cue) ─────────────────────────────────────
-  const ladderMat = new BABYLON.StandardMaterial(`${def.name}_ladderMat`, scene);
-  ladderMat.diffuseColor = new BABYLON.Color3(0.76, 0.79, 0.82);
-  ladderMat.emissiveColor = new BABYLON.Color3(0.08, 0.08, 0.10);
-  ladderMat.specularColor = new BABYLON.Color3(0.52, 0.52, 0.56);
-  const LADDER_X = (W * 0.5) - 0.72;
-  const LADDER_Z = -(D * 0.5) + 0.74;
-  const RAIL_SEP = 0.42;
-  const RAIL_H = 1.02;
-  for (let r = 0; r < 2; r++) {
-    const rail = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_rail${r}`, {
-      height: RAIL_H, diameter: 0.055, tessellation: 8,
-    }, scene);
-    rail.parent = root;
-    rail.position.set(LADDER_X, FLOOR_L - 0.28, LADDER_Z + (r * RAIL_SEP));
-    rail.material = ladderMat;
-    tagPoolVisual(rail);
-  }
-  for (let i = 0; i < 4; i++) {
-    const rungY = FLOOR_L - 0.26 - (i * 0.21);
-    const rung = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_rung${i}`, {
-      height: RAIL_SEP + 0.055, diameter: 0.042, tessellation: 8,
-    }, scene);
-    rung.parent = root;
-    rung.position.set(LADDER_X, rungY, LADDER_Z + (RAIL_SEP * 0.5));
-    rung.rotation.x = Math.PI * 0.5;
-    rung.material = ladderMat;
-    tagPoolVisual(rung);
-  }
-
-    return {
-      ...def,
-      root,
-      contains(pos) {
-        return getWaterStateAtPosition(pos, pos.y).inDeepWater;
-      },
-      getWaterState(pos, headY = pos.y) {
-        return getWaterStateAtPosition(pos, headY);
-      },
-      getExitSpawn() {
-        // West edge of pool (shallow end), standing on the coping at deck level.
-        return {
-          x: def.x - (def.w * 0.5) - 0.6,
-          y: def.y + (def.h * 0.5) + 0.42,
-          z: def.z ?? 0,
-        };
-      },
+  return {
+    ...def,
+    root,
+    visualMeshes,
+    collisionMeshes,
+    contains(pos) {
+      return getWaterStateAtPosition(pos, pos.y).inDeepWater;
+    },
+    getWaterState(pos, headY = pos.y) {
+      return getWaterStateAtPosition(pos, headY);
+    },
+    getExitSpawn() {
+      return {
+        x: def.x - (W * 0.5) - 0.6,
+        y: DECK_Y + 0.42,
+        z: def.z ?? 0,
+      };
+    },
     update(time) {
       waterMat.alpha = 0.62 + (Math.sin((time * 0.80) + this.x * 0.04) * 0.05);
-      water.position.y = waterBaseY + (Math.sin((time * 0.55) + this.x * 0.02) * 0.008);
+      water.position.y = WATER_SURFACE_Y + (Math.sin((time * 0.55) + this.x * 0.02) * 0.008);
     },
   };
 }
@@ -920,6 +932,15 @@ export function buildWorld5(scene, options = {}) {
 
   const currentJets = (LEVEL5.currents || []).map((def) => createCurrentJet(scene, def));
   const deepWaterPockets = (LEVEL5.deepWaterPockets || []).map((def) => createDeepWaterPocket(scene, def));
+  const poolCollisionMeshes = deepWaterPockets.flatMap((pocket) => pocket.collisionMeshes || []);
+  if (poolCollisionMeshes.length > 0) {
+    if (Array.isArray(world.platforms)) {
+      world.platforms.push(...poolCollisionMeshes);
+    }
+    if (Array.isArray(truthColliderMeshes)) {
+      truthColliderMeshes.push(...poolCollisionMeshes);
+    }
+  }
   const airBubblePickups = (LEVEL5.airBubblePickups || []).map((def) => createAirBubblePickup(scene, def));
   const eelRails = (LEVEL5.eelRails || []).map((def) => createEelRail(scene, def));
   const vents = (LEVEL5.vents || []).map((def) => createVent(scene, def));
