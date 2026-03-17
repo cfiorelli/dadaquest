@@ -417,6 +417,36 @@ function createDeepWaterPocket(scene, def) {
     y: (DECK_Y - DEEP_DEPTH) + 0.04,
     z: 0,
   }, 'walkable');
+
+  const stepMat = new BABYLON.StandardMaterial(`${def.name}_stepMat`, scene);
+  stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
+  stepMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
+  stepMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+  const interiorStepDefs = [
+    { name: 'step_1', x: INTERIOR_MIN_X + 1.05, y: DECK_Y - 0.44, w: 0.74, h: 0.20, d: 1.18 },
+    { name: 'step_2', x: INTERIOR_MIN_X + 0.68, y: DECK_Y - 0.27, w: 0.64, h: 0.20, d: 1.12 },
+    { name: 'step_3', x: INTERIOR_MIN_X + 0.36, y: DECK_Y - 0.10, w: 0.56, h: 0.20, d: 1.06 },
+  ];
+  for (const step of interiorStepDefs) {
+    const stepMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_${step.name}_vis`, {
+      width: step.w,
+      height: step.h,
+      depth: step.d,
+    }, scene);
+    stepMesh.parent = root;
+    stepMesh.position.set(step.x, step.y, 0);
+    stepMesh.material = stepMat;
+    tagPoolVisual(stepMesh);
+    createPoolCollider(`${def.name}_${step.name}_col`, {
+      width: step.w,
+      height: step.h,
+      depth: step.d,
+    }, {
+      x: step.x,
+      y: step.y,
+      z: 0,
+    }, 'walkable');
+  }
   // 4) Water surface visual (separate and non-solid)
   const water = BABYLON.MeshBuilder.CreateGround(`${def.name}_water_surface_vis`, {
     width: INTERIOR_W,
