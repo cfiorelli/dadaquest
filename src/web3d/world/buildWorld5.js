@@ -355,13 +355,11 @@ function createDeepWaterPocket(scene, def) {
   }
 
   // 2) Collision geometry (invisible, truth-first)
-  // Interior vertical walls: top at water surface so they block side penetration,
-  // but never become standable at deck height.
-  const wallColTopY = DECK_Y + 1.2;
+  // Wall colliders: exterior face, top just above deck so deck-level players are blocked
+  // but players cannot be pushed above deck by the wall top.
+  const wallColTopY = DECK_Y + 0.01; // 1cm above deck — blocks entry but not climbable
   const wallColHeight = Math.max(0.2, wallColTopY - BASIN_BOTTOM_Y);
   const wallColCenterY = BASIN_BOTTOM_Y + (wallColHeight * 0.5);
-  // Wall colliders centered on the EXTERIOR face of each visible wall (not the interior face).
-  // Using exterior face ensures the player is blocked at the outer visible surface.
   createPoolCollider(`${def.name}_wall_north_col`, {
     width: INTERIOR_W,
     height: wallColHeight,
@@ -399,37 +397,30 @@ function createDeepWaterPocket(scene, def) {
     z: 0,
   }, 'blocker');
 
-  const shallowColWidth = Math.max(0.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
-  createPoolCollider(`${def.name}_floor_shallow_col`, {
-    width: shallowColWidth,
-    height: 0.08,
-    depth: INTERIOR_D,
-  }, {
-    x: INTERIOR_MIN_X + (shallowColWidth * 0.5),
-    y: (DECK_Y - SHALLOW_DEPTH) + 0.04,
-    z: 0,
-  }, 'walkable');
-  const deepColWidth = Math.max(0.6, INTERIOR_MAX_X - SLOPE_MAX_X);
-  createPoolCollider(`${def.name}_floor_deep_col`, {
-    width: deepColWidth,
-    height: 0.08,
-    depth: INTERIOR_D,
-  }, {
-    x: SLOPE_MAX_X + (deepColWidth * 0.5),
-    y: (DECK_Y - DEEP_DEPTH) + 0.04,
-    z: 0,
-  }, 'walkable');
-  // Ramp zone bridge: AABB system cannot walk a slope; this flat box at deep-floor height
-  // prevents fall-through into the hazard zone. Swim physics handle vertical in water.
-  createPoolCollider(`${def.name}_ramp_col`, {
-    width: SLOPE_RUN,
-    height: 0.08,
-    depth: INTERIOR_D,
-  }, {
-    x: SHALLOW_MAX_X + (SLOPE_RUN * 0.5),
-    y: (DECK_Y - DEEP_DEPTH) + 0.04,
-    z: 0,
-  }, 'walkable');
+  // Basin floors: authored surfaces in level5.js (pool_shallow_floor, pool_deep_floor)
+  // already provide floor collision at the correct world positions and heights.
+  // We do NOT add duplicate floor_shallow_col / floor_deep_col here — they were at
+  // wrong heights (+0.04 center offset made maxY 0.08 units too high vs. authored top).
+
+  // Ramp zone stepped colliders (world x=[36, 38.364], local x=[0, SLOPE_MAX_X]).
+  // The 1.70-unit cliff between shallow authored floor (-0.55) and deep authored floor
+  // (-2.25) at x=36 causes a fall. Break it into N equal steps so the descent is gradual.
+  // AABB has no step-up; player descends via gravity between steps; ascending is via swim.
+  const RAMP_STEPS = 6;
+  const rampSliceW = SLOPE_MAX_X / RAMP_STEPS; // local width per step
+  for (let i = 0; i < RAMP_STEPS; i++) {
+    const t = (i + 0.5) / RAMP_STEPS; // midpoint t in [0,1]
+    const topY = DECK_Y - (SHALLOW_DEPTH + (DEEP_DEPTH - SHALLOW_DEPTH) * t);
+    createPoolCollider(`${def.name}_ramp_step_${i}_col`, {
+      width: rampSliceW,
+      height: 0.08,
+      depth: INTERIOR_D,
+    }, {
+      x: (i + 0.5) * rampSliceW, // local x center (0..SLOPE_MAX_X range)
+      y: topY - 0.04, // center = top - half-height
+      z: 0,
+    }, 'walkable');
+  }
 
   const stepMat = new BABYLON.StandardMaterial(`${def.name}_stepMat`, scene);
   stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
