@@ -277,8 +277,11 @@ function createDeepWaterPocket(scene, def) {
   copeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
   copeMat.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
 
-  const wallHeightVisual = DEEP_DEPTH;
-  const wallCenterYVisual = DECK_Y - (wallHeightVisual * 0.5);
+  // Wall visual top aligned with the styled-slab visual top (~DECK_Y - 0.05) so the
+  // basin walls do not protrude above the visible deck surface.
+  const WALL_VIS_TOP_Y = DECK_Y - 0.05;
+  const wallHeightVisual = WALL_VIS_TOP_Y - BASIN_BOTTOM_Y;    // 2.20
+  const wallCenterYVisual = (WALL_VIS_TOP_Y + BASIN_BOTTOM_Y) * 0.5; // -1.15
   const basinWallDefs = [
     { name: 'north', x: 0, z: -(D * 0.5) + (WALL_T * 0.5), width: W, depth: WALL_T },
     { name: 'south', x: 0, z: +(D * 0.5) - (WALL_T * 0.5), width: W, depth: WALL_T },
@@ -300,11 +303,11 @@ function createDeepWaterPocket(scene, def) {
   const shallowFloorWidth = Math.max(1.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
   const shallowFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_shallow_vis`, {
     width: shallowFloorWidth,
-    height: 0.07,
+    height: 0.22,
     depth: INTERIOR_D,
   }, scene);
   shallowFloor.parent = root;
-  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH + 0.035, 0);
+  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH - 0.11, 0);
   shallowFloor.material = floorMat;
   tagPoolVisual(shallowFloor);
 
@@ -326,11 +329,11 @@ function createDeepWaterPocket(scene, def) {
   const deepFloorWidth = Math.max(1.2, INTERIOR_MAX_X - SLOPE_MAX_X);
   const deepFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_deep_vis`, {
     width: deepFloorWidth,
-    height: 0.07,
+    height: 0.22,
     depth: INTERIOR_D,
   }, scene);
   deepFloor.parent = root;
-  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH + 0.035, 0);
+  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH - 0.11, 0);
   deepFloor.material = floorMat;
   tagPoolVisual(deepFloor);
 
