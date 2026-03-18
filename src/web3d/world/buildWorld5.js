@@ -266,55 +266,76 @@ function createDeepWaterPocket(scene, def) {
   basinWallMat.diffuseColor = new BABYLON.Color3(0.78, 0.85, 0.89);
   basinWallMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.09);
   basinWallMat.specularColor = new BABYLON.Color3(0.08, 0.10, 0.10);
+  basinWallMat.backFaceCulling = true;
 
   const floorMat = new BABYLON.StandardMaterial(`${def.name}_basinFloorMat`, scene);
   floorMat.diffuseColor = new BABYLON.Color3(0.27, 0.36, 0.43);
   floorMat.emissiveColor = new BABYLON.Color3(0.03, 0.06, 0.08);
   floorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+  floorMat.backFaceCulling = false;
 
   const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
   copeMat.diffuseColor = new BABYLON.Color3(0.88, 0.90, 0.92);
   copeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
   copeMat.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
 
-  // Wall visual top aligned with the styled-slab visual top (~DECK_Y - 0.05) so the
-  // basin walls do not protrude above the visible deck surface.
+  // Interior-only basin walls (planes): remove visible exterior shell thickness.
   const WALL_VIS_TOP_Y = DECK_Y - 0.05;
-  const wallHeightVisual = WALL_VIS_TOP_Y - BASIN_BOTTOM_Y;    // 2.20
-  const wallCenterYVisual = (WALL_VIS_TOP_Y + BASIN_BOTTOM_Y) * 0.5; // -1.15
-  const basinWallDefs = [
-    { name: 'north', x: 0, z: -(D * 0.5) + (WALL_T * 0.5), width: W, depth: WALL_T },
-    { name: 'south', x: 0, z: +(D * 0.5) - (WALL_T * 0.5), width: W, depth: WALL_T },
-    { name: 'east', x: +(W * 0.5) - (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
-    { name: 'west', x: -(W * 0.5) + (WALL_T * 0.5), z: 0, width: WALL_T, depth: D },
-  ];
-  for (const wall of basinWallDefs) {
-    const mesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_basin_wall_${wall.name}_vis`, {
-      width: wall.width,
-      height: wallHeightVisual,
-      depth: wall.depth,
-    }, scene);
-    mesh.parent = root;
-    mesh.position.set(wall.x, wallCenterYVisual, wall.z);
-    mesh.material = basinWallMat;
-    tagPoolVisual(mesh);
-  }
+  const wallHeightVisual = WALL_VIS_TOP_Y - BASIN_BOTTOM_Y;
+  const wallCenterYVisual = (WALL_VIS_TOP_Y + BASIN_BOTTOM_Y) * 0.5;
+  const northWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_north_vis`, {
+    width: INTERIOR_W,
+    height: wallHeightVisual,
+  }, scene);
+  northWall.parent = root;
+  northWall.position.set(0, wallCenterYVisual, INTERIOR_MIN_Z + 0.01);
+  northWall.material = basinWallMat;
+  tagPoolVisual(northWall);
+
+  const southWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_vis`, {
+    width: INTERIOR_W,
+    height: wallHeightVisual,
+  }, scene);
+  southWall.parent = root;
+  southWall.position.set(0, wallCenterYVisual, INTERIOR_MAX_Z - 0.01);
+  southWall.rotation.y = Math.PI;
+  southWall.material = basinWallMat;
+  tagPoolVisual(southWall);
+
+  const westWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_west_vis`, {
+    width: INTERIOR_D,
+    height: wallHeightVisual,
+  }, scene);
+  westWall.parent = root;
+  westWall.position.set(INTERIOR_MIN_X + 0.01, wallCenterYVisual, 0);
+  westWall.rotation.y = -Math.PI * 0.5;
+  westWall.material = basinWallMat;
+  tagPoolVisual(westWall);
+
+  const eastWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_east_vis`, {
+    width: INTERIOR_D,
+    height: wallHeightVisual,
+  }, scene);
+  eastWall.parent = root;
+  eastWall.position.set(INTERIOR_MAX_X - 0.01, wallCenterYVisual, 0);
+  eastWall.rotation.y = Math.PI * 0.5;
+  eastWall.material = basinWallMat;
+  tagPoolVisual(eastWall);
 
   const shallowFloorWidth = Math.max(1.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
-  const shallowFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_shallow_vis`, {
+  const shallowFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_shallow_vis`, {
     width: shallowFloorWidth,
-    height: 0.22,
-    depth: INTERIOR_D,
+    height: INTERIOR_D,
+    subdivisions: 1,
   }, scene);
   shallowFloor.parent = root;
-  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH - 0.11, 0);
+  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH, 0);
   shallowFloor.material = floorMat;
   tagPoolVisual(shallowFloor);
 
-  const slopeFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_slope_vis`, {
+  const slopeFloor = BABYLON.MeshBuilder.CreatePlane(`${def.name}_floor_slope_vis`, {
     width: SLOPE_RUN,
-    height: 0.07,
-    depth: INTERIOR_D - 0.04,
+    height: INTERIOR_D - 0.04,
   }, scene);
   slopeFloor.parent = root;
   slopeFloor.position.set(
@@ -327,13 +348,13 @@ function createDeepWaterPocket(scene, def) {
   tagPoolVisual(slopeFloor);
 
   const deepFloorWidth = Math.max(1.2, INTERIOR_MAX_X - SLOPE_MAX_X);
-  const deepFloor = BABYLON.MeshBuilder.CreateBox(`${def.name}_floor_deep_vis`, {
+  const deepFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_deep_vis`, {
     width: deepFloorWidth,
-    height: 0.22,
-    depth: INTERIOR_D,
+    height: INTERIOR_D,
+    subdivisions: 1,
   }, scene);
   deepFloor.parent = root;
-  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH - 0.11, 0);
+  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH, 0);
   deepFloor.material = floorMat;
   tagPoolVisual(deepFloor);
 
