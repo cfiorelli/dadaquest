@@ -162,27 +162,19 @@ function createDeepWaterPocket(scene, def) {
   const root = new BABYLON.TransformNode(def.name, scene);
   root.position.set(def.x, 0, def.z ?? 0);
 
-  const W = def.w;
-  const D = def.d;
+  const W = def.w;   // 16.00
+  const D = def.d;   // 8.00
   const GRP = 3;
   const DECK_Y = 0;
-  const SHALLOW_DEPTH = 0.55;
-  const DEEP_DEPTH = 2.25;
+  const SHALLOW_DEPTH = 0.70;   // shallow floor top at Y -0.70
+  const DEEP_DEPTH = 1.70;      // deep floor top at Y -1.70
   const WATER_SURFACE_Y = DECK_Y - 0.05;
-  const BASIN_BOTTOM_Y = DECK_Y - DEEP_DEPTH;
-  const WALL_T = 0.12;
-  const WALL_COL_T = 0.28;
-  const INTERIOR_W = W - (WALL_T * 2);
-  const INTERIOR_D = D - (WALL_T * 2);
-  const INTERIOR_MIN_X = -(INTERIOR_W * 0.5);
-  const INTERIOR_MAX_X = INTERIOR_W * 0.5;
-  const INTERIOR_MIN_Z = -(INTERIOR_D * 0.5);
-  const INTERIOR_MAX_Z = INTERIOR_D * 0.5;
-  const SHALLOW_RUN = INTERIOR_W * 0.45;
-  const SLOPE_RUN = Math.max(2.1, INTERIOR_W * 0.2);
-  const SHALLOW_MAX_X = Math.min(INTERIOR_MAX_X - SLOPE_RUN, INTERIOR_MIN_X + SHALLOW_RUN);
-  const SLOPE_MAX_X = SHALLOW_MAX_X + SLOPE_RUN;
   const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
+
+  // Depth axis is Z (north = shallow, south = deep).
+  // Transition zone: world Z 28.90 → 30.85. In local Z: SHALLOW_MAX_LZ=-1.10, SLOPE_MAX_LZ=0.85.
+  const SHALLOW_MAX_LZ = 28.90 - (def.z ?? 0);  // -1.10 for def.z=30
+  const SLOPE_MAX_LZ   = 30.85 - (def.z ?? 0);  //  0.85
 
   const visualMeshes = [];
   const collisionMeshes = [];
@@ -222,22 +214,18 @@ function createDeepWaterPocket(scene, def) {
     return mesh;
   }
 
-  function getDepthAtWorldX(worldX) {
-    const localX = worldX - def.x;
-    if (localX <= SHALLOW_MAX_X) return SHALLOW_DEPTH;
-    if (localX >= SLOPE_MAX_X) return DEEP_DEPTH;
-    const t = (localX - SHALLOW_MAX_X) / Math.max(0.0001, SLOPE_MAX_X - SHALLOW_MAX_X);
-    const eased = t * t;
-    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * eased);
+  // Depth axis is Z: shallow near north (-Z local), deep near south (+Z local).
+  function getDepthAtWorldZ(worldZ) {
+    const localZ = worldZ - (def.z ?? 0);
+    if (localZ <= SHALLOW_MAX_LZ) return SHALLOW_DEPTH;
+    if (localZ >= SLOPE_MAX_LZ)   return DEEP_DEPTH;
+    const t = (localZ - SHALLOW_MAX_LZ) / (SLOPE_MAX_LZ - SHALLOW_MAX_LZ);
+    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * t * t);
   }
 
+  // Water logic volume: X half-extent 7.80, Z half-extent 3.80 (spec C).
   function inBasinXZ(pos) {
-    const localX = pos.x - def.x;
-    const localZ = pos.z - (def.z ?? 0);
-    return localX >= INTERIOR_MIN_X
-      && localX <= INTERIOR_MAX_X
-      && localZ >= INTERIOR_MIN_Z
-      && localZ <= INTERIOR_MAX_Z;
+    return Math.abs(pos.x - def.x) <= 7.80 && Math.abs(pos.z - (def.z ?? 0)) <= 3.80;
   }
 
   function getWaterStateAtPosition(pos, headY = pos.y) {
@@ -246,18 +234,18 @@ function createDeepWaterPocket(scene, def) {
         inDeepWater: false,
         headSubmerged: false,
         waterSurfaceY: WATER_SURFACE_Y,
-        depthAtX: null,
+        depthAtZ: null,
       };
     }
-    const depthAtX = getDepthAtWorldX(pos.x);
-    const basinBottomAtX = DECK_Y - depthAtX;
-    const insideWaterColumn = pos.y >= basinBottomAtX && pos.y <= WATER_SURFACE_Y;
-    const inDeepWater = insideWaterColumn && depthAtX >= DEEP_FLOAT_DEPTH_THRESHOLD;
+    const depthAtZ = getDepthAtWorldZ(pos.z);
+    const basinBottomAtZ = DECK_Y - depthAtZ;
+    const insideWaterColumn = pos.y >= basinBottomAtZ && pos.y <= WATER_SURFACE_Y;
+    const inDeepWater = insideWaterColumn && depthAtZ >= DEEP_FLOAT_DEPTH_THRESHOLD;
     return {
       inDeepWater,
       headSubmerged: insideWaterColumn && headY <= (WATER_SURFACE_Y - 0.03),
       waterSurfaceY: WATER_SURFACE_Y,
-      depthAtX,
+      depthAtZ,
     };
   }
 
@@ -279,216 +267,104 @@ function createDeepWaterPocket(scene, def) {
   copeMat.emissiveColor = new BABYLON.Color3(0.03, 0.03, 0.03);
   copeMat.specularColor = new BABYLON.Color3(0.08, 0.08, 0.08);
 
-  // Interior-only basin walls (planes): remove visible exterior shell thickness.
-  const WALL_VIS_TOP_Y = DECK_Y - 0.05;
-  const wallHeightVisual = WALL_VIS_TOP_Y - BASIN_BOTTOM_Y;
-  const wallCenterYVisual = (WALL_VIS_TOP_Y + BASIN_BOTTOM_Y) * 0.5;
-  const northWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_north_vis`, {
-    width: INTERIOR_W,
-    height: wallHeightVisual,
-  }, scene);
-  northWall.parent = root;
-  northWall.position.set(0, wallCenterYVisual, INTERIOR_MIN_Z + 0.01);
-  northWall.material = basinWallMat;
-  tagPoolVisual(northWall);
-
-  const southWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_vis`, {
-    width: INTERIOR_W,
-    height: wallHeightVisual,
-  }, scene);
-  southWall.parent = root;
-  southWall.position.set(0, wallCenterYVisual, INTERIOR_MAX_Z - 0.01);
-  southWall.rotation.y = Math.PI;
-  southWall.material = basinWallMat;
-  tagPoolVisual(southWall);
-
-  const westWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_west_vis`, {
-    width: INTERIOR_D,
-    height: wallHeightVisual,
-  }, scene);
-  westWall.parent = root;
-  westWall.position.set(INTERIOR_MIN_X + 0.01, wallCenterYVisual, 0);
-  westWall.rotation.y = -Math.PI * 0.5;
-  westWall.material = basinWallMat;
-  tagPoolVisual(westWall);
-
-  const eastWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_east_vis`, {
-    width: INTERIOR_D,
-    height: wallHeightVisual,
-  }, scene);
-  eastWall.parent = root;
-  eastWall.position.set(INTERIOR_MAX_X - 0.01, wallCenterYVisual, 0);
-  eastWall.rotation.y = Math.PI * 0.5;
-  eastWall.material = basinWallMat;
-  tagPoolVisual(eastWall);
-
-  const shallowFloorWidth = Math.max(1.6, SHALLOW_MAX_X - INTERIOR_MIN_X);
-  const shallowFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_shallow_vis`, {
-    width: shallowFloorWidth,
-    height: INTERIOR_D,
-    subdivisions: 1,
-  }, scene);
-  shallowFloor.parent = root;
-  shallowFloor.position.set(INTERIOR_MIN_X + (shallowFloorWidth * 0.5), DECK_Y - SHALLOW_DEPTH, 0);
-  shallowFloor.material = floorMat;
-  tagPoolVisual(shallowFloor);
-
-  const slopeFloor = BABYLON.MeshBuilder.CreatePlane(`${def.name}_floor_slope_vis`, {
-    width: SLOPE_RUN,
-    height: INTERIOR_D - 0.04,
-  }, scene);
-  slopeFloor.parent = root;
-  slopeFloor.position.set(
-    SHALLOW_MAX_X + (SLOPE_RUN * 0.5),
-    DECK_Y - ((SHALLOW_DEPTH + DEEP_DEPTH) * 0.5),
-    0,
-  );
-  slopeFloor.rotation.z = -Math.atan((DEEP_DEPTH - SHALLOW_DEPTH) / Math.max(0.001, SLOPE_RUN));
-  slopeFloor.material = floorMat;
-  tagPoolVisual(slopeFloor);
-
-  const deepFloorWidth = Math.max(1.2, INTERIOR_MAX_X - SLOPE_MAX_X);
-  const deepFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_deep_vis`, {
-    width: deepFloorWidth,
-    height: INTERIOR_D,
-    subdivisions: 1,
-  }, scene);
-  deepFloor.parent = root;
-  deepFloor.position.set(SLOPE_MAX_X + (deepFloorWidth * 0.5), DECK_Y - DEEP_DEPTH, 0);
-  deepFloor.material = floorMat;
-  tagPoolVisual(deepFloor);
-
-  const COPE_W = 0.14;
-  const COPE_H = 0.02;
-  const copeDefs = [
-    { name: 'north', x: 0, z: -(D * 0.5) - (COPE_W * 0.5), width: W + (COPE_W * 2), depth: COPE_W },
-    { name: 'south', x: 0, z: +(D * 0.5) + (COPE_W * 0.5), width: W + (COPE_W * 2), depth: COPE_W },
-    { name: 'east', x: +(W * 0.5) + (COPE_W * 0.5), z: 0, width: COPE_W, depth: D },
-    { name: 'west', x: -(W * 0.5) - (COPE_W * 0.5), z: 0, width: COPE_W, depth: D },
+  // ── A1. Coping / rim (4 pieces, flush with deck, local coords relative to root) ──
+  // Spec world positions → local = world - (def.x, 0, def.z).
+  const copingDefs = [
+    { name: 'north', lx:   0,      lz: -3.925, width: 16.00, depth: 0.15 },
+    { name: 'south', lx:   0,      lz:  3.925, width: 16.00, depth: 0.15 },
+    { name: 'west',  lx: -7.925,   lz:  0,     width:  0.15, depth: 8.00 },
+    { name: 'east',  lx:  7.925,   lz:  0,     width:  0.15, depth: 8.00 },
   ];
-  for (const copeDef of copeDefs) {
-    const cope = BABYLON.MeshBuilder.CreateBox(`${def.name}_cope_${copeDef.name}_vis`, {
-      width: copeDef.width,
-      height: COPE_H,
-      depth: copeDef.depth,
+  for (const cd of copingDefs) {
+    const cope = BABYLON.MeshBuilder.CreateBox(`${def.name}_cope_${cd.name}_vis`, {
+      width: cd.width, height: 0.03, depth: cd.depth,
     }, scene);
     cope.parent = root;
-    cope.position.set(copeDef.x, DECK_Y + (COPE_H * 0.5), copeDef.z);
+    cope.position.set(cd.lx, DECK_Y + 0.015, cd.lz);
     cope.material = copeMat;
     tagPoolVisual(cope);
   }
 
-  // 2) Collision geometry (invisible, truth-first)
-  // Recessed-pool model: NO above-ground exterior wall collision.
-  // Interior basin walls only — block players from swimming through the basin walls
-  // from inside the pool. Deck-level players skip these entirely.
-  //
-  // Single lower band Y=[BASIN_BOTTOM_Y, DECK_Y-0.01]:
-  //   - Pool players (pMinY < -0.01) overlap → pushed back horizontally. ✓
-  //   - Deck players (pMinY = 0.005 ≥ maxY = -0.01) skip → deck freely walkable. ✓
-  //   - No hi_col upper band: no above-ground exterior wall needed for a hole-in-floor pool.
-  const BASIN_WALL_COL_MIN_Y = BASIN_BOTTOM_Y;  // -2.25
-  const BASIN_WALL_COL_MAX_Y = DECK_Y - 0.01;   // -0.01
-  const BASIN_WALL_COL_H  = BASIN_WALL_COL_MAX_Y - BASIN_WALL_COL_MIN_Y; // 2.24
-  const BASIN_WALL_COL_CY = (BASIN_WALL_COL_MIN_Y + BASIN_WALL_COL_MAX_Y) * 0.5; // -1.13
+  // ── A2. Interior basin walls (inward-facing planes) ──────────────────────
+  // North wall: world X 36, Y -0.35, Z 26.05 → local (0, -0.35, -3.95), span X 15.90, H 0.70, face +Z
+  const northWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_north_vis`, {
+    width: 15.90, height: 0.70,
+  }, scene);
+  northWall.parent = root;
+  northWall.position.set(0, -0.35, -3.95);
+  // Default Babylon plane normal is +Z — visible from inside (player is south of north wall).
+  northWall.material = basinWallMat;
+  tagPoolVisual(northWall);
 
-  function createBasinWall(baseName, dims, posXZ) {
-    createPoolCollider(`${baseName}_col`, {
-      width: dims.width, height: BASIN_WALL_COL_H, depth: dims.depth,
-    }, { x: posXZ.x, y: BASIN_WALL_COL_CY, z: posXZ.z }, 'blocker');
-  }
+  // South wall: world X 36, Y -0.85, Z 33.95 → local (0, -0.85, 3.95), span X 15.90, H 1.70, face -Z
+  const southWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_vis`, {
+    width: 15.90, height: 1.70,
+  }, scene);
+  southWall.parent = root;
+  southWall.position.set(0, -0.85, 3.95);
+  southWall.rotation.y = Math.PI;  // face -Z (inward)
+  southWall.material = basinWallMat;
+  tagPoolVisual(southWall);
 
-  // West wall split into north/south with a 2 m stair opening centered at z=0.
-  // The gap aligns with the exit stair hidden colliders below.
-  const STAIR_GAP_HALF_Z = 1.0;
-  const westSecDepth = (INTERIOR_D * 0.5) - STAIR_GAP_HALF_Z;
-  const westSecCenterZ = STAIR_GAP_HALF_Z + (westSecDepth * 0.5);
+  // West wall: world X 28.05, Y -0.85, Z 30 → local (-7.95, -0.85, 0), span Z 7.90, H 1.70, face +X
+  const westWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_west_vis`, {
+    width: 7.90, height: 1.70,
+  }, scene);
+  westWall.parent = root;
+  westWall.position.set(-7.95, -0.85, 0);
+  westWall.rotation.y = -Math.PI * 0.5;  // face +X (inward)
+  westWall.material = basinWallMat;
+  tagPoolVisual(westWall);
 
-  createBasinWall(`${def.name}_wall_north`, { width: INTERIOR_W, depth: WALL_COL_T },
-    { x: 0, z: -(D * 0.5) + (WALL_COL_T * 0.5) });
-  createBasinWall(`${def.name}_wall_south`, { width: INTERIOR_W, depth: WALL_COL_T },
-    { x: 0, z: +(D * 0.5) - (WALL_COL_T * 0.5) });
-  createBasinWall(`${def.name}_wall_west_north`, { width: WALL_COL_T, depth: westSecDepth },
-    { x: -(W * 0.5) + (WALL_COL_T * 0.5), z: -westSecCenterZ });
-  createBasinWall(`${def.name}_wall_west_south`, { width: WALL_COL_T, depth: westSecDepth },
-    { x: -(W * 0.5) + (WALL_COL_T * 0.5), z: +westSecCenterZ });
-  createBasinWall(`${def.name}_wall_east`, { width: WALL_COL_T, depth: INTERIOR_D },
-    { x: +(W * 0.5) - (WALL_COL_T * 0.5), z: 0 });
+  // East wall: world X 43.95, Y -0.85, Z 30 → local (7.95, -0.85, 0), span Z 7.90, H 1.70, face -X
+  const eastWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_east_vis`, {
+    width: 7.90, height: 1.70,
+  }, scene);
+  eastWall.parent = root;
+  eastWall.position.set(7.95, -0.85, 0);
+  eastWall.rotation.y = Math.PI * 0.5;  // face -X (inward)
+  eastWall.material = basinWallMat;
+  tagPoolVisual(eastWall);
 
-  // Basin floors: authored surfaces in level5.js (pool_shallow_floor, pool_deep_floor)
-  // already provide floor collision at the correct world positions and heights.
-  // We do NOT add duplicate floor_shallow_col / floor_deep_col here — they were at
-  // wrong heights (+0.04 center offset made maxY 0.08 units too high vs. authored top).
+  // ── A3. Floor surfaces ────────────────────────────────────────────────────
+  // Shallow floor: world X 36, Y -0.70, Z 27.975 → local (0, -0.70, -2.025), size X 15.90, Z 1.85
+  const shallowFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_shallow_vis`, {
+    width: 15.90, height: 1.85, subdivisions: 1,
+  }, scene);
+  shallowFloor.parent = root;
+  shallowFloor.position.set(0, -SHALLOW_DEPTH, -2.025);
+  shallowFloor.material = floorMat;
+  tagPoolVisual(shallowFloor);
 
-  // Ramp zone stepped colliders (world x=[36, 38.364], local x=[0, SLOPE_MAX_X]).
-  // The 1.70-unit cliff between shallow authored floor (-0.55) and deep authored floor
-  // (-2.25) at x=36 causes a fall. Break it into N equal steps so the descent is gradual.
-  // AABB has no step-up; player descends via gravity between steps; ascending is via swim.
-  const RAMP_STEPS = 6;
-  const rampSliceW = SLOPE_MAX_X / RAMP_STEPS; // local width per step
-  for (let i = 0; i < RAMP_STEPS; i++) {
-    const t = (i + 0.5) / RAMP_STEPS; // midpoint t in [0,1]
-    const topY = DECK_Y - (SHALLOW_DEPTH + (DEEP_DEPTH - SHALLOW_DEPTH) * t);
-    createPoolCollider(`${def.name}_ramp_step_${i}_col`, {
-      width: rampSliceW,
-      height: 0.08,
-      depth: INTERIOR_D,
-    }, {
-      x: (i + 0.5) * rampSliceW, // local x center (0..SLOPE_MAX_X range)
-      y: topY - 0.04, // center = top - half-height
-      z: 0,
-    }, 'walkable');
-  }
+  // Transition slope: north edge world Z 28.90 Y -0.70, south edge world Z 30.85 Y -1.70, width X 15.90.
+  // Local center: z = (28.90+30.85)/2 - 30 = -0.125, y = (-0.70+-1.70)/2 = -1.20
+  // Slope runs along Z (+Z = south = downhill). Hypotenuse length and X-axis tilt.
+  const slopeZRun = 1.95;  // 30.85 - 28.90
+  const slopeYDrop = DEEP_DEPTH - SHALLOW_DEPTH;  // 1.00
+  const slopeLen = Math.sqrt(slopeZRun * slopeZRun + slopeYDrop * slopeYDrop);
+  const slopeFloor = BABYLON.MeshBuilder.CreatePlane(`${def.name}_floor_slope_vis`, {
+    width: 15.90, height: slopeLen,
+  }, scene);
+  slopeFloor.parent = root;
+  slopeFloor.position.set(0, -1.20, -0.125);
+  // Rotate around X so south end (+Z) goes down: positive rotation.x tilts +Z side downward.
+  slopeFloor.rotation.x = Math.atan2(slopeYDrop, slopeZRun);
+  slopeFloor.material = floorMat;
+  tagPoolVisual(slopeFloor);
 
-  const stepMat = new BABYLON.StandardMaterial(`${def.name}_stepMat`, scene);
-  stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
-  stepMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
-  stepMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
-  const interiorStepDefs = [
-    { name: 'step_1', x: INTERIOR_MIN_X + 1.05, y: DECK_Y - 0.44, w: 0.74, h: 0.20, d: 1.18 },
-    { name: 'step_2', x: INTERIOR_MIN_X + 0.68, y: DECK_Y - 0.27, w: 0.64, h: 0.20, d: 1.12 },
-    { name: 'step_3', x: INTERIOR_MIN_X + 0.36, y: DECK_Y - 0.10, w: 0.56, h: 0.20, d: 1.06 },
-  ];
-  for (const step of interiorStepDefs) {
-    const stepMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_${step.name}_vis`, {
-      width: step.w,
-      height: step.h,
-      depth: step.d,
-    }, scene);
-    stepMesh.parent = root;
-    stepMesh.position.set(step.x, step.y, 0);
-    stepMesh.material = stepMat;
-    tagPoolVisual(stepMesh);
-  }
-  // Hidden walkable stair colliders — 10 equal steps replacing the 3 visible-step colliders.
-  // Rise per step = SHALLOW_DEPTH / 10 = 0.055 m. At MAX_SPEED=6.4 m/s @ 60 fps,
-  // one-frame x-travel = 0.107 m > overlapTop = rise − SKIN_WIDTH = 0.050 m, so AABB
-  // floor-detection (overlapTop wins) fires reliably on each step without a step-up mechanism.
-  // Depth = 1.8 m fits inside the 2 m west-wall gap (STAIR_GAP_HALF_Z * 2 = 2 m).
-  const STAIR_STEP_COUNT = 10;
-  const STAIR_START_X = INTERIOR_MIN_X + 1.05 + 0.37; // step_1 east face local  = -6.46
-  const STAIR_END_X   = INTERIOR_MIN_X + 0.36 - 0.28; // step_3 west face local  = -7.80
-  const STAIR_X_RUN   = STAIR_START_X - STAIR_END_X;  // 1.34 m
-  const STAIR_STEP_W  = STAIR_X_RUN   / STAIR_STEP_COUNT; // 0.134 m
-  const STAIR_STEP_RISE = SHALLOW_DEPTH / STAIR_STEP_COUNT; // 0.055 m
-  for (let i = 0; i < STAIR_STEP_COUNT; i++) {
-    const stepTopY    = DECK_Y - SHALLOW_DEPTH + (i + 1) * STAIR_STEP_RISE;
-    const stepCenterX = STAIR_START_X - (i + 0.5) * STAIR_STEP_W;
-    createPoolCollider(`${def.name}_exit_step_${i}_col`, {
-      width: STAIR_STEP_W,
-      height: 0.06,
-      depth: 1.8,
-    }, {
-      x: stepCenterX,
-      y: stepTopY - 0.03,
-      z: 0,
-    }, 'walkable');
-  }
-  // 4) Water surface visual (separate and non-solid)
+  // Deep floor: world X 36, Y -1.70, Z 32.40 → local (0, -1.70, 2.40), size X 15.90, Z 3.10
+  const deepFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_deep_vis`, {
+    width: 15.90, height: 3.10, subdivisions: 1,
+  }, scene);
+  deepFloor.parent = root;
+  deepFloor.position.set(0, -DEEP_DEPTH, 2.40);
+  deepFloor.material = floorMat;
+  tagPoolVisual(deepFloor);
+
+  // ── A4. Water surface (non-solid) ─────────────────────────────────────────
+  // world X 36, Y -0.05, Z 30 → local (0, -0.05, 0), size X 15.70, Z 7.70
   const water = BABYLON.MeshBuilder.CreateGround(`${def.name}_water_surface_vis`, {
-    width: INTERIOR_W,
-    height: INTERIOR_D,
-    subdivisions: 1,
+    width: 15.70, height: 7.70, subdivisions: 1,
   }, scene);
   water.parent = root;
   water.position.set(0, WATER_SURFACE_Y, 0);
@@ -502,6 +378,140 @@ function createDeepWaterPocket(scene, def) {
   water.material = waterMat;
   tagPoolVisual(water, { alphaIndex: 50 });
 
+  // ── A5. Lane stripe ────────────────────────────────────────────────────────
+  // world X 36, Y -1.695, Z 31.00 → local (0, -1.695, 1.00), size X 0.35, Y 0.01, Z 4.80
+  const laneMat = new BABYLON.StandardMaterial(`${def.name}_laneMat`, scene);
+  laneMat.diffuseColor = new BABYLON.Color3(0.08, 0.14, 0.40);
+  laneMat.emissiveColor = new BABYLON.Color3(0.02, 0.04, 0.10);
+  const laneStripe = BABYLON.MeshBuilder.CreateBox(`${def.name}_lane_stripe_vis`, {
+    width: 0.35, height: 0.01, depth: 4.80,
+  }, scene);
+  laneStripe.parent = root;
+  laneStripe.position.set(0, -1.695, 1.00);
+  laneStripe.material = laneMat;
+  tagPoolVisual(laneStripe);
+
+  // ── A6. Ladder (northeast interior corner, visual only) ────────────────────
+  // Local northeast corner ≈ x=+7.70, z=-3.70. Two rails + 3 rungs.
+  const ladderMat = new BABYLON.StandardMaterial(`${def.name}_ladderMat`, scene);
+  ladderMat.diffuseColor = new BABYLON.Color3(0.82, 0.84, 0.86);
+  ladderMat.emissiveColor = new BABYLON.Color3(0.06, 0.06, 0.07);
+  ladderMat.specularColor = new BABYLON.Color3(0.40, 0.42, 0.44);
+  for (let side = 0; side < 2; side++) {
+    const rail = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ladder_rail_${side}_vis`, {
+      diameter: 0.04, height: 1.20, tessellation: 8,
+    }, scene);
+    rail.parent = root;
+    rail.position.set(7.70 + (side === 0 ? -0.22 : 0.22), -SHALLOW_DEPTH * 0.5, -3.70);
+    rail.material = ladderMat;
+    tagPoolVisual(rail);
+  }
+  for (let r = 0; r < 3; r++) {
+    const rung = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ladder_rung_${r}_vis`, {
+      diameter: 0.03, height: 0.44, tessellation: 8,
+    }, scene);
+    rung.parent = root;
+    rung.position.set(7.70, -SHALLOW_DEPTH * 0.5 + 0.35 - (r * 0.22), -3.70);
+    rung.rotation.z = Math.PI * 0.5;
+    rung.material = ladderMat;
+    tagPoolVisual(rung);
+  }
+
+  // ── A7. Exit stairs (visible, north bay, X width 2.40 centered at X 36) ───
+  // 4 stairs descending south (+Z) from deck level into shallow floor.
+  // Local positions: world Z - def.z. E.g. Z 26.525 → local z = -3.475.
+  const stepMat = new BABYLON.StandardMaterial(`${def.name}_stepMat`, scene);
+  stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
+  stepMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
+  stepMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+  const visStairDefs = [
+    { ly: -0.0875, lz: -3.475 },
+    { ly: -0.2625, lz: -3.125 },
+    { ly: -0.4375, lz: -2.775 },
+    { ly: -0.6125, lz: -2.425 },
+  ];
+  for (let i = 0; i < visStairDefs.length; i++) {
+    const s = visStairDefs[i];
+    const stairMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_vis_stair_${i + 1}`, {
+      width: 2.40, height: 0.175, depth: 0.35,
+    }, scene);
+    stairMesh.parent = root;
+    stairMesh.position.set(0, s.ly, s.lz);
+    stairMesh.material = stepMat;
+    tagPoolVisual(stairMesh);
+  }
+
+  // ── B2. Perimeter top-edge blockers (invisible BLOCKER, prevent drop-in) ──
+  // Top Y 0.10, bottom Y -0.15, center Y -0.025, height 0.25, thickness 0.20.
+  // North side has stair bay gap; gap is between X 35.30 and 36.70 (spec blocker extents).
+  // All positions are local offsets (createPoolCollider adds def.x / def.z).
+  createPoolCollider(`${def.name}_edge_nw`, { width: 7.20, height: 0.25, depth: 0.20 },
+    { x: -4.30, y: -0.025, z: -3.90 }, 'blocker');
+  createPoolCollider(`${def.name}_edge_ne`, { width: 7.20, height: 0.25, depth: 0.20 },
+    { x:  4.30, y: -0.025, z: -3.90 }, 'blocker');
+  createPoolCollider(`${def.name}_edge_s`,  { width: 16.00, height: 0.25, depth: 0.20 },
+    { x:  0,    y: -0.025, z:  3.90 }, 'blocker');
+  createPoolCollider(`${def.name}_edge_w`,  { width:  0.20, height: 0.25, depth: 8.00 },
+    { x: -7.90, y: -0.025, z:  0    }, 'blocker');
+  createPoolCollider(`${def.name}_edge_e`,  { width:  0.20, height: 0.25, depth: 8.00 },
+    { x:  7.90, y: -0.025, z:  0    }, 'blocker');
+
+  // ── B3. Interior basin wall blockers (below deck, keep player in basin) ───
+  // Top Y -0.20, per-wall heights per spec.
+  createPoolCollider(`${def.name}_wall_nw`, { width: 7.20, height: 0.50, depth: 0.20 },
+    { x: -4.30, y: -0.45, z: -3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_ne`, { width: 7.20, height: 0.50, depth: 0.20 },
+    { x:  4.30, y: -0.45, z: -3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_s`,  { width: 15.90, height: 1.50, depth: 0.20 },
+    { x:  0,    y: -0.95, z:  3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_w`,  { width:  0.20, height: 1.50, depth: 7.70 },
+    { x: -7.85, y: -0.95, z:  0    }, 'blocker');
+  createPoolCollider(`${def.name}_wall_e`,  { width:  0.20, height: 1.50, depth: 7.70 },
+    { x:  7.85, y: -0.95, z:  0    }, 'blocker');
+
+  // ── B4. Walkable shallow floor collider ───────────────────────────────────
+  // world X 36, Y -0.75, Z 28.00 → local x=0, z=-2.00
+  createPoolCollider(`${def.name}_floor_shallow_col`, { width: 15.80, height: 0.10, depth: 1.60 },
+    { x: 0, y: -0.75, z: -2.00 }, 'walkable');
+
+  // ── B5. Walkable deep floor collider ──────────────────────────────────────
+  // world X 36, Y -1.75, Z 32.40 → local x=0, z=2.40
+  createPoolCollider(`${def.name}_floor_deep_col`, { width: 15.80, height: 0.10, depth: 3.10 },
+    { x: 0, y: -1.75, z: 2.40 }, 'walkable');
+
+  // ── B6. Transition steps (8 hidden walkable steps along Z) ────────────────
+  // Each tread Z 0.325, each rise Y 0.125. World Z values → local z = worldZ - def.z.
+  const transStepDefs = [
+    { lz: -1.6375, ly: -0.825 },
+    { lz: -1.3125, ly: -0.950 },
+    { lz: -0.9875, ly: -1.075 },
+    { lz: -0.6625, ly: -1.200 },
+    { lz: -0.3375, ly: -1.325 },
+    { lz: -0.0125, ly: -1.450 },
+    { lz:  0.3125, ly: -1.575 },
+    { lz:  0.6375, ly: -1.700 },
+  ];
+  for (let i = 0; i < transStepDefs.length; i++) {
+    createPoolCollider(`${def.name}_trans_step_${i}_col`, { width: 15.80, height: 0.10, depth: 0.325 },
+      { x: 0, y: transStepDefs[i].ly, z: transStepDefs[i].lz }, 'walkable');
+  }
+
+  // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
+  // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
+  const exitStairDefs = [
+    { lz: -3.475, ly: -0.175 },
+    { lz: -3.125, ly: -0.350 },
+    { lz: -2.775, ly: -0.525 },
+    { lz: -2.425, ly: -0.700 },
+  ];
+  for (let i = 0; i < exitStairDefs.length; i++) {
+    createPoolCollider(`${def.name}_exit_stair_${i + 1}_col`, { width: 2.40, height: 0.10, depth: 0.35 },
+      { x: 0, y: exitStairDefs[i].ly, z: exitStairDefs[i].lz }, 'walkable');
+  }
+  // Top landing: world X 36, Y -0.05, Z 26.175 → local z = -3.825
+  createPoolCollider(`${def.name}_exit_landing_col`, { width: 2.40, height: 0.10, depth: 0.35 },
+    { x: 0, y: -0.05, z: -3.825 }, 'walkable');
+
   return {
     ...def,
     root,
@@ -514,15 +524,16 @@ function createDeepWaterPocket(scene, def) {
       return getWaterStateAtPosition(pos, headY);
     },
     getExitSpawn() {
+      // North exit: just outside north pool edge at deck level.
       return {
-        x: def.x - (W * 0.5) - 0.6,
+        x: def.x,
         y: DECK_Y + 0.42,
-        z: def.z ?? 0,
+        z: (def.z ?? 0) - (D * 0.5) - 0.6,
       };
     },
     update(time) {
-      waterMat.alpha = 0.62 + (Math.sin((time * 0.80) + this.x * 0.04) * 0.05);
-      water.position.y = WATER_SURFACE_Y + (Math.sin((time * 0.55) + this.x * 0.02) * 0.008);
+      waterMat.alpha = 0.62 + (Math.sin((time * 0.80) + def.x * 0.04) * 0.05);
+      water.position.y = WATER_SURFACE_Y + (Math.sin((time * 0.55) + def.x * 0.02) * 0.008);
     },
   };
 }
@@ -1667,7 +1678,7 @@ export function buildWorld5(scene, options = {}) {
       for (const pocket of deepWaterPockets) {
         if (typeof pocket.getExitSpawn !== 'function') continue;
         const state = pocket.getWaterState(pos, pos.y);
-        if (state.inDeepWater || state.depthAtX !== null) {
+        if (state.inDeepWater || state.depthAtZ !== null) {
           return pocket.getExitSpawn();
         }
       }
@@ -1677,7 +1688,7 @@ export function buildWorld5(scene, options = {}) {
       for (const pocket of deepWaterPockets) {
         if (typeof pocket.getWaterState !== 'function') continue;
         const state = pocket.getWaterState(pos, headY);
-        if (state?.inDeepWater || state?.depthAtX !== null) {
+        if (state?.inDeepWater || state?.depthAtZ !== null) {
           return state;
         }
       }
@@ -1685,7 +1696,7 @@ export function buildWorld5(scene, options = {}) {
         inDeepWater: false,
         headSubmerged: false,
         waterSurfaceY: null,
-        depthAtX: null,
+        depthAtZ: null,
       };
     },
     tryHitByWeapon(attack = {}) {

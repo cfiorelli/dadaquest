@@ -94,9 +94,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
     {
       id: 'pool_edge',
       label: 'Pool Edge',
-      x: 27.0,
+      x: 36.0,
       y: PLAYER_SPAWN_Y,
-      z: 30.0,
+      z: 25.0,
       spaceId: 'starter_room',
       allowedReason: 'pool_hazard',
     },
@@ -136,15 +136,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
           surface('floor_east', 22, 12, 4, 8, 'starter_room_floor', {
             floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
           }),
-          // ── Pool basin floors (shallow end -0.55, deep end -2.25) ──────────────────
-          // visible: false — buildWorld5.js provides the pool-floor visual (shallowFloor/deepFloor meshes).
-          // These surfaces are collision-only so the AABB system gets the correct floor heights.
-          surface('pool_shallow_floor', 8, 12, 8, 8, 'pool_floor', {
-            floorY: -0.55, h: FLOOR_THICKNESS, walkableClassification: 'pool-floor', visible: false,
-          }),
-          surface('pool_deep_floor', 16, 12, 8, 8, 'pool_floor', {
-            floorY: -2.25, h: FLOOR_THICKNESS, walkableClassification: 'pool-floor', visible: false,
-          }),
+          // Pool basin floors: collision handled entirely by buildWorld5.js
+          // (B4 shallow floor col, B5 deep floor col, B6 transition steps).
+          // No authored surfaces here — they would create stale collision at wrong positions.
         ],
         decorBlocks: [
           block('north_wall', ROOM_CENTER_X, ROOM_HEIGHT * 0.5, -(WALL_THICKNESS * 0.5), ROOM_WIDTH + WALL_THICKNESS, ROOM_HEIGHT, WALL_THICKNESS, {
