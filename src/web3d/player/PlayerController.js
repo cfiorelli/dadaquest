@@ -147,7 +147,7 @@ export class PlayerController {
 
   setColliders(platforms) {
     this.colliders = platforms.map(p => {
-      const pos = p.position;
+      const pos = p.getAbsolutePosition(); // world position — handles parented pool collision meshes
       const ext = p.getBoundingInfo().boundingBox.extendSize;
       return {
         minX: pos.x - ext.x,
