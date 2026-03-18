@@ -358,36 +358,23 @@ function createDeepWaterPocket(scene, def) {
   }
 
   // 2) Collision geometry (invisible, truth-first)
-  // Two-band wall architecture — fixes the overlapTop-wins launch artifact.
+  // Recessed-pool model: NO above-ground exterior wall collision.
+  // Interior basin walls only — block players from swimming through the basin walls
+  // from inside the pool. Deck-level players skip these entirely.
   //
-  // Single-band walls with top at deck+PLAYER_HALF_H fail because the AABB solver picks
-  // minimum-overlap axis: on a large dt frame (tab-restore) or corner interactions,
-  // overlapTop wins and the player is launched to wallTop+PLAYER_HALF_H instead of
-  // being pushed back horizontally.
-  //
-  // Fix: split each wall face into two bands with a deliberate Y gap at deck level.
-  //   Lower band  Y=[-2.25, -0.01] — interior players hit this; deck-level players SKIP
-  //               (pMinY = 0.005 ≥ maxY = -0.01 → no AABB overlap).
-  //   Upper band  Y=[+0.10, +1.50] — deck-level players hit this; deep-pool players SKIP
-  //               (pMaxY ≈ 0.005+0.80=0.805 ≥ 0.10 → yes); overlapTop = 1.50-0.005 = 1.495
-  //               is physically impossible for any per-frame z-penetration to exceed at
-  //               any realistic speed → horizontal push ALWAYS wins → player is blocked.
-  const LOWER_WALL_MIN_Y = BASIN_BOTTOM_Y;     // -2.25
-  const LOWER_WALL_MAX_Y = DECK_Y - 0.01;      // -0.01  (deck-level player minY=0.005 skips)
-  const LOWER_WALL_H  = LOWER_WALL_MAX_Y - LOWER_WALL_MIN_Y; // 2.24
-  const LOWER_WALL_CY = (LOWER_WALL_MIN_Y + LOWER_WALL_MAX_Y) * 0.5; // -1.13
-  const UPPER_WALL_MIN_Y = DECK_Y + 0.10;      // +0.10  (deep-pool pMaxY<0.10 skips)
-  const UPPER_WALL_MAX_Y = DECK_Y + 1.50;      // +1.50
-  const UPPER_WALL_H  = UPPER_WALL_MAX_Y - UPPER_WALL_MIN_Y; // 1.40
-  const UPPER_WALL_CY = (UPPER_WALL_MIN_Y + UPPER_WALL_MAX_Y) * 0.5; // +0.80
+  // Single lower band Y=[BASIN_BOTTOM_Y, DECK_Y-0.01]:
+  //   - Pool players (pMinY < -0.01) overlap → pushed back horizontally. ✓
+  //   - Deck players (pMinY = 0.005 ≥ maxY = -0.01) skip → deck freely walkable. ✓
+  //   - No hi_col upper band: no above-ground exterior wall needed for a hole-in-floor pool.
+  const BASIN_WALL_COL_MIN_Y = BASIN_BOTTOM_Y;  // -2.25
+  const BASIN_WALL_COL_MAX_Y = DECK_Y - 0.01;   // -0.01
+  const BASIN_WALL_COL_H  = BASIN_WALL_COL_MAX_Y - BASIN_WALL_COL_MIN_Y; // 2.24
+  const BASIN_WALL_COL_CY = (BASIN_WALL_COL_MIN_Y + BASIN_WALL_COL_MAX_Y) * 0.5; // -1.13
 
-  function createWallPair(baseName, dims, posXZ) {
-    createPoolCollider(`${baseName}_lo_col`, {
-      width: dims.width, height: LOWER_WALL_H, depth: dims.depth,
-    }, { x: posXZ.x, y: LOWER_WALL_CY, z: posXZ.z }, 'blocker');
-    createPoolCollider(`${baseName}_hi_col`, {
-      width: dims.width, height: UPPER_WALL_H, depth: dims.depth,
-    }, { x: posXZ.x, y: UPPER_WALL_CY, z: posXZ.z }, 'blocker');
+  function createBasinWall(baseName, dims, posXZ) {
+    createPoolCollider(`${baseName}_col`, {
+      width: dims.width, height: BASIN_WALL_COL_H, depth: dims.depth,
+    }, { x: posXZ.x, y: BASIN_WALL_COL_CY, z: posXZ.z }, 'blocker');
   }
 
   // West wall split into north/south with a 2 m stair opening centered at z=0.
@@ -396,15 +383,15 @@ function createDeepWaterPocket(scene, def) {
   const westSecDepth = (INTERIOR_D * 0.5) - STAIR_GAP_HALF_Z;
   const westSecCenterZ = STAIR_GAP_HALF_Z + (westSecDepth * 0.5);
 
-  createWallPair(`${def.name}_wall_north`, { width: INTERIOR_W, depth: WALL_COL_T },
+  createBasinWall(`${def.name}_wall_north`, { width: INTERIOR_W, depth: WALL_COL_T },
     { x: 0, z: -(D * 0.5) + (WALL_COL_T * 0.5) });
-  createWallPair(`${def.name}_wall_south`, { width: INTERIOR_W, depth: WALL_COL_T },
+  createBasinWall(`${def.name}_wall_south`, { width: INTERIOR_W, depth: WALL_COL_T },
     { x: 0, z: +(D * 0.5) - (WALL_COL_T * 0.5) });
-  createWallPair(`${def.name}_wall_west_north`, { width: WALL_COL_T, depth: westSecDepth },
+  createBasinWall(`${def.name}_wall_west_north`, { width: WALL_COL_T, depth: westSecDepth },
     { x: -(W * 0.5) + (WALL_COL_T * 0.5), z: -westSecCenterZ });
-  createWallPair(`${def.name}_wall_west_south`, { width: WALL_COL_T, depth: westSecDepth },
+  createBasinWall(`${def.name}_wall_west_south`, { width: WALL_COL_T, depth: westSecDepth },
     { x: -(W * 0.5) + (WALL_COL_T * 0.5), z: +westSecCenterZ });
-  createWallPair(`${def.name}_wall_east`, { width: WALL_COL_T, depth: INTERIOR_D },
+  createBasinWall(`${def.name}_wall_east`, { width: WALL_COL_T, depth: INTERIOR_D },
     { x: +(W * 0.5) - (WALL_COL_T * 0.5), z: 0 });
 
   // Basin floors: authored surfaces in level5.js (pool_shallow_floor, pool_deep_floor)
