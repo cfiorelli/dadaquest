@@ -378,14 +378,28 @@ function createDeepWaterPocket(scene, def) {
     y: wallColCenterY,
     z: +(D * 0.5) - (WALL_COL_T * 0.5),
   }, 'blocker');
-  createPoolCollider(`${def.name}_wall_west_col`, {
+  // West wall split into north/south with a 2 m stair opening centered at z=0.
+  // The gap aligns with the exit stair hidden colliders below.
+  const STAIR_GAP_HALF_Z = 1.0;
+  const westSecDepth = (INTERIOR_D * 0.5) - STAIR_GAP_HALF_Z;
+  const westSecCenterZ = STAIR_GAP_HALF_Z + (westSecDepth * 0.5);
+  createPoolCollider(`${def.name}_wall_west_north_col`, {
     width: WALL_COL_T,
     height: wallColHeight,
-    depth: INTERIOR_D,
+    depth: westSecDepth,
   }, {
     x: -(W * 0.5) + (WALL_COL_T * 0.5),
     y: wallColCenterY,
-    z: 0,
+    z: -westSecCenterZ,
+  }, 'blocker');
+  createPoolCollider(`${def.name}_wall_west_south_col`, {
+    width: WALL_COL_T,
+    height: wallColHeight,
+    depth: westSecDepth,
+  }, {
+    x: -(W * 0.5) + (WALL_COL_T * 0.5),
+    y: wallColCenterY,
+    z: +westSecCenterZ,
   }, 'blocker');
   createPoolCollider(`${def.name}_wall_east_col`, {
     width: WALL_COL_T,
@@ -441,13 +455,28 @@ function createDeepWaterPocket(scene, def) {
     stepMesh.position.set(step.x, step.y, 0);
     stepMesh.material = stepMat;
     tagPoolVisual(stepMesh);
-    createPoolCollider(`${def.name}_${step.name}_col`, {
-      width: step.w,
-      height: step.h,
-      depth: step.d,
+  }
+  // Hidden walkable stair colliders — 10 equal steps replacing the 3 visible-step colliders.
+  // Rise per step = SHALLOW_DEPTH / 10 = 0.055 m. At MAX_SPEED=6.4 m/s @ 60 fps,
+  // one-frame x-travel = 0.107 m > overlapTop = rise − SKIN_WIDTH = 0.050 m, so AABB
+  // floor-detection (overlapTop wins) fires reliably on each step without a step-up mechanism.
+  // Depth = 1.8 m fits inside the 2 m west-wall gap (STAIR_GAP_HALF_Z * 2 = 2 m).
+  const STAIR_STEP_COUNT = 10;
+  const STAIR_START_X = INTERIOR_MIN_X + 1.05 + 0.37; // step_1 east face local  = -6.46
+  const STAIR_END_X   = INTERIOR_MIN_X + 0.36 - 0.28; // step_3 west face local  = -7.80
+  const STAIR_X_RUN   = STAIR_START_X - STAIR_END_X;  // 1.34 m
+  const STAIR_STEP_W  = STAIR_X_RUN   / STAIR_STEP_COUNT; // 0.134 m
+  const STAIR_STEP_RISE = SHALLOW_DEPTH / STAIR_STEP_COUNT; // 0.055 m
+  for (let i = 0; i < STAIR_STEP_COUNT; i++) {
+    const stepTopY    = DECK_Y - SHALLOW_DEPTH + (i + 1) * STAIR_STEP_RISE;
+    const stepCenterX = STAIR_START_X - (i + 0.5) * STAIR_STEP_W;
+    createPoolCollider(`${def.name}_exit_step_${i}_col`, {
+      width: STAIR_STEP_W,
+      height: 0.06,
+      depth: 1.8,
     }, {
-      x: step.x,
-      y: step.y,
+      x: stepCenterX,
+      y: stepTopY - 0.03,
       z: 0,
     }, 'walkable');
   }
