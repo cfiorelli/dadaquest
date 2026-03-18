@@ -204,8 +204,8 @@ function createDeepWaterPocket(scene, def) {
       height: Math.max(0.04, dims.height),
       depth: Math.max(0.04, dims.depth),
     }, scene);
-    mesh.parent = root;
-    mesh.position.set(position.x, position.y, position.z);
+    // No parent — bake root world offset into position so setColliders reads world coords via p.position
+    mesh.position.set(def.x + position.x, position.y, (def.z ?? 0) + position.z);
     mesh.visibility = 0;
     mesh.isPickable = role === 'blocker';
     mesh.checkCollisions = true;
