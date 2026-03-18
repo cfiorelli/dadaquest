@@ -417,6 +417,17 @@ function createDeepWaterPocket(scene, def) {
     y: (DECK_Y - DEEP_DEPTH) + 0.04,
     z: 0,
   }, 'walkable');
+  // Ramp zone bridge: AABB system cannot walk a slope; this flat box at deep-floor height
+  // prevents fall-through into the hazard zone. Swim physics handle vertical in water.
+  createPoolCollider(`${def.name}_ramp_col`, {
+    width: SLOPE_RUN,
+    height: 0.08,
+    depth: INTERIOR_D,
+  }, {
+    x: SHALLOW_MAX_X + (SLOPE_RUN * 0.5),
+    y: (DECK_Y - DEEP_DEPTH) + 0.04,
+    z: 0,
+  }, 'walkable');
 
   const stepMat = new BABYLON.StandardMaterial(`${def.name}_stepMat`, scene);
   stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
