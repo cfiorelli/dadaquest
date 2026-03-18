@@ -357,7 +357,10 @@ function createDeepWaterPocket(scene, def) {
   // 2) Collision geometry (invisible, truth-first)
   // Wall colliders: exterior face, top just above deck so deck-level players are blocked
   // but players cannot be pushed above deck by the wall top.
-  const wallColTopY = DECK_Y + 0.01; // 1cm above deck — blocks entry but not climbable
+  // 0.40 m above deck = PLAYER_HALF_H. overlapTop at deck approach = 0.395 m >>
+  // one-frame horizontal penetration at MAX_SPEED (0.107 m), so AABB horizontal push
+  // always wins over floor-detection → player cannot step over the wall from outside.
+  const wallColTopY = DECK_Y + 0.40;
   const wallColHeight = Math.max(0.2, wallColTopY - BASIN_BOTTOM_Y);
   const wallColCenterY = BASIN_BOTTOM_Y + (wallColHeight * 0.5);
   createPoolCollider(`${def.name}_wall_north_col`, {
