@@ -360,6 +360,8 @@ function createDeepWaterPocket(scene, def) {
   const wallColTopY = DECK_Y + 1.2;
   const wallColHeight = Math.max(0.2, wallColTopY - BASIN_BOTTOM_Y);
   const wallColCenterY = BASIN_BOTTOM_Y + (wallColHeight * 0.5);
+  // Wall colliders centered on the EXTERIOR face of each visible wall (not the interior face).
+  // Using exterior face ensures the player is blocked at the outer visible surface.
   createPoolCollider(`${def.name}_wall_north_col`, {
     width: INTERIOR_W,
     height: wallColHeight,
@@ -367,7 +369,7 @@ function createDeepWaterPocket(scene, def) {
   }, {
     x: 0,
     y: wallColCenterY,
-    z: INTERIOR_MIN_Z + (WALL_COL_T * 0.5),
+    z: -(D * 0.5) + (WALL_COL_T * 0.5),
   }, 'blocker');
   createPoolCollider(`${def.name}_wall_south_col`, {
     width: INTERIOR_W,
@@ -376,14 +378,14 @@ function createDeepWaterPocket(scene, def) {
   }, {
     x: 0,
     y: wallColCenterY,
-    z: INTERIOR_MAX_Z - (WALL_COL_T * 0.5),
+    z: +(D * 0.5) - (WALL_COL_T * 0.5),
   }, 'blocker');
   createPoolCollider(`${def.name}_wall_west_col`, {
     width: WALL_COL_T,
     height: wallColHeight,
     depth: INTERIOR_D,
   }, {
-    x: INTERIOR_MIN_X + (WALL_COL_T * 0.5),
+    x: -(W * 0.5) + (WALL_COL_T * 0.5),
     y: wallColCenterY,
     z: 0,
   }, 'blocker');
@@ -392,7 +394,7 @@ function createDeepWaterPocket(scene, def) {
     height: wallColHeight,
     depth: INTERIOR_D,
   }, {
-    x: INTERIOR_MAX_X - (WALL_COL_T * 0.5),
+    x: +(W * 0.5) - (WALL_COL_T * 0.5),
     y: wallColCenterY,
     z: 0,
   }, 'blocker');
