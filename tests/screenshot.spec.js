@@ -804,10 +804,10 @@ test('capture Level 6 under-construction proof screenshots', async ({ page }) =>
   await captureProof('docs/screenshots/level6-under-construction-blocked.png');
 });
 
-test('capture Level 5 Squarium proof screenshots', async ({ page }) => {
+test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   test.setTimeout(240_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-squarium', { recursive: true });
+  await mkdir('docs/proof/level5-graybox', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -815,18 +815,16 @@ test('capture Level 5 Squarium proof screenshots', async ({ page }) => {
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-squarium/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-graybox/${path.split('/').pop()}`);
   }
 
-  async function setView(pose, cameraView, waitMs = 800) {
-    await page.evaluate(({ nextPose, nextCameraView }) => {
+  async function frameRoom({ path, pose, view }) {
+    await page.evaluate(({ nextPose, nextView }) => {
       window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
-      window.__DADA_DEBUG__?.setEra5CameraDebugView?.(nextCameraView);
-    }, {
-      nextPose: pose,
-      nextCameraView: cameraView,
-    });
-    await page.waitForTimeout(waitMs);
+      window.__DADA_DEBUG__?.setEra5CameraDebugView?.(nextView);
+    }, { nextPose: pose, nextView: view });
+    await page.waitForTimeout(700);
+    await captureProof(path);
   }
 
   await gotoDebugLevel(page, 5);
@@ -838,21 +836,17 @@ test('capture Level 5 Squarium proof screenshots', async ({ page }) => {
   await page.waitForTimeout(1800);
   await hideGameplayUi(page);
 
-  const report = await page.evaluate(() => ({
-    topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
-    level5State: window.__DADA_DEBUG__?.level5State ?? null,
+  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
+  expect(topology?.mapId).toBe('level5-squarium-graybox');
+  expect(topology?.sectorCount).toBe(7);
+  const runtimeState = await page.evaluate(() => ({
     lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
   }));
-  expect(report.lastRuntimeError).toBeNull();
-  expect(report.topology?.mapId).toBe('level5-squarium');
-  expect(report.topology?.sectorCount).toBe(7);
-  expect(report.level5State?.squarium?.domeVisible).toBe(true);
-  expect(report.level5State?.squarium?.outerOceanVisible).toBe(true);
-  expect(report.level5State?.squarium?.whaleCount).toBe(2);
-  expect(report.level5State?.squarium?.kelpCount).toBe(12);
+  expect(runtimeState.lastRuntimeError).toBeNull();
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
       walkables: false,
       colliders: false,
@@ -861,103 +855,82 @@ test('capture Level 5 Squarium proof screenshots', async ({ page }) => {
     });
   });
 
-  await setView({
-    x: 8.0,
-    y: 0.42,
-    z: 12.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  }, {
-    label: 'l5-squarium-room1',
-    position: { x: 10.0, y: 5.2, z: 5.8 },
-    target: { x: 36.0, y: 0.8, z: 30.0 },
-    fov: 0.58,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room1-pool-lab.png',
+    pose: { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    view: {
+      label: 'l5-graybox-room1',
+      position: { x: 5.5, y: 3.8, z: 8.5 },
+      target: { x: 36.0, y: -0.6, z: 30.0 },
+      fov: 0.58,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room1-pool-lab.png');
 
-  await setView({
-    x: 36.0,
-    y: -1.2,
-    z: 45.0,
-    yaw: 0,
-    cameraYaw: 0,
-  }, {
-    label: 'l5-squarium-room2',
-    position: { x: 36.0, y: 0.4, z: 40.5 },
-    target: { x: 36.0, y: -0.9, z: 56.0 },
-    fov: 0.72,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room2-service-tunnel.png',
+    pose: { x: 36.0, y: -1.1, z: 42.0, yaw: Math.PI, cameraYaw: Math.PI },
+    view: {
+      label: 'l5-graybox-room2',
+      position: { x: 36.0, y: 0.2, z: 47.0 },
+      target: { x: 36.0, y: -0.9, z: 58.5 },
+      fov: 0.62,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room2-service-tunnel.png');
 
-  await setView({
-    x: 31.5,
-    y: 0.42,
-    z: 70.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  }, {
-    label: 'l5-squarium-room3',
-    position: { x: 29.2, y: 4.8, z: 78.2 },
-    target: { x: 40.0, y: 1.8, z: 68.0 },
-    fov: 0.72,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room3-pump-junction.png',
+    pose: { x: 31.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    view: {
+      label: 'l5-graybox-room3',
+      position: { x: 27.5, y: 5.3, z: 80.5 },
+      target: { x: 40.0, y: 1.8, z: 68.0 },
+      fov: 0.62,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room3-pump-junction.png');
 
-  await setView({
-    x: 58.0,
-    y: 0.42,
-    z: 68.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  }, {
-    label: 'l5-squarium-room4',
-    position: { x: 56.0, y: 4.6, z: 74.5 },
-    target: { x: 76.5, y: 2.2, z: 68.0 },
-    fov: 0.66,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room4-transfer-gallery.png',
+    pose: { x: 58.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    view: {
+      label: 'l5-graybox-room4',
+      position: { x: 55.0, y: 4.8, z: 80.0 },
+      target: { x: 73.0, y: 1.6, z: 68.0 },
+      fov: 0.58,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room4-transfer-gallery.png');
 
-  await setView({
-    x: 126.0,
-    y: 0.42,
-    z: 80.0,
-    yaw: Math.PI,
-    cameraYaw: Math.PI,
-  }, {
-    label: 'l5-squarium-room5',
-    position: { x: 126.0, y: 6.0, z: 88.0 },
-    target: { x: 126.0, y: 18.5, z: 46.0 },
-    fov: 0.82,
-  }, 1100);
-  await captureProof('docs/screenshots/level5-squarium-room5-grand-dome.png');
-
-  await setView({
-    x: 96.0,
-    y: 8.42,
-    z: 18.0,
-    yaw: Math.PI,
-    cameraYaw: Math.PI,
-  }, {
-    label: 'l5-squarium-room6',
-    position: { x: 96.0, y: 11.2, z: 28.5 },
-    target: { x: 96.0, y: 9.2, z: 12.5 },
-    fov: 0.7,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room5-stadium-room.png',
+    pose: { x: 92.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    view: {
+      label: 'l5-graybox-room5',
+      position: { x: 86.0, y: 10.5, z: 98.0 },
+      target: { x: 126.0, y: 3.0, z: 68.0 },
+      fov: 0.72,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room6-west-wing.png');
 
-  await setView({
-    x: 156.0,
-    y: 8.42,
-    z: 18.0,
-    yaw: Math.PI,
-    cameraYaw: Math.PI,
-  }, {
-    label: 'l5-squarium-room7',
-    position: { x: 156.0, y: 11.2, z: 28.5 },
-    target: { x: 156.0, y: 9.2, z: 12.5 },
-    fov: 0.7,
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room6-west-wing.png',
+    pose: { x: 96.0, y: 8.42, z: 18.0, yaw: Math.PI, cameraYaw: Math.PI },
+    view: {
+      label: 'l5-graybox-room6',
+      position: { x: 91.0, y: 12.8, z: 27.0 },
+      target: { x: 96.0, y: 9.2, z: 15.0 },
+      fov: 0.56,
+    },
   });
-  await captureProof('docs/screenshots/level5-squarium-room7-east-wing.png');
+
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room7-east-wing.png',
+    pose: { x: 156.0, y: 8.42, z: 18.0, yaw: Math.PI, cameraYaw: Math.PI },
+    view: {
+      label: 'l5-graybox-room7',
+      position: { x: 151.0, y: 12.8, z: 27.0 },
+      target: { x: 156.0, y: 9.2, z: 15.0 },
+      fov: 0.56,
+    },
+  });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();

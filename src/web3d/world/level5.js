@@ -48,9 +48,9 @@ function makeWallBlocks(roomId, bounds, side, opening = null, extra = {}) {
   const blocks = [];
   const wallTopY = extra.wallTopY ?? bounds.maxY;
   const wallBottomY = extra.wallBottomY ?? bounds.minY;
-  const rgb = extra.rgb || [122, 168, 160];
-  const roughness = extra.roughness ?? 0.88;
-  const emissiveScale = extra.emissiveScale ?? 0.04;
+  const rgb = extra.rgb || [150, 150, 150];
+  const roughness = extra.roughness ?? 0.92;
+  const emissiveScale = extra.emissiveScale ?? 0.01;
   const thickness = extra.thickness ?? 0.5;
 
   function pushBlock(name, minX, maxX, minY, maxY, minZ, maxZ) {
@@ -102,9 +102,9 @@ function makeWallBlocks(roomId, bounds, side, opening = null, extra = {}) {
 
 function makeCeilingBlock(roomId, bounds, y, extra = {}) {
   return blockBounds(`${roomId}_ceiling`, bounds.minX, bounds.maxX, y, y + 0.5, bounds.minZ, bounds.maxZ, {
-    rgb: extra.rgb || [184, 214, 218],
-    roughness: extra.roughness ?? 0.90,
-    emissiveScale: extra.emissiveScale ?? 0.03,
+    rgb: extra.rgb || [176, 176, 176],
+    roughness: extra.roughness ?? 0.94,
+    emissiveScale: extra.emissiveScale ?? 0.01,
     solid: true,
     structuralShell: true,
     cameraIgnore: false,
@@ -123,6 +123,46 @@ function makeShell(roomId, bounds, openings = {}, extra = {}) {
     ...makeWallBlocks(roomId, bounds, 'east', openings.east || null, extra),
     ...(extra.ceiling === false ? [] : [makeCeilingBlock(roomId, bounds, extra.ceilingY ?? bounds.maxY, extra)]),
   ];
+}
+
+function makeNorthWallWithMultipleOpenings(roomId, bounds, openings, extra = {}) {
+  const rgb = extra.rgb || [150, 150, 150];
+  const thickness = extra.thickness ?? 0.5;
+  const wallBottomY = extra.wallBottomY ?? bounds.minY;
+  const wallTopY = extra.wallTopY ?? bounds.maxY;
+  const segments = [];
+  let cursor = bounds.minX;
+
+  function pushBlock(name, minX, maxX, minY, maxY, minZ, maxZ) {
+    if ((maxX - minX) <= 0.01 || (maxY - minY) <= 0.01 || (maxZ - minZ) <= 0.01) return;
+    segments.push(blockBounds(name, minX, maxX, minY, maxY, minZ, maxZ, {
+      rgb,
+      roughness: extra.roughness ?? 0.92,
+      emissiveScale: extra.emissiveScale ?? 0.01,
+      solid: true,
+      structuralShell: true,
+      cameraIgnore: false,
+      cameraBlocker: true,
+      cameraFadeable: false,
+      decorIntent: 'wall',
+      blockerReason: 'room-boundary',
+    }));
+  }
+
+  for (const [index, opening] of openings.entries()) {
+    if (opening.minA > cursor) {
+      pushBlock(`${roomId}_north_wall_segment_${index}`, cursor, opening.minA, wallBottomY, wallTopY, bounds.minZ - thickness, bounds.minZ);
+    }
+    pushBlock(`${roomId}_north_wall_lower_${index}`, opening.minA, opening.maxA, wallBottomY, opening.minY, bounds.minZ - thickness, bounds.minZ);
+    pushBlock(`${roomId}_north_wall_header_${index}`, opening.minA, opening.maxA, opening.maxY, wallTopY, bounds.minZ - thickness, bounds.minZ);
+    cursor = opening.maxA;
+  }
+
+  if (cursor < bounds.maxX) {
+    pushBlock(`${roomId}_north_wall_tail`, cursor, bounds.maxX, wallBottomY, wallTopY, bounds.minZ - thickness, bounds.minZ);
+  }
+
+  return segments;
 }
 
 const LEVEL5_CAMERA_PRESETS = {
@@ -155,13 +195,13 @@ const ROOM5 = { minX: 80.0, maxX: 172.0, minY: 0.0, maxY: 12.0, minZ: 32.0, maxZ
 const ROOM6 = { minX: 84.0, maxX: 108.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
 const ROOM7 = { minX: 144.0, maxX: 168.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
 
-const LEVEL5_THEME_RGB = [92, 138, 150];
-const SERVICE_RGB = [74, 112, 126];
-const EXHIBIT_RGB = [96, 154, 170];
-const UPPER_WING_RGB = [104, 146, 138];
+const LAB_RGB = [138, 138, 138];
+const SERVICE_RGB = [120, 120, 120];
+const STADIUM_RGB = [146, 146, 146];
+const UPPER_RGB = [156, 156, 156];
 
 const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
-  rgb: LEVEL5_THEME_RGB,
+  rgb: LAB_RGB,
   wallBottomY: 0.0,
   wallTopY: 6.0,
   ceilingY: 6.0,
@@ -188,11 +228,10 @@ const room3Blocks = [
     ceilingY: 7.4,
   }),
   blockBounds('pump_core', 34.0, 46.0, -0.6, 3.2, 64.0, 72.0, {
-    rgb: [70, 86, 90],
-    roughness: 0.82,
-    emissiveScale: 0.03,
+    rgb: [98, 98, 98],
+    roughness: 0.9,
+    emissiveScale: 0.01,
     solid: true,
-    structuralShell: false,
     cameraIgnore: false,
     cameraBlocker: true,
     cameraFadeable: false,
@@ -205,20 +244,10 @@ const room4Blocks = makeShell('transfer_gallery', ROOM4, {
   west: openingAlongZ(68.0, 1.2, 6.0, 3.2),
   east: openingAlongZ(68.0, 2.2, 10.0, 4.4),
 }, {
-  rgb: EXHIBIT_RGB,
+  rgb: SERVICE_RGB,
   wallBottomY: 0.0,
   wallTopY: 8.0,
   ceilingY: 8.0,
-});
-
-const room5Blocks = makeShell('grand_dome_exhibit', ROOM5, {
-  west: openingAlongZ(68.0, 2.2, 10.0, 4.4),
-  north: null,
-}, {
-  rgb: EXHIBIT_RGB,
-  wallBottomY: 0.0,
-  wallTopY: 12.0,
-  ceiling: false,
 });
 
 const room5NorthOpenings = [
@@ -226,95 +255,38 @@ const room5NorthOpenings = [
   openingAlongX(156.0, 9.0, 4.0, 3.0),
 ];
 
-function makeNorthWallWithMultipleOpenings(roomId, bounds, openings, extra = {}) {
-  const rgb = extra.rgb || EXHIBIT_RGB;
-  const segments = [];
-  let cursor = bounds.minX;
-  const thickness = 0.5;
-  for (const [index, opening] of openings.entries()) {
-    if (opening.minA > cursor) {
-      segments.push(blockBounds(`${roomId}_north_wall_segment_${index}`, cursor, opening.minA, 0.0, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
-        rgb,
-        roughness: 0.88,
-        emissiveScale: 0.04,
-        solid: true,
-        structuralShell: true,
-        cameraIgnore: false,
-        cameraBlocker: true,
-        cameraFadeable: false,
-        decorIntent: 'wall',
-        blockerReason: 'room-boundary',
-      }));
-    }
-    segments.push(blockBounds(`${roomId}_north_wall_lower_${index}`, opening.minA, opening.maxA, 0.0, opening.minY, bounds.minZ - thickness, bounds.minZ, {
-      rgb,
-      roughness: 0.88,
-      emissiveScale: 0.04,
-      solid: true,
-      structuralShell: true,
-      cameraIgnore: false,
-      cameraBlocker: true,
-      cameraFadeable: false,
-      decorIntent: 'wall',
-      blockerReason: 'room-boundary',
-    }));
-    segments.push(blockBounds(`${roomId}_north_wall_header_${index}`, opening.minA, opening.maxA, opening.maxY, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
-      rgb,
-      roughness: 0.88,
-      emissiveScale: 0.04,
-      solid: true,
-      structuralShell: true,
-      cameraIgnore: false,
-      cameraBlocker: true,
-      cameraFadeable: false,
-      decorIntent: 'wall',
-      blockerReason: 'room-boundary',
-    }));
-    cursor = opening.maxA;
-  }
-  if (cursor < bounds.maxX) {
-    segments.push(blockBounds(`${roomId}_north_wall_tail`, cursor, bounds.maxX, 0.0, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
-      rgb,
-      roughness: 0.88,
-      emissiveScale: 0.04,
-      solid: true,
-      structuralShell: true,
-      cameraIgnore: false,
-      cameraBlocker: true,
-      cameraFadeable: false,
-      decorIntent: 'wall',
-      blockerReason: 'room-boundary',
-    }));
-  }
-  return segments;
-}
-
-const room5ShellWithoutNorth = [
-  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'south', null, {
-    rgb: EXHIBIT_RGB,
+const room5Blocks = [
+  ...makeWallBlocks('grand_stadium_room', ROOM5, 'south', null, {
+    rgb: STADIUM_RGB,
     wallBottomY: 0.0,
     wallTopY: 12.0,
   }),
-  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'west', openingAlongZ(68.0, 2.2, 10.0, 4.4), {
-    rgb: EXHIBIT_RGB,
+  ...makeWallBlocks('grand_stadium_room', ROOM5, 'west', openingAlongZ(68.0, 2.2, 10.0, 4.4), {
+    rgb: STADIUM_RGB,
     wallBottomY: 0.0,
     wallTopY: 12.0,
   }),
-  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'east', null, {
-    rgb: EXHIBIT_RGB,
+  ...makeWallBlocks('grand_stadium_room', ROOM5, 'east', null, {
+    rgb: STADIUM_RGB,
     wallBottomY: 0.0,
     wallTopY: 12.0,
   }),
-  ...makeNorthWallWithMultipleOpenings('grand_dome_exhibit', ROOM5, room5NorthOpenings, {
-    rgb: EXHIBIT_RGB,
+  ...makeNorthWallWithMultipleOpenings('grand_stadium_room', ROOM5, room5NorthOpenings, {
+    rgb: STADIUM_RGB,
+    wallBottomY: 0.0,
     wallTopY: 12.0,
+  }),
+  makeCeilingBlock('grand_stadium_room', ROOM5, 12.0, {
+    rgb: STADIUM_RGB,
+    roughness: 0.95,
+    emissiveScale: 0.01,
   }),
 ];
 
 const room6Blocks = makeShell('west_kelp_operations_wing', ROOM6, {
   south: openingAlongX(96.0, 9.0, 4.0, 3.0),
 }, {
-  rgb: UPPER_WING_RGB,
+  rgb: UPPER_RGB,
   wallBottomY: 6.0,
   wallTopY: 16.0,
   ceilingY: 16.0,
@@ -323,11 +295,29 @@ const room6Blocks = makeShell('west_kelp_operations_wing', ROOM6, {
 const room7Blocks = makeShell('east_whale_observation_wing', ROOM7, {
   south: openingAlongX(156.0, 9.0, 4.0, 3.0),
 }, {
-  rgb: UPPER_WING_RGB,
+  rgb: UPPER_RGB,
   wallBottomY: 6.0,
   wallTopY: 16.0,
   ceilingY: 16.0,
 });
+
+const westBridgeBounds = {
+  minX: 93.0,
+  maxX: 99.0,
+  minY: 8.0,
+  maxY: 10.5,
+  minZ: 25.0,
+  maxZ: 34.0,
+};
+
+const eastBridgeBounds = {
+  minX: 153.0,
+  maxX: 159.0,
+  minY: 8.0,
+  maxY: 10.5,
+  minZ: 25.0,
+  maxZ: 34.0,
+};
 
 const tunnelSteps = [];
 for (let index = 0; index < 10; index += 1) {
@@ -361,6 +351,7 @@ const pumpNorthThresholds = [
 
 export const LEVEL5 = compileAuthoredEraLayout({
   totalCollectibles: 0,
+  graybox: true,
   extents: {
     minX: -0.5,
     maxX: 176.5,
@@ -373,7 +364,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
   spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
   goal: { x: 156.0, y: 8.42, z: 16.0 },
   goalPresentation: 'trigger-only',
-  theme: 'aquarium',
+  theme: 'neutral',
   showGroundVisual: false,
   showRouteRibbons: false,
   disableDecorOcclusionFade: true,
@@ -397,17 +388,17 @@ export const LEVEL5 = compileAuthoredEraLayout({
       allowedReason: 'respawn',
     },
     {
-      id: 'grand_dome_anchor',
-      label: 'Grand Dome Exhibit',
+      id: 'grand_stadium_anchor',
+      label: 'Grand Stadium Room',
       x: 92.0,
       y: PLAYER_SPAWN_Y,
       z: 68.0,
-      spaceId: 'grand_dome_exhibit',
+      spaceId: 'grand_stadium_room',
       allowedReason: 'respawn',
     },
     {
       id: 'west_wing_anchor',
-      label: 'West Kelp Operations Wing',
+      label: 'West Wing',
       x: 96.0,
       y: 8.42,
       z: 18.0,
@@ -416,7 +407,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
     },
     {
       id: 'east_wing_anchor',
-      label: 'East Whale Observation Wing',
+      label: 'East Wing',
       x: 156.0,
       y: 8.42,
       z: 18.0,
@@ -425,11 +416,11 @@ export const LEVEL5 = compileAuthoredEraLayout({
     },
   ],
   acts: [
-    { id: 'A', label: 'Mechanics Lab', range: [0, 52] },
-    { id: 'B', label: 'Aquarium Expansion', range: [52, 176] },
+    { id: 'A', label: 'Pool Lab', range: [0, 52] },
+    { id: 'B', label: 'Graybox Expansion', range: [52, 176] },
   ],
   authoredMap: {
-    id: 'level5-squarium',
+    id: 'level5-squarium-graybox',
     startSector: 'starter_pool_lab',
     goalSector: 'east_whale_observation_wing',
     sectors: [
@@ -443,7 +434,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 0.0,
         ceilingY: 6.0,
         floorSurfaceType: 'starter_room_floor',
-        wallLanguage: 'aquarium_service_shell',
+        wallLanguage: 'graybox_lab_shell',
         landmarks: ['pool', 'south pool tunnel mouth'],
         shell: false,
         surfaces: [
@@ -480,7 +471,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: -1.6,
         ceilingY: 1.4,
         floorSurfaceType: 'service_tunnel_floor',
-        wallLanguage: 'submerged_service_shell',
+        wallLanguage: 'graybox_tunnel_shell',
         landmarks: ['submerged tunnel'],
         shell: false,
         surfaces: tunnelSteps,
@@ -496,7 +487,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 0.0,
         ceilingY: 7.4,
         floorSurfaceType: 'pump_junction_floor',
-        wallLanguage: 'service_room_shell',
+        wallLanguage: 'graybox_service_shell',
         landmarks: ['central machinery block'],
         shell: false,
         surfaces: [
@@ -534,7 +525,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 0.0,
         ceilingY: 8.0,
         floorSurfaceType: 'transfer_gallery_floor',
-        wallLanguage: 'public_gallery_shell',
+        wallLanguage: 'graybox_gallery_shell',
         landmarks: ['public transition'],
         shell: false,
         surfaces: [
@@ -547,49 +538,49 @@ export const LEVEL5 = compileAuthoredEraLayout({
         decorBlocks: room4Blocks,
       },
       {
-        id: 'grand_dome_exhibit',
-        label: 'Grand Dome Exhibit',
+        id: 'grand_stadium_room',
+        label: 'Grand Stadium Room',
         x: 126.0,
         z: 68.0,
         w: 92.0,
         d: 72.0,
         floorY: 0.0,
-        ceilingY: 28.0,
-        floorSurfaceType: 'grand_dome_floor',
-        wallLanguage: 'grand_dome_shell',
-        landmarks: ['dome', 'ocean shell', 'balcony ring'],
+        ceilingY: 12.0,
+        floorSurfaceType: 'grand_stadium_floor',
+        wallLanguage: 'graybox_stadium_shell',
+        landmarks: ['stadium floor', 'balcony ring'],
         shell: false,
         surfaces: [
-          surfaceRect('grand_dome_west_entry_apron', 80.0, 84.0, 0.0, 63.0, 73.0, 'grand_dome_floor', {
+          surfaceRect('grand_stadium_west_entry_apron', 80.0, 84.0, 0.0, 63.0, 73.0, 'grand_stadium_floor', {
             h: 0.75,
             walkableClassification: 'threshold-floor',
             roomSurface: true,
           }),
-          surfaceRect('grand_dome_main_floor', 84.0, 168.0, 0.0, 36.0, 100.0, 'grand_dome_floor', {
+          surfaceRect('grand_stadium_main_floor', 84.0, 168.0, 0.0, 36.0, 100.0, 'grand_stadium_floor', {
             h: 0.75,
             walkableClassification: 'room-floor',
             roomSurface: true,
           }),
-          surfaceRect('grand_dome_north_balcony', 88.0, 164.0, 8.0, 34.0, 38.0, 'grand_dome_balcony', {
+          surfaceRect('grand_stadium_north_balcony', 88.0, 164.0, 8.0, 34.0, 38.0, 'grand_stadium_balcony', {
             h: 0.4,
             minThickness: 0.4,
             walkableClassification: 'balcony',
             roomSurface: true,
           }),
-          surfaceRect('grand_dome_west_balcony', 84.0, 88.0, 8.0, 40.0, 92.0, 'grand_dome_balcony', {
+          surfaceRect('grand_stadium_west_balcony', 84.0, 88.0, 8.0, 40.0, 92.0, 'grand_stadium_balcony', {
             h: 0.4,
             minThickness: 0.4,
             walkableClassification: 'balcony',
             roomSurface: true,
           }),
-          surfaceRect('grand_dome_east_balcony', 164.0, 168.0, 8.0, 40.0, 92.0, 'grand_dome_balcony', {
+          surfaceRect('grand_stadium_east_balcony', 164.0, 168.0, 8.0, 40.0, 92.0, 'grand_stadium_balcony', {
             h: 0.4,
             minThickness: 0.4,
             walkableClassification: 'balcony',
             roomSurface: true,
           }),
         ],
-        decorBlocks: room5ShellWithoutNorth,
+        decorBlocks: room5Blocks,
       },
       {
         id: 'west_kelp_operations_wing',
@@ -601,8 +592,8 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 8.0,
         ceilingY: 16.0,
         floorSurfaceType: 'upper_wing_floor',
-        wallLanguage: 'upper_wing_shell',
-        landmarks: ['kelp ops wing'],
+        wallLanguage: 'graybox_upper_wing_shell',
+        landmarks: ['west upper wing'],
         shell: false,
         surfaces: [
           surfaceRect('west_wing_floor', 84.0, 108.0, 8.0, 7.0, 25.0, 'upper_wing_floor', {
@@ -624,8 +615,8 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 8.0,
         ceilingY: 16.0,
         floorSurfaceType: 'upper_wing_floor',
-        wallLanguage: 'upper_wing_shell',
-        landmarks: ['whale observation wing'],
+        wallLanguage: 'graybox_upper_wing_shell',
+        landmarks: ['east upper wing'],
         shell: false,
         surfaces: [
           surfaceRect('east_wing_floor', 144.0, 168.0, 8.0, 7.0, 25.0, 'upper_wing_floor', {
@@ -685,10 +676,10 @@ export const LEVEL5 = compileAuthoredEraLayout({
         surfaces: [],
       },
       {
-        id: 'gallery_to_grand_dome',
-        label: 'Gallery To Grand Dome',
+        id: 'gallery_to_grand_stadium',
+        label: 'Gallery To Grand Stadium',
         sourceSector: 'transfer_gallery',
-        destinationSector: 'grand_dome_exhibit',
+        destinationSector: 'grand_stadium_room',
         x: 80.1,
         z: 68.0,
         w: 0.4,
@@ -702,7 +693,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
       {
         id: 'west_balcony_bridge',
         label: 'West Balcony Bridge',
-        sourceSector: 'grand_dome_exhibit',
+        sourceSector: 'grand_stadium_room',
         destinationSector: 'west_kelp_operations_wing',
         x: 96.0,
         z: 29.5,
@@ -711,7 +702,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 8.0,
         ceilingY: 10.5,
         floorSurfaceType: 'upper_bridge_floor',
-        wallLanguage: 'upper_bridge_shell',
+        wallLanguage: 'graybox_bridge_shell',
         shell: false,
         surfaces: [
           surfaceRect('west_balcony_bridge_floor', 93.0, 99.0, 8.0, 25.0, 34.0, 'upper_bridge_floor', {
@@ -721,29 +712,20 @@ export const LEVEL5 = compileAuthoredEraLayout({
             roomSurface: true,
           }),
         ],
-        decorBlocks: [
-          ...makeShell('west_balcony_bridge', {
-            minX: 93.0,
-            maxX: 99.0,
-            minY: 8.0,
-            maxY: 10.5,
-            minZ: 25.0,
-            maxZ: 34.0,
-          }, {
-            south: openingAlongX(96.0, 9.0, 4.0, 3.0),
-            north: openingAlongX(96.0, 9.0, 4.0, 3.0),
-          }, {
-            rgb: UPPER_WING_RGB,
-            wallBottomY: 8.0,
-            wallTopY: 10.5,
-            ceilingY: 10.5,
-          }),
-        ],
+        decorBlocks: makeShell('west_balcony_bridge', westBridgeBounds, {
+          south: openingAlongX(96.0, 9.0, 4.0, 3.0),
+          north: openingAlongX(96.0, 9.0, 4.0, 3.0),
+        }, {
+          rgb: UPPER_RGB,
+          wallBottomY: 8.0,
+          wallTopY: 10.5,
+          ceilingY: 10.5,
+        }),
       },
       {
         id: 'east_balcony_bridge',
         label: 'East Balcony Bridge',
-        sourceSector: 'grand_dome_exhibit',
+        sourceSector: 'grand_stadium_room',
         destinationSector: 'east_whale_observation_wing',
         x: 156.0,
         z: 29.5,
@@ -752,7 +734,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: 8.0,
         ceilingY: 10.5,
         floorSurfaceType: 'upper_bridge_floor',
-        wallLanguage: 'upper_bridge_shell',
+        wallLanguage: 'graybox_bridge_shell',
         shell: false,
         surfaces: [
           surfaceRect('east_balcony_bridge_floor', 153.0, 159.0, 8.0, 25.0, 34.0, 'upper_bridge_floor', {
@@ -762,24 +744,15 @@ export const LEVEL5 = compileAuthoredEraLayout({
             roomSurface: true,
           }),
         ],
-        decorBlocks: [
-          ...makeShell('east_balcony_bridge', {
-            minX: 153.0,
-            maxX: 159.0,
-            minY: 8.0,
-            maxY: 10.5,
-            minZ: 25.0,
-            maxZ: 34.0,
-          }, {
-            south: openingAlongX(156.0, 9.0, 4.0, 3.0),
-            north: openingAlongX(156.0, 9.0, 4.0, 3.0),
-          }, {
-            rgb: UPPER_WING_RGB,
-            wallBottomY: 8.0,
-            wallTopY: 10.5,
-            ceilingY: 10.5,
-          }),
-        ],
+        decorBlocks: makeShell('east_balcony_bridge', eastBridgeBounds, {
+          south: openingAlongX(156.0, 9.0, 4.0, 3.0),
+          north: openingAlongX(156.0, 9.0, 4.0, 3.0),
+        }, {
+          rgb: UPPER_RGB,
+          wallBottomY: 8.0,
+          wallTopY: 10.5,
+          ceilingY: 10.5,
+        }),
       },
     ],
   },
@@ -826,7 +799,6 @@ export const LEVEL5 = compileAuthoredEraLayout({
       width: 1.2,
       bottomY: 0.0,
       topY: 8.0,
-      mountSide: 'west',
       topExit: { x: 87.6, y: 8.42, z: 44.0 },
       bottomExit: { x: 90.8, y: 0.42, z: 44.0 },
     },
@@ -838,92 +810,13 @@ export const LEVEL5 = compileAuthoredEraLayout({
       width: 1.2,
       bottomY: 0.0,
       topY: 8.0,
-      mountSide: 'east',
       topExit: { x: 164.4, y: 8.42, z: 44.0 },
       bottomExit: { x: 161.2, y: 0.42, z: 44.0 },
     },
   ],
-  squarium: {
-    dome: {
-      inner: { centerX: 126.0, centerY: 12.0, centerZ: 68.0, radiusX: 46.0, radiusY: 16.0, radiusZ: 36.0 },
-      outer: { centerX: 126.0, centerY: 14.0, centerZ: 68.0, radiusX: 50.0, radiusY: 20.0, radiusZ: 40.0 },
-    },
-    whales: [
-      {
-        id: 'humpback_path_a',
-        bodyLength: 14.0,
-        points: [
-          { x: 92.0, y: 17.0, z: 46.0 },
-          { x: 108.0, y: 21.0, z: 40.0 },
-          { x: 126.0, y: 23.0, z: 38.0 },
-          { x: 146.0, y: 21.0, z: 42.0 },
-          { x: 160.0, y: 18.0, z: 52.0 },
-        ],
-      },
-      {
-        id: 'humpback_path_b',
-        bodyLength: 14.0,
-        points: [
-          { x: 160.0, y: 19.0, z: 86.0 },
-          { x: 146.0, y: 22.0, z: 94.0 },
-          { x: 126.0, y: 24.0, z: 98.0 },
-          { x: 106.0, y: 22.0, z: 94.0 },
-          { x: 92.0, y: 19.0, z: 84.0 },
-        ],
-      },
-    ],
-    kelpClusters: [
-      { x: 92.0, y: 8.0, z: 46.0, height: 14.0 },
-      { x: 100.0, y: 8.0, z: 56.0, height: 13.0 },
-      { x: 108.0, y: 8.0, z: 92.0, height: 16.0 },
-      { x: 118.0, y: 8.0, z: 100.0, height: 12.0 },
-      { x: 126.0, y: 8.0, z: 102.0, height: 18.0 },
-      { x: 136.0, y: 8.0, z: 100.0, height: 15.0 },
-      { x: 146.0, y: 8.0, z: 92.0, height: 16.0 },
-      { x: 154.0, y: 8.0, z: 82.0, height: 12.0 },
-      { x: 156.0, y: 8.0, z: 54.0, height: 17.0 },
-      { x: 146.0, y: 8.0, z: 42.0, height: 13.0 },
-      { x: 126.0, y: 8.0, z: 36.0, height: 14.0 },
-      { x: 106.0, y: 8.0, z: 42.0, height: 11.0 },
-    ],
-  },
-  airBubblePickups: [
-    { name: 'bubble_pool_01', x: 32.0, y: -0.35, z: 29.0, radius: 0.9 },
-    { name: 'bubble_pool_02', x: 40.0, y: -1.0, z: 31.0, radius: 0.9 },
-  ],
+  airBubblePickups: [],
   eelRails: [],
   vents: [],
-  jellyfish: [
-    {
-      name: 'jelly_01',
-      x: 28.0,
-      y: 2.0,
-      z: 9.0,
-      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
-      speed: 1.8,
-      turnSpeed: 0.9,
-      hpMax: 3,
-    },
-    {
-      name: 'jelly_02',
-      x: 34.0,
-      y: 2.2,
-      z: 18.0,
-      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
-      speed: 1.8,
-      turnSpeed: 0.9,
-      hpMax: 3,
-    },
-    {
-      name: 'jelly_03',
-      x: 26.0,
-      y: 1.9,
-      z: 27.0,
-      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
-      speed: 1.8,
-      turnSpeed: 0.9,
-      hpMax: 3,
-    },
-  ],
+  jellyfish: [],
   signage: [],
 });

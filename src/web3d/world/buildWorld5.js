@@ -28,33 +28,6 @@ function markDecor(node) {
   markDecorNode(node, { cameraBlocker: false });
 }
 
-function markDecorStructure(node) {
-  if (!node) return;
-  markDecor(node);
-  node.metadata = {
-    ...(node.metadata || {}),
-    gameplaySurface: false,
-    gameplay: false,
-    decor: true,
-    cameraIgnore: true,
-    cameraFadeable: false,
-  };
-  const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
-  for (const mesh of meshes) {
-    if (!(mesh instanceof BABYLON.Mesh)) continue;
-    mesh.metadata = {
-      ...(mesh.metadata || {}),
-      gameplaySurface: false,
-      gameplay: false,
-      decor: true,
-      cameraIgnore: true,
-      cameraFadeable: false,
-    };
-    mesh.isPickable = false;
-    mesh.checkCollisions = false;
-  }
-}
-
 function markHazard(node) {
   if (!node) return;
   markDecor(node);
@@ -90,21 +63,6 @@ function makeGlowMaterial(scene, name, rgb, {
     (rgb[2] / 255) * emissive,
   );
   material.transparencyMode = alpha < 1 ? BABYLON.Material.MATERIAL_ALPHABLEND : material.transparencyMode;
-  return material;
-}
-
-function makeFlatDecorMaterial(scene, name, rgb, alpha = 1, emissiveScale = 0.12) {
-  const material = new BABYLON.StandardMaterial(name, scene);
-  material.diffuseColor = new BABYLON.Color3(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
-  material.emissiveColor = new BABYLON.Color3(
-    (rgb[0] / 255) * emissiveScale,
-    (rgb[1] / 255) * emissiveScale,
-    (rgb[2] / 255) * emissiveScale,
-  );
-  material.alpha = alpha;
-  material.specularColor = BABYLON.Color3.Black();
-  material.backFaceCulling = false;
-  material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   return material;
 }
 
@@ -405,7 +363,7 @@ function createDeepWaterPocket(scene, def) {
     }, scene);
     southWall.parent = root;
     southWall.position.set(0, -0.85, 3.95);
-    southWall.rotation.y = Math.PI;  // face -Z (inward)
+    southWall.rotation.y = Math.PI;
     southWall.material = basinWallMat;
     tagPoolVisual(southWall);
   }
@@ -526,15 +484,15 @@ function createDeepWaterPocket(scene, def) {
   createPoolCollider(`${def.name}_edge_ne`, { width: 7.20, height: 0.25, depth: 0.20 },
     { x:  4.30, y: -0.025, z: -3.90 }, 'blocker');
   if (southTunnel?.width > 0) {
-    const tunnelHalfWidth = southTunnel.width * 0.5;
-    const sideWidth = 8.0 - tunnelHalfWidth;
-    createPoolCollider(`${def.name}_edge_sw`, { width: sideWidth, height: 0.25, depth: 0.20 },
-      { x: -(tunnelHalfWidth + (sideWidth * 0.5)), y: -0.025, z: 3.90 }, 'blocker');
-    createPoolCollider(`${def.name}_edge_se`, { width: sideWidth, height: 0.25, depth: 0.20 },
-      { x: tunnelHalfWidth + (sideWidth * 0.5), y: -0.025, z: 3.90 }, 'blocker');
+    const edgeWidth = (16.0 - southTunnel.width) * 0.5;
+    const edgeOffset = (southTunnel.width * 0.5) + (edgeWidth * 0.5);
+    createPoolCollider(`${def.name}_edge_sw`, { width: edgeWidth, height: 0.25, depth: 0.20 },
+      { x: -edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
+    createPoolCollider(`${def.name}_edge_se`, { width: edgeWidth, height: 0.25, depth: 0.20 },
+      { x: edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
   } else {
-    createPoolCollider(`${def.name}_edge_s`,  { width: 16.00, height: 0.25, depth: 0.20 },
-      { x:  0,    y: -0.025, z:  3.90 }, 'blocker');
+    createPoolCollider(`${def.name}_edge_s`, { width: 16.00, height: 0.25, depth: 0.20 },
+      { x: 0, y: -0.025, z: 3.90 }, 'blocker');
   }
   createPoolCollider(`${def.name}_edge_w`,  { width:  0.20, height: 0.25, depth: 8.00 },
     { x: -7.90, y: -0.025, z:  0    }, 'blocker');
@@ -549,15 +507,15 @@ function createDeepWaterPocket(scene, def) {
   createPoolCollider(`${def.name}_wall_ne`, { width: 7.20,  height: WALL_H, depth: WALL_T },
     { x:  4.30, y: WALL_CY, z: -3.85 }, 'blocker');
   if (southTunnel?.width > 0) {
-    const tunnelHalfWidth = southTunnel.width * 0.5;
-    const sideWidth = 7.95 - tunnelHalfWidth;
-    createPoolCollider(`${def.name}_wall_sw`, { width: sideWidth, height: WALL_H, depth: WALL_T },
-      { x: -(tunnelHalfWidth + (sideWidth * 0.5)), y: WALL_CY, z: 3.85 }, 'blocker');
-    createPoolCollider(`${def.name}_wall_se`, { width: sideWidth, height: WALL_H, depth: WALL_T },
-      { x: tunnelHalfWidth + (sideWidth * 0.5), y: WALL_CY, z: 3.85 }, 'blocker');
+    const wallWidth = (15.90 - southTunnel.width) * 0.5;
+    const wallOffset = (southTunnel.width * 0.5) + (wallWidth * 0.5);
+    createPoolCollider(`${def.name}_wall_sw`, { width: wallWidth, height: WALL_H, depth: WALL_T },
+      { x: -wallOffset, y: WALL_CY, z: 3.85 }, 'blocker');
+    createPoolCollider(`${def.name}_wall_se`, { width: wallWidth, height: WALL_H, depth: WALL_T },
+      { x: wallOffset, y: WALL_CY, z: 3.85 }, 'blocker');
   } else {
-    createPoolCollider(`${def.name}_wall_s`,  { width: 15.90, height: WALL_H, depth: WALL_T },
-      { x:  0,    y: WALL_CY, z:  3.85 }, 'blocker');
+    createPoolCollider(`${def.name}_wall_s`, { width: 15.90, height: WALL_H, depth: WALL_T },
+      { x: 0, y: WALL_CY, z: 3.85 }, 'blocker');
   }
   createPoolCollider(`${def.name}_wall_w`,  { width: WALL_T, height: WALL_H, depth: 7.70 },
     { x: -7.85, y: WALL_CY, z:  0    }, 'blocker');
@@ -671,6 +629,88 @@ function createAirBubblePickup(scene, def) {
       root.position.set(this.x, this.y, this.z ?? 0);
       root.rotation.set(0, 0, 0);
       root.setEnabled(true);
+    },
+  };
+}
+
+function createSubmergedPassage(def) {
+  return {
+    ...def,
+    contains(pos) {
+      return pos.x >= def.minX
+        && pos.x <= def.maxX
+        && pos.y >= def.minY
+        && pos.y <= def.maxY
+        && pos.z >= def.minZ
+        && pos.z <= def.maxZ;
+    },
+    getFloorY(worldZ) {
+      const t = clamp((worldZ - def.minZ) / Math.max(0.001, def.maxZ - def.minZ), 0, 1);
+      return lerp(def.floorStartY ?? def.minY, def.floorEndY ?? def.minY, t);
+    },
+    getWaterState(pos, headY = pos.y) {
+      if (!this.contains(pos)) {
+        return {
+          inDeepWater: false,
+          headSubmerged: false,
+          waterSurfaceY: def.waterSurfaceY ?? def.maxY,
+          depthAtZ: null,
+        };
+      }
+      const floorY = this.getFloorY(pos.z);
+      const waterSurfaceY = def.waterSurfaceY ?? def.maxY;
+      return {
+        inDeepWater: pos.y <= waterSurfaceY && (waterSurfaceY - floorY) >= 1.0,
+        headSubmerged: headY <= (waterSurfaceY - 0.04),
+        waterSurfaceY,
+        depthAtZ: waterSurfaceY - floorY,
+      };
+    },
+  };
+}
+
+function createGrayboxLadder(scene, def) {
+  const root = new BABYLON.TransformNode(def.id, scene);
+  root.position.set(def.centerX, (def.bottomY + def.topY) * 0.5, def.centerZ);
+  markDecor(root);
+  const halfHeight = (def.topY - def.bottomY) * 0.5;
+
+  const railMat = makePlastic(scene, `${def.id}_railMat`, 0.64, 0.64, 0.64, { roughness: 0.92 });
+  const rungMat = makePlastic(scene, `${def.id}_rungMat`, 0.72, 0.72, 0.72, { roughness: 0.9 });
+
+  for (const z of [-(def.width * 0.38), def.width * 0.38]) {
+    const rail = BABYLON.MeshBuilder.CreateBox(`${def.id}_rail_${z > 0 ? 'r' : 'l'}`, {
+      width: 0.14,
+      height: def.topY - def.bottomY,
+      depth: 0.14,
+    }, scene);
+    rail.parent = root;
+    rail.position.set(0, 0, z);
+    rail.material = railMat;
+    markDecor(rail);
+  }
+
+  const rungCount = 13;
+  for (let index = 0; index < rungCount; index += 1) {
+    const rung = BABYLON.MeshBuilder.CreateBox(`${def.id}_rung_${index}`, {
+      width: 0.12,
+      height: 0.08,
+      depth: def.width * 0.78,
+    }, scene);
+    rung.parent = root;
+    rung.position.set(0, -halfHeight + 0.35 + (index * ((def.topY - def.bottomY - 0.7) / Math.max(1, rungCount - 1))), 0);
+    rung.material = rungMat;
+    markDecor(rung);
+  }
+
+  return {
+    ...def,
+    root,
+    contains(pos) {
+      return Math.abs(pos.x - def.centerX) <= 1.1
+        && Math.abs(pos.z - def.centerZ) <= 0.9
+        && pos.y >= (def.bottomY - 0.3)
+        && pos.y <= (def.topY + 0.9);
     },
   };
 }
@@ -1080,260 +1120,6 @@ function createOverlayMaterial(scene, name, rgb, alpha) {
   return material;
 }
 
-function createSubmergedPassage(def) {
-  return {
-    ...def,
-    contains(pos) {
-      return pos.x >= def.minX
-        && pos.x <= def.maxX
-        && pos.y >= def.minY
-        && pos.y <= def.maxY
-        && pos.z >= def.minZ
-        && pos.z <= def.maxZ;
-    },
-    getFloorY(worldZ) {
-      const t = clamp((worldZ - def.minZ) / Math.max(0.001, def.maxZ - def.minZ), 0, 1);
-      return lerp(def.floorStartY ?? def.minY, def.floorEndY ?? def.minY, t);
-    },
-    getWaterState(pos, headY = pos.y) {
-      if (!this.contains(pos)) {
-        return {
-          inDeepWater: false,
-          headSubmerged: false,
-          waterSurfaceY: def.waterSurfaceY ?? def.maxY,
-          depthAtZ: null,
-        };
-      }
-      const floorY = this.getFloorY(pos.z);
-      const waterSurfaceY = def.waterSurfaceY ?? def.maxY;
-      return {
-        inDeepWater: pos.y <= waterSurfaceY && (waterSurfaceY - floorY) >= 1.0,
-        headSubmerged: headY <= (waterSurfaceY - 0.04),
-        waterSurfaceY,
-        depthAtZ: waterSurfaceY - floorY,
-      };
-    },
-  };
-}
-
-function createSquariumWhale(scene, def) {
-  const root = new BABYLON.TransformNode(def.id, scene);
-  const center = def.points[2];
-  const prev = def.points[1];
-  const next = def.points[3];
-  const dx = next.x - prev.x;
-  const dz = next.z - prev.z;
-  const dy = next.y - prev.y;
-  const yaw = Math.atan2(dx, dz);
-  const pitch = Math.atan2(dy, Math.max(0.001, Math.hypot(dx, dz)));
-  root.position.set(center.x, center.y, center.z);
-  root.rotation.set(-pitch, yaw, 0);
-
-  const body = BABYLON.MeshBuilder.CreateSphere(`${def.id}_body`, {
-    diameter: 1,
-    segments: 18,
-  }, scene);
-  body.parent = root;
-  body.scaling.set(def.bodyLength * 0.48, 2.8, 4.2);
-  body.material = makeGlowMaterial(scene, `${def.id}_bodyMat`, [78, 110, 132], {
-    emissive: 0.06,
-    roughness: 0.24,
-    alpha: 0.94,
-  });
-  markDecorStructure(body);
-
-  const belly = BABYLON.MeshBuilder.CreateSphere(`${def.id}_belly`, {
-    diameter: 1,
-    segments: 16,
-  }, scene);
-  belly.parent = root;
-  belly.position.y = -0.7;
-  belly.scaling.set(def.bodyLength * 0.42, 1.8, 3.6);
-  belly.material = makeGlowMaterial(scene, `${def.id}_bellyMat`, [198, 214, 220], {
-    emissive: 0.04,
-    roughness: 0.28,
-    alpha: 0.86,
-  });
-  markDecorStructure(belly);
-
-  const finMat = makeGlowMaterial(scene, `${def.id}_finMat`, [92, 128, 146], {
-    emissive: 0.06,
-    roughness: 0.34,
-    alpha: 0.82,
-  });
-
-  for (const side of [-1, 1]) {
-    const fin = BABYLON.MeshBuilder.CreatePlane(`${def.id}_fin_${side > 0 ? 'r' : 'l'}`, {
-      width: def.bodyLength * 0.28,
-      height: 2.1,
-    }, scene);
-    fin.parent = root;
-    fin.position.set(def.bodyLength * 0.04, -0.15, side * 2.7);
-    fin.rotation.set(0.2, side > 0 ? Math.PI * 0.12 : -Math.PI * 0.12, side * 0.5);
-    fin.material = finMat;
-    markDecorStructure(fin);
-  }
-
-  const dorsal = BABYLON.MeshBuilder.CreatePlane(`${def.id}_dorsal`, {
-    width: def.bodyLength * 0.18,
-    height: 2.6,
-  }, scene);
-  dorsal.parent = root;
-  dorsal.position.set(-def.bodyLength * 0.04, 2.2, 0);
-  dorsal.rotation.z = Math.PI * 0.5;
-  dorsal.material = finMat;
-  markDecorStructure(dorsal);
-
-  const tail = BABYLON.MeshBuilder.CreatePlane(`${def.id}_tail`, {
-    width: 4.8,
-    height: 4.2,
-  }, scene);
-  tail.parent = root;
-  tail.position.set(-(def.bodyLength * 0.58), 0.4, 0);
-  tail.rotation.y = Math.PI * 0.5;
-  tail.rotation.z = Math.PI * 0.08;
-  tail.material = finMat;
-  markDecorStructure(tail);
-
-  return { def, root };
-}
-
-function createSquariumKelpCluster(scene, def, index) {
-  const root = new BABYLON.TransformNode(`kelp_cluster_${index}`, scene);
-  root.position.set(def.x, def.y, def.z);
-  const heights = [
-    def.height,
-    Math.max(10, def.height - 2),
-    Math.min(18, def.height + 1),
-    Math.max(10, def.height - 1),
-    Math.min(18, def.height + 2),
-  ];
-  for (let strandIndex = 0; strandIndex < heights.length; strandIndex += 1) {
-    const plane = BABYLON.MeshBuilder.CreatePlane(`kelp_cluster_${index}_strand_${strandIndex}`, {
-      width: 1.2 + ((strandIndex % 2) * 0.35),
-      height: heights[strandIndex],
-    }, scene);
-    plane.parent = root;
-    plane.position.set(
-      -1.0 + (strandIndex * 0.5),
-      heights[strandIndex] * 0.5,
-      ((strandIndex % 3) - 1) * 0.38,
-    );
-    plane.rotation.y = strandIndex * 0.64;
-    plane.material = makeFlatDecorMaterial(scene, `kelp_cluster_${index}_mat_${strandIndex}`, [58, 128, 92], 0.38, 0.10);
-    markDecorStructure(plane);
-  }
-  return { def, root };
-}
-
-function createSquariumHeroSet(scene, squarium) {
-  if (!squarium?.dome) return null;
-
-  const root = new BABYLON.TransformNode('level5_squarium_hero_root', scene);
-  markDecorStructure(root);
-
-  const innerDome = BABYLON.MeshBuilder.CreateSphere('level5_inner_dome', {
-    diameter: 2,
-    segments: 36,
-  }, scene);
-  innerDome.parent = root;
-  innerDome.position.set(squarium.dome.inner.centerX, squarium.dome.inner.centerY, squarium.dome.inner.centerZ);
-  innerDome.scaling.set(squarium.dome.inner.radiusX, squarium.dome.inner.radiusY, squarium.dome.inner.radiusZ);
-  innerDome.material = makeGlowMaterial(scene, 'level5_inner_dome_mat', [108, 190, 214], {
-    emissive: 0.12,
-    roughness: 0.10,
-    alpha: 0.24,
-  });
-  innerDome.material.backFaceCulling = false;
-  innerDome.material.needDepthPrePass = true;
-  innerDome.renderingGroupId = 2;
-  innerDome.alwaysSelectAsActiveMesh = true;
-  markDecorStructure(innerDome);
-
-  const outerShell = BABYLON.MeshBuilder.CreateSphere('level5_outer_ocean_shell', {
-    diameter: 2,
-    segments: 36,
-  }, scene);
-  outerShell.parent = root;
-  outerShell.position.set(squarium.dome.outer.centerX, squarium.dome.outer.centerY, squarium.dome.outer.centerZ);
-  outerShell.scaling.set(squarium.dome.outer.radiusX, squarium.dome.outer.radiusY, squarium.dome.outer.radiusZ);
-  outerShell.material = makeGlowMaterial(scene, 'level5_outer_ocean_shell_mat', [26, 70, 94], {
-    emissive: 0.18,
-    roughness: 0.12,
-    alpha: 0.30,
-  });
-  outerShell.material.backFaceCulling = false;
-  outerShell.material.needDepthPrePass = true;
-  outerShell.renderingGroupId = 0;
-  outerShell.alwaysSelectAsActiveMesh = true;
-  markDecorStructure(outerShell);
-
-  const whales = (squarium.whales || []).map((def) => createSquariumWhale(scene, def));
-  const kelpClusters = (squarium.kelpClusters || []).map((def, index) => createSquariumKelpCluster(scene, def, index));
-  for (const whale of whales) whale.root.parent = root;
-  for (const kelp of kelpClusters) kelp.root.parent = root;
-
-  return {
-    root,
-    innerDome,
-    outerShell,
-    whales,
-    kelpClusters,
-  };
-}
-
-function createSquariumLadder(scene, def) {
-  const root = new BABYLON.TransformNode(def.id, scene);
-  root.position.set(def.centerX, (def.bottomY + def.topY) * 0.5, def.centerZ);
-  const halfHeight = (def.topY - def.bottomY) * 0.5;
-  const railMat = makeGlowMaterial(scene, `${def.id}_railMat`, [156, 174, 182], {
-    emissive: 0.06,
-    roughness: 0.42,
-    alpha: 0.96,
-  });
-  const rungMat = makeGlowMaterial(scene, `${def.id}_rungMat`, [188, 200, 206], {
-    emissive: 0.08,
-    roughness: 0.38,
-    alpha: 0.96,
-  });
-
-  for (const z of [-(def.width * 0.38), def.width * 0.38]) {
-    const rail = BABYLON.MeshBuilder.CreateBox(`${def.id}_rail_${z > 0 ? 'r' : 'l'}`, {
-      width: 0.12,
-      height: def.topY - def.bottomY,
-      depth: 0.12,
-    }, scene);
-    rail.parent = root;
-    rail.position.set(0, 0, z);
-    rail.material = railMat;
-    markDecorStructure(rail);
-  }
-
-  const rungCount = 13;
-  for (let index = 0; index < rungCount; index += 1) {
-    const rung = BABYLON.MeshBuilder.CreateBox(`${def.id}_rung_${index}`, {
-      width: 0.10,
-      height: 0.08,
-      depth: def.width * 0.78,
-    }, scene);
-    rung.parent = root;
-    rung.position.set(0, -halfHeight + 0.35 + (index * ((def.topY - def.bottomY - 0.7) / Math.max(1, rungCount - 1))), 0);
-    rung.material = rungMat;
-    markDecorStructure(rung);
-  }
-
-  return {
-    ...def,
-    root,
-    contains(pos) {
-      return Math.abs(pos.x - def.centerX) <= 1.1
-        && Math.abs(pos.z - def.centerZ) <= 0.9
-        && pos.y >= (def.bottomY - 0.3)
-        && pos.y <= (def.topY + 0.9);
-    },
-  };
-}
-
 export function buildWorld5(scene, options = {}) {
   const world = buildEraAdventureWorld(scene, LEVEL5, options);
   const shadowGen = world.shadowGen;
@@ -1366,13 +1152,13 @@ export function buildWorld5(scene, options = {}) {
   const vents = (LEVEL5.vents || []).map((def) => createVent(scene, def));
   const jellyfish = (LEVEL5.jellyfish || []).map((def) => createJellyfish(scene, def, shadowGen));
   const sharkSweep = LEVEL5.sharkSweep ? createSharkSweep(scene, LEVEL5.sharkSweep) : null;
-  const squariumHeroSet = createSquariumHeroSet(scene, LEVEL5.squarium);
-  const ladders = (LEVEL5.ladders || []).map((def) => createSquariumLadder(scene, def));
+  const ladders = (LEVEL5.ladders || []).map((def) => createGrayboxLadder(scene, def));
 
   // ── Spawn area decorations ─────────────────────────────────────────────────
   // Colorful curtains along the west wall near spawn (x=4, z=18).
   // Cryptic floor logo: concentric symbol centered at spawn position.
   (function createSpawnDecorations() {
+    if (LEVEL5.graybox) return;
     const spawnX = world.spawn.x;       // 4.0
     const spawnZ = world.spawn.z ?? 0;  // 18.0
     const WALL_X = 0.28;                // inner face of west wall
@@ -2088,10 +1874,10 @@ export function buildWorld5(scene, options = {}) {
       if (!pos || !player) return;
 
       updateCurrentJets(dt, player);
-      updateLadders(dt, ctx);
       for (const pocket of deepWaterPockets) {
         pocket.update(runtimeTime);
       }
+      updateLadders(dt, ctx);
       for (const bubble of airBubblePickups) {
         bubble.update(dt, runtimeTime);
         if (!bubble.collected && bubble.contains(pos)) {
@@ -2254,7 +2040,6 @@ export function buildWorld5(scene, options = {}) {
           maxY: passage.maxY,
           minZ: passage.minZ,
           maxZ: passage.maxZ,
-          waterSurfaceY: passage.waterSurfaceY,
         })),
         airBubbles: airBubblePickups.map((bubble) => ({
           name: bubble.name,
@@ -2276,11 +2061,7 @@ export function buildWorld5(scene, options = {}) {
         jellyfish: getEnemyReport().enemies,
         enemyDebug: { ...enemyDebugState },
         truthOverlay: { ...overlayState },
-        squarium: squariumHeroSet ? {
-          domeVisible: squariumHeroSet.innerDome.isEnabled(),
-          outerOceanVisible: squariumHeroSet.outerShell.isEnabled(),
-          whaleCount: squariumHeroSet.whales.length,
-          kelpCount: squariumHeroSet.kelpClusters.length,
+        graybox: {
           ladders: ladders.map((ladder) => ({
             id: ladder.id,
             centerX: ladder.centerX,
@@ -2289,7 +2070,7 @@ export function buildWorld5(scene, options = {}) {
             topY: ladder.topY,
           })),
           activeLadderId,
-        } : null,
+        },
       });
     },
   };
