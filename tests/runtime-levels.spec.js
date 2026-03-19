@@ -1534,356 +1534,246 @@ test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is 
   }
 });
 
-test('@level5 @era5 runtime: level 5 exposes one-room topology and clean shell truth with no fade pop while turning', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-  const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
-  const truth = await page.evaluate(() => window.__DADA_DEBUG__?.level5TruthReport?.() ?? null);
-  const collision = await page.evaluate(() => window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null);
-  const walkable = await page.evaluate(() => window.__DADA_DEBUG__?.level5WalkableReport?.() ?? null);
-  const respawn = await page.evaluate(() => window.__DADA_DEBUG__?.level5RespawnReport?.() ?? null);
-  test.skip(!topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
-  expect(topology).not.toBeNull();
-  expect(truth).not.toBeNull();
-  expect(collision).not.toBeNull();
-  expect(walkable).not.toBeNull();
-  expect(respawn).not.toBeNull();
-  expect(topology.sectorCount).toBe(1);
-  expect(topology.connectorCount).toBe(0);
-  expect(topology.topology?.hasCycle).toBe(false);
-  expect((topology.topology?.routeChoices ?? []).length).toBe(0);
-  expect(topology.walkableReport?.walkableSurfaceCount ?? 0).toBe(1);
-  expect(topology.walkableReport?.missingCollision ?? []).toEqual([]);
-  expect(topology.walkableReport?.underThickness ?? []).toEqual([]);
-  expect(topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
-  expect(topology.walkableReport?.unclassifiedWalkables ?? []).toEqual([]);
-  expect(truth?.disableDecorOcclusionFade).toBe(true);
-  expect(truth?.fadeableShells ?? []).toEqual([]);
-  expect(truth?.cullRiskShells ?? []).toEqual([]);
-  expect(collision?.unownedBlockers ?? []).toEqual([]);
-  expect(collision?.invisibleBlockers ?? []).toEqual([]);
-  expect(collision?.roomVolumeShells ?? []).toEqual([]);
-  expect(walkable?.missingVisibleWalkables ?? []).toEqual([]);
-  expect(walkable?.suspiciousFloorLikeDecor ?? []).toEqual([]);
-  expect(respawn?.anchorCount ?? 0).toBe(1);
-  expect(respawn?.selectedAnchor?.id).toBe('level5_spawn_anchor');
-  const room = topology.sectors?.[0] ?? null;
-  expect(room?.label).toBe('Starter Room');
-  expect(Number(room?.w?.toFixed?.(2) ?? room?.w)).toBe(48);
-  expect(Number(room?.d?.toFixed?.(2) ?? room?.d)).toBe(36);
-  const audit = await getLevel5StarterRoomAudit(page);
-  expect(audit.structuralCeilingShells).toHaveLength(1);
-  expect(audit.transparentShells).toEqual([]);
-  expect(audit.coplanarCeilingPairs).toEqual([]);
-  expect(audit.visibleGoalMeshes).toEqual([]);
-  expect(audit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
-  expect(audit.actorSummary?.goal?.visibleMeshCount ?? 0).toBe(0);
-  expect(audit.actorSummary?.goal?.allowInvisible).toBe(true);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(audit, launchAudit);
+const LEVEL5_SQUARIUM_SECTOR_IDS = [
+  'starter_pool_lab',
+  'submerged_service_tunnel',
+  'pump_junction',
+  'transfer_gallery',
+  'grand_dome_exhibit',
+  'west_kelp_operations_wing',
+  'east_whale_observation_wing',
+];
 
-  await resetEra5Pose(page, { x: 24.0, y: 0.42, z: 18.0, yaw: 0.0, cameraYaw: 0.0 });
-  const sweepSamples = [];
-  const allowedOccluders = new Set([
-    null,
-    ...audit.shellMeshes.map((mesh) => `neutral_decorBlock_${mesh.name}`),
-  ]);
-  for (let i = 0; i < 16; i += 1) {
-    const yaw = (i / 16) * Math.PI * 2;
-    await resetEra5Pose(page, {
-      x: 24.0,
-      y: 0.42,
-      z: 18.0,
-      yaw,
-      cameraYaw: yaw,
-    });
-    await page.waitForTimeout(120);
-    sweepSamples.push(await page.evaluate(() => {
-      const report = window.__DADA_DEBUG__?.era5VisionReport?.({ limit: 6 }) ?? null;
-      return {
-        fadedMeshes: report?.counts?.fadedMeshes ?? null,
-        occluderMesh: report?.occluderMesh ?? null,
-        goalVisibleMeshCount: window.__DADA_DEBUG__?.actors?.goal?.visibleMeshCount ?? null,
-      };
-    }));
-  }
-  expect(sweepSamples.every((sample) => sample.fadedMeshes === 0)).toBe(true);
-  expect(sweepSamples.every((sample) => allowedOccluders.has(sample.occluderMesh))).toBe(true);
-  expect(sweepSamples.every((sample) => sample.goalVisibleMeshCount === 0)).toBe(true);
-});
+const LEVEL5_SQUARIUM_ADJACENCY = {
+  starter_pool_lab: ['submerged_service_tunnel'],
+  submerged_service_tunnel: ['starter_pool_lab', 'pump_junction'],
+  pump_junction: ['submerged_service_tunnel', 'transfer_gallery'],
+  transfer_gallery: ['pump_junction', 'grand_dome_exhibit'],
+  grand_dome_exhibit: ['transfer_gallery', 'west_kelp_operations_wing', 'east_whale_observation_wing'],
+  west_kelp_operations_wing: ['grand_dome_exhibit'],
+  east_whale_observation_wing: ['grand_dome_exhibit'],
+};
 
-test('@level5 @era5 runtime: level 5 launch frame and two brief left turns keep the starter-room shell visible and camera state aligned', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
+const LEVEL5_WEST_WING_BOUNDS = { minX: 84.0, maxX: 108.0, minY: 8.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
+const LEVEL5_EAST_WING_BOUNDS = { minX: 144.0, maxX: 168.0, minY: 8.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
+const LEVEL5_WEST_BRIDGE_BOUNDS = { minX: 93.0, maxX: 99.0, minY: 8.0, maxY: 10.5, minZ: 25.0, maxZ: 34.0 };
+const LEVEL5_EAST_BRIDGE_BOUNDS = { minX: 153.0, maxX: 159.0, minY: 8.0, maxY: 10.5, minZ: 25.0, maxZ: 34.0 };
 
-  const initialStarterAudit = await getLevel5StarterRoomAudit(page);
-  const initialLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(initialStarterAudit, initialLaunchAudit);
+function sortAdjacency(adjacency) {
+  return Object.fromEntries(Object.entries(adjacency || {})
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, values]) => [key, [...values].sort()]));
+}
 
-  await tapEra5LeftTurnTwice(page);
+function expectPositionInBounds(position, bounds) {
+  expect(position).not.toBeNull();
+  expect(position.x).toBeGreaterThanOrEqual(bounds.minX - 0.15);
+  expect(position.x).toBeLessThanOrEqual(bounds.maxX + 0.15);
+  expect(position.y).toBeGreaterThanOrEqual(bounds.minY - 0.2);
+  expect(position.y).toBeLessThanOrEqual(bounds.maxY + 0.2);
+  expect(position.z).toBeGreaterThanOrEqual(bounds.minZ - 0.15);
+  expect(position.z).toBeLessThanOrEqual(bounds.maxZ + 0.15);
+}
 
-  const turnedStarterAudit = await getLevel5StarterRoomAudit(page);
-  const turnedLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(turnedStarterAudit, turnedLaunchAudit);
-});
-
-test('@level5 @era5 runtime: level 5 jump camera stays below the ceiling and inside the starter-room shell through ascent apex and landing', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const jumpTrace = await captureLevel5JumpCameraTrace(page);
-  expect(jumpTrace.roomBounds).not.toBeNull();
-  expect(Number(jumpTrace.ceilingY?.toFixed?.(3) ?? jumpTrace.ceilingY)).toBe(6);
-  expect(jumpTrace.anyCameraAboveCeiling).toBe(false);
-  expect(jumpTrace.anyCameraOutsideRoomXZ).toBe(false);
-  expect(jumpTrace.ceilingOccluderSeen).toBe(true);
-  expect(jumpTrace.entryClampSeen).toBe(true);
-  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.before, jumpTrace.roomBounds, jumpTrace.ceilingY);
-  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.ascent, jumpTrace.roomBounds, jumpTrace.ceilingY);
-  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.apex, jumpTrace.roomBounds, jumpTrace.ceilingY);
-  expectLevel5JumpPhaseInsideStarterRoom(jumpTrace.landing, jumpTrace.roomBounds, jumpTrace.ceilingY);
-  expect(jumpTrace.ascent.playerVy).toBeGreaterThan(0.4);
-  expect(jumpTrace.apex.occlusion?.pickDistance).not.toBeNull();
-  expect(jumpTrace.apex.occlusion?.safeDistance).toBeLessThan(jumpTrace.apex.occlusion?.pickDistance ?? Infinity);
-  expect(jumpTrace.landing.grounded).toBe(true);
-  expect(Math.abs(jumpTrace.landing.cameraPos.y - jumpTrace.before.cameraPos.y)).toBeLessThan(0.05);
-});
-
-test('@level5 @era5 runtime: southeast pool reads as a recessed commercial basin and still preserves weapon visibility plus water trigger behavior', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-
-  await resetEra5Pose(page, {
-    x: 27.4,
-    y: 0.42,
-    z: 30.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  });
-  await page.waitForTimeout(180);
-
-  await page.evaluate(() => {
-    /** @type {any} */
-    const anyWindow = window;
-    anyWindow.__DADA_DEBUG__?.setEra5Vitals?.({ oxygen: 5, clearInvuln: true, clearLastDamage: true });
-  });
-  await page.waitForTimeout(450);
-  const edgeOxygen = await page.evaluate(() => {
-    /** @type {any} */
-    const anyWindow = window;
-    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
-  });
-  const poolAudit = await getLevel5PoolAudit(page);
-  expectLevel5PoolAudit(poolAudit);
-  expect(poolAudit.weapon.onScreen).toBe(true);
-  expect(poolAudit.weapon.pickedIsWeapon).toBe(true);
-  expect(edgeOxygen).not.toBeNull();
-  expect(Math.abs(edgeOxygen - 5)).toBeLessThan(0.15);
-
-  await resetEra5Pose(page, {
-    x: 36.0,
-    y: 0.42,
-    z: 30.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  });
-  await page.waitForTimeout(180);
-
-  const insideBefore = await page.evaluate(() => {
-    /** @type {any} */
-    const anyWindow = window;
-    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
-  });
-  await page.waitForTimeout(900);
-  const insideAfter = await page.evaluate(() => {
-    /** @type {any} */
-    const anyWindow = window;
-    return anyWindow.__DADA_DEBUG__?.era5Vitals?.oxygen ?? null;
-  });
-  const insideAudit = await getLevel5PoolAudit(page);
-  expect(insideBefore).not.toBeNull();
-  expect(insideAfter).not.toBeNull();
-  expect(insideAfter).toBeLessThan(insideBefore);
-  expect(insideAudit.weapon.onScreen).toBe(true);
-  expect(insideAudit.weapon.pickedIsWeapon).toBe(true);
-});
-
-test('@level5 @era5 runtime: level 5 burst shots 1 through 3 stay readable above the far floor band from the gameplay camera', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const report = await captureLevel5ProjectileBurstReport(page);
-  expectLevel5ProjectileBurstReport(report);
-
-  const postLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expect(postLaunchAudit.cameraInsideRoom).toBe(true);
-  expect(postLaunchAudit.fadedMeshes).toBe(0);
-  expect(postLaunchAudit.occluderMesh).toBe('neutral_decorBlock_west_wall');
-});
-
-test('@level5 @era5 runtime: projectiles remain occluded by solid blocker geometry from direct block view', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-
-  const candidatePoses = [
-    LEVEL5_DOORWAY_DIRECT_BLOCK_POSE,
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw - 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw - 0.28 },
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, yaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.yaw + 0.28, cameraYaw: LEVEL5_DOORWAY_DIRECT_BLOCK_POSE.cameraYaw + 0.28 },
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 43.8, z: 18.0 },
-    { ...LEVEL5_DOORWAY_DIRECT_BLOCK_POSE, x: 46.7, z: 18.0 },
-  ];
-
-  let hit = null;
-  for (const pose of candidatePoses) {
-    await resetEra5Pose(page, pose);
-    await page.waitForTimeout(120);
-    const probe = await probeLevel5ProjectileBlockerOcclusion(page);
-    if (probe?.blockedBySolid) {
-      hit = probe;
-      break;
-    }
-    await page.waitForTimeout(150);
-  }
-
-  expect(hit?.blockedBySolid).toBe(true);
-  expect(String(hit?.pickedName || '').length).toBeGreaterThan(0);
-});
-
-test('@level5 @era5 runtime: level 5 east doorway assembly stays flush and camera-safe from direct blocker and right-turn doorway views', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const assemblyReport = await getLevel5DoorwayAssemblyReport(page);
-  expectLevel5DoorwayAssemblyReport(assemblyReport);
-
-  const phases = await captureLevel5DoorwayRotationPhases(page);
-  for (const phase of Object.values(phases)) {
-    expect(phase?.roomBounds).not.toBeNull();
-    expect(phase?.cameraPos).not.toBeNull();
-    expect(phase?.cameraTarget).not.toBeNull();
-    expect(phase?.cameraInsideRoom).toBe(true);
-  }
-
-  expect(phases.directBlock.occluderMesh).toBe('neutral_decorBlock_future_exit_blocker');
-  expect(phases.directBlock.occlusion?.pickDistance).not.toBeNull();
-  expect(phases.directBlock.occlusion?.usedEntryClamp).toBe(true);
-
-  if (phases.rightStress.occluderMesh !== null) {
-    expect(phases.rightStress.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
-    expect(phases.rightStress.occlusion?.pickDistance).not.toBeNull();
-    expect(phases.rightStress.occlusion?.safeDistance).toBeLessThan(phases.rightStress.occlusion?.pickDistance ?? Infinity);
-  }
-  expect(phases.rightStress.cameraPos.x).toBeLessThan((phases.rightStress.roomBounds?.maxX ?? Infinity) - 0.05);
-});
-
-test('@level5 @era5 runtime: level 5 floor is fully traversable and the visible exit blocker keeps the player inside the room', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-
-  for (const sample of [
-    { x: 1.5, z: 1.5 },
-    { x: 46.5, z: 1.5 },
-    { x: 46.5, z: 34.5 },
-    { x: 1.5, z: 34.5 },
-    { x: 24.0, z: 18.0 },
-  ]) {
-    await resetEra5Pose(page, {
-      x: sample.x,
-      y: 0.42,
-      z: sample.z,
-      yaw: Math.PI * 0.5,
-      cameraYaw: Math.PI * 0.5,
-    });
-    await page.waitForTimeout(280);
-    const state = await page.evaluate(() => ({
-      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
-      pos: window.__DADA_DEBUG__?.playerPos ?? null,
-    }));
-    expect(state.sceneKey).toBe('CribScene');
-    expect(state.pos).not.toBeNull();
-    expect(state.pos.y).toBeGreaterThan(0.35);
-    expect(state.pos.y).toBeLessThan(0.6);
-  }
-
-  const blocker = await page.evaluate(() => {
-    const report = window.__DADA_DEBUG__?.level5CollisionReport?.() ?? null;
-    return (report?.blockers ?? []).find((entry) => entry.sourceName === 'future_exit_blocker') ?? null;
-  });
-  expect(blocker).not.toBeNull();
-  expect(blocker.visibleOwnerCount).toBeGreaterThan(0);
-
-  await resetEra5Pose(page, {
-    x: 44.0,
-    y: 0.42,
-    z: 18.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
-  });
-  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-  await page.waitForTimeout(1400);
-  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
-  const blockedState = await page.evaluate(() => ({
-    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+async function getLevel5SquariumRuntimeReport(page) {
+  return page.evaluate(() => ({
     sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
+    truth: window.__DADA_DEBUG__?.level5TruthReport?.() ?? null,
+    walkable: window.__DADA_DEBUG__?.level5WalkableReport?.() ?? null,
+    respawn: window.__DADA_DEBUG__?.level5RespawnReport?.() ?? null,
+    level5State: window.__DADA_DEBUG__?.level5State ?? null,
+    actors: window.__DADA_DEBUG__?.actors ?? null,
   }));
-  expect(blockedState.sceneKey).toBe('CribScene');
-  expect(blockedState.pos).not.toBeNull();
-  expect(blockedState.pos.x).toBeLessThan(47.5);
-});
+}
 
-test('@level5 @era5 runtime: level 5 respawn returns to the starter-room spawn anchor', async ({ page }) => {
+async function setLevel5Pose(page, pose) {
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, pose);
+  await page.waitForTimeout(250);
+}
+
+async function holdForwardFromPose(page, pose, holdMs) {
+  await setLevel5Pose(page, pose);
+  await page.keyboard.down('w');
+  await page.waitForTimeout(holdMs);
+  await page.keyboard.up('w');
+  await page.waitForTimeout(350);
+  return page.evaluate(() => ({
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    playerVel: window.__DADA_DEBUG__?.playerVelocity ?? null,
+    level5State: window.__DADA_DEBUG__?.level5State ?? null,
+  }));
+}
+
+test('@level5 @era5 runtime: level 5 exposes the 7-room Squarium topology and hero-room state from the authored Era 5 path', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
   await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(1600);
 
-  await resetEra5Pose(page, {
-    x: 18.0,
+  const report = await getLevel5SquariumRuntimeReport(page);
+  expect(report.sceneKey).toBe('CribScene');
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.topology).not.toBeNull();
+  expect(report.truth).not.toBeNull();
+  expect(report.walkable).not.toBeNull();
+  expect(report.respawn).not.toBeNull();
+  expect(report.level5State?.squarium).not.toBeNull();
+  expect(report.topology.mapId).toBe('level5-squarium');
+  expect(report.topology.sectorCount).toBe(7);
+  expect(report.topology.connectorCount).toBe(6);
+  expect(report.topology.sectors.map((sector) => sector.id)).toEqual(LEVEL5_SQUARIUM_SECTOR_IDS);
+  expect(sortAdjacency(report.topology.topology?.adjacency)).toEqual(sortAdjacency(LEVEL5_SQUARIUM_ADJACENCY));
+  expect(report.topology.topology?.hasCycle).toBe(false);
+  expect((report.topology.topology?.routeChoices ?? []).map((entry) => entry.sectorId)).toEqual([
+    'submerged_service_tunnel',
+    'pump_junction',
+    'transfer_gallery',
+    'grand_dome_exhibit',
+  ]);
+  expect(report.topology.walkableReport?.walkableSurfaceCount ?? 0).toBe(31);
+  expect(report.topology.walkableReport?.missingCollision ?? []).toEqual([]);
+  expect(report.topology.walkableReport?.underThickness ?? []).toEqual([]);
+  expect(report.topology.walkableReport?.hiddenWalkables ?? []).toEqual([]);
+  expect(report.topology.walkableReport?.unclassifiedWalkables ?? []).toEqual([]);
+  expect(report.walkable.missingVisibleWalkables ?? []).toEqual([]);
+  expect(report.walkable.suspiciousFloorLikeDecor ?? []).toEqual([]);
+  expect(report.truth.disableDecorOcclusionFade).toBe(true);
+  expect(report.truth.fadeableShells ?? []).toEqual([]);
+  expect(report.truth.cullRiskShells ?? []).toEqual([]);
+  expect(report.respawn.anchorCount).toBe(5);
+  expect(report.respawn.selectedAnchor?.id).toBe('level5_spawn_anchor');
+  expect(report.respawn.selectedAnchor?.spaceId).toBe('starter_pool_lab');
+  expect(report.level5State.squarium.domeVisible).toBe(true);
+  expect(report.level5State.squarium.outerOceanVisible).toBe(true);
+  expect(report.level5State.squarium.whaleCount).toBe(2);
+  expect(report.level5State.squarium.kelpCount).toBe(12);
+  expect(report.level5State.squarium.ladders.map((ladder) => ladder.id)).toEqual(['west_ladder', 'east_ladder']);
+  expect(report.level5State.squarium.activeLadderId).toBeNull();
+  expect(report.actors?.goal?.visibleMeshCount ?? 0).toBe(0);
+});
+
+test('@level5 @era5 runtime: level 5 tunnel, dome entry, ladders, balcony, and both upper wings are reachable on the live gameplay path', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1600);
+  await focusGameplay(page);
+
+  const tunnelNorth = await holdForwardFromPose(page, {
+    x: 36.0,
+    y: 0.02,
+    z: 58.2,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  }, 1600);
+  expect(tunnelNorth.playerPos.z).toBeLessThan(57.2);
+  expect(tunnelNorth.playerPos.y).toBeLessThan(0.1);
+  expect(tunnelNorth.playerPos.y).toBeGreaterThan(-1.8);
+
+  const tunnelSouth = await holdForwardFromPose(page, {
+    x: 36.0,
+    y: -1.2,
+    z: 35.2,
+    yaw: 0,
+    cameraYaw: 0,
+  }, 2200);
+  expect(tunnelSouth.playerPos.z).toBeGreaterThan(36.2);
+  expect(tunnelSouth.playerPos.y).toBeGreaterThan(-1.8);
+
+  await setLevel5Pose(page, {
+    x: 81.0,
     y: 0.42,
-    z: 14.0,
+    z: 68.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  const domeEntry = await page.evaluate(() => ({ playerPos: window.__DADA_DEBUG__?.playerPos ?? null }));
+  expect(domeEntry.playerPos.x).toBeGreaterThan(80.8);
+  expect(domeEntry.playerPos.y).toBeGreaterThan(0.35);
+  expect(domeEntry.playerPos.y).toBeLessThan(0.6);
+
+  const westClimb = await holdForwardFromPose(page, {
+    x: 90.8,
+    y: 0.42,
+    z: 44.0,
+    yaw: 0,
+    cameraYaw: 0,
+  }, 3600);
+  expect(westClimb.level5State?.squarium?.activeLadderId ?? null).toBeNull();
+  expect(westClimb.playerPos.x).toBeCloseTo(87.6, 1);
+  expect(westClimb.playerPos.y).toBeGreaterThan(7.9);
+  expect(westClimb.playerPos.y).toBeLessThan(8.7);
+
+  const eastClimb = await holdForwardFromPose(page, {
+    x: 161.2,
+    y: 0.42,
+    z: 44.0,
+    yaw: 0,
+    cameraYaw: 0,
+  }, 3600);
+  expect(eastClimb.level5State?.squarium?.activeLadderId ?? null).toBeNull();
+  expect(eastClimb.playerPos.x).toBeCloseTo(164.4, 1);
+  expect(eastClimb.playerPos.y).toBeGreaterThan(7.9);
+  expect(eastClimb.playerPos.y).toBeLessThan(8.7);
+
+  await setLevel5Pose(page, {
+    x: 96.0,
+    y: 8.42,
+    z: 29.5,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  });
+  const westBridge = await page.evaluate(() => ({ playerPos: window.__DADA_DEBUG__?.playerPos ?? null }));
+  expectPositionInBounds(westBridge.playerPos, LEVEL5_WEST_BRIDGE_BOUNDS);
+
+  await setLevel5Pose(page, {
+    x: 96.0,
+    y: 8.42,
+    z: 18.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  });
+  const westWing = await page.evaluate(() => ({ playerPos: window.__DADA_DEBUG__?.playerPos ?? null }));
+  expectPositionInBounds(westWing.playerPos, LEVEL5_WEST_WING_BOUNDS);
+
+  await setLevel5Pose(page, {
+    x: 156.0,
+    y: 8.42,
+    z: 29.5,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  });
+  const eastBridge = await page.evaluate(() => ({ playerPos: window.__DADA_DEBUG__?.playerPos ?? null }));
+  expectPositionInBounds(eastBridge.playerPos, LEVEL5_EAST_BRIDGE_BOUNDS);
+
+  await setLevel5Pose(page, {
+    x: 156.0,
+    y: 8.42,
+    z: 18.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  });
+  const eastWing = await page.evaluate(() => ({ playerPos: window.__DADA_DEBUG__?.playerPos ?? null }));
+  expectPositionInBounds(eastWing.playerPos, LEVEL5_EAST_WING_BOUNDS);
+});
+
+test('@level5 @era5 runtime: level 5 respawn returns to the starter pool lab anchor after manual reset', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1600);
+
+  await setLevel5Pose(page, {
+    x: 126.0,
+    y: 0.42,
+    z: 68.0,
     yaw: 0.24,
     cameraYaw: 0.24,
   });
@@ -1899,17 +1789,17 @@ test('@level5 @era5 runtime: level 5 respawn returns to the starter-room spawn a
     { timeout: 6_000 },
   ).toMatchObject({
     id: 'level5_spawn_anchor',
-    spaceId: 'starter_room',
+    spaceId: 'starter_pool_lab',
   });
 
   const finalState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
     anchor: window.__DADA_DEBUG__?.lastRespawnAnchor ?? null,
   }));
-  expect(finalState.pos).not.toBeNull();
   expect(finalState.anchor?.id).toBe('level5_spawn_anchor');
+  expect(finalState.anchor?.spaceId).toBe('starter_pool_lab');
   expect(Math.abs(finalState.pos.x - 4.0)).toBeLessThan(0.35);
-  expect(Math.abs(finalState.pos.z - 9.0)).toBeLessThan(0.35);
+  expect(Math.abs(finalState.pos.z - 18.0)).toBeLessThan(0.35);
   expect(finalState.pos.y).toBeGreaterThan(0.35);
   expect(finalState.pos.y).toBeLessThan(0.6);
 });

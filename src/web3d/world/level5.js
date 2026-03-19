@@ -1,29 +1,128 @@
 import { compileAuthoredEraLayout } from './eraAuthoredLayout.js';
 
-function surface(id, offsetX, offsetZ, w, d, surfaceType, extra = {}) {
+function surfaceRect(id, minX, maxX, topY, minZ, maxZ, surfaceType, extra = {}) {
   return {
     id,
-    offsetX,
-    offsetZ,
-    w,
-    d,
-    h: extra.h ?? 0.52,
+    x: (minX + maxX) * 0.5,
+    z: (minZ + maxZ) * 0.5,
+    w: maxX - minX,
+    d: maxZ - minZ,
+    floorY: topY,
     surfaceType,
     ...extra,
   };
 }
 
-function block(name, x, y, z, w, h, d, extra = {}) {
+function blockBounds(name, minX, maxX, minY, maxY, minZ, maxZ, extra = {}) {
   return {
     name,
-    x,
-    y,
-    z,
-    w,
-    h,
-    d,
+    x: (minX + maxX) * 0.5,
+    y: (minY + maxY) * 0.5,
+    z: (minZ + maxZ) * 0.5,
+    w: maxX - minX,
+    h: maxY - minY,
+    d: maxZ - minZ,
     ...extra,
   };
+}
+
+function openingAlongX(centerX, centerY, width, height) {
+  return {
+    minA: centerX - (width * 0.5),
+    maxA: centerX + (width * 0.5),
+    minY: centerY - (height * 0.5),
+    maxY: centerY + (height * 0.5),
+  };
+}
+
+function openingAlongZ(centerZ, centerY, width, height) {
+  return {
+    minA: centerZ - (width * 0.5),
+    maxA: centerZ + (width * 0.5),
+    minY: centerY - (height * 0.5),
+    maxY: centerY + (height * 0.5),
+  };
+}
+
+function makeWallBlocks(roomId, bounds, side, opening = null, extra = {}) {
+  const blocks = [];
+  const wallTopY = extra.wallTopY ?? bounds.maxY;
+  const wallBottomY = extra.wallBottomY ?? bounds.minY;
+  const rgb = extra.rgb || [122, 168, 160];
+  const roughness = extra.roughness ?? 0.88;
+  const emissiveScale = extra.emissiveScale ?? 0.04;
+  const thickness = extra.thickness ?? 0.5;
+
+  function pushBlock(name, minX, maxX, minY, maxY, minZ, maxZ) {
+    if ((maxX - minX) <= 0.01 || (maxY - minY) <= 0.01 || (maxZ - minZ) <= 0.01) return;
+    blocks.push(blockBounds(name, minX, maxX, minY, maxY, minZ, maxZ, {
+      rgb,
+      roughness,
+      emissiveScale,
+      solid: true,
+      structuralShell: true,
+      cameraIgnore: false,
+      cameraBlocker: true,
+      cameraFadeable: false,
+      decorIntent: side === 'ceiling' ? 'ceiling' : 'wall',
+      blockerReason: 'room-boundary',
+    }));
+  }
+
+  if (!opening) {
+    if (side === 'north') {
+      pushBlock(`${roomId}_${side}_wall`, bounds.minX, bounds.maxX, wallBottomY, wallTopY, bounds.minZ - thickness, bounds.minZ);
+    } else if (side === 'south') {
+      pushBlock(`${roomId}_${side}_wall`, bounds.minX, bounds.maxX, wallBottomY, wallTopY, bounds.maxZ, bounds.maxZ + thickness);
+    } else if (side === 'west') {
+      pushBlock(`${roomId}_${side}_wall`, bounds.minX - thickness, bounds.minX, wallBottomY, wallTopY, bounds.minZ, bounds.maxZ);
+    } else if (side === 'east') {
+      pushBlock(`${roomId}_${side}_wall`, bounds.maxX, bounds.maxX + thickness, wallBottomY, wallTopY, bounds.minZ, bounds.maxZ);
+    }
+    return blocks;
+  }
+
+  if (side === 'north' || side === 'south') {
+    const wallMinZ = side === 'north' ? bounds.minZ - thickness : bounds.maxZ;
+    const wallMaxZ = side === 'north' ? bounds.minZ : bounds.maxZ + thickness;
+    pushBlock(`${roomId}_${side}_wall_west`, bounds.minX, opening.minA, wallBottomY, wallTopY, wallMinZ, wallMaxZ);
+    pushBlock(`${roomId}_${side}_wall_east`, opening.maxA, bounds.maxX, wallBottomY, wallTopY, wallMinZ, wallMaxZ);
+    pushBlock(`${roomId}_${side}_wall_header`, opening.minA, opening.maxA, opening.maxY, wallTopY, wallMinZ, wallMaxZ);
+    pushBlock(`${roomId}_${side}_wall_lower`, opening.minA, opening.maxA, wallBottomY, opening.minY, wallMinZ, wallMaxZ);
+  } else {
+    const wallMinX = side === 'west' ? bounds.minX - thickness : bounds.maxX;
+    const wallMaxX = side === 'west' ? bounds.minX : bounds.maxX + thickness;
+    pushBlock(`${roomId}_${side}_wall_north`, wallMinX, wallMaxX, wallBottomY, wallTopY, bounds.minZ, opening.minA);
+    pushBlock(`${roomId}_${side}_wall_south`, wallMinX, wallMaxX, wallBottomY, wallTopY, opening.maxA, bounds.maxZ);
+    pushBlock(`${roomId}_${side}_wall_header`, wallMinX, wallMaxX, opening.maxY, wallTopY, opening.minA, opening.maxA);
+    pushBlock(`${roomId}_${side}_wall_lower`, wallMinX, wallMaxX, wallBottomY, opening.minY, opening.minA, opening.maxA);
+  }
+  return blocks;
+}
+
+function makeCeilingBlock(roomId, bounds, y, extra = {}) {
+  return blockBounds(`${roomId}_ceiling`, bounds.minX, bounds.maxX, y, y + 0.5, bounds.minZ, bounds.maxZ, {
+    rgb: extra.rgb || [184, 214, 218],
+    roughness: extra.roughness ?? 0.90,
+    emissiveScale: extra.emissiveScale ?? 0.03,
+    solid: true,
+    structuralShell: true,
+    cameraIgnore: false,
+    cameraBlocker: true,
+    cameraFadeable: false,
+    decorIntent: 'ceiling',
+    blockerReason: 'room-boundary',
+  });
+}
+
+function makeShell(roomId, bounds, openings = {}, extra = {}) {
+  return [
+    ...makeWallBlocks(roomId, bounds, 'north', openings.north || null, extra),
+    ...makeWallBlocks(roomId, bounds, 'south', openings.south || null, extra),
+    ...makeWallBlocks(roomId, bounds, 'west', openings.west || null, extra),
+    ...makeWallBlocks(roomId, bounds, 'east', openings.east || null, extra),
+    ...(extra.ceiling === false ? [] : [makeCeilingBlock(roomId, bounds, extra.ceilingY ?? bounds.maxY, extra)]),
+  ];
 }
 
 const LEVEL5_CAMERA_PRESETS = {
@@ -47,267 +146,780 @@ const LEVEL5_CAMERA_PRESETS = {
   },
 };
 
-const ROOM_WIDTH = 48.0;
-const ROOM_DEPTH = 36.0;
-const ROOM_HEIGHT = 6.0;
-const WALL_THICKNESS = 0.5;
-const FLOOR_THICKNESS = 0.75;
-const CEILING_THICKNESS = 0.5;
-const DOOR_WIDTH = 4.0;
-const DOOR_HEIGHT = 3.2;
-
-const ROOM_CENTER_X = ROOM_WIDTH * 0.5;
-const ROOM_CENTER_Z = ROOM_DEPTH * 0.5;
-const EAST_WALL_X = ROOM_WIDTH + (WALL_THICKNESS * 0.5);
-const EAST_SIDE_DEPTH = (ROOM_DEPTH - DOOR_WIDTH) * 0.5;
-const EAST_SIDE_OFFSET_Z = (DOOR_WIDTH * 0.5) + (EAST_SIDE_DEPTH * 0.5);
 const PLAYER_SPAWN_Y = 0.42;
+const ROOM1 = { minX: 0.0, maxX: 48.0, minY: 0.0, maxY: 6.0, minZ: 0.0, maxZ: 36.0 };
+const ROOM2 = { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 };
+const ROOM3 = { minX: 28.0, maxX: 52.0, minY: -0.6, maxY: 7.4, minZ: 58.0, maxZ: 78.0 };
+const ROOM4 = { minX: 52.0, maxX: 80.0, minY: 0.0, maxY: 8.0, minZ: 61.0, maxZ: 75.0 };
+const ROOM5 = { minX: 80.0, maxX: 172.0, minY: 0.0, maxY: 12.0, minZ: 32.0, maxZ: 104.0 };
+const ROOM6 = { minX: 84.0, maxX: 108.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
+const ROOM7 = { minX: 144.0, maxX: 168.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 };
+
+const LEVEL5_THEME_RGB = [92, 138, 150];
+const SERVICE_RGB = [74, 112, 126];
+const EXHIBIT_RGB = [96, 154, 170];
+const UPPER_WING_RGB = [104, 146, 138];
+
+const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
+  rgb: LEVEL5_THEME_RGB,
+  wallBottomY: 0.0,
+  wallTopY: 6.0,
+  ceilingY: 6.0,
+});
+
+const room2Blocks = makeShell('submerged_service_tunnel', ROOM2, {
+  north: openingAlongX(36.0, -1.15, 2.8, 2.3),
+  south: openingAlongX(36.0, -0.2, 3.0, 2.8),
+}, {
+  rgb: SERVICE_RGB,
+  wallBottomY: -1.8,
+  wallTopY: 1.4,
+  ceilingY: 1.4,
+});
+
+const room3Blocks = [
+  ...makeShell('pump_junction', ROOM3, {
+    north: openingAlongX(36.0, -0.2, 3.0, 2.8),
+    east: openingAlongZ(68.0, 1.2, 6.0, 3.2),
+  }, {
+    rgb: SERVICE_RGB,
+    wallBottomY: -0.6,
+    wallTopY: 7.4,
+    ceilingY: 7.4,
+  }),
+  blockBounds('pump_core', 34.0, 46.0, -0.6, 3.2, 64.0, 72.0, {
+    rgb: [70, 86, 90],
+    roughness: 0.82,
+    emissiveScale: 0.03,
+    solid: true,
+    structuralShell: false,
+    cameraIgnore: false,
+    cameraBlocker: true,
+    cameraFadeable: false,
+    decorIntent: 'machinery',
+    blockerReason: 'machinery',
+  }),
+];
+
+const room4Blocks = makeShell('transfer_gallery', ROOM4, {
+  west: openingAlongZ(68.0, 1.2, 6.0, 3.2),
+  east: openingAlongZ(68.0, 2.2, 10.0, 4.4),
+}, {
+  rgb: EXHIBIT_RGB,
+  wallBottomY: 0.0,
+  wallTopY: 8.0,
+  ceilingY: 8.0,
+});
+
+const room5Blocks = makeShell('grand_dome_exhibit', ROOM5, {
+  west: openingAlongZ(68.0, 2.2, 10.0, 4.4),
+  north: null,
+}, {
+  rgb: EXHIBIT_RGB,
+  wallBottomY: 0.0,
+  wallTopY: 12.0,
+  ceiling: false,
+});
+
+const room5NorthOpenings = [
+  openingAlongX(96.0, 9.0, 4.0, 3.0),
+  openingAlongX(156.0, 9.0, 4.0, 3.0),
+];
+
+function makeNorthWallWithMultipleOpenings(roomId, bounds, openings, extra = {}) {
+  const rgb = extra.rgb || EXHIBIT_RGB;
+  const segments = [];
+  let cursor = bounds.minX;
+  const thickness = 0.5;
+  for (const [index, opening] of openings.entries()) {
+    if (opening.minA > cursor) {
+      segments.push(blockBounds(`${roomId}_north_wall_segment_${index}`, cursor, opening.minA, 0.0, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
+        rgb,
+        roughness: 0.88,
+        emissiveScale: 0.04,
+        solid: true,
+        structuralShell: true,
+        cameraIgnore: false,
+        cameraBlocker: true,
+        cameraFadeable: false,
+        decorIntent: 'wall',
+        blockerReason: 'room-boundary',
+      }));
+    }
+    segments.push(blockBounds(`${roomId}_north_wall_lower_${index}`, opening.minA, opening.maxA, 0.0, opening.minY, bounds.minZ - thickness, bounds.minZ, {
+      rgb,
+      roughness: 0.88,
+      emissiveScale: 0.04,
+      solid: true,
+      structuralShell: true,
+      cameraIgnore: false,
+      cameraBlocker: true,
+      cameraFadeable: false,
+      decorIntent: 'wall',
+      blockerReason: 'room-boundary',
+    }));
+    segments.push(blockBounds(`${roomId}_north_wall_header_${index}`, opening.minA, opening.maxA, opening.maxY, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
+      rgb,
+      roughness: 0.88,
+      emissiveScale: 0.04,
+      solid: true,
+      structuralShell: true,
+      cameraIgnore: false,
+      cameraBlocker: true,
+      cameraFadeable: false,
+      decorIntent: 'wall',
+      blockerReason: 'room-boundary',
+    }));
+    cursor = opening.maxA;
+  }
+  if (cursor < bounds.maxX) {
+    segments.push(blockBounds(`${roomId}_north_wall_tail`, cursor, bounds.maxX, 0.0, extra.wallTopY ?? bounds.maxY, bounds.minZ - thickness, bounds.minZ, {
+      rgb,
+      roughness: 0.88,
+      emissiveScale: 0.04,
+      solid: true,
+      structuralShell: true,
+      cameraIgnore: false,
+      cameraBlocker: true,
+      cameraFadeable: false,
+      decorIntent: 'wall',
+      blockerReason: 'room-boundary',
+    }));
+  }
+  return segments;
+}
+
+const room5ShellWithoutNorth = [
+  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'south', null, {
+    rgb: EXHIBIT_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 12.0,
+  }),
+  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'west', openingAlongZ(68.0, 2.2, 10.0, 4.4), {
+    rgb: EXHIBIT_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 12.0,
+  }),
+  ...makeWallBlocks('grand_dome_exhibit', ROOM5, 'east', null, {
+    rgb: EXHIBIT_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 12.0,
+  }),
+  ...makeNorthWallWithMultipleOpenings('grand_dome_exhibit', ROOM5, room5NorthOpenings, {
+    rgb: EXHIBIT_RGB,
+    wallTopY: 12.0,
+  }),
+];
+
+const room6Blocks = makeShell('west_kelp_operations_wing', ROOM6, {
+  south: openingAlongX(96.0, 9.0, 4.0, 3.0),
+}, {
+  rgb: UPPER_WING_RGB,
+  wallBottomY: 6.0,
+  wallTopY: 16.0,
+  ceilingY: 16.0,
+});
+
+const room7Blocks = makeShell('east_whale_observation_wing', ROOM7, {
+  south: openingAlongX(156.0, 9.0, 4.0, 3.0),
+}, {
+  rgb: UPPER_WING_RGB,
+  wallBottomY: 6.0,
+  wallTopY: 16.0,
+  ceilingY: 16.0,
+});
+
+const tunnelSteps = [];
+for (let index = 0; index < 10; index += 1) {
+  const minZ = 34.0 + (index * 2.5);
+  const maxZ = minZ + 2.5;
+  const topY = -1.6 + (index * 0.1);
+  tunnelSteps.push(surfaceRect(`service_tunnel_step_${index + 1}`, 33.55, 38.45, topY, minZ, maxZ, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'service-tunnel-floor',
+  }));
+}
+
+const pumpNorthThresholds = [
+  surfaceRect('pump_north_step_1', 28.0, 52.0, -0.4, 58.0, 59.333, 'pump_junction_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'threshold-floor',
+  }),
+  surfaceRect('pump_north_step_2', 28.0, 52.0, -0.2, 59.333, 60.667, 'pump_junction_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'threshold-floor',
+  }),
+  surfaceRect('pump_north_step_3', 28.0, 52.0, 0.0, 60.667, 62.0, 'pump_junction_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'threshold-floor',
+  }),
+];
 
 export const LEVEL5 = compileAuthoredEraLayout({
   totalCollectibles: 0,
   extents: {
-    minX: -WALL_THICKNESS,
-    maxX: ROOM_WIDTH + WALL_THICKNESS,
-    minZ: -WALL_THICKNESS,
-    maxZ: ROOM_DEPTH + WALL_THICKNESS,
+    minX: -0.5,
+    maxX: 176.5,
+    minZ: -0.5,
+    maxZ: 108.5,
   },
   spawnYaw: Math.PI * 0.5,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
-  spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: ROOM_CENTER_Z },
-  goal: { x: 80.0, y: PLAYER_SPAWN_Y, z: 9.0 },
+  spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
+  goal: { x: 156.0, y: 8.42, z: 16.0 },
   goalPresentation: 'trigger-only',
-  theme: 'neutral',
+  theme: 'aquarium',
   showGroundVisual: false,
   showRouteRibbons: false,
   disableDecorOcclusionFade: true,
   respawnAnchors: [
     {
       id: 'level5_spawn_anchor',
-      label: 'Start',
+      label: 'Starter Pool Lab',
       x: 4.0,
       y: PLAYER_SPAWN_Y,
-      z: ROOM_CENTER_Z,
-      spaceId: 'starter_room',
+      z: 18.0,
+      spaceId: 'starter_pool_lab',
       allowedReason: 'spawn',
     },
     {
-      id: 'pool_edge',
-      label: 'Pool Edge',
-      x: 36.0,
+      id: 'pump_junction_anchor',
+      label: 'Pump Junction',
+      x: 40.0,
       y: PLAYER_SPAWN_Y,
-      z: 25.0,
-      spaceId: 'starter_room',
-      allowedReason: 'pool_hazard',
+      z: 61.6,
+      spaceId: 'pump_junction',
+      allowedReason: 'respawn',
+    },
+    {
+      id: 'grand_dome_anchor',
+      label: 'Grand Dome Exhibit',
+      x: 92.0,
+      y: PLAYER_SPAWN_Y,
+      z: 68.0,
+      spaceId: 'grand_dome_exhibit',
+      allowedReason: 'respawn',
+    },
+    {
+      id: 'west_wing_anchor',
+      label: 'West Kelp Operations Wing',
+      x: 96.0,
+      y: 8.42,
+      z: 18.0,
+      spaceId: 'west_kelp_operations_wing',
+      allowedReason: 'respawn',
+    },
+    {
+      id: 'east_wing_anchor',
+      label: 'East Whale Observation Wing',
+      x: 156.0,
+      y: 8.42,
+      z: 18.0,
+      spaceId: 'east_whale_observation_wing',
+      allowedReason: 'respawn',
     },
   ],
   acts: [
-    { id: 'A', label: 'Starter Room', range: [0, ROOM_WIDTH] },
+    { id: 'A', label: 'Mechanics Lab', range: [0, 52] },
+    { id: 'B', label: 'Aquarium Expansion', range: [52, 176] },
   ],
   authoredMap: {
-    id: 'level5-room-reset',
-    startSector: 'starter_room',
-    goalSector: 'starter_room',
+    id: 'level5-squarium',
+    startSector: 'starter_pool_lab',
+    goalSector: 'east_whale_observation_wing',
     sectors: [
       {
-        id: 'starter_room',
-        label: 'Starter Room',
-        x: ROOM_CENTER_X,
-        z: ROOM_CENTER_Z,
-        w: ROOM_WIDTH,
-        d: ROOM_DEPTH,
+        id: 'starter_pool_lab',
+        label: 'Starter / Pool Lab',
+        x: 24.0,
+        z: 18.0,
+        w: 48.0,
+        d: 36.0,
         floorY: 0.0,
-        ceilingY: ROOM_HEIGHT,
+        ceilingY: 6.0,
         floorSurfaceType: 'starter_room_floor',
-        wallLanguage: 'starter_shell',
-        landmarks: ['future exit'],
+        wallLanguage: 'aquarium_service_shell',
+        landmarks: ['pool', 'south pool tunnel mouth'],
         shell: false,
         surfaces: [
-          // ── Deck floor (4 sections carved around pool footprint x=[28,44] z=[26,34]) ──
-          surface('floor_north', 0, -5, ROOM_WIDTH, 26, 'starter_room_floor', {
-            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          surfaceRect('starter_floor_north', 0.0, 48.0, 0.0, 0.0, 26.0, 'starter_room_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
           }),
-          surface('floor_south', 0, 17, ROOM_WIDTH, 2, 'starter_room_floor', {
-            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          surfaceRect('starter_floor_south', 0.0, 48.0, 0.0, 34.0, 36.0, 'starter_room_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
           }),
-          surface('floor_west', -10, 12, 28, 8, 'starter_room_floor', {
-            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          surfaceRect('starter_floor_west', 0.0, 28.0, 0.0, 26.0, 34.0, 'starter_room_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
           }),
-          surface('floor_east', 22, 12, 4, 8, 'starter_room_floor', {
-            floorY: 0.0, h: FLOOR_THICKNESS, walkableClassification: 'room-floor', roomSurface: true,
+          surfaceRect('starter_floor_east', 44.0, 48.0, 0.0, 26.0, 34.0, 'starter_room_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
           }),
-          // Pool basin floors: collision handled entirely by buildWorld5.js
-          // (B4 shallow floor col, B5 deep floor col, B6 transition steps).
-          // No authored surfaces here — they would create stale collision at wrong positions.
+        ],
+        decorBlocks: room1Blocks,
+      },
+      {
+        id: 'submerged_service_tunnel',
+        label: 'Submerged Service Tunnel',
+        x: 36.0,
+        z: 46.5,
+        w: 5.0,
+        d: 25.0,
+        floorY: -1.6,
+        ceilingY: 1.4,
+        floorSurfaceType: 'service_tunnel_floor',
+        wallLanguage: 'submerged_service_shell',
+        landmarks: ['submerged tunnel'],
+        shell: false,
+        surfaces: tunnelSteps,
+        decorBlocks: room2Blocks,
+      },
+      {
+        id: 'pump_junction',
+        label: 'Pump Junction',
+        x: 40.0,
+        z: 68.0,
+        w: 24.0,
+        d: 20.0,
+        floorY: 0.0,
+        ceilingY: 7.4,
+        floorSurfaceType: 'pump_junction_floor',
+        wallLanguage: 'service_room_shell',
+        landmarks: ['central machinery block'],
+        shell: false,
+        surfaces: [
+          ...pumpNorthThresholds,
+          surfaceRect('pump_west_walk', 28.0, 34.0, 0.0, 62.0, 78.0, 'pump_junction_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+          surfaceRect('pump_east_walk', 46.0, 52.0, 0.0, 62.0, 78.0, 'pump_junction_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+          surfaceRect('pump_north_walk', 34.0, 46.0, 0.0, 62.0, 64.0, 'pump_junction_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+          surfaceRect('pump_south_walk', 34.0, 46.0, 0.0, 72.0, 78.0, 'pump_junction_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: room3Blocks,
+      },
+      {
+        id: 'transfer_gallery',
+        label: 'Transfer Gallery',
+        x: 66.0,
+        z: 68.0,
+        w: 28.0,
+        d: 14.0,
+        floorY: 0.0,
+        ceilingY: 8.0,
+        floorSurfaceType: 'transfer_gallery_floor',
+        wallLanguage: 'public_gallery_shell',
+        landmarks: ['public transition'],
+        shell: false,
+        surfaces: [
+          surfaceRect('transfer_gallery_floor', 52.0, 80.0, 0.0, 61.0, 75.0, 'transfer_gallery_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: room4Blocks,
+      },
+      {
+        id: 'grand_dome_exhibit',
+        label: 'Grand Dome Exhibit',
+        x: 126.0,
+        z: 68.0,
+        w: 92.0,
+        d: 72.0,
+        floorY: 0.0,
+        ceilingY: 28.0,
+        floorSurfaceType: 'grand_dome_floor',
+        wallLanguage: 'grand_dome_shell',
+        landmarks: ['dome', 'ocean shell', 'balcony ring'],
+        shell: false,
+        surfaces: [
+          surfaceRect('grand_dome_west_entry_apron', 80.0, 84.0, 0.0, 63.0, 73.0, 'grand_dome_floor', {
+            h: 0.75,
+            walkableClassification: 'threshold-floor',
+            roomSurface: true,
+          }),
+          surfaceRect('grand_dome_main_floor', 84.0, 168.0, 0.0, 36.0, 100.0, 'grand_dome_floor', {
+            h: 0.75,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+          surfaceRect('grand_dome_north_balcony', 88.0, 164.0, 8.0, 34.0, 38.0, 'grand_dome_balcony', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'balcony',
+            roomSurface: true,
+          }),
+          surfaceRect('grand_dome_west_balcony', 84.0, 88.0, 8.0, 40.0, 92.0, 'grand_dome_balcony', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'balcony',
+            roomSurface: true,
+          }),
+          surfaceRect('grand_dome_east_balcony', 164.0, 168.0, 8.0, 40.0, 92.0, 'grand_dome_balcony', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'balcony',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: room5ShellWithoutNorth,
+      },
+      {
+        id: 'west_kelp_operations_wing',
+        label: 'West Kelp Operations Wing',
+        x: 96.0,
+        z: 16.0,
+        w: 24.0,
+        d: 18.0,
+        floorY: 8.0,
+        ceilingY: 16.0,
+        floorSurfaceType: 'upper_wing_floor',
+        wallLanguage: 'upper_wing_shell',
+        landmarks: ['kelp ops wing'],
+        shell: false,
+        surfaces: [
+          surfaceRect('west_wing_floor', 84.0, 108.0, 8.0, 7.0, 25.0, 'upper_wing_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: room6Blocks,
+      },
+      {
+        id: 'east_whale_observation_wing',
+        label: 'East Whale Observation Wing',
+        x: 156.0,
+        z: 16.0,
+        w: 24.0,
+        d: 18.0,
+        floorY: 8.0,
+        ceilingY: 16.0,
+        floorSurfaceType: 'upper_wing_floor',
+        wallLanguage: 'upper_wing_shell',
+        landmarks: ['whale observation wing'],
+        shell: false,
+        surfaces: [
+          surfaceRect('east_wing_floor', 144.0, 168.0, 8.0, 7.0, 25.0, 'upper_wing_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: room7Blocks,
+      },
+    ],
+    connectors: [
+      {
+        id: 'pool_tunnel_mouth',
+        label: 'Pool Tunnel Mouth',
+        sourceSector: 'starter_pool_lab',
+        destinationSector: 'submerged_service_tunnel',
+        x: 36.0,
+        z: 34.15,
+        w: 2.8,
+        d: 0.4,
+        floorY: -1.6,
+        ceilingY: 0.0,
+        floorSurfaceType: 'submerged_threshold',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'pump_junction_entry',
+        label: 'Pump Junction Entry',
+        sourceSector: 'submerged_service_tunnel',
+        destinationSector: 'pump_junction',
+        x: 36.0,
+        z: 58.8,
+        w: 3.0,
+        d: 1.6,
+        floorY: -0.6,
+        ceilingY: 1.2,
+        floorSurfaceType: 'threshold_floor',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'pump_to_transfer_gallery',
+        label: 'Pump To Transfer Gallery',
+        sourceSector: 'pump_junction',
+        destinationSector: 'transfer_gallery',
+        x: 52.1,
+        z: 68.0,
+        w: 0.4,
+        d: 6.0,
+        floorY: 0.0,
+        ceilingY: 3.2,
+        floorSurfaceType: 'threshold_floor',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'gallery_to_grand_dome',
+        label: 'Gallery To Grand Dome',
+        sourceSector: 'transfer_gallery',
+        destinationSector: 'grand_dome_exhibit',
+        x: 80.1,
+        z: 68.0,
+        w: 0.4,
+        d: 10.0,
+        floorY: 0.0,
+        ceilingY: 4.4,
+        floorSurfaceType: 'threshold_floor',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'west_balcony_bridge',
+        label: 'West Balcony Bridge',
+        sourceSector: 'grand_dome_exhibit',
+        destinationSector: 'west_kelp_operations_wing',
+        x: 96.0,
+        z: 29.5,
+        w: 6.0,
+        d: 9.0,
+        floorY: 8.0,
+        ceilingY: 10.5,
+        floorSurfaceType: 'upper_bridge_floor',
+        wallLanguage: 'upper_bridge_shell',
+        shell: false,
+        surfaces: [
+          surfaceRect('west_balcony_bridge_floor', 93.0, 99.0, 8.0, 25.0, 34.0, 'upper_bridge_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'bridge-floor',
+            roomSurface: true,
+          }),
         ],
         decorBlocks: [
-          block('north_wall', ROOM_CENTER_X, ROOM_HEIGHT * 0.5, -(WALL_THICKNESS * 0.5), ROOM_WIDTH + WALL_THICKNESS, ROOM_HEIGHT, WALL_THICKNESS, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
+          ...makeShell('west_balcony_bridge', {
+            minX: 93.0,
+            maxX: 99.0,
+            minY: 8.0,
+            maxY: 10.5,
+            minZ: 25.0,
+            maxZ: 34.0,
+          }, {
+            south: openingAlongX(96.0, 9.0, 4.0, 3.0),
+            north: openingAlongX(96.0, 9.0, 4.0, 3.0),
+          }, {
+            rgb: UPPER_WING_RGB,
+            wallBottomY: 8.0,
+            wallTopY: 10.5,
+            ceilingY: 10.5,
           }),
-          block('south_wall', ROOM_CENTER_X, ROOM_HEIGHT * 0.5, ROOM_DEPTH + (WALL_THICKNESS * 0.5), ROOM_WIDTH + WALL_THICKNESS, ROOM_HEIGHT, WALL_THICKNESS, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
+        ],
+      },
+      {
+        id: 'east_balcony_bridge',
+        label: 'East Balcony Bridge',
+        sourceSector: 'grand_dome_exhibit',
+        destinationSector: 'east_whale_observation_wing',
+        x: 156.0,
+        z: 29.5,
+        w: 6.0,
+        d: 9.0,
+        floorY: 8.0,
+        ceilingY: 10.5,
+        floorSurfaceType: 'upper_bridge_floor',
+        wallLanguage: 'upper_bridge_shell',
+        shell: false,
+        surfaces: [
+          surfaceRect('east_balcony_bridge_floor', 153.0, 159.0, 8.0, 25.0, 34.0, 'upper_bridge_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'bridge-floor',
+            roomSurface: true,
           }),
-          block('west_wall', -(WALL_THICKNESS * 0.5), ROOM_HEIGHT * 0.5, ROOM_CENTER_Z, WALL_THICKNESS, ROOM_HEIGHT, ROOM_DEPTH, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
-          }),
-          block('east_wall_north', EAST_WALL_X, ROOM_HEIGHT * 0.5, ROOM_CENTER_Z - EAST_SIDE_OFFSET_Z, WALL_THICKNESS, ROOM_HEIGHT, EAST_SIDE_DEPTH, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
-          }),
-          block('east_wall_south', EAST_WALL_X, ROOM_HEIGHT * 0.5, ROOM_CENTER_Z + EAST_SIDE_OFFSET_Z, WALL_THICKNESS, ROOM_HEIGHT, EAST_SIDE_DEPTH, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
-          }),
-          block('east_wall_header', EAST_WALL_X, DOOR_HEIGHT + ((ROOM_HEIGHT - DOOR_HEIGHT) * 0.5), ROOM_CENTER_Z, WALL_THICKNESS, ROOM_HEIGHT - DOOR_HEIGHT, DOOR_WIDTH, {
-            rgb: [206, 208, 210],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'wall',
-            blockerReason: 'room-boundary',
-          }),
-          block('ceiling_shell', ROOM_CENTER_X, ROOM_HEIGHT + (CEILING_THICKNESS * 0.5), ROOM_CENTER_Z, ROOM_WIDTH, CEILING_THICKNESS, ROOM_DEPTH, {
-            rgb: [226, 228, 230],
-            roughness: 0.96,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'ceiling',
-            blockerReason: 'room-boundary',
-          }),
-          block('ceiling_light_panel', ROOM_CENTER_X, ROOM_HEIGHT - 0.10, ROOM_CENTER_Z, 8.0, 0.12, 3.0, {
-            rgb: [244, 246, 240],
-            roughness: 0.98,
-            emissiveScale: 0.18,
-            solid: false,
-            cameraFadeable: false,
-            decorIntent: 'light-fixture',
-          }),
-          block('future_exit_blocker', EAST_WALL_X, DOOR_HEIGHT * 0.5, ROOM_CENTER_Z, WALL_THICKNESS, DOOR_HEIGHT, DOOR_WIDTH, {
-            rgb: [162, 166, 170],
-            roughness: 0.94,
-            emissiveScale: 0.0,
-            solid: true,
-            structuralShell: true,
-            cameraIgnore: false,
-            cameraBlocker: true,
-            cameraFadeable: false,
-            decorIntent: 'doorway-blocker',
-            blockerReason: 'closed-access',
-          }),
-          // Enemy lane floor marker — covers patrol bounds footprint (X 18-42, Z 6-30)
-          block('enemy_lane_marker', 30, 0.005, 18, 24, 0.01, 24, {
-            rgb: [200, 140, 55],
-            roughness: 0.9,
-            emissiveScale: 0.26,
-            alpha: 0.40,
-            solid: false,
-            cameraIgnore: true,
-            cameraBlocker: false,
-            cameraFadeable: false,
-            decorIntent: 'floor-marker',
+        ],
+        decorBlocks: [
+          ...makeShell('east_balcony_bridge', {
+            minX: 153.0,
+            maxX: 159.0,
+            minY: 8.0,
+            maxY: 10.5,
+            minZ: 25.0,
+            maxZ: 34.0,
+          }, {
+            south: openingAlongX(156.0, 9.0, 4.0, 3.0),
+            north: openingAlongX(156.0, 9.0, 4.0, 3.0),
+          }, {
+            rgb: UPPER_WING_RGB,
+            wallBottomY: 8.0,
+            wallTopY: 10.5,
+            ceilingY: 10.5,
           }),
         ],
       },
     ],
-    connectors: [],
   },
   coins: [],
   currents: [],
   deepWaterPockets: [
     {
-      name: 'water_se_pool',
-      x: 36,
+      name: 'starter_pool',
+      x: 36.0,
       y: -1.125,
-      z: 30,
-      w: 16,
+      z: 30.0,
+      w: 16.0,
       h: 2.25,
-      d: 8,
+      d: 8.0,
+      southTunnelMouth: {
+        centerX: 36.0,
+        centerY: -1.15,
+        centerZ: 33.95,
+        width: 2.8,
+        height: 2.3,
+      },
     },
   ],
+  submergedPassages: [
+    {
+      name: 'service_tunnel_water',
+      minX: 33.5,
+      maxX: 38.5,
+      minY: -1.8,
+      maxY: 1.4,
+      minZ: 34.0,
+      maxZ: 59.0,
+      waterSurfaceY: 1.2,
+      floorStartY: -1.6,
+      floorEndY: -0.6,
+    },
+  ],
+  ladders: [
+    {
+      id: 'west_ladder',
+      label: 'West Ladder',
+      centerX: 90.0,
+      centerZ: 44.0,
+      width: 1.2,
+      bottomY: 0.0,
+      topY: 8.0,
+      mountSide: 'west',
+      topExit: { x: 87.6, y: 8.42, z: 44.0 },
+      bottomExit: { x: 90.8, y: 0.42, z: 44.0 },
+    },
+    {
+      id: 'east_ladder',
+      label: 'East Ladder',
+      centerX: 162.0,
+      centerZ: 44.0,
+      width: 1.2,
+      bottomY: 0.0,
+      topY: 8.0,
+      mountSide: 'east',
+      topExit: { x: 164.4, y: 8.42, z: 44.0 },
+      bottomExit: { x: 161.2, y: 0.42, z: 44.0 },
+    },
+  ],
+  squarium: {
+    dome: {
+      inner: { centerX: 126.0, centerY: 12.0, centerZ: 68.0, radiusX: 46.0, radiusY: 16.0, radiusZ: 36.0 },
+      outer: { centerX: 126.0, centerY: 14.0, centerZ: 68.0, radiusX: 50.0, radiusY: 20.0, radiusZ: 40.0 },
+    },
+    whales: [
+      {
+        id: 'humpback_path_a',
+        bodyLength: 14.0,
+        points: [
+          { x: 92.0, y: 17.0, z: 46.0 },
+          { x: 108.0, y: 21.0, z: 40.0 },
+          { x: 126.0, y: 23.0, z: 38.0 },
+          { x: 146.0, y: 21.0, z: 42.0 },
+          { x: 160.0, y: 18.0, z: 52.0 },
+        ],
+      },
+      {
+        id: 'humpback_path_b',
+        bodyLength: 14.0,
+        points: [
+          { x: 160.0, y: 19.0, z: 86.0 },
+          { x: 146.0, y: 22.0, z: 94.0 },
+          { x: 126.0, y: 24.0, z: 98.0 },
+          { x: 106.0, y: 22.0, z: 94.0 },
+          { x: 92.0, y: 19.0, z: 84.0 },
+        ],
+      },
+    ],
+    kelpClusters: [
+      { x: 92.0, y: 8.0, z: 46.0, height: 14.0 },
+      { x: 100.0, y: 8.0, z: 56.0, height: 13.0 },
+      { x: 108.0, y: 8.0, z: 92.0, height: 16.0 },
+      { x: 118.0, y: 8.0, z: 100.0, height: 12.0 },
+      { x: 126.0, y: 8.0, z: 102.0, height: 18.0 },
+      { x: 136.0, y: 8.0, z: 100.0, height: 15.0 },
+      { x: 146.0, y: 8.0, z: 92.0, height: 16.0 },
+      { x: 154.0, y: 8.0, z: 82.0, height: 12.0 },
+      { x: 156.0, y: 8.0, z: 54.0, height: 17.0 },
+      { x: 146.0, y: 8.0, z: 42.0, height: 13.0 },
+      { x: 126.0, y: 8.0, z: 36.0, height: 14.0 },
+      { x: 106.0, y: 8.0, z: 42.0, height: 11.0 },
+    ],
+  },
   airBubblePickups: [
-    { name: 'bubble_se_01', x: 32, y: -0.35, z: 29, radius: 0.9 },
-    { name: 'bubble_se_02', x: 40, y: -1.0, z: 31, radius: 0.9 },
+    { name: 'bubble_pool_01', x: 32.0, y: -0.35, z: 29.0, radius: 0.9 },
+    { name: 'bubble_pool_02', x: 40.0, y: -1.0, z: 31.0, radius: 0.9 },
   ],
   eelRails: [],
   vents: [],
   jellyfish: [
     {
       name: 'jelly_01',
-      x: 28,
+      x: 28.0,
       y: 2.0,
-      z: 9,
-      bounds: { minX: 18, maxX: 42, minZ: 6, maxZ: 30, minY: 0.8, maxY: 4.2 },
+      z: 9.0,
+      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
       speed: 1.8,
       turnSpeed: 0.9,
       hpMax: 3,
     },
     {
       name: 'jelly_02',
-      x: 34,
+      x: 34.0,
       y: 2.2,
-      z: 18,
-      bounds: { minX: 18, maxX: 42, minZ: 6, maxZ: 30, minY: 0.8, maxY: 4.2 },
+      z: 18.0,
+      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
       speed: 1.8,
       turnSpeed: 0.9,
       hpMax: 3,
     },
     {
       name: 'jelly_03',
-      x: 26,
+      x: 26.0,
       y: 1.9,
-      z: 27,
-      bounds: { minX: 18, maxX: 42, minZ: 6, maxZ: 30, minY: 0.8, maxY: 4.2 },
+      z: 27.0,
+      bounds: { minX: 18.0, maxX: 42.0, minZ: 6.0, maxZ: 30.0, minY: 0.8, maxY: 4.2 },
       speed: 1.8,
       turnSpeed: 0.9,
       hpMax: 3,

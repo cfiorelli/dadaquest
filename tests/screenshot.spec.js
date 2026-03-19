@@ -804,10 +804,10 @@ test('capture Level 6 under-construction proof screenshots', async ({ page }) =>
   await captureProof('docs/screenshots/level6-under-construction-blocked.png');
 });
 
-test('capture Level 5 room reset proof screenshots', async ({ page }) => {
+test('capture Level 5 Squarium proof screenshots', async ({ page }) => {
   test.setTimeout(240_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-room-reset', { recursive: true });
+  await mkdir('docs/proof/level5-squarium', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -815,7 +815,18 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-room-reset/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-squarium/${path.split('/').pop()}`);
+  }
+
+  async function setView(pose, cameraView, waitMs = 800) {
+    await page.evaluate(({ nextPose, nextCameraView }) => {
+      window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+      window.__DADA_DEBUG__?.setEra5CameraDebugView?.(nextCameraView);
+    }, {
+      nextPose: pose,
+      nextCameraView: cameraView,
+    });
+    await page.waitForTimeout(waitMs);
   }
 
   await gotoDebugLevel(page, 5);
@@ -827,18 +838,21 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
   await page.waitForTimeout(1800);
   await hideGameplayUi(page);
 
-  const audit = await getLevel5StarterRoomAudit(page);
-  expect(audit.structuralCeilingShellCount).toBe(1);
-  expect(audit.transparentShells).toEqual([]);
-  expect(audit.coplanarCeilingPairs).toEqual([]);
-  expect(audit.visibleGoalMeshes).toEqual([]);
-  expect(audit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
-  expect(audit.actorSummary?.goal?.visibleMeshCount ?? 0).toBe(0);
-  expect(audit.actorSummary?.goal?.allowInvisible).toBe(true);
+  const report = await page.evaluate(() => ({
+    topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
+    level5State: window.__DADA_DEBUG__?.level5State ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+  }));
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.topology?.mapId).toBe('level5-squarium');
+  expect(report.topology?.sectorCount).toBe(7);
+  expect(report.level5State?.squarium?.domeVisible).toBe(true);
+  expect(report.level5State?.squarium?.outerOceanVisible).toBe(true);
+  expect(report.level5State?.squarium?.whaleCount).toBe(2);
+  expect(report.level5State?.squarium?.kelpCount).toBe(12);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
       walkables: false,
       colliders: false,
@@ -847,372 +861,105 @@ test('capture Level 5 room reset proof screenshots', async ({ page }) => {
     });
   });
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 4.0,
-      y: 0.42,
-      z: 18.0,
-      yaw: Math.PI * 0.5,
-      cameraYaw: Math.PI * 0.5,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-start',
-      position: { x: 2.1, y: 2.1, z: 22.4 },
-      target: { x: 36.0, y: 1.6, z: 18.0 },
-      fov: 0.44,
-    });
+  await setView({
+    x: 8.0,
+    y: 0.42,
+    z: 12.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  }, {
+    label: 'l5-squarium-room1',
+    position: { x: 10.0, y: 5.2, z: 5.8 },
+    target: { x: 36.0, y: 0.8, z: 30.0 },
+    fov: 0.58,
   });
-  await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-room-reset-start.png');
+  await captureProof('docs/screenshots/level5-squarium-room1-pool-lab.png');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 40.0,
-      y: 0.42,
-      z: 18.0,
-      yaw: -Math.PI * 0.5,
-      cameraYaw: -Math.PI * 0.5,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-looking-back',
-      position: { x: 41.2, y: 2.1, z: 21.8 },
-      target: { x: 4.2, y: 1.6, z: 18.0 },
-      fov: 0.44,
-    });
+  await setView({
+    x: 36.0,
+    y: -1.2,
+    z: 45.0,
+    yaw: 0,
+    cameraYaw: 0,
+  }, {
+    label: 'l5-squarium-room2',
+    position: { x: 36.0, y: 0.4, z: 40.5 },
+    target: { x: 36.0, y: -0.9, z: 56.0 },
+    fov: 0.72,
   });
-  await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-room-reset-looking-back.png');
+  await captureProof('docs/screenshots/level5-squarium-room2-service-tunnel.png');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 39.0,
-      y: 0.42,
-      z: 18.0,
-      yaw: Math.PI * 0.5,
-      cameraYaw: Math.PI * 0.5,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-doorway',
-      position: { x: 38.2, y: 2.0, z: 20.2 },
-      target: { x: 47.9, y: 1.6, z: 18.0 },
-      fov: 0.36,
-    });
+  await setView({
+    x: 31.5,
+    y: 0.42,
+    z: 70.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  }, {
+    label: 'l5-squarium-room3',
+    position: { x: 29.2, y: 4.8, z: 78.2 },
+    target: { x: 40.0, y: 1.8, z: 68.0 },
+    fov: 0.72,
   });
-  await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-room-reset-doorway.png');
+  await captureProof('docs/screenshots/level5-squarium-room3-pump-junction.png');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
-      walkables: true,
-      colliders: false,
-      hazards: false,
-      respawnAnchors: false,
-    });
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 6.0,
-      y: 0.42,
-      z: 14.0,
-      yaw: 0.24,
-      cameraYaw: 0.24,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-walkable',
-      position: { x: 3.2, y: 4.8, z: 15.8 },
-      target: { x: 18.6, y: 0.8, z: 5.6 },
-      fov: 0.72,
-    });
+  await setView({
+    x: 58.0,
+    y: 0.42,
+    z: 68.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  }, {
+    label: 'l5-squarium-room4',
+    position: { x: 56.0, y: 4.6, z: 74.5 },
+    target: { x: 76.5, y: 2.2, z: 68.0 },
+    fov: 0.66,
   });
-  await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-room-reset-walkable-overlay.png');
+  await captureProof('docs/screenshots/level5-squarium-room4-transfer-gallery.png');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
-      walkables: false,
-      colliders: true,
-      hazards: false,
-      respawnAnchors: false,
-    });
-    window.__DADA_DEBUG__?.setEra5Pose?.({
-      x: 10.0,
-      y: 0.42,
-      z: 14.0,
-      yaw: 0.18,
-      cameraYaw: 0.18,
-    });
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-collision',
-      position: { x: 8.0, y: 6.0, z: 28.0 },
-      target: { x: 44.0, y: 1.2, z: 18.0 },
-      fov: 0.72,
-    });
+  await setView({
+    x: 126.0,
+    y: 0.42,
+    z: 80.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  }, {
+    label: 'l5-squarium-room5',
+    position: { x: 126.0, y: 6.0, z: 88.0 },
+    target: { x: 126.0, y: 18.5, z: 46.0 },
+    fov: 0.82,
+  }, 1100);
+  await captureProof('docs/screenshots/level5-squarium-room5-grand-dome.png');
+
+  await setView({
+    x: 96.0,
+    y: 8.42,
+    z: 18.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  }, {
+    label: 'l5-squarium-room6',
+    position: { x: 96.0, y: 11.2, z: 28.5 },
+    target: { x: 96.0, y: 9.2, z: 12.5 },
+    fov: 0.7,
   });
-  await page.waitForTimeout(500);
-  await captureProof('docs/screenshots/level5-room-reset-collision-overlay.png');
+  await captureProof('docs/screenshots/level5-squarium-room6-west-wing.png');
 
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setLevel5TruthOverlay?.({
-      walkables: false,
-      colliders: false,
-      hazards: false,
-      respawnAnchors: false,
-    });
+  await setView({
+    x: 156.0,
+    y: 8.42,
+    z: 18.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
+  }, {
+    label: 'l5-squarium-room7',
+    position: { x: 156.0, y: 11.2, z: 28.5 },
+    target: { x: 156.0, y: 9.2, z: 12.5 },
+    fov: 0.7,
   });
-});
-
-test('capture Level 5 room reset doorway proof screenshots', async ({ page }) => {
-  test.setTimeout(240_000);
-  await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-room-reset-doorway', { recursive: true });
-  await page.setViewportSize({ width: 1440, height: 900 });
-
-  async function captureProof(path) {
-    await page.screenshot({
-      path,
-      clip: { x: 0, y: 0, width: 1440, height: 900 },
-    });
-    await copyFile(path, `docs/proof/level5-room-reset-doorway/${path.split('/').pop()}`);
-  }
-
-  await gotoDebugLevel(page, 5);
-  await unlockThroughLevel(page, 4);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.(5);
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-  await hideGameplayUi(page);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
-    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-  });
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const assemblyReport = await getLevel5DoorwayAssemblyReport(page);
-  expectLevel5DoorwayAssemblyReport(assemblyReport);
-
-  await page.evaluate((pose) => {
-    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
-  }, LEVEL5_DOORWAY_START_POSE);
-  await page.waitForTimeout(320);
-  const straightState = await getLevel5DoorwayCameraState(page);
-  expect(straightState.cameraInsideRoom).toBe(true);
-  await captureProof('docs/screenshots/level5-room-reset-doorway-straight.png');
-
-  await page.evaluate((pose) => {
-    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
-  }, LEVEL5_DOORWAY_DIRECT_BLOCK_POSE);
-  await page.waitForTimeout(320);
-  const directBlockState = await getLevel5DoorwayCameraState(page);
-  expect(directBlockState.cameraInsideRoom).toBe(true);
-  expect(directBlockState.occluderMesh).toBe('neutral_decorBlock_future_exit_blocker');
-
-  await page.evaluate((pose) => {
-    window.__DADA_DEBUG__?.setEra5Pose?.(pose);
-  }, LEVEL5_DOORWAY_START_POSE);
-  await page.waitForTimeout(220);
-
-  for (const step of LEVEL5_DOORWAY_RIGHT_TURN_STEPS) {
-    await dispatchHeldKey(page, 'keydown', { code: 'ArrowRight', key: 'ArrowRight' });
-    await page.waitForTimeout(step.holdMs);
-    await dispatchHeldKey(page, 'keyup', { code: 'ArrowRight', key: 'ArrowRight' });
-    await page.waitForTimeout(280);
-    const state = await getLevel5DoorwayCameraState(page);
-    expect(state.cameraInsideRoom).toBe(true);
-    if (step.key === 'right-stress') {
-      if (state.occluderMesh !== null) {
-        expect(state.occluderMesh).toMatch(/neutral_decorBlock_(future_exit_blocker|east_wall_north|east_wall_south|east_wall_header)/);
-        expect(state.occlusion?.pickDistance).not.toBeNull();
-      }
-    }
-    await captureProof(step.path);
-  }
-
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
-      label: 'l5-room-reset-doorway-floor-seam',
-      position: { x: 45.3, y: 0.68, z: 19.55 },
-      target: { x: 48.18, y: 0.26, z: 18.45 },
-      fov: 0.52,
-    });
-  });
-  await page.waitForTimeout(420);
-  const seamState = await getLevel5DoorwayAssemblyReport(page);
-  expectLevel5DoorwayAssemblyReport(seamState);
-  await captureProof('docs/screenshots/level5-room-reset-doorway-floor-seam.png');
+  await captureProof('docs/screenshots/level5-squarium-room7-east-wing.png');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
   });
-});
-
-test('capture Level 5 room reset launch-state and double-left-turn proof screenshots', async ({ page }) => {
-  test.setTimeout(240_000);
-  await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-room-reset-launch-turn', { recursive: true });
-  await page.setViewportSize({ width: 1280, height: 720 });
-
-  async function captureProof(path) {
-    await page.screenshot({
-      path,
-      clip: { x: 0, y: 0, width: 1280, height: 720 },
-    });
-    await copyFile(path, `docs/proof/level5-room-reset-launch-turn/${path.split('/').pop()}`);
-  }
-
-  await gotoDebugLevel(page, 5);
-  await unlockThroughLevel(page, 4);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.(5);
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-  await hideGameplayUi(page);
-
-  const initialStarterAudit = await getLevel5StarterRoomAudit(page);
-  const initialLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(initialStarterAudit, initialLaunchAudit);
-  await captureProof('docs/screenshots/level5-room-reset-load-initial.png');
-
-  await tapEra5LeftTurnTwice(page);
-
-  const turnedStarterAudit = await getLevel5StarterRoomAudit(page);
-  const turnedLaunchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(turnedStarterAudit, turnedLaunchAudit);
-  await captureProof('docs/screenshots/level5-room-reset-load-double-left.png');
-});
-
-test('capture Level 5 room reset jump camera proof screenshots', async ({ page }) => {
-  test.setTimeout(240_000);
-  await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-room-reset-jump-camera', { recursive: true });
-  await page.setViewportSize({ width: 1280, height: 720 });
-
-  async function captureProof(path) {
-    await page.screenshot({
-      path,
-      clip: { x: 0, y: 0, width: 1280, height: 720 },
-    });
-    await copyFile(path, `docs/proof/level5-room-reset-jump-camera/${path.split('/').pop()}`);
-  }
-
-  await gotoDebugLevel(page, 5);
-  await unlockThroughLevel(page, 4);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.(5);
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
-  await page.waitForTimeout(1300);
-  await focusGameplay(page);
-  await hideGameplayUi(page);
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const before = await getLevel5JumpCameraState(page);
-  expectLevel5JumpStateInsideStarterRoom(before);
-  await captureProof('docs/screenshots/level5-room-reset-jump-before.png');
-
-  await dispatchHeldKey(page, 'keydown', { code: 'Space', key: ' ' });
-  await page.waitForTimeout(320);
-  await dispatchHeldKey(page, 'keyup', { code: 'Space', key: ' ' });
-
-  let ascentShot = false;
-  let landingShot = false;
-  let airborneSeen = false;
-  let ascentState = null;
-  let apexState = null;
-  let landingState = null;
-  let apexHeight = -Infinity;
-
-  for (let i = 0; i < 180; i += 1) {
-    const state = await getLevel5JumpCameraState(page);
-    airborneSeen ||= !state.grounded;
-    expectLevel5JumpStateInsideStarterRoom(state);
-
-    if (!ascentShot && !state.grounded && state.playerVy > 0.4) {
-      ascentState = state;
-      ascentShot = true;
-      await captureProof('docs/screenshots/level5-room-reset-jump-ascent.png');
-    }
-
-    if (!state.grounded && airborneSeen && state.playerPos && state.playerPos.y >= apexHeight) {
-      apexHeight = state.playerPos.y;
-      apexState = state;
-      await captureProof('docs/screenshots/level5-room-reset-jump-apex.png');
-    }
-
-    if (airborneSeen && state.grounded) {
-      landingState = state;
-      landingShot = true;
-      await captureProof('docs/screenshots/level5-room-reset-jump-landing.png');
-      break;
-    }
-
-    await page.waitForTimeout(40);
-  }
-
-  expect(ascentShot).toBe(true);
-  expect(apexState).not.toBeNull();
-  expect(landingShot).toBe(true);
-  expectLevel5JumpStateInsideStarterRoom(ascentState);
-  expectLevel5JumpStateInsideStarterRoom(apexState);
-  expectLevel5JumpStateInsideStarterRoom(landingState);
-});
-
-test('capture Level 5 room reset projectile readability proof screenshots', async ({ page }) => {
-  test.setTimeout(240_000);
-  await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-room-reset-projectile', { recursive: true });
-  await page.setViewportSize({ width: 1280, height: 720 });
-
-  async function captureProof(path) {
-    await page.screenshot({
-      path,
-      clip: { x: 0, y: 0, width: 1280, height: 720 },
-    });
-    await copyFile(path, `docs/proof/level5-room-reset-projectile/${path.split('/').pop()}`);
-  }
-
-  await gotoDebugLevel(page, 5);
-  await unlockThroughLevel(page, 4);
-  await page.evaluate(() => {
-    window.__DADA_DEBUG__?.startLevel?.(5);
-  });
-  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
-  await page.waitForTimeout(1300);
-  await hideGameplayUi(page);
-
-  const starterAudit = await getLevel5StarterRoomAudit(page);
-  const launchAudit = await getLevel5StarterRoomLaunchAudit(page);
-  expectLevel5StarterRoomLaunchAudit(starterAudit, launchAudit);
-
-  const beforeCount = await page.evaluate(() => window.__DADA_DEBUG__?.era5ProjectileCount ?? 0);
-  expect(beforeCount).toBe(0);
-  await captureProof('docs/screenshots/level5-room-reset-projectile-before.png');
-
-  const proof = await captureLevel5ProjectileBurstProof(page, captureProof);
-  expect(proof?.report?.preexistingProjectileCount).toBe(0);
-  expect(proof?.firstFrames).toHaveLength(5);
-  for (const frame of proof.firstFrames.slice(0, 3)) {
-    expectLevel5ProjectileBurstFrame(frame);
-  }
-  expect(proof?.report?.shots).toHaveLength(5);
-  for (const shot of proof.report.shots.slice(0, 3)) {
-    expectLevel5ProjectileBurstFrame(shot?.frames?.[0]);
-    expect(shot?.frames?.[1]?.bottomClearancePx).toBeGreaterThan(shot?.frames?.[0]?.bottomClearancePx ?? -Infinity);
-    expect(shot?.frames?.[2]?.bottomClearancePx).toBeGreaterThan(shot?.frames?.[1]?.bottomClearancePx ?? -Infinity);
-    expect((shot?.launchState?.origin?.y ?? -Infinity) - (shot?.launchState?.floorTopY ?? Infinity)).toBeGreaterThan(1.6);
-  }
-  expect(proof?.report?.activeProjectiles?.length ?? 0).toBeGreaterThanOrEqual(2);
-  for (const projectile of proof?.report?.activeProjectiles ?? []) {
-    expect(projectile?.screen).not.toBeNull();
-    expect(projectile?.bottomClearancePx).toBeGreaterThan(4);
-  }
 });
