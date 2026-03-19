@@ -319,13 +319,13 @@ function createDeepWaterPocket(scene, def) {
     tagPoolVisual(cope);
   }
 
-  // ── A2. Interior basin walls (inward-facing planes) ──────────────────────
-  // North wall: world X 36, Y -0.35, Z 26.05 → local (0, -0.35, -3.95), span X 15.90, H 0.70, face +Z
+  // ── A2. Interior basin walls (inward-facing planes, all height 1.70 top-to-floor) ──
+  // All walls: height=1.70, center y=-0.85 → top y=0 (deck), bottom y=-1.70 (flat floor).
   const northWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_north_vis`, {
-    width: 15.90, height: 0.70,
+    width: 15.90, height: 1.70,
   }, scene);
   northWall.parent = root;
-  northWall.position.set(0, -0.35, -3.95);
+  northWall.position.set(0, -0.85, -3.95);
   // Default Babylon plane normal is +Z — visible from inside (player is south of north wall).
   northWall.material = basinWallMat;
   tagPoolVisual(northWall);
@@ -360,40 +360,14 @@ function createDeepWaterPocket(scene, def) {
   eastWall.material = basinWallMat;
   tagPoolVisual(eastWall);
 
-  // ── A3. Floor surfaces ────────────────────────────────────────────────────
-  // Shallow floor: world X 36, Y -0.70, Z 27.975 → local (0, -0.70, -2.025), size X 15.90, Z 1.85
-  const shallowFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_shallow_vis`, {
-    width: 15.90, height: 1.85, subdivisions: 1,
+  // ── A3. Floor (one flat surface at deep level) ────────────────────────────
+  const poolFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_vis`, {
+    width: IN_W, height: IN_D, subdivisions: 1,
   }, scene);
-  shallowFloor.parent = root;
-  shallowFloor.position.set(0, -SHALLOW_DEPTH, -2.025);
-  shallowFloor.material = floorMat;
-  tagPoolVisual(shallowFloor);
-
-  // Transition slope: north edge world Z 28.90 Y -0.70, south edge world Z 30.85 Y -1.70, width X 15.90.
-  // Local center: z = (28.90+30.85)/2 - 30 = -0.125, y = (-0.70+-1.70)/2 = -1.20
-  // Slope runs along Z (+Z = south = downhill). Hypotenuse length and X-axis tilt.
-  const slopeZRun = 1.95;  // 30.85 - 28.90
-  const slopeYDrop = DEEP_DEPTH - SHALLOW_DEPTH;  // 1.00
-  const slopeLen = Math.sqrt(slopeZRun * slopeZRun + slopeYDrop * slopeYDrop);
-  const slopeFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_slope_vis`, {
-    width: 15.90, height: slopeLen, subdivisions: 1,
-  }, scene);
-  slopeFloor.parent = root;
-  slopeFloor.position.set(0, -1.20, -0.125);
-  // Negative rotation.x tilts +Z (south) end down while keeping normal facing up+north (inward).
-  slopeFloor.rotation.x = -Math.atan2(slopeYDrop, slopeZRun);
-  slopeFloor.material = floorMat;
-  tagPoolVisual(slopeFloor);
-
-  // Deep floor: world X 36, Y -1.70, Z 32.40 → local (0, -1.70, 2.40), size X 15.90, Z 3.10
-  const deepFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_deep_vis`, {
-    width: 15.90, height: 3.10, subdivisions: 1,
-  }, scene);
-  deepFloor.parent = root;
-  deepFloor.position.set(0, -DEEP_DEPTH, 2.40);
-  deepFloor.material = floorMat;
-  tagPoolVisual(deepFloor);
+  poolFloor.parent = root;
+  poolFloor.position.set(0, DEEP_Y, 0);
+  poolFloor.material = floorMat;
+  tagPoolVisual(poolFloor);
 
   // ── A4. Water surface (non-solid) ─────────────────────────────────────────
   // world X 36, Y -0.05, Z 30 → local (0, -0.05, 0), size X 15.70, Z 7.70
