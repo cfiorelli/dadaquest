@@ -28,11 +28,16 @@ const GROUND_ACCEL = 48; // 60 × 0.80 — scaled with MAX_SPEED
 const GROUND_DECEL = 64; // 80 × 0.80 — scaled with MAX_SPEED
 const AIR_ACCEL = 30;
 const AIR_DECEL = 10;
-const MAX_SPEED = 6.4; // was 8; walk -20% per design
+const MAX_SPEED = 7.36; // +15% from 6.4
 const GRAVITY = 32;
 const JUMP_VEL = 14;
 const COYOTE_MS = 100;
 const JUMP_BUFFER_MS = 100;
+// Wall run
+const WALL_RUN_DURATION_MS = 1200;  // how long wall run lasts
+const WALL_RUN_MIN_SPEED = 4.0;     // minimum approach speed to trigger
+const WALL_RUN_GRAVITY_SCALE = 0.15; // greatly reduced gravity while wall running
+const WALL_RUN_MAX_DESCENT = 1.5;   // cap downward velocity during wall run
 const JUMP_CUT_MULT = 0.4;   // multiply vy when jump released early
 const PLAYER_HALF_W = 0.25;
 const PLAYER_HALF_H = 0.4;
@@ -143,6 +148,8 @@ export class PlayerController {
     this.sideJumpPlatform = null;
     this.capeFloatTimerMs = 0;
     this.capeFloatCount = 0;
+    this.wallRunActive = false;
+    this.wallRunTimerMs = 0;
   }
 
   setColliders(platforms) {
@@ -218,6 +225,8 @@ export class PlayerController {
     this.sideJumpDirZ = 0;
     this.sideJumpPlatform = null;
     this.capeFloatTimerMs = 0;
+    this.wallRunActive = false;
+    this.wallRunTimerMs = 0;
     this.visual.rotation.set(0, 0, 0);
     this.era5Yaw = 0;
     this.era5YawVel = 0;
@@ -405,6 +414,10 @@ export class PlayerController {
     if (this.capeFloatTimerMs > 0) {
       this.capeFloatTimerMs = Math.max(0, this.capeFloatTimerMs - dt * 1000);
     }
+    if (this.wallRunTimerMs > 0) {
+      this.wallRunTimerMs = Math.max(0, this.wallRunTimerMs - dt * 1000);
+      if (this.wallRunTimerMs <= 0) this.wallRunActive = false;
+    }
 
     // Timers
     if (this.grounded) {
@@ -414,6 +427,8 @@ export class PlayerController {
       this.sideJumpDir = 0;
       this.sideJumpDirZ = 0;
       this.sideJumpPlatform = null;
+      this.wallRunActive = false;
+      this.wallRunTimerMs = 0;
     } else {
       this.timeSinceGround += dt * 1000;
     }
@@ -473,6 +488,8 @@ export class PlayerController {
       if (canSideJump) {
         this.sideJumpUsed = true;
         this.sideJumpWindowMs = 0;
+        this.wallRunActive = false;
+        this.wallRunTimerMs = 0;
         this.emitEvent('jump');
       } else if (canAirJump) {
         this.airJumpsUsed += 1;
@@ -532,8 +549,12 @@ export class PlayerController {
       this.jumping = false;
       this.jumpCutApplied = false;
     } else {
-      // Gravity
-      this.vy -= (GRAVITY * this.gravityScale) * dt;
+      // Gravity — reduced while wall running (requires active movement input)
+      const wallRunEffect = this.wallRunActive && moveLen > 0.05;
+      this.vy -= (GRAVITY * (wallRunEffect ? WALL_RUN_GRAVITY_SCALE : this.gravityScale)) * dt;
+      if (wallRunEffect && this.vy < -WALL_RUN_MAX_DESCENT) {
+        this.vy = -WALL_RUN_MAX_DESCENT;
+      }
     }
 
     // Integrate position
@@ -548,6 +569,8 @@ export class PlayerController {
     // Collision resolution (AABB vs platforms)
     this.grounded = false;
     this.lastCollisionHits = 0;
+    const preColVx = this.vx;
+    const preColVz = this.vz;
     for (const c of this.colliders) {
       const pMinX = pos.x - PLAYER_HALF_W;
       const pMaxX = pos.x + PLAYER_HALF_W;
@@ -586,38 +609,62 @@ export class PlayerController {
       } else if (minOverlap === overlapLeft) {
         pos.x = c.minX - PLAYER_HALF_W - SKIN_WIDTH;
         this.vx = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
-          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
-          this.sideJumpDir = -1;
-          this.sideJumpDirZ = 0;
-          this.sideJumpPlatform = c;
+        if (!this.grounded && !this.sideJumpUsed) {
+          if (!this.wallRunActive && Math.abs(preColVx) >= WALL_RUN_MIN_SPEED) {
+            this.wallRunActive = true;
+            this.wallRunTimerMs = WALL_RUN_DURATION_MS;
+          }
+          if (this.wallRunActive || this.vy < 0) {
+            this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+            this.sideJumpDir = -1;
+            this.sideJumpDirZ = 0;
+            this.sideJumpPlatform = c;
+          }
         }
       } else if (minOverlap === overlapRight) {
         pos.x = c.maxX + PLAYER_HALF_W + SKIN_WIDTH;
         this.vx = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
-          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
-          this.sideJumpDir = 1;
-          this.sideJumpDirZ = 0;
-          this.sideJumpPlatform = c;
+        if (!this.grounded && !this.sideJumpUsed) {
+          if (!this.wallRunActive && Math.abs(preColVx) >= WALL_RUN_MIN_SPEED) {
+            this.wallRunActive = true;
+            this.wallRunTimerMs = WALL_RUN_DURATION_MS;
+          }
+          if (this.wallRunActive || this.vy < 0) {
+            this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+            this.sideJumpDir = 1;
+            this.sideJumpDirZ = 0;
+            this.sideJumpPlatform = c;
+          }
         }
       } else if (freeMove && minOverlap === overlapBack) {
         pos.z = c.minZ - PLAYER_HALF_D - SKIN_WIDTH;
         this.vz = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
-          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
-          this.sideJumpDir = 0;
-          this.sideJumpDirZ = -1;
-          this.sideJumpPlatform = c;
+        if (!this.grounded && !this.sideJumpUsed) {
+          if (!this.wallRunActive && Math.abs(preColVz) >= WALL_RUN_MIN_SPEED) {
+            this.wallRunActive = true;
+            this.wallRunTimerMs = WALL_RUN_DURATION_MS;
+          }
+          if (this.wallRunActive || this.vy < 0) {
+            this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+            this.sideJumpDir = 0;
+            this.sideJumpDirZ = -1;
+            this.sideJumpPlatform = c;
+          }
         }
       } else if (freeMove && minOverlap === overlapFront) {
         pos.z = c.maxZ + PLAYER_HALF_D + SKIN_WIDTH;
         this.vz = 0;
-        if (!this.grounded && this.vy < 0 && !this.sideJumpUsed) {
-          this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
-          this.sideJumpDir = 0;
-          this.sideJumpDirZ = 1;
-          this.sideJumpPlatform = c;
+        if (!this.grounded && !this.sideJumpUsed) {
+          if (!this.wallRunActive && Math.abs(preColVz) >= WALL_RUN_MIN_SPEED) {
+            this.wallRunActive = true;
+            this.wallRunTimerMs = WALL_RUN_DURATION_MS;
+          }
+          if (this.wallRunActive || this.vy < 0) {
+            this.sideJumpWindowMs = SIDE_JUMP_WINDOW_MS;
+            this.sideJumpDir = 0;
+            this.sideJumpDirZ = 1;
+            this.sideJumpPlatform = c;
+          }
         }
       }
     }
