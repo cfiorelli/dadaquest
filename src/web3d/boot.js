@@ -3889,6 +3889,9 @@ export async function boot(options = {}) {
           shield: era5Shield,
           timeMs: performance.now(),
         };
+        // Clear invuln set by the damage applyHit above so triggerReset's
+        // internal applyHit call succeeds (same pattern as scuba_empty path).
+        player.invulnTimerMs = 0;
         triggerReset(`${source}_defeat`, directionX >= 0 ? 1 : -1);
         return true;
       }
