@@ -474,16 +474,20 @@ function createDeepWaterPocket(scene, def) {
   createPoolCollider(`${def.name}_wall_e`,  { width: WALL_T, height: WALL_H, depth: 7.70 },
     { x:  7.85, y: WALL_CY, z:  0    }, 'blocker');
 
-  // ── B4+B5. Single flat floor at y=-1.75 covering entire pool ──────────────
-  // Matches the flat visual floor at DEEP_Y=-1.70. Eliminating separate shallow
-  // floor (y=-0.75) removes the 1m-high step that caused: (a) a visible ledge
-  // in the pool interior from above-south angle, (b) players appearing to float
-  // 1m above the visual floor in the shallow zone.
-  // Spans z=[-3.70, +3.95]: center=-0.125, depth=7.65.
-  // North extent z=-3.70 covers corners alongside stair bay (previously caused
-  // infinity falls). Exit stairs handle descent; player drops into pool from stair 4.
-  createPoolCollider(`${def.name}_floor_col`, { width: 15.80, height: 0.10, depth: 7.65 },
-    { x: 0, y: -1.75, z: -0.125 }, 'walkable');
+  // ── B4. Shallow floor at y=-0.72 (5 cm below SHALLOW_Y=-0.70 visual) ────────
+  // Covers north pool z=[-3.70, -0.50]. Width 15.80 matches inner basin.
+  // North extent z=-3.70 covers corners alongside stair bay.
+  // center_z = (-3.70 + -0.50)/2 = -2.10, depth = 3.20
+  createPoolCollider(`${def.name}_shallow_floor_col`, { width: 15.80, height: 0.10, depth: 3.20 },
+    { x: 0, y: -0.72, z: -2.10 }, 'walkable');
+
+  // ── B5. Deep floor at y=-1.75 (5 cm below DEEP_Y=-1.70 visual) ───────────
+  // Covers south pool z=[-0.50, +3.95]. Player transitions from shallow via a
+  // step drop — acceptable in water (player swims). No transition step colliders
+  // (previously removed because they caused an invisible horizontal swimming barrier).
+  // center_z = (-0.50 + 3.95)/2 = 1.725, depth = 4.45
+  createPoolCollider(`${def.name}_deep_floor_col`, { width: 15.80, height: 0.10, depth: 4.45 },
+    { x: 0, y: -1.75, z: 1.725 }, 'walkable');
 
   // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
   // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
