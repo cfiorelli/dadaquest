@@ -302,26 +302,6 @@ const room2Blocks = [
     decorIntent: 'secret-tunnel-turn',
     blockerReason: 'secret-tunnel-turn',
   }),
-  // ── Exit corridor: narrow 4 m hall immediately after tunnel stair exit ────
-  // Tunnel stair section ends at z=59 (TUNNEL_STAIR_END_Z), y=0 deck level.
-  // These two walls narrow the pump-junction entry vestibule to 4 m wide
-  // (x=34..38) for the first 4.5 m, giving the player a confined hallway feel
-  // when they surface. Walls stop at z=63.5 so the pump_west_walk / pump_east_walk
-  // surfaces remain accessible from z=62+ without blocking future traversal.
-  shellBlock('exit_hall_west_wall', 28.0, 34.0, -0.6, 4.5, TUNNEL_STAIR_END_Z, 63.5, {
-    rgb: [108, 108, 108],
-    roughness: 0.92,
-    emissiveScale: 0.01,
-    decorIntent: 'exit-hallway',
-    blockerReason: 'exit-hallway-wall',
-  }),
-  shellBlock('exit_hall_east_wall', 38.0, 52.0, -0.6, 4.5, TUNNEL_STAIR_END_Z, 63.5, {
-    rgb: [108, 108, 108],
-    roughness: 0.92,
-    emissiveScale: 0.01,
-    decorIntent: 'exit-hallway',
-    blockerReason: 'exit-hallway-wall',
-  }),
 ];
 
 const room3Blocks = [
@@ -460,16 +440,29 @@ for (let index = 0; index < 6; index += 1) {
   }));
 }
 
-const pumpNorthThresholds = [
-  surfaceRect('pump_entry_landing', 33.7, 38.3, 0.0, 59.0, 60.8, 'pump_junction_floor', {
-    h: 0.3,
-    minThickness: 0.3,
-    walkableClassification: 'threshold-floor',
+// ── Narrow exit hallway: 4 m wide × 4.5 m tall × 16 m long ──────────────────
+// Starts at z=59 (TUNNEL_STAIR_END_Z) where the stair stringer reaches y=0.
+// Runs south to z=75 (dead end). Interior x=[34..38], y=[0..4.5].
+// No openings to any larger space — south wall is sealed.
+const HALL_MIN_X = 34.0;
+const HALL_MAX_X = 38.0;
+const HALL_MIN_Z = TUNNEL_STAIR_END_Z; // 59.0
+const HALL_MAX_Z = 75.0;
+const HALL_CEIL_Y = 4.5;
+const HALL_RGB = [112, 112, 112];
+
+const hallwayBlocks = [
+  shellBlock('hall_west_wall', HALL_MIN_X - 0.5, HALL_MIN_X, 0.0, HALL_CEIL_Y, HALL_MIN_Z, HALL_MAX_Z, {
+    rgb: HALL_RGB,
   }),
-  surfaceRect('pump_entry_spread', 31.0, 41.0, 0.0, 60.8, 62.0, 'pump_junction_floor', {
-    h: 0.3,
-    minThickness: 0.3,
-    walkableClassification: 'threshold-floor',
+  shellBlock('hall_east_wall', HALL_MAX_X, HALL_MAX_X + 0.5, 0.0, HALL_CEIL_Y, HALL_MIN_Z, HALL_MAX_Z, {
+    rgb: HALL_RGB,
+  }),
+  shellBlock('hall_ceiling', HALL_MIN_X - 0.5, HALL_MAX_X + 0.5, HALL_CEIL_Y, HALL_CEIL_Y + 0.5, HALL_MIN_Z, HALL_MAX_Z, {
+    rgb: HALL_RGB,
+  }),
+  shellBlock('hall_south_wall', HALL_MIN_X - 0.5, HALL_MAX_X + 0.5, 0.0, HALL_CEIL_Y + 0.5, HALL_MAX_Z, HALL_MAX_Z + 0.5, {
+    rgb: HALL_RGB,
   }),
 ];
 
@@ -480,13 +473,13 @@ export const LEVEL5 = compileAuthoredEraLayout({
     minX: -0.5,
     maxX: 50.0,
     minZ: -0.5,
-    maxZ: 62.0,
+    maxZ: 78.0,
   },
   spawnYaw: Math.PI * 0.5,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
   spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
-  goal: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
+  goal: { x: 36.0, y: PLAYER_SPAWN_Y, z: 73.0 },
   goalPresentation: 'trigger-only',
   theme: 'neutral',
   showGroundVisual: false,
@@ -509,7 +502,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
   authoredMap: {
     id: 'level5-squarium-graybox',
     startSector: 'starter_pool_lab',
-    goalSector: 'starter_pool_lab',
+    goalSector: 'tunnel_exit_hallway',
     sectors: [
       {
         id: 'starter_pool_lab',
@@ -564,6 +557,29 @@ export const LEVEL5 = compileAuthoredEraLayout({
         surfaces: tunnelSteps,
         decorBlocks: room2Blocks,
       },
+      {
+        id: 'tunnel_exit_hallway',
+        label: 'Tunnel Exit Hallway',
+        x: 36.0,
+        z: 67.0,
+        w: 4.0,
+        d: 16.0,
+        floorY: 0.0,
+        ceilingY: HALL_CEIL_Y,
+        floorSurfaceType: 'hallway_floor',
+        wallLanguage: 'graybox_hallway_shell',
+        landmarks: ['narrow exit corridor'],
+        shell: false,
+        surfaces: [
+          surfaceRect('hallway_floor', HALL_MIN_X, HALL_MAX_X, 0.0, HALL_MIN_Z, HALL_MAX_Z, 'hallway_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+          }),
+        ],
+        decorBlocks: hallwayBlocks,
+      },
     ],
     connectors: [
       {
@@ -578,6 +594,21 @@ export const LEVEL5 = compileAuthoredEraLayout({
         floorY: -1.6,
         ceilingY: -0.25,
         floorSurfaceType: 'submerged_threshold',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'tunnel_to_hallway',
+        label: 'Tunnel To Hallway',
+        sourceSector: 'submerged_service_tunnel',
+        destinationSector: 'tunnel_exit_hallway',
+        x: 36.0,
+        z: 58.8,
+        w: 3.0,
+        d: 1.6,
+        floorY: -0.2,
+        ceilingY: 1.2,
+        floorSurfaceType: 'threshold_floor',
         shell: false,
         surfaces: [],
       },
