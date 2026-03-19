@@ -260,7 +260,7 @@ function createDeepWaterPocket(scene, def) {
   floorMat.diffuseColor = new BABYLON.Color3(0.27, 0.36, 0.43);
   floorMat.emissiveColor = new BABYLON.Color3(0.03, 0.06, 0.08);
   floorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
-  floorMat.backFaceCulling = false;
+  floorMat.backFaceCulling = true;
 
   const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
   copeMat.diffuseColor = new BABYLON.Color3(0.88, 0.90, 0.92);
@@ -312,7 +312,7 @@ function createDeepWaterPocket(scene, def) {
   }, scene);
   westWall.parent = root;
   westWall.position.set(-7.95, -0.85, 0);
-  westWall.rotation.y = -Math.PI * 0.5;  // face +X (inward)
+  westWall.rotation.y = Math.PI * 0.5;  // face +X (inward)
   westWall.material = basinWallMat;
   tagPoolVisual(westWall);
 
@@ -322,7 +322,7 @@ function createDeepWaterPocket(scene, def) {
   }, scene);
   eastWall.parent = root;
   eastWall.position.set(7.95, -0.85, 0);
-  eastWall.rotation.y = Math.PI * 0.5;  // face -X (inward)
+  eastWall.rotation.y = -Math.PI * 0.5;  // face -X (inward)
   eastWall.material = basinWallMat;
   tagPoolVisual(eastWall);
 
@@ -342,13 +342,13 @@ function createDeepWaterPocket(scene, def) {
   const slopeZRun = 1.95;  // 30.85 - 28.90
   const slopeYDrop = DEEP_DEPTH - SHALLOW_DEPTH;  // 1.00
   const slopeLen = Math.sqrt(slopeZRun * slopeZRun + slopeYDrop * slopeYDrop);
-  const slopeFloor = BABYLON.MeshBuilder.CreatePlane(`${def.name}_floor_slope_vis`, {
-    width: 15.90, height: slopeLen,
+  const slopeFloor = BABYLON.MeshBuilder.CreateGround(`${def.name}_floor_slope_vis`, {
+    width: 15.90, height: slopeLen, subdivisions: 1,
   }, scene);
   slopeFloor.parent = root;
   slopeFloor.position.set(0, -1.20, -0.125);
-  // Rotate around X so south end (+Z) goes down: positive rotation.x tilts +Z side downward.
-  slopeFloor.rotation.x = Math.atan2(slopeYDrop, slopeZRun);
+  // Negative rotation.x tilts +Z (south) end down while keeping normal facing up+north (inward).
+  slopeFloor.rotation.x = -Math.atan2(slopeYDrop, slopeZRun);
   slopeFloor.material = floorMat;
   tagPoolVisual(slopeFloor);
 
