@@ -249,18 +249,36 @@ function createDeepWaterPocket(scene, def) {
     };
   }
 
+  // ── Stencil portal gate ───────────────────────────────────────────────────
+  // Pool interior is only visible through the deck-level aperture (stencil=1).
+  // From the sides or underneath the aperture doesn't project → interior hidden.
+  scene.stencilEnabled = true;
+  // Preserve stencil from group 2 (aperture) into group 3 (interior); depth still cleared.
+  scene.setRenderingAutoClearDepthStencil(3, true, true, false);
+
+  function addStencilTest(mat) {
+    mat.stencil.enabled = true;
+    mat.stencil.func           = BABYLON.Constants.EQUAL;
+    mat.stencil.funcRef        = 1;
+    mat.stencil.opStencilFail  = BABYLON.Constants.KEEP;
+    mat.stencil.opDepthFail    = BABYLON.Constants.KEEP;
+    mat.stencil.opDepthPass    = BABYLON.Constants.KEEP;
+  }
+
   // 1) Basin/deck visuals
   const basinWallMat = new BABYLON.StandardMaterial(`${def.name}_basinWallMat`, scene);
   basinWallMat.diffuseColor = new BABYLON.Color3(0.78, 0.85, 0.89);
   basinWallMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.09);
   basinWallMat.specularColor = new BABYLON.Color3(0.08, 0.10, 0.10);
   basinWallMat.backFaceCulling = true;
+  addStencilTest(basinWallMat);
 
   const floorMat = new BABYLON.StandardMaterial(`${def.name}_basinFloorMat`, scene);
   floorMat.diffuseColor = new BABYLON.Color3(0.27, 0.36, 0.43);
   floorMat.emissiveColor = new BABYLON.Color3(0.03, 0.06, 0.08);
   floorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
   floorMat.backFaceCulling = true;
+  addStencilTest(floorMat);
 
   const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
   copeMat.diffuseColor = new BABYLON.Color3(0.88, 0.90, 0.92);
@@ -375,6 +393,7 @@ function createDeepWaterPocket(scene, def) {
   waterMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   waterMat.specularColor = new BABYLON.Color3(0.16, 0.22, 0.28);
   waterMat.needDepthPrePass = true;
+  addStencilTest(waterMat);
   water.material = waterMat;
   tagPoolVisual(water, { alphaIndex: 50 });
 
@@ -383,6 +402,7 @@ function createDeepWaterPocket(scene, def) {
   const laneMat = new BABYLON.StandardMaterial(`${def.name}_laneMat`, scene);
   laneMat.diffuseColor = new BABYLON.Color3(0.08, 0.14, 0.40);
   laneMat.emissiveColor = new BABYLON.Color3(0.02, 0.04, 0.10);
+  addStencilTest(laneMat);
   const laneStripe = BABYLON.MeshBuilder.CreateBox(`${def.name}_lane_stripe_vis`, {
     width: 0.35, height: 0.01, depth: 4.80,
   }, scene);
@@ -397,6 +417,7 @@ function createDeepWaterPocket(scene, def) {
   ladderMat.diffuseColor = new BABYLON.Color3(0.82, 0.84, 0.86);
   ladderMat.emissiveColor = new BABYLON.Color3(0.06, 0.06, 0.07);
   ladderMat.specularColor = new BABYLON.Color3(0.40, 0.42, 0.44);
+  addStencilTest(ladderMat);
   for (let side = 0; side < 2; side++) {
     const rail = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ladder_rail_${side}_vis`, {
       diameter: 0.04, height: 1.20, tessellation: 8,
@@ -424,6 +445,7 @@ function createDeepWaterPocket(scene, def) {
   stepMat.diffuseColor = new BABYLON.Color3(0.72, 0.80, 0.86);
   stepMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
   stepMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
+  addStencilTest(stepMat);
   const visStairDefs = [
     { ly: -0.0875, lz: -3.475 },
     { ly: -0.2625, lz: -3.125 },
@@ -440,6 +462,28 @@ function createDeepWaterPocket(scene, def) {
     stairMesh.material = stepMat;
     tagPoolVisual(stairMesh);
   }
+
+  // ── A8. Stencil aperture (invisible, group 2, writes stencil=1 at deck opening) ──
+  // Renders before group 3 interior; covers pool opening footprint at Y=0.
+  const aperture = BABYLON.MeshBuilder.CreateGround(`${def.name}_aperture`, {
+    width: 15.60, height: 7.60, subdivisions: 1,
+  }, scene);
+  aperture.parent = root;
+  aperture.position.set(0, 0, 0);
+  const apertureMat = new BABYLON.StandardMaterial(`${def.name}_apertureMat`, scene);
+  apertureMat.alpha = 0.001;
+  apertureMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  apertureMat.stencil.enabled       = true;
+  apertureMat.stencil.func          = BABYLON.Constants.ALWAYS;
+  apertureMat.stencil.funcRef       = 1;
+  apertureMat.stencil.opStencilFail = BABYLON.Constants.KEEP;
+  apertureMat.stencil.opDepthFail   = BABYLON.Constants.KEEP;
+  apertureMat.stencil.opDepthPass   = BABYLON.Constants.REPLACE;
+  aperture.material = apertureMat;
+  aperture.renderingGroupId = 2;
+  aperture.isPickable = false;
+  aperture.checkCollisions = false;
+  aperture.alwaysSelectAsActiveMesh = true;
 
   // ── B2. Perimeter top-edge blockers (invisible BLOCKER, prevent drop-in) ──
   // Top Y 0.10, bottom Y -0.15, center Y -0.025, height 0.25, thickness 0.20.
