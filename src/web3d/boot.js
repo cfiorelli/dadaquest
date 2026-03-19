@@ -2564,6 +2564,7 @@ export async function boot(options = {}) {
   let era5CameraYawVel = 0;
   let era5CameraManualLookMs = 0;
   let era5CameraDebugOverride = null;
+  let era5WallRunCamFade = 0; // 0-1: smoothly reduces camera height during wall run to avoid ceiling clips
   let level2ProbeTimer = 0;
   let level2LoggedOccluderId = null;
   let era5CurrentOccluderName = null;
@@ -6265,13 +6266,20 @@ export async function boot(options = {}) {
           // into the ceiling every frame. This preserves constant pitch angle
           // while the player finishes the jump arc. X/Z and yaw track normally.
           const cameraClampBounds = getLevel5StarterRoomCameraClampBounds();
-          const rawCameraY = py + preset.height;
+          // Wall-run camera: smoothly reduce height so camera doesn't clip room ceilings.
+          // Fades in quickly when wall run starts, out more slowly after leaving the wall.
+          const wallRunActive = !!player.wallRunActive;
+          era5WallRunCamFade = wallRunActive
+            ? Math.min(1, era5WallRunCamFade + dt * 6)   // ~170ms to full fade-in
+            : Math.max(0, era5WallRunCamFade - dt * 2.5); // ~400ms to fade out
+          const wallRunHeightReduction = era5WallRunCamFade * preset.height * 0.38;
+          const rawCameraY = py + preset.height - wallRunHeightReduction;
           const ceilingClamped = cameraClampBounds !== null && rawCameraY > cameraClampBounds.maxY;
           const effectiveCameraY = ceilingClamped ? cameraClampBounds.maxY : rawCameraY;
           // Freeze focus/target Y to preserve pitch angle when ceiling-constrained.
           const effectiveFocusY = ceilingClamped
             ? cameraClampBounds.maxY - preset.height + preset.focusHeight
-            : py + preset.focusHeight;
+            : py + preset.focusHeight - (wallRunHeightReduction * 0.5);
           const focusPos = new BABYLON.Vector3(px, effectiveFocusY, player.mesh.position.z);
           const desiredTarget = new BABYLON.Vector3(
             px + (lookForward.x * preset.lookAhead),
