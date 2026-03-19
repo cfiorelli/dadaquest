@@ -4139,7 +4139,7 @@ export async function boot(options = {}) {
           triggerReset('scuba_empty', 0, null);
         } else {
           era5OxygenDamageTimer += dt;
-          const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
+          const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 1);
           if (era5OxygenDamageTimer >= interval) {
             era5OxygenDamageTimer = Math.max(0, era5OxygenDamageTimer - interval);
             applyEra5Damage('oxygen', { x: 0, z: 0 }, { invulnMs: 850, element: 'water', resist: era5State.stats.waterResist ?? 0 });
