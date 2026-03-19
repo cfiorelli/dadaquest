@@ -1,4 +1,5 @@
 import * as BABYLON from '@babylonjs/core';
+import { applyVfxRenderPolicy } from '../render/renderPolicy.js';
 
 function createRadialTexture(scene, name, stops) {
   const size = 64;
@@ -32,7 +33,7 @@ function makeParticleMesh(scene, name, material) {
   mesh.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
   mesh.material = material;
   mesh.isPickable = false;
-  mesh.renderingGroupId = 2;
+  applyVfxRenderPolicy(mesh);
   mesh.setEnabled(false);
   return mesh;
 }

@@ -5,6 +5,15 @@ import { createTelegraphedHazard } from './telegraphHazard.js';
 import { NoiseWanderMover } from './noiseMover.js';
 import { markDecorNode } from './envFx.js';
 import { makePlastic } from '../materials.js';
+import {
+  applyEnemyAlphaRenderPolicy,
+  applyRenderPolicyToMaterials,
+  applyRenderPolicyToMeshes,
+  applyVfxRenderPolicy,
+  applyWaterSurfaceRenderPolicy,
+  applyWorldAlphaRenderPolicy,
+  applyWorldOpaqueRenderPolicy,
+} from '../render/renderPolicy.js';
 
 const EEL_WARN_SEC = 0.8;
 const EEL_ACTIVE_SEC = 1.2;
@@ -62,7 +71,6 @@ function makeGlowMaterial(scene, name, rgb, {
     (rgb[1] / 255) * emissive,
     (rgb[2] / 255) * emissive,
   );
-  material.transparencyMode = alpha < 1 ? BABYLON.Material.MATERIAL_ALPHABLEND : material.transparencyMode;
   return material;
 }
 
@@ -82,9 +90,8 @@ function createCurrentJet(scene, def) {
   zoneMat.diffuseColor = new BABYLON.Color3(0.12, 0.62, 0.74);
   zoneMat.emissiveColor = new BABYLON.Color3(0.06, 0.18, 0.20);
   zoneMat.alpha = 0.12;
-  zoneMat.backFaceCulling = false;
-  zoneMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   zone.material = zoneMat;
+  applyVfxRenderPolicy(zone);
   markHazard(zone);
 
   for (let i = 0; i < 4; i += 1) {
@@ -98,9 +105,9 @@ function createCurrentJet(scene, def) {
     arrowMat.diffuseColor = new BABYLON.Color3(0.44, 0.96, 1.0);
     arrowMat.emissiveColor = new BABYLON.Color3(0.20, 0.56, 0.60);
     arrowMat.alpha = 0.72;
-    arrowMat.backFaceCulling = false;
     arrow.material = arrowMat;
     if (def.pushX < 0) arrow.rotation.z = Math.PI;
+    applyVfxRenderPolicy(arrow);
     arrows.push(arrow);
     markHazard(arrow);
   }
@@ -117,8 +124,8 @@ function createCurrentJet(scene, def) {
     bubbleMat.emissiveColor = new BABYLON.Color3(0.06, 0.18, 0.22);
     bubbleMat.alpha = 0.34;
     bubbleMat.specularColor = new BABYLON.Color3(0.72, 0.92, 1.0);
-    bubbleMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     bubble.material = bubbleMat;
+    applyVfxRenderPolicy(bubble);
     bubbles.push(bubble);
     markHazard(bubble);
   }
@@ -188,7 +195,6 @@ function createDeepWaterPocket(scene, def) {
   // Top exceeds player-in-basin top (~+0.10), so AABB always resolves horizontally.
   const WALL_H  = 2.50;
   const WALL_CY = -0.75;
-  const GRP = 3;
   const WATER_SURFACE_Y = DECK_Y - 0.05;
   const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
   // Derived depth constants for water state logic
@@ -200,12 +206,10 @@ function createDeepWaterPocket(scene, def) {
   const visualMeshes = [];
   const collisionMeshes = [];
 
-  function tagPoolVisual(mesh, { alphaIndex = null } = {}) {
-    mesh.renderingGroupId = GRP;
+  function tagPoolVisual(mesh, applyPolicy = applyWorldOpaqueRenderPolicy) {
     mesh.isPickable = false;
     mesh.checkCollisions = false;
-    mesh.alwaysSelectAsActiveMesh = true;
-    if (Number.isFinite(alphaIndex)) mesh.alphaIndex = alphaIndex;
+    applyPolicy(mesh);
     markDecor(mesh);
     visualMeshes.push(mesh);
     return mesh;
@@ -290,14 +294,12 @@ function createDeepWaterPocket(scene, def) {
   basinWallMat.diffuseColor = new BABYLON.Color3(0.78, 0.85, 0.89);
   basinWallMat.emissiveColor = new BABYLON.Color3(0.05, 0.08, 0.09);
   basinWallMat.specularColor = new BABYLON.Color3(0.08, 0.10, 0.10);
-  basinWallMat.backFaceCulling = true;
   addStencilTest(basinWallMat);
 
   const floorMat = new BABYLON.StandardMaterial(`${def.name}_basinFloorMat`, scene);
   floorMat.diffuseColor = new BABYLON.Color3(0.27, 0.36, 0.43);
   floorMat.emissiveColor = new BABYLON.Color3(0.03, 0.06, 0.08);
   floorMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
-  floorMat.backFaceCulling = true;
   addStencilTest(floorMat);
 
   const copeMat = new BABYLON.StandardMaterial(`${def.name}_copeMat`, scene);
@@ -410,12 +412,10 @@ function createDeepWaterPocket(scene, def) {
   waterMat.diffuseColor = new BABYLON.Color3(0.14, 0.52, 0.66);
   waterMat.emissiveColor = new BABYLON.Color3(0.03, 0.12, 0.16);
   waterMat.alpha = 0.64;
-  waterMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   waterMat.specularColor = new BABYLON.Color3(0.16, 0.22, 0.28);
-  waterMat.needDepthPrePass = true;
   addStencilTest(waterMat);
   water.material = waterMat;
-  tagPoolVisual(water, { alphaIndex: 50 });
+  tagPoolVisual(water, applyWaterSurfaceRenderPolicy);
 
   // ── A5. Lane stripe ────────────────────────────────────────────────────────
   // world X 36, Y -1.695, Z 31.00 → local (0, -1.695, 1.00), size X 0.35, Y 0.01, Z 4.80
@@ -474,7 +474,7 @@ function createDeepWaterPocket(scene, def) {
   apertureMat.stencil.opDepthFail   = BABYLON.Constants.KEEP;
   apertureMat.stencil.opDepthPass   = BABYLON.Constants.REPLACE;
   aperture.material = apertureMat;
-  aperture.renderingGroupId = 2;
+  applyRenderPolicyToMeshes(aperture, 'worldAlpha');
   aperture.isPickable = false;
   aperture.checkCollisions = false;
   aperture.alwaysSelectAsActiveMesh = true;
@@ -621,8 +621,8 @@ function createAirBubblePickup(scene, def) {
     mat.emissiveColor = new BABYLON.Color3(0.12, 0.26, 0.32);
     mat.alpha = 0.48;
     mat.specularColor = new BABYLON.Color3(0.84, 1.0, 1.0);
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     globe.material = mat;
+    applyVfxRenderPolicy(globe);
     globes.push(globe);
     markDecor(globe);
   }
@@ -777,6 +777,7 @@ function createEelRail(scene, def) {
     alpha: 0.42,
     roughness: 0.18,
   });
+  applyVfxRenderPolicy(beam);
   markHazard(beam);
 
   const halo = BABYLON.MeshBuilder.CreatePlane(`${def.name}_halo`, {
@@ -788,10 +789,9 @@ function createEelRail(scene, def) {
   haloMat.diffuseColor = new BABYLON.Color3(0.24, 1.0, 0.92);
   haloMat.emissiveColor = new BABYLON.Color3(0.14, 0.44, 0.38);
   haloMat.alpha = 0.24;
-  haloMat.backFaceCulling = false;
-  haloMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   halo.material = haloMat;
   halo.position.z = 0.4;
+  applyVfxRenderPolicy(halo);
   markHazard(halo);
 
   return {
@@ -838,9 +838,8 @@ function createVent(scene, def) {
   plumeMat.diffuseColor = new BABYLON.Color3(0.56, 0.98, 1.0);
   plumeMat.emissiveColor = new BABYLON.Color3(0.14, 0.30, 0.34);
   plumeMat.alpha = 0.12;
-  plumeMat.backFaceCulling = false;
-  plumeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plume.material = plumeMat;
+  applyVfxRenderPolicy(plume);
   markHazard(plume);
 
   return { ...def, root, grate, plume };
@@ -861,8 +860,7 @@ function createJellyfish(scene, def, shadowGen) {
     alpha: 0.48,
     roughness: 0.16,
   });
-  bell.material.needDepthPrePass = true;
-  bell.renderingGroupId = 3;
+  applyEnemyAlphaRenderPolicy(bell);
   shadowGen.addShadowCaster(bell);
   markHazard(bell);
 
@@ -878,10 +876,8 @@ function createJellyfish(scene, def, shadowGen) {
   silhouetteMat.emissiveColor = new BABYLON.Color3(0.04, 0.10, 0.12);
   silhouetteMat.alpha = 0.38;
   silhouetteMat.specularColor = BABYLON.Color3.Black();
-  silhouetteMat.backFaceCulling = false;
-  silhouetteMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   silhouette.material = silhouetteMat;
-  silhouette.renderingGroupId = 3;
+  applyEnemyAlphaRenderPolicy(silhouette);
   markHazard(silhouette);
 
   const core = BABYLON.MeshBuilder.CreateSphere(`${def.name}_core`, {
@@ -894,7 +890,7 @@ function createJellyfish(scene, def, shadowGen) {
     emissive: 0.46,
     roughness: 0.12,
   });
-  core.renderingGroupId = 3;
+  applyEnemyAlphaRenderPolicy(core);
   markHazard(core);
 
   const tentacles = [];
@@ -915,7 +911,7 @@ function createJellyfish(scene, def, shadowGen) {
       alpha: 0.42,
       roughness: 0.24,
     });
-    tentacle.renderingGroupId = 3;
+    applyEnemyAlphaRenderPolicy(tentacle);
     tentacles.push(tentacle);
     markHazard(tentacle);
   }
@@ -1055,9 +1051,8 @@ function createSharkSweep(scene, def) {
   shadowMat.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.05);
   shadowMat.emissiveColor = new BABYLON.Color3(0.01, 0.02, 0.03);
   shadowMat.alpha = 0.12;
-  shadowMat.backFaceCulling = false;
-  shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   shadow.material = shadowMat;
+  applyVfxRenderPolicy(shadow);
   markHazard(shadow);
 
   const laneIndicator = BABYLON.MeshBuilder.CreatePlane(`${def.name}_indicator`, {
@@ -1071,9 +1066,8 @@ function createSharkSweep(scene, def) {
   indicatorMat.diffuseColor = new BABYLON.Color3(0.90, 0.98, 1.0);
   indicatorMat.emissiveColor = new BABYLON.Color3(0.28, 0.36, 0.42);
   indicatorMat.alpha = 0.22;
-  indicatorMat.backFaceCulling = false;
-  indicatorMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   laneIndicator.material = indicatorMat;
+  applyVfxRenderPolicy(laneIndicator);
   markHazard(laneIndicator);
 
   return {
@@ -1138,8 +1132,7 @@ function createOverlayMaterial(scene, name, rgb, alpha) {
   material.emissiveColor = new BABYLON.Color3((rgb[0] / 255) * 0.22, (rgb[1] / 255) * 0.22, (rgb[2] / 255) * 0.22);
   material.specularColor = BABYLON.Color3.Black();
   material.alpha = alpha;
-  material.backFaceCulling = false;
-  material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  applyRenderPolicyToMaterials(material, 'worldAlpha');
   return material;
 }
 
@@ -1200,8 +1193,6 @@ export function buildWorld5(scene, options = {}) {
       mat.diffuseColor = curtainColors[i];
       mat.emissiveColor = curtainColors[i].scale(0.14);
       mat.alpha = 0.82;
-      mat.backFaceCulling = false;
-      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
       const mesh = BABYLON.MeshBuilder.CreatePlane(`spawn_curtain_${i}`, {
         width: 2.20, height: 5.60,
       }, scene);
@@ -1210,6 +1201,7 @@ export function buildWorld5(scene, options = {}) {
       mesh.material = mat;
       mesh.isPickable = false;
       mesh.checkCollisions = false;
+      applyWorldAlphaRenderPolicy(mesh);
       markDecor(mesh);
     });
 
@@ -1332,14 +1324,14 @@ export function buildWorld5(scene, options = {}) {
     rugMat.emissiveTexture = sigilTex;
     rugMat.emissiveColor   = new BABYLON.Color3(0.82, 0.82, 0.82);
     rugMat.diffuseColor    = new BABYLON.Color3(0.30, 0.30, 0.30);
-    rugMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    rugMat.backFaceCulling = false;
+    applyRenderPolicyToMaterials(rugMat, 'worldAlpha');
 
     const rug = BABYLON.MeshBuilder.CreateGround('spawn_sigil_rug', { width: RUG_M, height: RUG_M }, scene);
     rug.position.set(spawnX, FLOOR_Y, spawnZ);
-    rug.renderingGroupId = 1;
+    rug.material = rugMat;
     rug.isPickable = false;
     rug.checkCollisions = false;
+    applyWorldAlphaRenderPolicy(rug);
     markDecor(rug);
   }());
 
@@ -1440,7 +1432,7 @@ export function buildWorld5(scene, options = {}) {
     markDecor(mesh);
     mesh.isPickable = false;
     mesh.checkCollisions = false;
-    mesh.renderingGroupId = 2;
+    applyRenderPolicyToMeshes(mesh, 'worldAlpha');
     mesh.metadata = {
       ...(mesh.metadata || {}),
       cameraIgnore: true,

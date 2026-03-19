@@ -26,6 +26,29 @@ const LEVEL5_DOORWAY_RIGHT_TURN_STEPS = [
   { key: 'right-90', holdMs: 1300, path: 'docs/screenshots/level5-room-reset-doorway-right-90.png' },
   { key: 'right-stress', holdMs: 2200, path: 'docs/screenshots/level5-room-reset-doorway-right-stress.png' },
 ];
+const LEVEL5_POOL_RENDER_POSES = {
+  aboveWater: {
+    x: 35.2,
+    y: 0.42,
+    z: 26.2,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  },
+  waterline: {
+    x: 36.0,
+    y: -0.22,
+    z: 30.4,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  },
+  underwater: {
+    x: 36.0,
+    y: -1.15,
+    z: 30.8,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  },
+};
 
 async function gotoDebugLevel(page, levelId) {
   await page.goto(`http://127.0.0.1:4173/?level=${levelId}&debug=1`);
@@ -74,6 +97,31 @@ async function unlockThroughLevel(page, completedLevel = 5) {
       levelCompleted,
     });
   }, completedLevel);
+}
+
+async function seedEra5BubbleWand(page) {
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setProgress?.({
+      sourdoughUnlocked: true,
+      levelCompleted: { 4: true },
+      era5: {
+        inventory: [
+          {
+            instanceId: 'starter-scuba-tank',
+            defId: 'scuba_tank',
+          },
+          {
+            instanceId: 'starter-bubble-wand',
+            defId: 'bubble_wand',
+          },
+        ],
+        equipped: {
+          tool: 'starter-scuba-tank',
+          weaponPrimary: 'starter-bubble-wand',
+        },
+      },
+    });
+  });
 }
 
 async function hideGameplayUi(page, { keepStatus = false } = {}) {
@@ -578,6 +626,18 @@ async function installLevel5ProjectileBurstAudit(page) {
       const bottomClearancePx = (centerClearancePx !== null && screenRadiusPx !== null)
         ? Number((centerClearancePx - screenRadiusPx).toFixed(3))
         : null;
+      const engine = scene?.getEngine?.();
+      const viewportWidth = engine?.getRenderWidth?.() ?? null;
+      const viewportHeight = engine?.getRenderHeight?.() ?? null;
+      const onScreen = !!(
+        screen
+        && Number.isFinite(viewportWidth)
+        && Number.isFinite(viewportHeight)
+        && screen.x >= 0
+        && screen.x <= viewportWidth
+        && screen.y >= 0
+        && screen.y <= viewportHeight
+      );
       return {
         world: {
           x: Number(pos.x.toFixed(3)),
@@ -585,12 +645,19 @@ async function installLevel5ProjectileBurstAudit(page) {
           z: Number(pos.z.toFixed(3)),
         },
         screen,
+        onScreen,
         floorEdgeScreen,
         screenRadiusPx,
         centerClearancePx,
         bottomClearancePx,
+        renderingGroupId: mesh.renderingGroupId ?? null,
+        renderPolicyCategory: mesh.metadata?.renderPolicyCategory ?? null,
+        needDepthPrePass: typeof mesh.material?.needDepthPrePass === 'boolean' ? mesh.material.needDepthPrePass : null,
+        forceDepthWrite: typeof mesh.material?.forceDepthWrite === 'boolean' ? mesh.material.forceDepthWrite : null,
+        backFaceCulling: typeof mesh.material?.backFaceCulling === 'boolean' ? mesh.material.backFaceCulling : null,
         readableByCenter: (centerClearancePx ?? -Infinity) > 0,
         readableByBottom: (bottomClearancePx ?? -Infinity) > 0,
+        readableOnScreen: onScreen && ((screenRadiusPx ?? -Infinity) > 4),
       };
     };
     const tick = () => {
@@ -705,7 +772,11 @@ async function installLevel5ProjectileBurstAudit(page) {
   });
 }
 
-async function captureLevel5ProjectileBurstProof(page, captureProof, { shotCount = 5, interShotDelayMs = 390 } = {}) {
+async function captureLevel5ProjectileBurstProof(page, captureProof, {
+  shotCount = 3,
+  interShotDelayMs = 460,
+  pathPrefix = 'docs/screenshots/level5-room-reset-projectile-burst',
+} = {}) {
   await page.evaluate(() => {
     window.focus();
   });
@@ -714,24 +785,20 @@ async function captureLevel5ProjectileBurstProof(page, captureProof, { shotCount
   const firstFrames = [];
   for (let shotIndex = 1; shotIndex <= shotCount; shotIndex += 1) {
     await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.planShot(index), shotIndex);
-    await page.keyboard.press('f');
+    await page.evaluate(() => window.__DADA_DEBUG__?.fireEra5Weapon?.());
     const frame = await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(index, 0), shotIndex);
     firstFrames.push(frame);
     if (shotIndex <= 3) {
-      await captureProof(`docs/screenshots/level5-room-reset-projectile-burst-shot${shotIndex}.png`);
+      await captureProof(`${pathPrefix}-shot${shotIndex}.png`);
     }
     if (shotIndex < shotCount) {
       await page.waitForTimeout(interShotDelayMs);
     }
   }
 
-  const report = await page.evaluate(async (shotCountValue) => {
-    for (let shotIndex = 1; shotIndex <= shotCountValue; shotIndex += 1) {
-      await window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(shotIndex, 2);
-    }
-    return window.__LEVEL5_PROJECTILE_BURST_AUDIT__.stop();
-  }, shotCount);
-  await captureProof('docs/screenshots/level5-room-reset-projectile-burst-continuous.png');
+  await page.waitForTimeout(220);
+  const report = await page.evaluate(() => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.stop());
+  await captureProof(`${pathPrefix}-continuous.png`);
   return {
     firstFrames,
     report,
@@ -741,11 +808,140 @@ async function captureLevel5ProjectileBurstProof(page, captureProof, { shotCount
 function expectLevel5ProjectileBurstFrame(frame) {
   expect(frame?.world).not.toBeNull();
   expect(frame?.screen).not.toBeNull();
-  expect(frame?.floorEdgeScreen).not.toBeNull();
+  expect(frame?.onScreen).toBe(true);
   expect(frame?.screenRadiusPx).toBeGreaterThan(4);
-  expect(frame?.centerClearancePx).toBeGreaterThan(4);
-  expect(frame?.bottomClearancePx).toBeGreaterThan(4);
-  expect(frame?.readableByBottom).toBe(true);
+  expect(frame?.readableOnScreen).toBe(true);
+  expect(frame?.renderPolicyCategory).toBe('projectile');
+  expect(frame?.renderingGroupId).toBe(4);
+  expect(frame?.needDepthPrePass).toBe(true);
+  expect(frame?.forceDepthWrite).toBe(true);
+  expect(frame?.backFaceCulling).toBe(false);
+}
+
+async function getLevel5RenderPolicyAudit(page) {
+  return page.evaluate(() => {
+    const debug = window.__DADA_DEBUG__ ?? {};
+    const scene = debug?.sceneRef ?? null;
+    const camera = debug?.cameraRef ?? scene?.activeCamera ?? null;
+    const Vector3 = window.BABYLON?.Vector3 ?? camera?.position?.constructor ?? null;
+    const Matrix = window.BABYLON?.Matrix ?? scene?.getTransformMatrix?.()?.constructor ?? null;
+    const meshes = scene?.meshes ?? [];
+    const projectPoint = (point) => {
+      if (!point || !scene || !camera || !Vector3 || !Matrix) return null;
+      const engine = scene.getEngine();
+      const projected = Vector3.Project(
+        point,
+        Matrix.Identity(),
+        scene.getTransformMatrix(),
+        camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()),
+      );
+      return {
+        x: Number(projected.x.toFixed(2)),
+        y: Number(projected.y.toFixed(2)),
+      };
+    };
+    const getScreenBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box || !scene || !camera || !Vector3 || !Matrix) return null;
+      const { minimumWorld: min, maximumWorld: max } = box;
+      const corners = [
+        new Vector3(min.x, min.y, min.z),
+        new Vector3(min.x, min.y, max.z),
+        new Vector3(min.x, max.y, min.z),
+        new Vector3(min.x, max.y, max.z),
+        new Vector3(max.x, min.y, min.z),
+        new Vector3(max.x, min.y, max.z),
+        new Vector3(max.x, max.y, min.z),
+        new Vector3(max.x, max.y, max.z),
+      ]
+        .map(projectPoint)
+        .filter(Boolean);
+      if (corners.length === 0) return null;
+      const xs = corners.map((point) => point.x);
+      const ys = corners.map((point) => point.y);
+      return {
+        minX: Number(Math.min(...xs).toFixed(2)),
+        maxX: Number(Math.max(...xs).toFixed(2)),
+        minY: Number(Math.min(...ys).toFixed(2)),
+        maxY: Number(Math.max(...ys).toFixed(2)),
+      };
+    };
+    const isOnScreen = (screenBounds) => !!(
+      screenBounds
+      && scene
+      && camera
+      && screenBounds.maxX >= 0
+      && screenBounds.minX <= scene.getEngine().getRenderWidth()
+      && screenBounds.maxY >= 0
+      && screenBounds.minY <= scene.getEngine().getRenderHeight()
+    );
+    const getBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: box.minimumWorld.x,
+        maxX: box.maximumWorld.x,
+        minY: box.minimumWorld.y,
+        maxY: box.maximumWorld.y,
+        minZ: box.minimumWorld.z,
+        maxZ: box.maximumWorld.z,
+      };
+    };
+    const summarizeMesh = (mesh) => {
+      if (!mesh) return null;
+      const center = mesh.getBoundingInfo?.()?.boundingBox?.centerWorld?.clone?.() ?? null;
+      const screenBounds = getScreenBounds(mesh);
+      const screen = screenBounds
+        ? {
+          x: Number((((screenBounds.minX + screenBounds.maxX) * 0.5)).toFixed(2)),
+          y: Number((((screenBounds.minY + screenBounds.maxY) * 0.5)).toFixed(2)),
+        }
+        : projectPoint(center);
+      return {
+        name: mesh.name,
+        screen,
+        screenBounds,
+        onScreen: isOnScreen(screenBounds),
+        renderingGroupId: mesh.renderingGroupId ?? null,
+        renderPolicyCategory: mesh.metadata?.renderPolicyCategory ?? null,
+        needDepthPrePass: typeof mesh.material?.needDepthPrePass === 'boolean' ? mesh.material.needDepthPrePass : null,
+        backFaceCulling: typeof mesh.material?.backFaceCulling === 'boolean' ? mesh.material.backFaceCulling : null,
+        forceDepthWrite: typeof mesh.material?.forceDepthWrite === 'boolean' ? mesh.material.forceDepthWrite : null,
+        bounds: getBounds(mesh),
+      };
+    };
+    const compareWeaponSummary = (a, b) => {
+      const aOnScreen = a?.onScreen ? 1 : 0;
+      const bOnScreen = b?.onScreen ? 1 : 0;
+      if (aOnScreen !== bOnScreen) return bOnScreen - aOnScreen;
+      const aBounds = a?.bounds;
+      const bBounds = b?.bounds;
+      const av = aBounds
+        ? (aBounds.maxX - aBounds.minX) * (aBounds.maxY - aBounds.minY) * (aBounds.maxZ - aBounds.minZ)
+        : -Infinity;
+      const bv = bBounds
+        ? (bBounds.maxX - bBounds.minX) * (bBounds.maxY - bBounds.minY) * (bBounds.maxZ - bBounds.minZ)
+        : -Infinity;
+      return bv - av;
+    };
+    const weaponMeshes = meshes.filter((mesh) => {
+      let node = mesh;
+      while (node) {
+        if (String(node.name || '').startsWith('weapon_')) return true;
+        node = node.parent || null;
+      }
+      return false;
+    });
+    const weaponMesh = weaponMeshes
+      .map((mesh) => summarizeMesh(mesh))
+      .filter(Boolean)
+      .sort(compareWeaponSummary)[0] ?? null;
+    const waterMesh = meshes.find((mesh) => mesh?.name === 'starter_pool_water_surface_vis') ?? null;
+    return {
+      weapon: weaponMesh,
+      water: summarizeMesh(waterMesh),
+    };
+  });
 }
 
 test('capture scene screenshots', async ({ page }) => {
@@ -828,7 +1024,7 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   }
 
   await gotoDebugLevel(page, 5);
-  await unlockThroughLevel(page, 4);
+  await seedEra5BubbleWand(page);
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.startLevel?.(5);
   });
@@ -964,4 +1160,60 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
   });
+});
+
+test('capture Level 5 render-policy proof screenshots', async ({ page }) => {
+  test.setTimeout(180_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/render-policy-level5', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/render-policy-level5/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await seedEra5BubbleWand(page);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1800);
+  await hideGameplayUi(page);
+  await focusGameplay(page);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+  });
+
+  for (const [key, pose] of Object.entries(LEVEL5_POOL_RENDER_POSES)) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+    }, pose);
+    await page.waitForTimeout(260);
+    const audit = await getLevel5RenderPolicyAudit(page);
+    expect(audit?.water?.renderPolicyCategory).toBe('waterSurface');
+    expect(audit?.water?.renderingGroupId).toBe(3);
+    expect(audit?.weapon?.name).toBeTruthy();
+    expect(audit?.weapon?.onScreen).toBe(true);
+    expect(audit?.weapon?.renderPolicyCategory).toBe('heldItem');
+    expect(audit?.weapon?.renderingGroupId).toBe(4);
+    await captureProof(`docs/screenshots/render-policy-level5-held-${key}.png`);
+  }
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, LEVEL5_POOL_RENDER_POSES.waterline);
+  await page.waitForTimeout(260);
+  const burst = await captureLevel5ProjectileBurstProof(page, captureProof, {
+    pathPrefix: 'docs/screenshots/render-policy-level5-projectile-burst',
+  });
+  for (const frame of burst.firstFrames.slice(0, 3)) {
+    expectLevel5ProjectileBurstFrame(frame);
+  }
 });

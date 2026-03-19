@@ -1,4 +1,9 @@
 import * as BABYLON from '@babylonjs/core';
+import {
+  applyUnderwaterOverlayRenderPolicy,
+  applyVfxRenderPolicy,
+  applyWorldAlphaRenderPolicy,
+} from '../render/renderPolicy.js';
 
 export function markDecorNode(node, extraMetadata = {}) {
   if (!node) return;
@@ -108,8 +113,8 @@ function createBubbleNode(scene, name, position, scale = 1) {
   mat.emissiveColor = new BABYLON.Color3(0.06, 0.20, 0.24);
   mat.alpha = 0.34;
   mat.specularColor = new BABYLON.Color3(0.45, 0.82, 0.88);
-  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mesh.material = mat;
+  applyVfxRenderPolicy(mesh);
   markEnvNode(mesh, { era5EnvKind: 'particle' });
   return mesh;
 }
@@ -127,9 +132,8 @@ function createGlassFrame(scene, name, { width, height }) {
   panelMat.emissiveColor = new BABYLON.Color3(0.03, 0.10, 0.12);
   panelMat.alpha = 0.12;
   panelMat.specularColor = new BABYLON.Color3(0.42, 0.72, 0.80);
-  panelMat.backFaceCulling = false;
-  panelMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   panel.material = panelMat;
+  applyWorldAlphaRenderPolicy(panel);
 
   const frameMaterials = [];
   const pieces = [
@@ -151,9 +155,8 @@ function createGlassFrame(scene, name, { width, height }) {
     mat.alpha = 0.30;
     mat.specularColor = BABYLON.Color3.Black();
     mat.disableLighting = true;
-    mat.backFaceCulling = false;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     frame.material = mat;
+    applyWorldAlphaRenderPolicy(frame);
     frameMaterials.push(mat);
   }
 
@@ -188,9 +191,8 @@ export function createAquariumEnvironmentFx(scene, {
   fogMat.opacityTexture = fogMat.diffuseTexture;
   fogMat.specularColor = BABYLON.Color3.Black();
   fogMat.disableLighting = true;
-  fogMat.backFaceCulling = false;
-  fogMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   fogPlane.material = fogMat;
+  applyUnderwaterOverlayRenderPolicy(fogPlane);
   markEnvNode(fogPlane, { era5EnvKind: 'plane' });
 
   const causticPlane = BABYLON.MeshBuilder.CreatePlane('aquariumCausticPlane', {
@@ -206,9 +208,8 @@ export function createAquariumEnvironmentFx(scene, {
   causticMat.specularColor = BABYLON.Color3.Black();
   causticMat.disableLighting = true;
   causticMat.alpha = 0.34;
-  causticMat.backFaceCulling = false;
-  causticMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   causticPlane.material = causticMat;
+  applyUnderwaterOverlayRenderPolicy(causticPlane);
   markEnvNode(causticPlane, { era5EnvKind: 'plane' });
 
   const columns = [];
@@ -225,8 +226,8 @@ export function createAquariumEnvironmentFx(scene, {
     mat.alpha = 0.52;
     mat.specularColor = BABYLON.Color3.Black();
     mat.disableLighting = true;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     column.material = mat;
+    applyWorldAlphaRenderPolicy(column);
     columns.push(column);
     markEnvNode(column, { era5EnvKind: 'plane' });
   }
@@ -251,9 +252,8 @@ export function createAquariumEnvironmentFx(scene, {
     shadowMat.specularColor = BABYLON.Color3.Black();
     shadowMat.disableLighting = true;
     shadowMat.alpha = 0.42;
-    shadowMat.backFaceCulling = false;
-    shadowMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     shadow.material = shadowMat;
+    applyUnderwaterOverlayRenderPolicy(shadow);
     markEnvNode(shadow, { era5EnvKind: 'plane' });
     fishShadows.push({
       mesh: shadow,
@@ -386,9 +386,8 @@ function createRectPlane(scene, name, {
   mat.alpha = alpha;
   mat.specularColor = BABYLON.Color3.Black();
   mat.disableLighting = true;
-  mat.backFaceCulling = false;
-  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   plane.material = mat;
+  applyWorldAlphaRenderPolicy(plane);
   markEnvNode(plane, { era5EnvKind: 'plane' });
   return { plane, mat };
 }
@@ -406,12 +405,11 @@ function applyGradientPlaneMaterial(scene, plane, name, {
   mat.emissiveTexture = tex;
   mat.opacityTexture = tex;
   mat.disableLighting = true;
-  mat.backFaceCulling = false;
   mat.specularColor = BABYLON.Color3.Black();
   mat.alpha = alpha;
-  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mat.emissiveColor = new BABYLON.Color3(emissiveScale, emissiveScale, emissiveScale);
   plane.material = mat;
+  applyWorldAlphaRenderPolicy(plane);
   markEnvNode(plane, { era5EnvKind: 'plane' });
   return mat;
 }
@@ -428,8 +426,8 @@ function createParticleSphere(scene, name, {
   mat.emissiveColor = emissive;
   mat.alpha = alpha;
   mat.specularColor = BABYLON.Color3.Black();
-  mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
   mesh.material = mat;
+  applyVfxRenderPolicy(mesh);
   markEnvNode(mesh, { era5EnvKind: 'particle' });
   return { mesh, mat };
 }

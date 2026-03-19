@@ -17,6 +17,11 @@ import { createDebugHud } from './ui/debugHud.js';
 import { installRestStabilityTest } from './util/restStabilityTest.js';
 import { JuiceFx } from './util/juiceFx.js';
 import {
+  applyHeldItemRenderPolicy,
+  applyProjectileRenderPolicy,
+  applyVfxRenderPolicy,
+} from './render/renderPolicy.js';
+import {
   applyHdriEnvironment,
   getAvailableModels,
   loadOptionalModel,
@@ -3381,7 +3386,6 @@ export async function boot(options = {}) {
       orbMat.diffuseColor = new BABYLON.Color3(0.7, 0.96, 1.0);
       orbMat.emissiveColor = new BABYLON.Color3(0.14, 0.38, 0.50);
       orbMat.alpha = 0.88;
-      orbMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
       orb.material = orbMat;
     } else if (defId === 'foam_blaster') {
       const body = BABYLON.MeshBuilder.CreateBox(`${defId}_body`, {
@@ -3405,7 +3409,6 @@ export async function boot(options = {}) {
       handle.rotation.z = Math.PI * 0.5;
       handle.material = solidMat(`${defId}_hmat`, 0.62, 0.36, 0.24);
       const fanMat = solidMat(`${defId}_fmat`, 0.98, 0.52, 0.72, 0.3);
-      fanMat.backFaceCulling = false;
       for (let f = 0; f < 4; f += 1) {
         const petal = BABYLON.MeshBuilder.CreatePlane(`${defId}_petal${f}`, { width: 0.10 * S, height: 0.07 * S }, scene);
         petal.parent = root;
@@ -3451,13 +3454,11 @@ export async function boot(options = {}) {
     }
 
     // Apply to all meshes in tree.
-    // Group 3: same pass as pool surface for correct depth-sort against water.
     root.getChildMeshes().forEach((mesh) => {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
-      mesh.renderingGroupId = 3;
-      mesh.alwaysSelectAsActiveMesh = true;
     });
+    applyHeldItemRenderPolicy(root);
     return root;
   }
 
@@ -3745,25 +3746,21 @@ export async function boot(options = {}) {
     mat.diffuseColor = new BABYLON.Color3(vis.r, vis.g, vis.b);
     mat.emissiveColor = new BABYLON.Color3(vis.er, vis.eg, vis.eb);
     mat.alpha = vis.alpha;
-    if (vis.alpha < 1) {
-      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    }
-    mat.needDepthPrePass = true;
-    mat.forceDepthWrite = true;
     mat.stencil.enabled = true;
     mat.stencil.func = BABYLON.Constants.ALWAYS;
     mat.stencil.funcRef = 0;
     mat.stencil.opStencilFail = BABYLON.Constants.KEEP;
     mat.stencil.opDepthFail = BABYLON.Constants.KEEP;
     mat.stencil.opDepthPass = BABYLON.Constants.KEEP;
-    mat.backFaceCulling = false;
     mesh.material = mat;
-    mesh.renderingGroupId = 4;
-    mesh.alphaIndex = 1000;
-    mesh.alwaysSelectAsActiveMesh = true;
+    applyProjectileRenderPolicy(mesh);
     mesh.checkCollisions = false;
     mesh.isPickable = false;
-    mesh.metadata = { cameraIgnore: true, decor: true };
+    mesh.metadata = {
+      ...(mesh.metadata || {}),
+      cameraIgnore: true,
+      decor: true,
+    };
 
     const projectileState = {
       mesh,
@@ -3976,14 +3973,12 @@ export async function boot(options = {}) {
     burst.position.copyFrom(point);
     burst.isPickable = false;
     burst.checkCollisions = false;
-    burst.renderingGroupId = 3;
     const mat = new BABYLON.StandardMaterial(`${burst.name}_mat`, scene);
     mat.diffuseColor = color;
     mat.emissiveColor = color.scale(0.5);
     mat.alpha = 0.82;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    mat.backFaceCulling = false;
     burst.material = mat;
+    applyVfxRenderPolicy(burst);
     let elapsed = 0;
     const totalMs = style === 'splash' ? 260 : 180;
     const impactObs = scene.onBeforeRenderObservable.add(() => {
@@ -4082,15 +4077,13 @@ export async function boot(options = {}) {
     const ripple = BABYLON.MeshBuilder.CreateDisc('era5Ripple', { radius: 0.18, tessellation: 20 }, scene);
     ripple.position.set(pos.x, pos.y + 0.12, pos.z);
     ripple.rotation.x = Math.PI * 0.5;
-    ripple.renderingGroupId = 3;
     ripple.isPickable = false;
     const mat = new BABYLON.StandardMaterial('era5RippleMat', scene);
     mat.diffuseColor = new BABYLON.Color3(0.55, 0.88, 1.0);
     mat.emissiveColor = new BABYLON.Color3(0.18, 0.42, 0.60);
     mat.alpha = 0.72;
-    mat.backFaceCulling = false;
-    mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
     ripple.material = mat;
+    applyVfxRenderPolicy(ripple);
     let elapsed = 0;
     const observer = scene.onBeforeRenderObservable.add(() => {
       elapsed += scene.getEngine().getDeltaTime() * 0.001;

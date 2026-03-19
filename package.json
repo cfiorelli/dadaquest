@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "vite",
     "dev:test": "vite --host 127.0.0.1 --port 4173 --strictPort",
-    "build": "npm run check:asset-manifest && vite build && npm run check:dist-nozip",
+    "build": "npm run check:asset-manifest && npm run check:render-policy && vite build && npm run check:dist-nozip",
     "preview": "vite preview",
     "preview:test": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "check:asset-manifest": "node scripts/validate-assets-manifest.js",
+    "check:render-policy": "node scripts/check-render-policy.js",
     "check:dist-nozip": "node -e \"const fs=require('fs');const p='dist';const bad=[];const walk=(d)=>{if(!fs.existsSync(d))return;for(const e of fs.readdirSync(d,{withFileTypes:true})){const f=d+'/'+e.name;if(e.isDirectory())walk(f);else if(/\\.zip$/i.test(e.name))bad.push(f)}};walk(p);if(bad.length){console.error('Zip artifacts found in dist:');for(const f of bad)console.error(' - '+f);process.exit(1)}console.log('No zip artifacts in dist.');\"",
     "pw:install": "playwright install --with-deps chromium",
     "test": "npm run test:fast",

@@ -46,6 +46,8 @@ Always treat these as distinct layers. Changes to one must not silently affect a
 4. **Camera interaction** — cameraBlocker, cameraFadeable, occlusion
 5. **Render/transparency behavior** — renderingGroupId, needDepthPrePass, alphaIndex, ALPHABLEND
 
+Render/transparency settings for held items, projectiles, enemies, water, overlays, VFX, and translucent world geometry must use the shared helpers in `src/web3d/render/renderPolicy.js`. Direct per-mesh writes to `renderingGroupId`, `alphaIndex`, `needDepthPrePass`, `forceDepthWrite`, `disableDepthWrite`, `transparencyMode`, or `backFaceCulling` are forbidden outside that module unless the file is an explicit legacy exception documented in `docs/RENDER_POLICY.md`.
+
 ### Define invariants before coding
 
 Before any 3D edit, state the invariants the patch must preserve. Example:

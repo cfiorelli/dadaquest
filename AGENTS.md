@@ -83,6 +83,30 @@ The following must align before composition or polish work is considered complet
 
 If those truths disagree, fix that before improving appearance.
 
+### Central render-policy rule
+
+Gameplay-visible render-order and transparency settings for held items, projectiles, enemies, water, overlays, VFX, and translucent world meshes must go through the central policy module in `src/web3d/render/renderPolicy.js`.
+
+Do not directly assign:
+
+- `renderingGroupId`
+- `alphaIndex`
+- `needDepthPrePass`
+- `forceDepthWrite`
+- `disableDepthWrite`
+- `transparencyMode`
+- `backFaceCulling`
+
+outside the central render-policy module or its approved helper calls, unless a documented legacy exception is already listed in `docs/RENDER_POLICY.md`.
+
+Run:
+
+```bash
+npm run check:render-policy
+```
+
+when touching render/transparency behavior, and use the visibility matrix in `docs/RENDER_POLICY.md` as the proof contract.
+
 ### Banned Era 5 fallback patterns
 
 Do not ship Era 5 work that relies on:
