@@ -218,7 +218,7 @@ const UPPER_RGB = [156, 156, 156];
 
 const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
   rgb: LAB_RGB,
-  wallBottomY: 0.0,
+  wallBottomY: -2.0,
   wallTopY: 6.0,
   ceilingY: 6.0,
 });
