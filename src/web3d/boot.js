@@ -3749,9 +3749,15 @@ export async function boot(options = {}) {
     }
     mat.needDepthPrePass = true;
     mat.forceDepthWrite = true;
+    mat.stencil.enabled = true;
+    mat.stencil.func = BABYLON.Constants.ALWAYS;
+    mat.stencil.funcRef = 0;
+    mat.stencil.opStencilFail = BABYLON.Constants.KEEP;
+    mat.stencil.opDepthFail = BABYLON.Constants.KEEP;
+    mat.stencil.opDepthPass = BABYLON.Constants.KEEP;
     mat.backFaceCulling = false;
     mesh.material = mat;
-    mesh.renderingGroupId = 3;
+    mesh.renderingGroupId = 4;
     mesh.alphaIndex = 1000;
     mesh.alwaysSelectAsActiveMesh = true;
     mesh.checkCollisions = false;

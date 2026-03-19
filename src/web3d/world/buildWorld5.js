@@ -1373,7 +1373,6 @@ export function buildWorld5(scene, options = {}) {
   // Colorful curtains along the west wall near spawn (x=4, z=18).
   // Cryptic floor logo: concentric symbol centered at spawn position.
   (function createSpawnDecorations() {
-    if (LEVEL5.squarium) return;
     const spawnX = world.spawn.x;       // 4.0
     const spawnZ = world.spawn.z ?? 0;  // 18.0
     const WALL_X = 0.28;                // inner face of west wall
