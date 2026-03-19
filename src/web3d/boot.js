@@ -3592,9 +3592,6 @@ export async function boot(options = {}) {
       }
       return;
     }
-    if (toolId !== 'scuba_tank') {
-      era5Oxygen = meterMax;
-    }
   }
 
   function getEra5CameraForward() {
