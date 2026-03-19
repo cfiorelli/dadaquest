@@ -22,7 +22,8 @@ MAP → DISCUSS → PLAN → EXECUTE → VERIFY → COMMIT
 ## Bead Policy
 
 - One bead per bounded goal.
-- Two beads maximum per session, and only if the two goals are clearly separable with no shared state.
+- No limit on beads per session. Execute as many as needed to complete the work.
+- Parallelise beads that touch non-overlapping systems (e.g. HUD-only vs. collision-only).
 - One commit per bead. Do not batch beads into one commit.
 - Push after every commit.
 
@@ -32,8 +33,8 @@ MAP → DISCUSS → PLAN → EXECUTE → VERIFY → COMMIT
 
 ### Auto-advance and parallelization
 
-- **Auto-advance is OFF** for any task touching: 3D geometry, gameplay volumes, collision, camera, rendering groups, transparency, HUD state.
-- **Parallelization is OFF** for 3D/spatial tasks. Spatial bugs interact; parallel edits mask root cause.
+- **Auto-advance is ON** unless the user explicitly asks to pause for review.
+- **Parallelization is ON** for beads that touch non-overlapping systems. Spatial bugs interact, so geometry/collision/camera edits to the *same object* are still done sequentially. Independent systems (e.g. HUD vs. pool collision) may be parallelised.
 
 ### Separate concerns before touching anything
 
