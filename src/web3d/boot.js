@@ -3892,7 +3892,6 @@ export async function boot(options = {}) {
           shield: era5Shield,
           timeMs: performance.now(),
         };
-        restoreEra5Vitals();
         triggerReset(`${source}_defeat`, directionX >= 0 ? 1 : -1);
         return true;
       }
@@ -4127,9 +4126,9 @@ export async function boot(options = {}) {
     if (inDeepWater || headSubmerged) {
       era5OxygenHideTimer = 2.0;
     }
-    if (headSubmerged) {
-      const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
-      const drainPerSec = Math.max(0.05, era5State.stats.oxygenDrainRate ?? 0.25) * drainScale; // 0.25/s = 1 per 4s
+    if (inDeepWater) {
+      // Drain oxygen while underwater: 1 unit/sec for both breath and scuba
+      const drainPerSec = era5State.stats.oxygenDrainRate ?? 1.0; // 1 unit/sec
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
       if (era5Oxygen <= 0.001) {
         if (hasScubaTank && !respawnState) {
@@ -4150,12 +4149,12 @@ export async function boot(options = {}) {
       return;
     }
     if (hasScubaTank) {
-      const refillPerSec = 8;
+      // Scuba tank above water: recharge at 4 units/sec
+      const refillPerSec = 4;
       era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
     } else {
-      // No scuba tank: gradual refill (1 unit/s = 4s to fully refill 4-unit breath pool).
-      // Instant reset was masking drain — any single frame above water reset to max.
-      era5Oxygen = Math.min(oxygenMax, era5Oxygen + (1.0 * dt));
+      // No scuba tank (breath): instant recharge to full while above water
+      era5Oxygen = oxygenMax;
     }
     era5OxygenDamageTimer = 0;
     era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
@@ -5929,6 +5928,7 @@ export async function boot(options = {}) {
           ui.setFade(0.42 * t);
           if (respawnState.timer <= 0) {
             ui.setFade(0);
+            restoreEra5Vitals();
             respawnState = null;
             if (debugMode) {
               debugIdleTimerMs = 1000;
