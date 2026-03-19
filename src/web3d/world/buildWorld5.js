@@ -475,9 +475,11 @@ function createDeepWaterPocket(scene, def) {
     { x:  7.85, y: WALL_CY, z:  0    }, 'blocker');
 
   // ── B4. Walkable shallow floor collider ───────────────────────────────────
-  // world X 36, Y -0.75, Z 28.00 → local x=0, z=-2.00
-  createPoolCollider(`${def.name}_floor_shallow_col`, { width: 15.80, height: 0.10, depth: 1.60 },
-    { x: 0, y: -0.75, z: -2.00 }, 'walkable');
+  // Extended north to z=-3.70 (just inside north wall at -3.85) to cover the corner
+  // areas alongside the stair bay — previously no floor there caused infinity falls.
+  // Spans z=[-3.70, -1.20]: center=-2.45, depth=2.50.
+  createPoolCollider(`${def.name}_floor_shallow_col`, { width: 15.80, height: 0.10, depth: 2.50 },
+    { x: 0, y: -0.75, z: -2.45 }, 'walkable');
 
   // ── B5. Walkable deep floor collider ──────────────────────────────────────
   // Extended to cover from z=-1.20 (where shallow floor ends) all the way to z=+3.95.

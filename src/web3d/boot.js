@@ -3300,7 +3300,7 @@ export async function boot(options = {}) {
       shield: era5Shield,
       shieldMax,
       oxygen: era5Oxygen,
-      oxygenMax: Math.max(0, era5State.stats.oxygenMax ?? 0),
+      oxygenMax: Math.max(4.0, getEra5MeterMax()),
       showOxygen: era5OxygenHideTimer > 0,
       toolLabel: getEra5BreathLabel(toolDef),
       weaponLabel: weaponDef?.name || 'No Weapon',
@@ -3433,12 +3433,11 @@ export async function boot(options = {}) {
     }
 
     // Apply to all meshes in tree.
-    // Group 4: renders after all pool geometry so weapon is always visible above/below water.
-    // (Group 3 caused the weapon tip to be hidden by pool stencil logic when underwater.)
+    // Group 3: same pass as pool surface for correct depth-sort against water.
     root.getChildMeshes().forEach((mesh) => {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
-      mesh.renderingGroupId = 4;
+      mesh.renderingGroupId = 3;
       mesh.alwaysSelectAsActiveMesh = true;
     });
     return root;
@@ -3703,11 +3702,11 @@ export async function boot(options = {}) {
 
     // Per-weapon visual parameters
     const WEAPON_VISUALS = {
-      bubble_wand:       { diameter: 0.22, r: 0.76, g: 0.98, b: 1.0,  er: 0.12, eg: 0.24, eb: 0.30, alpha: 0.76, radius: 0.24 },
-      foam_blaster:      { diameter: 0.14, r: 1.0,  g: 0.96, b: 0.60, er: 0.30, eg: 0.28, eb: 0.00, alpha: 0.92, radius: 0.18 },
-      paper_fan:         { diameter: 0.11, r: 1.0,  g: 0.55, b: 0.72, er: 0.30, eg: 0.05, eb: 0.15, alpha: 0.90, radius: 0.15 },
-      bookmark_boomerang:{ diameter: 0.22, r: 0.85, g: 0.72, b: 0.45, er: 0.20, eg: 0.15, eb: 0.00, alpha: 1.00, radius: 0.24, card: true },
-      kite_string_whip:  { diameter: 0.32, r: 1.0,  g: 0.55, b: 0.10, er: 0.40, eg: 0.15, eb: 0.00, alpha: 0.96, radius: 0.34 },
+      bubble_wand:       { diameter: 0.28, r: 0.76, g: 0.98, b: 1.0,  er: 0.55, eg: 0.90, eb: 1.00, alpha: 0.88, radius: 0.24 },
+      foam_blaster:      { diameter: 0.18, r: 1.0,  g: 0.96, b: 0.60, er: 0.72, eg: 0.65, eb: 0.00, alpha: 0.95, radius: 0.18 },
+      paper_fan:         { diameter: 0.14, r: 1.0,  g: 0.55, b: 0.72, er: 0.65, eg: 0.15, eb: 0.40, alpha: 0.95, radius: 0.15 },
+      bookmark_boomerang:{ diameter: 0.24, r: 0.85, g: 0.72, b: 0.45, er: 0.55, eg: 0.42, eb: 0.00, alpha: 1.00, radius: 0.24, card: true },
+      kite_string_whip:  { diameter: 0.36, r: 1.0,  g: 0.55, b: 0.10, er: 0.80, eg: 0.38, eb: 0.00, alpha: 0.98, radius: 0.34 },
     };
     const vis = WEAPON_VISUALS[wId] ?? WEAPON_VISUALS.bubble_wand;
 
@@ -3738,7 +3737,7 @@ export async function boot(options = {}) {
     mat.forceDepthWrite = true;
     mat.backFaceCulling = false;
     mesh.material = mat;
-    mesh.renderingGroupId = 4; // above pool geometry so projectiles are visible underwater
+    mesh.renderingGroupId = 3;
     mesh.alphaIndex = 1000;
     mesh.alwaysSelectAsActiveMesh = true;
     mesh.checkCollisions = false;
@@ -4154,7 +4153,9 @@ export async function boot(options = {}) {
       const refillPerSec = 8;
       era5Oxygen = Math.min(oxygenMax, era5Oxygen + (refillPerSec * dt));
     } else {
-      era5Oxygen = oxygenMax;
+      // No scuba tank: gradual refill (1 unit/s = 4s to fully refill 4-unit breath pool).
+      // Instant reset was masking drain — any single frame above water reset to max.
+      era5Oxygen = Math.min(oxygenMax, era5Oxygen + (1.0 * dt));
     }
     era5OxygenDamageTimer = 0;
     era5OxygenHideTimer = Math.max(0, era5OxygenHideTimer - dt);
