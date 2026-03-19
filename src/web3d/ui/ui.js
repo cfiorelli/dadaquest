@@ -836,6 +836,14 @@ const CSS = `
   display: none;
   z-index: 7;
 }
+.dada-era5-compass {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  z-index: 7;
+  border-radius: 50%;
+  pointer-events: none;
+}
 .dada-era5-panel {
   border-radius: 18px;
   border: 1px solid rgba(134, 233, 255, 0.24);
@@ -1939,6 +1947,16 @@ export function createUI(uiRoot, options = {}) {
     </div>
   `;
   uiRoot.appendChild(era5HudEl);
+
+  // ── 3D XYZ compass ─────────────────────────────────────────────────────────
+  const era5CompassEl = document.createElement('canvas');
+  era5CompassEl.className = 'dada-era5-compass';
+  era5CompassEl.width = 72;
+  era5CompassEl.height = 72;
+  era5CompassEl.setAttribute('aria-hidden', 'true');
+  uiRoot.appendChild(era5CompassEl);
+  const era5CompassCtx = era5CompassEl.getContext('2d');
+
   const era5HeartsEl = era5HudEl.querySelector('[data-era5-hearts]');
   const era5ShieldsEl = era5HudEl.querySelector('[data-era5-shields]');
   const era5ShieldBlockEl = era5ShieldsEl?.closest('.dada-era5-block') ?? null;
@@ -2603,6 +2621,52 @@ export function createUI(uiRoot, options = {}) {
             <div class="dada-era5-weapon-pip-name">${slot.abbr || ''}</div>
           </div>
         `).join('');
+      }
+    },
+    updateEra5Compass(cameraRight, cameraUp) {
+      if (!era5CompassCtx) return;
+      const ctx = era5CompassCtx;
+      const w = era5CompassEl.width;
+      const h = era5CompassEl.height;
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const len = 24;
+      ctx.clearRect(0, 0, w, h);
+      // Background circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.42)';
+      ctx.fill();
+      // Axis definitions: +X=east(red), +Y=up(green), +Z=south(blue), negatives dimmer
+      const axes = [
+        { v: [-1, 0, 0], color: '#a33', label: 'W' },
+        { v: [0, -1, 0], color: '#3a3', label: 'D' },
+        { v: [0, 0, -1], color: '#33a', label: 'N' },
+        { v: [1,  0, 0], color: '#f55', label: 'E' },
+        { v: [0,  1, 0], color: '#5f5', label: 'U' },
+        { v: [0,  0, 1], color: '#55f', label: 'S' },
+      ];
+      // Sort by depth (dot with -cameraForward) so near axes draw on top
+      const withDepth = axes.map((ax) => {
+        const px = ax.v[0] * cameraRight.x + ax.v[1] * cameraRight.y + ax.v[2] * cameraRight.z;
+        const py = -(ax.v[0] * cameraUp.x + ax.v[1] * cameraUp.y + ax.v[2] * cameraUp.z);
+        return { ...ax, px, py };
+      });
+      withDepth.sort((a, b) => (a.px * a.px + a.py * a.py) - (b.px * b.px + b.py * b.py));
+      for (const ax of withDepth) {
+        const ex = cx + ax.px * len;
+        const ey = cy + ax.py * len;
+        ctx.beginPath();
+        ctx.strokeStyle = ax.color;
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(ex, ey);
+        ctx.stroke();
+        ctx.fillStyle = ax.color;
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ax.label, ex + ax.px * 8, ey + ax.py * 8);
       }
     },
     setEra5InventoryHandlers({

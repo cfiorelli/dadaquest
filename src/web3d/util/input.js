@@ -27,6 +27,14 @@ export class InputManager {
     document.addEventListener('keyup', (e) => {
       const code = e.code;
       this.held[code] = false;
+      // On macOS, Option+Arrow can swallow the arrow keyup, leaving the key stuck.
+      // Clear all arrow keys when either Alt key is released.
+      if (code === 'AltLeft' || code === 'AltRight') {
+        this.held.ArrowLeft = false;
+        this.held.ArrowRight = false;
+        this.held.ArrowUp = false;
+        this.held.ArrowDown = false;
+      }
     });
     document.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;

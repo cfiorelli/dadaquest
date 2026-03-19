@@ -4126,19 +4126,18 @@ export async function boot(options = {}) {
       };
     const inDeepWater = !!waterState.inDeepWater;
     const headSubmerged = !!waterState.headSubmerged;
-    if (inDeepWater) {
-      era5OxygenHideTimer = 1.5;
+    if (inDeepWater || headSubmerged) {
+      era5OxygenHideTimer = 2.0;
     }
     if (headSubmerged) {
       const drainScale = Math.max(0.35, 1 - (era5State.stats.waterResist ?? 0));
-      const drainPerSec = Math.max(0.1, era5State.stats.oxygenDrainRate ?? 1) * drainScale;
+      const drainPerSec = Math.max(0.05, era5State.stats.oxygenDrainRate ?? 0.25) * drainScale; // 0.25/s = 1 per 4s
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
       if (era5Oxygen <= 0.001) {
         if (hasScubaTank && !respawnState) {
-          // Scuba tank empty: hazard-reset to pool edge instead of damage cycling.
+          // Scuba tank empty: reset to original spawn.
           player.invulnTimerMs = 0;
-          const exitSpawn = world.level5?.getPoolExitSpawn?.(player.mesh.position) || null;
-          triggerReset('scuba_empty', 0, exitSpawn);
+          triggerReset('scuba_empty', 0, null);
         } else {
           era5OxygenDamageTimer += dt;
           const interval = Math.max(0.5, era5State.stats.oxygenDamageInterval ?? 2);
@@ -6253,13 +6252,25 @@ export async function boot(options = {}) {
             effectiveCameraY,
             player.mesh.position.z - (cameraForward.z * preset.distance),
           );
-          const occlusion = resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
+          // Skip occlusion when player is underwater: room walls would push camera to near-1st-person.
+          // constrainEra5CameraToStarterRoom still clamps camera inside room bounds.
+          const isPlayerUnderwater = py < -0.1;
+          const occlusion = isPlayerUnderwater
+            ? { correctedPos: desiredCameraPos, hit: null, info: null }
+            : resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
           era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
           era5CurrentOcclusionInfo = occlusion.info || null;
           camera.position.copyFrom(constrainEra5CameraToStarterRoom(occlusion.correctedPos));
           camera.setTarget(desiredTarget);
           camera.fov = preset.fov;
           updateEra5DecorOcclusion(dt, focusPos, camera.position);
+          // Update 3D XYZ compass each frame using camera right/up vectors.
+          if (isEra5Level) {
+            const camFwd = desiredTarget.subtract(camera.position).normalize();
+            const camRight = BABYLON.Vector3.Cross(camFwd, camera.upVector).normalize();
+            const camUp = BABYLON.Vector3.Cross(camRight, camFwd).normalize();
+            ui.updateEra5Compass(camRight, camUp);
+          }
         }
       } else if (levelId === 2) {
         const desiredCameraPos = new BABYLON.Vector3(px - 10.0, py + 10.0, -18.0);

@@ -230,13 +230,11 @@ function createDeepWaterPocket(scene, def) {
     return mesh;
   }
 
-  // Depth axis is Z: shallow near north (-Z local), deep near south (+Z local).
+  // Depth: stair-exit bay (localZ < -2.0) is shallow so player can walk out.
+  // Everywhere else is deep — matches the flat visual floor at DEEP_Y.
   function getDepthAtWorldZ(worldZ) {
     const localZ = worldZ - (def.z ?? 0);
-    if (localZ <= SHALLOW_MAX_LZ) return SHALLOW_DEPTH;
-    if (localZ >= SLOPE_MAX_LZ)   return DEEP_DEPTH;
-    const t = (localZ - SHALLOW_MAX_LZ) / (SLOPE_MAX_LZ - SHALLOW_MAX_LZ);
-    return SHALLOW_DEPTH + ((DEEP_DEPTH - SHALLOW_DEPTH) * t * t);
+    return localZ < -2.0 ? SHALLOW_DEPTH : DEEP_DEPTH;
   }
 
   // Water logic volume: X half-extent 7.80, Z half-extent 3.80 (spec C).
@@ -401,33 +399,6 @@ function createDeepWaterPocket(scene, def) {
   laneStripe.material = laneMat;
   tagPoolVisual(laneStripe);
 
-  // ── A6. Ladder (northeast interior corner, visual only) ────────────────────
-  // Local northeast corner ≈ x=+7.70, z=-3.70. Two rails + 3 rungs.
-  const ladderMat = new BABYLON.StandardMaterial(`${def.name}_ladderMat`, scene);
-  ladderMat.diffuseColor = new BABYLON.Color3(0.82, 0.84, 0.86);
-  ladderMat.emissiveColor = new BABYLON.Color3(0.06, 0.06, 0.07);
-  ladderMat.specularColor = new BABYLON.Color3(0.40, 0.42, 0.44);
-  addStencilTest(ladderMat);
-  for (let side = 0; side < 2; side++) {
-    const rail = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ladder_rail_${side}_vis`, {
-      diameter: 0.04, height: 1.20, tessellation: 8,
-    }, scene);
-    rail.parent = root;
-    rail.position.set(7.70 + (side === 0 ? -0.22 : 0.22), -SHALLOW_DEPTH * 0.5, -3.70);
-    rail.material = ladderMat;
-    tagPoolVisual(rail);
-  }
-  for (let r = 0; r < 3; r++) {
-    const rung = BABYLON.MeshBuilder.CreateCylinder(`${def.name}_ladder_rung_${r}_vis`, {
-      diameter: 0.03, height: 0.44, tessellation: 8,
-    }, scene);
-    rung.parent = root;
-    rung.position.set(7.70, -SHALLOW_DEPTH * 0.5 + 0.35 - (r * 0.22), -3.70);
-    rung.rotation.z = Math.PI * 0.5;
-    rung.material = ladderMat;
-    tagPoolVisual(rung);
-  }
-
   // ── A7. Exit stairs (visible, north bay, X width 2.40 centered at X 36) ───
   // 4 stairs descending south (+Z) from deck level into shallow floor.
   // Local positions: world Z - def.z. E.g. Z 26.525 → local z = -3.475.
@@ -459,7 +430,7 @@ function createDeepWaterPocket(scene, def) {
     width: 15.60, height: 7.60, subdivisions: 1,
   }, scene);
   aperture.parent = root;
-  aperture.position.set(0, 0, 0);
+  aperture.position.set(0, -0.005, 0); // slightly below deck: avoids z-fight grey-line artifact
   const apertureMat = new BABYLON.StandardMaterial(`${def.name}_apertureMat`, scene);
   apertureMat.alpha = 0.001;
   apertureMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
@@ -1064,6 +1035,87 @@ export function buildWorld5(scene, options = {}) {
   const jellyfish = (LEVEL5.jellyfish || []).map((def) => createJellyfish(scene, def, shadowGen));
   const sharkSweep = LEVEL5.sharkSweep ? createSharkSweep(scene, LEVEL5.sharkSweep) : null;
 
+  // ── Spawn area decorations ─────────────────────────────────────────────────
+  // Colorful curtains along the west wall near spawn (x=4, z=18).
+  // Cryptic floor logo: concentric symbol centered at spawn position.
+  (function createSpawnDecorations() {
+    const spawnX = world.spawn.x;       // 4.0
+    const spawnZ = world.spawn.z ?? 0;  // 18.0
+    const WALL_X = 0.28;                // inner face of west wall
+    const FLOOR_Y = 0.003;             // just above floor
+
+    // Curtains: 4 vertical planes hung from the west wall, spaced along Z.
+    const curtainColors = [
+      new BABYLON.Color3(0.72, 0.18, 0.52),  // deep magenta
+      new BABYLON.Color3(0.22, 0.48, 0.80),  // cobalt
+      new BABYLON.Color3(0.78, 0.52, 0.12),  // amber
+      new BABYLON.Color3(0.24, 0.68, 0.38),  // emerald
+    ];
+    const curtainOffsets = [-3.0, -1.0, 1.0, 3.0];
+    curtainOffsets.forEach((zOff, i) => {
+      const mat = new BABYLON.StandardMaterial(`spawn_curtain_mat_${i}`, scene);
+      mat.diffuseColor = curtainColors[i];
+      mat.emissiveColor = curtainColors[i].scale(0.14);
+      mat.alpha = 0.82;
+      mat.backFaceCulling = false;
+      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      const mesh = BABYLON.MeshBuilder.CreatePlane(`spawn_curtain_${i}`, {
+        width: 2.20, height: 5.60,
+      }, scene);
+      mesh.position.set(WALL_X, 2.80, spawnZ + zOff);
+      mesh.rotation.y = Math.PI * 0.5; // face +X (away from west wall)
+      mesh.material = mat;
+      mesh.isPickable = false;
+      mesh.checkCollisions = false;
+      markDecor(mesh);
+    });
+
+    // Floor logo: three concentric shapes centered at spawn, rendered just above floor.
+    // Outer ring (hexagonal look via cylinder), middle ring, inner glyph.
+    const logoColors = [
+      { rgb: new BABYLON.Color3(0.10, 0.78, 0.82), emissive: 0.30, r: 1.80, h: 0.008 },
+      { rgb: new BABYLON.Color3(0.88, 0.78, 0.10), emissive: 0.22, r: 1.20, h: 0.010 },
+      { rgb: new BABYLON.Color3(0.82, 0.18, 0.52), emissive: 0.42, r: 0.55, h: 0.012 },
+    ];
+    logoColors.forEach(({ rgb, emissive, r, h }, i) => {
+      const mat = new BABYLON.StandardMaterial(`spawn_logo_mat_${i}`, scene);
+      mat.diffuseColor = rgb;
+      mat.emissiveColor = rgb.scale(emissive);
+      mat.alpha = i === 0 ? 0.55 : i === 1 ? 0.70 : 0.90;
+      mat.backFaceCulling = false;
+      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+      const disc = BABYLON.MeshBuilder.CreateCylinder(`spawn_logo_disc_${i}`, {
+        diameter: r * 2, height: h, tessellation: i === 0 ? 6 : i === 1 ? 12 : 24,
+      }, scene);
+      disc.position.set(spawnX, FLOOR_Y + h * 0.5 + i * 0.001, spawnZ);
+      disc.rotation.y = (i * Math.PI) / (i === 0 ? 6 : 8);
+      disc.material = mat;
+      disc.isPickable = false;
+      disc.checkCollisions = false;
+      markDecor(disc);
+    });
+
+    // Four radial spokes from logo center
+    const spokeMat = new BABYLON.StandardMaterial('spawn_spoke_mat', scene);
+    spokeMat.diffuseColor = new BABYLON.Color3(0.10, 0.78, 0.82);
+    spokeMat.emissiveColor = new BABYLON.Color3(0.03, 0.25, 0.28);
+    spokeMat.alpha = 0.55;
+    spokeMat.backFaceCulling = false;
+    spokeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    for (let s = 0; s < 4; s++) {
+      const angle = (s * Math.PI * 0.5) + Math.PI * 0.25;
+      const spoke = BABYLON.MeshBuilder.CreateBox(`spawn_spoke_${s}`, {
+        width: 0.06, height: 0.007, depth: 1.20,
+      }, scene);
+      spoke.position.set(spawnX, FLOOR_Y, spawnZ);
+      spoke.rotation.y = angle;
+      spoke.material = spokeMat;
+      spoke.isPickable = false;
+      spoke.checkCollisions = false;
+      markDecor(spoke);
+    }
+  }());
+
   let currentPushTimer = 0;
   let currentPushForce = 0;
   let currentPushZ = 0;
@@ -1361,9 +1413,9 @@ export function buildWorld5(scene, options = {}) {
     const reason = baseSpawn?.reason || null;
     let anchor = null;
     let selectedBy = 'fallback';
-    // Pool drowning: always route to pool-edge anchor regardless of other logic.
-    if (reason === 'scuba_empty' && respawnAnchorMap.has('pool_edge')) {
-      anchor = respawnAnchorMap.get('pool_edge');
+    // Pool drowning: route to original spawn (not pool_edge).
+    if (reason === 'scuba_empty' && respawnAnchorMap.has('level5_spawn_anchor')) {
+      anchor = respawnAnchorMap.get('level5_spawn_anchor');
       selectedBy = 'scuba_empty';
     }
     if (!anchor && requestedSpawn.anchorId && respawnAnchorMap.has(requestedSpawn.anchorId)) {
