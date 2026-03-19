@@ -4126,9 +4126,11 @@ export async function boot(options = {}) {
     if (inDeepWater || headSubmerged) {
       era5OxygenHideTimer = 2.0;
     }
-    if (inDeepWater) {
-      // Drain oxygen while underwater: 1 unit/sec for both breath and scuba
-      const drainPerSec = era5State.stats.oxygenDrainRate ?? 1.0; // 1 unit/sec
+    // Drain oxygen while underwater (either head submerged or body in water column)
+    const isUnderwater = headSubmerged || (waterState.depthAtZ !== null && headY < waterState.waterSurfaceY);
+    if (isUnderwater) {
+      // Drain oxygen: 1 unit/sec for both breath and scuba
+      const drainPerSec = era5State.stats.oxygenDrainRate ?? 1.0;
       era5Oxygen = Math.max(0, era5Oxygen - (drainPerSec * dt));
       if (era5Oxygen <= 0.001) {
         if (hasScubaTank && !respawnState) {
