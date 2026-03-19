@@ -165,6 +165,7 @@ function createCurrentJet(scene, def) {
 function createDeepWaterPocket(scene, def) {
   const root = new BABYLON.TransformNode(def.name, scene);
   root.position.set(def.x, 0, def.z ?? 0);
+  const hasNorthExitStairs = def.northExitStairs !== false;
 
   // ── Geometry constants ────────────────────────────────────────────────────
   const DECK_Y    = 0;
@@ -237,6 +238,7 @@ function createDeepWaterPocket(scene, def) {
   // Depth: stair-exit bay (localZ < -2.0) is shallow so player can walk out.
   // Everywhere else is deep — matches the flat visual floor at DEEP_Y.
   function getDepthAtWorldZ(worldZ) {
+    if (!hasNorthExitStairs) return DEEP_DEPTH;
     const localZ = worldZ - (def.z ?? 0);
     return localZ < -2.0 ? SHALLOW_DEPTH : DEEP_DEPTH;
   }
@@ -437,21 +439,23 @@ function createDeepWaterPocket(scene, def) {
   stepMat.emissiveColor = new BABYLON.Color3(0.03, 0.05, 0.07);
   stepMat.specularColor = new BABYLON.Color3(0.05, 0.06, 0.08);
   addStencilTest(stepMat);
-  const visStairDefs = [
-    { ly: -0.0875, lz: -3.475 },
-    { ly: -0.2625, lz: -3.125 },
-    { ly: -0.4375, lz: -2.775 },
-    { ly: -0.6125, lz: -2.425 },
-  ];
-  for (let i = 0; i < visStairDefs.length; i++) {
-    const s = visStairDefs[i];
-    const stairMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_vis_stair_${i + 1}`, {
-      width: 2.40, height: 0.175, depth: 0.35,
-    }, scene);
-    stairMesh.parent = root;
-    stairMesh.position.set(0, s.ly, s.lz);
-    stairMesh.material = stepMat;
-    tagPoolVisual(stairMesh);
+  if (hasNorthExitStairs) {
+    const visStairDefs = [
+      { ly: -0.0875, lz: -3.475 },
+      { ly: -0.2625, lz: -3.125 },
+      { ly: -0.4375, lz: -2.775 },
+      { ly: -0.6125, lz: -2.425 },
+    ];
+    for (let i = 0; i < visStairDefs.length; i++) {
+      const s = visStairDefs[i];
+      const stairMesh = BABYLON.MeshBuilder.CreateBox(`${def.name}_vis_stair_${i + 1}`, {
+        width: 2.40, height: 0.175, depth: 0.35,
+      }, scene);
+      stairMesh.parent = root;
+      stairMesh.position.set(0, s.ly, s.lz);
+      stairMesh.material = stepMat;
+      tagPoolVisual(stairMesh);
+    }
   }
 
   // ── A8. Stencil aperture (invisible, group 2, writes stencil=1 at deck opening) ──
@@ -479,10 +483,15 @@ function createDeepWaterPocket(scene, def) {
   // Top Y 0.10, bottom Y -0.15, center Y -0.025, height 0.25, thickness 0.20.
   // North side has stair bay gap; gap is between X 35.30 and 36.70 (spec blocker extents).
   // All positions are local offsets (createPoolCollider adds def.x / def.z).
-  createPoolCollider(`${def.name}_edge_nw`, { width: 7.20, height: 0.25, depth: 0.20 },
-    { x: -4.30, y: -0.025, z: -3.90 }, 'blocker');
-  createPoolCollider(`${def.name}_edge_ne`, { width: 7.20, height: 0.25, depth: 0.20 },
-    { x:  4.30, y: -0.025, z: -3.90 }, 'blocker');
+  if (hasNorthExitStairs) {
+    createPoolCollider(`${def.name}_edge_nw`, { width: 7.20, height: 0.25, depth: 0.20 },
+      { x: -4.30, y: -0.025, z: -3.90 }, 'blocker');
+    createPoolCollider(`${def.name}_edge_ne`, { width: 7.20, height: 0.25, depth: 0.20 },
+      { x:  4.30, y: -0.025, z: -3.90 }, 'blocker');
+  } else {
+    createPoolCollider(`${def.name}_edge_n`, { width: 16.00, height: 0.25, depth: 0.20 },
+      { x: 0, y: -0.025, z: -3.90 }, 'blocker');
+  }
   if (southTunnel?.width > 0) {
     const edgeWidth = (16.0 - southTunnel.width) * 0.5;
     const edgeOffset = (southTunnel.width * 0.5) + (edgeWidth * 0.5);
@@ -502,10 +511,15 @@ function createDeepWaterPocket(scene, def) {
   // ── B3. Interior basin wall blockers (below deck, keep player in basin) ───
   // WALL_H=2.50, WALL_CY=-0.75 → top Y=+0.50.
   // Player-in-shallow top ≈ +0.10 < +0.50, so AABB always resolves horizontally (not upward).
-  createPoolCollider(`${def.name}_wall_nw`, { width: 7.20,  height: WALL_H, depth: WALL_T },
-    { x: -4.30, y: WALL_CY, z: -3.85 }, 'blocker');
-  createPoolCollider(`${def.name}_wall_ne`, { width: 7.20,  height: WALL_H, depth: WALL_T },
-    { x:  4.30, y: WALL_CY, z: -3.85 }, 'blocker');
+  if (hasNorthExitStairs) {
+    createPoolCollider(`${def.name}_wall_nw`, { width: 7.20,  height: WALL_H, depth: WALL_T },
+      { x: -4.30, y: WALL_CY, z: -3.85 }, 'blocker');
+    createPoolCollider(`${def.name}_wall_ne`, { width: 7.20,  height: WALL_H, depth: WALL_T },
+      { x:  4.30, y: WALL_CY, z: -3.85 }, 'blocker');
+  } else {
+    createPoolCollider(`${def.name}_wall_n`, { width: 15.90, height: WALL_H, depth: WALL_T },
+      { x: 0, y: WALL_CY, z: -3.85 }, 'blocker');
+  }
   if (southTunnel?.width > 0) {
     const wallWidth = (15.90 - southTunnel.width) * 0.5;
     const wallOffset = (southTunnel.width * 0.5) + (wallWidth * 0.5);
@@ -526,35 +540,44 @@ function createDeepWaterPocket(scene, def) {
   // Covers north pool z=[-3.70, -0.50]. Width 15.80 matches inner basin.
   // North extent z=-3.70 covers corners alongside stair bay.
   // center_z = (-3.70 + -0.50)/2 = -2.10, depth = 3.20
-  createPoolCollider(`${def.name}_shallow_floor_col`, { width: 15.80, height: 0.10, depth: 3.20 },
-    { x: 0, y: -0.72, z: -2.10 }, 'walkable');
+  if (hasNorthExitStairs) {
+    createPoolCollider(`${def.name}_shallow_floor_col`, { width: 15.80, height: 0.10, depth: 3.20 },
+      { x: 0, y: -0.72, z: -2.10 }, 'walkable');
+  }
 
   // ── B5. Deep floor at y=-1.75 (5 cm below DEEP_Y=-1.70 visual) ───────────
   // Covers south pool z=[-0.50, +3.95]. Player transitions from shallow via a
   // step drop — acceptable in water (player swims). No transition step colliders
   // (previously removed because they caused an invisible horizontal swimming barrier).
   // center_z = (-0.50 + 3.95)/2 = 1.725, depth = 4.45
-  createPoolCollider(`${def.name}_deep_floor_col`, { width: 15.80, height: 0.10, depth: 4.45 },
-    { x: 0, y: -1.75, z: 1.725 }, 'walkable');
+  if (hasNorthExitStairs) {
+    createPoolCollider(`${def.name}_deep_floor_col`, { width: 15.80, height: 0.10, depth: 4.45 },
+      { x: 0, y: -1.75, z: 1.725 }, 'walkable');
+  } else {
+    createPoolCollider(`${def.name}_deep_floor_col`, { width: 15.80, height: 0.10, depth: 7.65 },
+      { x: 0, y: -1.75, z: 0.125 }, 'walkable');
+  }
 
   // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
   // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
   // h=0.30 (robust AABB detection — thin h=0.10 was missed at normal movement speed).
   // ly = intended walkable top − 0.15 (half of new height), preserving same tread surfaces.
-  const exitStairDefs = [
-    { lz: -3.475, ly: -0.275 },  // tread top y=-0.125
-    { lz: -3.125, ly: -0.450 },  // tread top y=-0.300
-    { lz: -2.775, ly: -0.625 },  // tread top y=-0.475
-    { lz: -2.425, ly: -0.800 },  // tread top y=-0.650
-  ];
-  for (let i = 0; i < exitStairDefs.length; i++) {
-    createPoolCollider(`${def.name}_exit_stair_${i + 1}_col`, { width: 2.40, height: 0.30, depth: 0.35 },
-      { x: 0, y: exitStairDefs[i].ly, z: exitStairDefs[i].lz }, 'walkable');
+  if (hasNorthExitStairs) {
+    const exitStairDefs = [
+      { lz: -3.475, ly: -0.275 },  // tread top y=-0.125
+      { lz: -3.125, ly: -0.450 },  // tread top y=-0.300
+      { lz: -2.775, ly: -0.625 },  // tread top y=-0.475
+      { lz: -2.425, ly: -0.800 },  // tread top y=-0.650
+    ];
+    for (let i = 0; i < exitStairDefs.length; i++) {
+      createPoolCollider(`${def.name}_exit_stair_${i + 1}_col`, { width: 2.40, height: 0.30, depth: 0.35 },
+        { x: 0, y: exitStairDefs[i].ly, z: exitStairDefs[i].lz }, 'walkable');
+    }
+    // Top landing: fills gap between deck floor (world Z ≤ 26) and stair 1 (world Z 26.30–26.65).
+    // h=0.30 prevents fall-through. Walkable top at y=0 (deck level), center y=-0.15.
+    createPoolCollider(`${def.name}_exit_landing_col`, { width: 2.40, height: 0.30, depth: 0.35 },
+      { x: 0, y: -0.15, z: -3.825 }, 'walkable');
   }
-  // Top landing: fills gap between deck floor (world Z ≤ 26) and stair 1 (world Z 26.30–26.65).
-  // h=0.30 prevents fall-through. Walkable top at y=0 (deck level), center y=-0.15.
-  createPoolCollider(`${def.name}_exit_landing_col`, { width: 2.40, height: 0.30, depth: 0.35 },
-    { x: 0, y: -0.15, z: -3.825 }, 'walkable');
 
   return {
     ...def,
@@ -1190,50 +1213,134 @@ export function buildWorld5(scene, options = {}) {
       markDecor(mesh);
     });
 
-    // Floor logo: three concentric shapes centered at spawn, rendered just above floor.
-    // Outer ring (hexagonal look via cylinder), middle ring, inner glyph.
-    const logoColors = [
-      { rgb: new BABYLON.Color3(0.10, 0.78, 0.82), emissive: 0.30, r: 2.20, h: 0.06 },
-      { rgb: new BABYLON.Color3(0.88, 0.78, 0.10), emissive: 0.22, r: 1.50, h: 0.06 },
-      { rgb: new BABYLON.Color3(0.82, 0.18, 0.52), emissive: 0.42, r: 0.70, h: 0.06 },
-    ];
-    logoColors.forEach(({ rgb, emissive, r, h }, i) => {
-      const mat = new BABYLON.StandardMaterial(`spawn_logo_mat_${i}`, scene);
-      mat.diffuseColor = rgb;
-      mat.emissiveColor = rgb.scale(emissive);
-      mat.alpha = i === 0 ? 0.55 : i === 1 ? 0.70 : 0.90;
-      mat.backFaceCulling = false;
-      mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-      const disc = BABYLON.MeshBuilder.CreateCylinder(`spawn_logo_disc_${i}`, {
-        diameter: r * 2, height: h, tessellation: i === 0 ? 6 : i === 1 ? 12 : 24,
-      }, scene);
-      disc.position.set(spawnX, FLOOR_Y + h * 0.5 + i * 0.001, spawnZ);
-      disc.rotation.y = (i * Math.PI) / (i === 0 ? 6 : 8);
-      disc.material = mat;
-      disc.isPickable = false;
-      disc.checkCollisions = false;
-      markDecor(disc);
-    });
+    // ── Sigil rug: DynamicTexture drawn with Canvas 2D API ──────────────────
+    // An ancient glowing floor glyph on a flat ground mesh.
+    // renderingGroupId=1 ensures it renders after the floor (group 0),
+    // eliminating z-fighting regardless of alpha depth-sort order.
+    const RUG_M = 5.50;
+    const TEX = 1024;
+    const sigilTex = new BABYLON.DynamicTexture('spawn_sigil_tex', { width: TEX, height: TEX }, scene, false);
+    {
+      const c = sigilTex.getContext();
+      const S = TEX; const cx = S * 0.5; const cy = S * 0.5;
+      const T  = (a) => `rgba(18,212,200,${a})`;
+      const Am = (a) => `rgba(240,175,28,${a})`;
+      const Mg = (a) => `rgba(218,38,132,${a})`;
+      const R0 = S * 0.47;
+      const R1 = S * 0.390;
+      const R2 = S * 0.280;
+      const R3 = S * 0.168;
+      const R4 = S * 0.072;
 
-    // Four radial spokes from logo center
-    const spokeMat = new BABYLON.StandardMaterial('spawn_spoke_mat', scene);
-    spokeMat.diffuseColor = new BABYLON.Color3(0.10, 0.78, 0.82);
-    spokeMat.emissiveColor = new BABYLON.Color3(0.03, 0.25, 0.28);
-    spokeMat.alpha = 0.55;
-    spokeMat.backFaceCulling = false;
-    spokeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-    for (let s = 0; s < 4; s++) {
-      const angle = (s * Math.PI * 0.5) + Math.PI * 0.25;
-      const spoke = BABYLON.MeshBuilder.CreateBox(`spawn_spoke_${s}`, {
-        width: 0.10, height: 0.06, depth: 2.00,
-      }, scene);
-      spoke.position.set(spawnX, FLOOR_Y, spawnZ);
-      spoke.rotation.y = angle;
-      spoke.material = spokeMat;
-      spoke.isPickable = false;
-      spoke.checkCollisions = false;
-      markDecor(spoke);
+      c.clearRect(0, 0, S, S);
+      const base = c.createRadialGradient(cx, cy, 0, cx, cy, R0);
+      base.addColorStop(0,    'rgba(10,24,28,0.90)');
+      base.addColorStop(0.72, 'rgba(6,14,18,0.80)');
+      base.addColorStop(1,    'rgba(2,6,10,0)');
+      c.fillStyle = base;
+      c.beginPath(); c.arc(cx, cy, R0, 0, Math.PI * 2); c.fill();
+
+      c.lineWidth = 18; c.strokeStyle = T(0.92);
+      c.beginPath(); c.arc(cx, cy, R0, 0, Math.PI * 2); c.stroke();
+
+      for (let i = 0; i < 32; i++) {
+        const a = (i / 32) * Math.PI * 2; const maj = i % 4 === 0;
+        c.lineWidth = maj ? 7 : 3; c.strokeStyle = maj ? Am(0.90) : T(0.55);
+        const r0t = R0 + 4; const r1t = r0t + (maj ? 30 : 15);
+        c.beginPath();
+        c.moveTo(cx + Math.cos(a) * r0t, cy + Math.sin(a) * r0t);
+        c.lineTo(cx + Math.cos(a) * r1t, cy + Math.sin(a) * r1t);
+        c.stroke();
+      }
+
+      for (let i = 0; i < 16; i++) {
+        const a0 = ((i + 0.05) / 16) * Math.PI * 2;
+        const a1 = ((i + 0.95) / 16) * Math.PI * 2;
+        c.beginPath(); c.arc(cx, cy, R0 - 2, a0, a1); c.arc(cx, cy, R1 + 2, a1, a0, true); c.closePath();
+        c.fillStyle = i % 2 === 0 ? 'rgba(18,212,200,0.09)' : 'rgba(240,175,28,0.07)'; c.fill();
+        const am = ((i + 0.5) / 16) * Math.PI * 2; const rm = (R0 + R1) * 0.5;
+        const px = cx + Math.cos(am) * rm; const py = cy + Math.sin(am) * rm;
+        const perp = am + Math.PI * 0.5; const rs = 13;
+        c.lineWidth = 3.5; c.strokeStyle = i % 2 === 0 ? T(0.88) : Am(0.78);
+        c.beginPath();
+        c.moveTo(px + Math.cos(am) * (-rs * 0.5), py + Math.sin(am) * (-rs * 0.5));
+        c.lineTo(px + Math.cos(am) * (rs * 0.5),  py + Math.sin(am) * (rs * 0.5));
+        c.stroke();
+        c.beginPath();
+        c.moveTo(px + Math.cos(perp) * (rs * 0.40), py + Math.sin(perp) * (rs * 0.40));
+        c.lineTo(px - Math.cos(perp) * (rs * 0.15), py - Math.sin(perp) * (rs * 0.15));
+        c.stroke();
+      }
+
+      c.lineWidth = 5; c.strokeStyle = T(0.62);
+      c.beginPath(); c.arc(cx, cy, R1, 0, Math.PI * 2); c.stroke();
+
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2; const maj = i % 3 === 0;
+        c.lineWidth = maj ? 5.5 : 2.5; c.strokeStyle = maj ? Am(0.80) : T(0.48);
+        c.beginPath();
+        c.moveTo(cx + Math.cos(a) * R3, cy + Math.sin(a) * R3);
+        c.lineTo(cx + Math.cos(a) * R1, cy + Math.sin(a) * R1);
+        c.stroke();
+      }
+
+      const tri = (off, r, col, lw) => {
+        c.lineWidth = lw; c.strokeStyle = col; c.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const a = off + (i / 3) * Math.PI * 2;
+          if (i === 0) c.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          else         c.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        }
+        c.closePath(); c.stroke();
+      };
+      tri(-Math.PI * 0.5, R2, T(0.88),  8);
+      tri( Math.PI * 0.5, R2, Mg(0.82), 8);
+
+      c.lineWidth = 4; c.strokeStyle = Am(0.68);
+      c.beginPath(); c.arc(cx, cy, R2, 0, Math.PI * 2); c.stroke();
+
+      c.lineWidth = 5.5; c.strokeStyle = Mg(0.82);
+      c.beginPath(); c.arc(cx, cy, R3, 0, Math.PI * 2); c.stroke();
+
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const px = cx + Math.cos(a) * R3; const py = cy + Math.sin(a) * R3;
+        const ds = i % 3 === 0 ? 13 : 7;
+        c.fillStyle = i % 3 === 0 ? Am(0.95) : T(0.92);
+        c.beginPath();
+        c.moveTo(px, py - ds); c.lineTo(px + ds, py); c.lineTo(px, py + ds); c.lineTo(px - ds, py);
+        c.closePath(); c.fill();
+      }
+
+      c.lineWidth = 10; c.strokeStyle = Mg(0.94);
+      c.beginPath(); c.arc(cx, cy, R4, 0, Math.PI * 2); c.stroke();
+
+      const iris = c.createRadialGradient(cx, cy, 0, cx, cy, R4);
+      iris.addColorStop(0,    'rgba(255,255,255,0.42)');
+      iris.addColorStop(0.35, 'rgba(218,38,132,0.52)');
+      iris.addColorStop(0.85, 'rgba(18,212,200,0.18)');
+      iris.addColorStop(1,    'rgba(18,212,200,0)');
+      c.fillStyle = iris;
+      c.beginPath(); c.arc(cx, cy, R4, 0, Math.PI * 2); c.fill();
+
+      sigilTex.update();
     }
+    sigilTex.hasAlpha = true;
+
+    const rugMat = new BABYLON.StandardMaterial('spawn_sigil_mat', scene);
+    rugMat.diffuseTexture  = sigilTex;
+    rugMat.emissiveTexture = sigilTex;
+    rugMat.emissiveColor   = new BABYLON.Color3(0.82, 0.82, 0.82);
+    rugMat.diffuseColor    = new BABYLON.Color3(0.30, 0.30, 0.30);
+    rugMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+    rugMat.backFaceCulling = false;
+
+    const rug = BABYLON.MeshBuilder.CreateGround('spawn_sigil_rug', { width: RUG_M, height: RUG_M }, scene);
+    rug.position.set(spawnX, FLOOR_Y, spawnZ);
+    rug.renderingGroupId = 1;
+    rug.isPickable = false;
+    rug.checkCollisions = false;
+    markDecor(rug);
   }());
 
   let currentPushTimer = 0;
@@ -1382,6 +1489,8 @@ export function buildWorld5(scene, options = {}) {
     for (const node of hazardOverlayNodes) node.setEnabled(overlayState.hazards);
     for (const node of respawnOverlayNodes) node.setEnabled(overlayState.respawnAnchors);
   }
+
+  applyTruthOverlayState();
 
   function getCollisionReport() {
     const blockerColliders = truthColliderMeshes.filter((mesh) => mesh?.metadata?.truthRole === 'blocker');
