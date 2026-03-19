@@ -1951,8 +1951,8 @@ export function createUI(uiRoot, options = {}) {
   // ── 3D XYZ compass ─────────────────────────────────────────────────────────
   const era5CompassEl = document.createElement('canvas');
   era5CompassEl.className = 'dada-era5-compass';
-  era5CompassEl.width = 72;
-  era5CompassEl.height = 72;
+  era5CompassEl.width = 79;
+  era5CompassEl.height = 79;
   era5CompassEl.setAttribute('aria-hidden', 'true');
   uiRoot.appendChild(era5CompassEl);
   const era5CompassCtx = era5CompassEl.getContext('2d');
@@ -2630,7 +2630,7 @@ export function createUI(uiRoot, options = {}) {
       const h = era5CompassEl.height;
       const cx = w * 0.5;
       const cy = h * 0.5;
-      const len = 24;
+      const len = 26;
       ctx.clearRect(0, 0, w, h);
       // Background circle
       ctx.beginPath();

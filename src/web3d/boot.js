@@ -2648,7 +2648,7 @@ export async function boot(options = {}) {
   let flourPuffCooldownMs = 0;
   let era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
   let era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
-  let era5Oxygen = Math.max(0, era5State.stats.toolMeterMax || era5State.stats.oxygenMax || 0);
+  let era5Oxygen = Math.max(4.0, era5State.stats.toolMeterMax || era5State.stats.oxygenMax || 0);
   let era5OxygenDamageTimer = 0;
   let era5OxygenHideTimer = 0;
   let era5WasInDeepWater = false;
@@ -4107,7 +4107,7 @@ export async function boot(options = {}) {
 
   function updateEra5Oxygen(dt) {
     if (!isEra5Level) return;
-    const oxygenMax = Math.max(0, getEra5MeterMax());
+    const oxygenMax = Math.max(4.0, getEra5MeterMax());
     const toolDef = getEquippedEra5ToolDef();
     const hasScubaTank = toolDef?.defId === 'scuba_tank';
     if (oxygenMax <= 0) {
@@ -5665,7 +5665,7 @@ export async function boot(options = {}) {
       }
     }
 
-    let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1) : 1;
+    let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1.15) : 1;
     let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
     const sprinting = input.isSprintHeld();
     if (isEra5Level && (world.level5?.isInDeepWater?.(pos) || world.era5Level?.isInDeepWater?.(pos))) {
@@ -5675,7 +5675,7 @@ export async function boot(options = {}) {
     }
     if (sprinting) {
       if (isEra5Level) {
-        speedMultiplier *= 1.22;
+        speedMultiplier *= 1.27;
         accelBonusMultiplier *= 1.12;
       } else {
         speedMultiplier = 1.75;      // run = walk * 1.75 — clearly noticeable

@@ -432,8 +432,7 @@ function createDeepWaterPocket(scene, def) {
   aperture.parent = root;
   aperture.position.set(0, -0.005, 0); // slightly below deck: avoids z-fight grey-line artifact
   const apertureMat = new BABYLON.StandardMaterial(`${def.name}_apertureMat`, scene);
-  apertureMat.alpha = 0.001;
-  apertureMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+  apertureMat.disableColorWrite = true; // stencil-only: no color writes → no grey edge lines
   apertureMat.stencil.enabled       = true;
   apertureMat.stencil.func          = BABYLON.Constants.ALWAYS;
   apertureMat.stencil.funcRef       = 1;
@@ -1073,9 +1072,9 @@ export function buildWorld5(scene, options = {}) {
     // Floor logo: three concentric shapes centered at spawn, rendered just above floor.
     // Outer ring (hexagonal look via cylinder), middle ring, inner glyph.
     const logoColors = [
-      { rgb: new BABYLON.Color3(0.10, 0.78, 0.82), emissive: 0.30, r: 1.80, h: 0.008 },
-      { rgb: new BABYLON.Color3(0.88, 0.78, 0.10), emissive: 0.22, r: 1.20, h: 0.010 },
-      { rgb: new BABYLON.Color3(0.82, 0.18, 0.52), emissive: 0.42, r: 0.55, h: 0.012 },
+      { rgb: new BABYLON.Color3(0.10, 0.78, 0.82), emissive: 0.30, r: 2.20, h: 0.06 },
+      { rgb: new BABYLON.Color3(0.88, 0.78, 0.10), emissive: 0.22, r: 1.50, h: 0.06 },
+      { rgb: new BABYLON.Color3(0.82, 0.18, 0.52), emissive: 0.42, r: 0.70, h: 0.06 },
     ];
     logoColors.forEach(({ rgb, emissive, r, h }, i) => {
       const mat = new BABYLON.StandardMaterial(`spawn_logo_mat_${i}`, scene);
@@ -1105,7 +1104,7 @@ export function buildWorld5(scene, options = {}) {
     for (let s = 0; s < 4; s++) {
       const angle = (s * Math.PI * 0.5) + Math.PI * 0.25;
       const spoke = BABYLON.MeshBuilder.CreateBox(`spawn_spoke_${s}`, {
-        width: 0.06, height: 0.007, depth: 1.20,
+        width: 0.10, height: 0.06, depth: 2.00,
       }, scene);
       spoke.position.set(spawnX, FLOOR_Y, spawnZ);
       spoke.rotation.y = angle;
@@ -1417,6 +1416,11 @@ export function buildWorld5(scene, options = {}) {
     if (reason === 'scuba_empty' && respawnAnchorMap.has('level5_spawn_anchor')) {
       anchor = respawnAnchorMap.get('level5_spawn_anchor');
       selectedBy = 'scuba_empty';
+    }
+    // Combat defeat: always route to spawn, not nearest-anchor (avoids pool_edge when dying near pool).
+    if (!anchor && reason === 'defeat' && respawnAnchorMap.has('level5_spawn_anchor')) {
+      anchor = respawnAnchorMap.get('level5_spawn_anchor');
+      selectedBy = 'defeat';
     }
     if (!anchor && requestedSpawn.anchorId && respawnAnchorMap.has(requestedSpawn.anchorId)) {
       anchor = respawnAnchorMap.get(requestedSpawn.anchorId);
