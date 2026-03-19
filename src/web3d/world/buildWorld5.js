@@ -474,20 +474,16 @@ function createDeepWaterPocket(scene, def) {
   createPoolCollider(`${def.name}_wall_e`,  { width: WALL_T, height: WALL_H, depth: 7.70 },
     { x:  7.85, y: WALL_CY, z:  0    }, 'blocker');
 
-  // ── B4. Walkable shallow floor collider ───────────────────────────────────
-  // Extended north to z=-3.70 (just inside north wall at -3.85) to cover the corner
-  // areas alongside the stair bay — previously no floor there caused infinity falls.
-  // Spans z=[-3.70, -1.20]: center=-2.45, depth=2.50.
-  createPoolCollider(`${def.name}_floor_shallow_col`, { width: 15.80, height: 0.10, depth: 2.50 },
-    { x: 0, y: -0.75, z: -2.45 }, 'walkable');
-
-  // ── B5. Walkable deep floor collider ──────────────────────────────────────
-  // Extended to cover from z=-1.20 (where shallow floor ends) all the way to z=+3.95.
-  // This eliminates the 8 transition steps that were blocking horizontal swimming
-  // at the pool midpoint. Players step off the shallow floor at z=-1.20 and drop ~1m
-  // to the deep floor — correct pool-entry feel. No more invisible staircase barrier.
-  createPoolCollider(`${def.name}_floor_deep_col`, { width: 15.80, height: 0.10, depth: 5.15 },
-    { x: 0, y: -1.75, z: 1.375 }, 'walkable');
+  // ── B4+B5. Single flat floor at y=-1.75 covering entire pool ──────────────
+  // Matches the flat visual floor at DEEP_Y=-1.70. Eliminating separate shallow
+  // floor (y=-0.75) removes the 1m-high step that caused: (a) a visible ledge
+  // in the pool interior from above-south angle, (b) players appearing to float
+  // 1m above the visual floor in the shallow zone.
+  // Spans z=[-3.70, +3.95]: center=-0.125, depth=7.65.
+  // North extent z=-3.70 covers corners alongside stair bay (previously caused
+  // infinity falls). Exit stairs handle descent; player drops into pool from stair 4.
+  createPoolCollider(`${def.name}_floor_col`, { width: 15.80, height: 0.10, depth: 7.65 },
+    { x: 0, y: -1.75, z: -0.125 }, 'walkable');
 
   // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
   // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
