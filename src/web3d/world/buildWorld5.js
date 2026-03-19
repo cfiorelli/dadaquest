@@ -1388,6 +1388,36 @@ export function buildWorld5(scene, options = {}) {
     sourceVisuals.get(sourceName).push(mesh);
   }
 
+  // ── Room 1 sector gate ───────────────────────────────────────────────────
+  // All tunnel and hallway meshes are hidden while the player is inside Room 1
+  // (z < 36.0, the Room 1 south wall). They become visible the moment the
+  // player crosses the south wall threshold into the tunnel zone.
+  // This prevents tunnel walls, stair steps, and the hallway floor from leaking
+  // into Room 1 view space regardless of camera angle or pool position.
+  const ROOM1_GATE_Z = 36.0;
+  const room1GatedMeshes = [];
+  for (const mesh of truthVisualMeshes) {
+    const sn = mesh?.metadata?.sourceName || '';
+    if (sn.startsWith('submerged_service_tunnel') || sn.startsWith('service_tunnel') || sn.startsWith('hall_')) {
+      room1GatedMeshes.push(mesh);
+    }
+  }
+  // Platform visuals (floor slabs) are identified by node name, not metadata.
+  for (const node of truthGeometry.platformVisuals || []) {
+    const nm = String(node?.name || '');
+    if (nm.includes('service_tunnel') || nm.includes('hallway_floor')) {
+      room1GatedMeshes.push(node);
+    }
+  }
+  let room1GateActive = true;
+  for (const mesh of room1GatedMeshes) mesh.setEnabled(false);
+
+  function applyRoom1Gate(active) {
+    if (active === room1GateActive) return;
+    room1GateActive = active;
+    for (const mesh of room1GatedMeshes) mesh.setEnabled(!active);
+  }
+
   const truthOverlayRoot = new BABYLON.TransformNode('level5_truth_overlay_root', scene);
   truthOverlayRoot.setEnabled(false);
   markDecor(truthOverlayRoot);
@@ -1984,6 +2014,7 @@ export function buildWorld5(scene, options = {}) {
       const player = ctx.player;
       if (!pos || !player) return;
 
+      applyRoom1Gate(pos.z < ROOM1_GATE_Z);
       updateCurrentJets(dt, player);
       for (const pocket of deepWaterPockets) {
         pocket.update(runtimeTime);
@@ -2012,6 +2043,8 @@ export function buildWorld5(scene, options = {}) {
       currentPushZ = 0;
       lastResolvedRespawn = null;
       activeLadderId = null;
+      room1GateActive = !room1GateActive; // force applyRoom1Gate to re-run on first update
+      applyRoom1Gate(true); // player always respawns in Room 1
       baseLevel.reset();
       for (const jet of currentJets) {
         jet.playerInside = false;

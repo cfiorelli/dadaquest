@@ -245,63 +245,6 @@ const room2Blocks = [
     wallTopY: 1.4,
     ceilingY: 1.4,
   }),
-  // Keep the pool read to a dark opening only. The first long straight run is narrow and enclosed,
-  // then two offset turns hide the stair breakout from the pool room.
-  shellBlock('service_tunnel_mouth_shroud_west', 33.5, TUNNEL_MOUTH_MIN_X, -1.8, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
-    rgb: [72, 72, 72],
-    decorIntent: 'secret-tunnel-shroud',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_mouth_shroud_east', TUNNEL_MOUTH_MAX_X, 38.5, -1.8, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
-    rgb: [72, 72, 72],
-    decorIntent: 'secret-tunnel-shroud',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_mouth_shroud_header', TUNNEL_MOUTH_MIN_X, TUNNEL_MOUTH_MAX_X, -0.25, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
-    rgb: [68, 68, 68],
-    decorIntent: 'secret-tunnel-shroud',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_overburden', 33.5, 38.5, -0.55, 1.4, 34.0, 54.0, {
-    rgb: [64, 64, 64],
-    decorIntent: 'secret-tunnel-overburden',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_inner_bulkhead_west', 33.5, TUNNEL_MOUTH_MIN_X, -1.8, 1.4, 34.6, 35.2, {
-    rgb: [60, 60, 60],
-    decorIntent: 'secret-tunnel-bulkhead',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_inner_bulkhead_east', TUNNEL_MOUTH_MAX_X, 38.5, -1.8, 1.4, 34.6, 35.2, {
-    rgb: [60, 60, 60],
-    decorIntent: 'secret-tunnel-bulkhead',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_inner_bulkhead_header', TUNNEL_MOUTH_MIN_X, TUNNEL_MOUTH_MAX_X, -0.55, 1.4, 34.6, 35.2, {
-    rgb: [56, 56, 56],
-    decorIntent: 'secret-tunnel-bulkhead',
-    blockerReason: 'secret-tunnel-occluder',
-  }),
-  shellBlock('service_tunnel_first_turn_crosswall', 34.9, 38.5, -1.8, 1.4, TUNNEL_MOUTH_RUN_MAX_Z, 39.8, {
-    rgb: [82, 82, 82],
-    decorIntent: 'secret-tunnel-turn',
-    blockerReason: 'secret-tunnel-turn',
-  }),
-  shellBlock('service_tunnel_first_turn_sidewall', 35.3, 38.5, -1.8, 1.4, 39.8, TUNNEL_FIRST_TURN_MAX_Z, {
-    rgb: [82, 82, 82],
-    decorIntent: 'secret-tunnel-turn',
-    blockerReason: 'secret-tunnel-turn',
-  }),
-  shellBlock('service_tunnel_second_turn_crosswall', 33.5, 37.1, -1.8, 1.4, TUNNEL_FIRST_TURN_MAX_Z, 52.6, {
-    rgb: [82, 82, 82],
-    decorIntent: 'secret-tunnel-turn',
-    blockerReason: 'secret-tunnel-turn',
-  }),
-  shellBlock('service_tunnel_second_turn_sidewall', 33.5, 36.7, -1.8, 1.4, 52.6, TUNNEL_SECOND_TURN_MAX_Z, {
-    rgb: [82, 82, 82],
-    decorIntent: 'secret-tunnel-turn',
-    blockerReason: 'secret-tunnel-turn',
-  }),
 ];
 
 const room3Blocks = [
