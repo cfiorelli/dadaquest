@@ -1430,6 +1430,7 @@ export function buildWorld5(scene, options = {}) {
     mesh.position.copyFrom(position);
     mesh.material = material;
     markTruthOverlayMesh(mesh);
+    mesh.setEnabled(false);
     return mesh;
   }
 
@@ -1477,6 +1478,7 @@ export function buildWorld5(scene, options = {}) {
     marker.position.set(anchor.x, anchor.y + 0.36, anchor.z);
     marker.material = respawnOverlayMat;
     markTruthOverlayMesh(marker);
+    marker.setEnabled(false);
     respawnOverlayNodes.push(marker);
   }
 

@@ -860,11 +860,29 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
     pose: { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
     view: {
       label: 'l5-graybox-room1',
-      position: { x: 5.5, y: 3.8, z: 8.5 },
-      target: { x: 36.0, y: -0.6, z: 30.0 },
+      position: { x: 6.0, y: 3.4, z: 10.0 },
+      target: { x: 36.0, y: -0.85, z: 31.2 },
+      fov: 0.6,
+    },
+  });
+
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room1-hidden-exit.png',
+    pose: { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    view: {
+      label: 'l5-graybox-room1-hidden-exit',
+      position: { x: 13.5, y: 2.7, z: 14.5 },
+      target: { x: 36.0, y: -1.1, z: 33.4 },
       fov: 0.58,
     },
   });
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 });
+  });
+  await page.waitForTimeout(800);
+  await captureProof('docs/screenshots/level5-graybox-room1-gameplay-view.png');
 
   await frameRoom({
     path: 'docs/screenshots/level5-graybox-room2-service-tunnel.png',
@@ -874,6 +892,17 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
       position: { x: 36.0, y: 0.2, z: 47.0 },
       target: { x: 36.0, y: -0.9, z: 58.5 },
       fov: 0.62,
+    },
+  });
+
+  await frameRoom({
+    path: 'docs/screenshots/level5-graybox-room2-secret-stairs.png',
+    pose: { x: 36.0, y: -0.55, z: 56.2, yaw: Math.PI, cameraYaw: Math.PI },
+    view: {
+      label: 'l5-graybox-room2-secret-stairs',
+      position: { x: 40.2, y: 1.3, z: 58.8 },
+      target: { x: 36.0, y: -0.2, z: 55.8 },
+      fov: 0.6,
     },
   });
 

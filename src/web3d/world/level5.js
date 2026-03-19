@@ -26,6 +26,22 @@ function blockBounds(name, minX, maxX, minY, maxY, minZ, maxZ, extra = {}) {
   };
 }
 
+function shellBlock(name, minX, maxX, minY, maxY, minZ, maxZ, extra = {}) {
+  return blockBounds(name, minX, maxX, minY, maxY, minZ, maxZ, {
+    rgb: extra.rgb || [150, 150, 150],
+    roughness: extra.roughness ?? 0.92,
+    emissiveScale: extra.emissiveScale ?? 0.01,
+    solid: true,
+    structuralShell: true,
+    cameraIgnore: false,
+    cameraBlocker: true,
+    cameraFadeable: false,
+    decorIntent: extra.decorIntent || 'wall',
+    blockerReason: extra.blockerReason || 'room-boundary',
+    ...extra,
+  });
+}
+
 function openingAlongX(centerX, centerY, width, height) {
   return {
     minA: centerX - (width * 0.5),
@@ -207,15 +223,38 @@ const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
   ceilingY: 6.0,
 });
 
-const room2Blocks = makeShell('submerged_service_tunnel', ROOM2, {
-  north: openingAlongX(36.0, -1.15, 2.8, 2.3),
-  south: openingAlongX(36.0, -0.2, 3.0, 2.8),
-}, {
-  rgb: SERVICE_RGB,
-  wallBottomY: -1.8,
-  wallTopY: 1.4,
-  ceilingY: 1.4,
-});
+const room2Blocks = [
+  ...makeShell('submerged_service_tunnel', ROOM2, {
+    north: openingAlongX(36.0, -1.15, 2.8, 2.3),
+    south: openingAlongX(36.0, -0.2, 3.0, 2.8),
+  }, {
+    rgb: SERVICE_RGB,
+    wallBottomY: -1.8,
+    wallTopY: 1.4,
+    ceilingY: 1.4,
+  }),
+  // A low swim slot plus a short dogleg keep the secret exit discoverable only from inside the pool.
+  shellBlock('service_tunnel_mouth_wall_east', 35.0, 38.5, -1.8, 2.6, 34.2, 36.6, {
+    rgb: [110, 110, 110],
+    decorIntent: 'bulkhead',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_mouth_header_west', 33.5, 35.0, -0.25, 2.6, 34.2, 36.6, {
+    rgb: [110, 110, 110],
+    decorIntent: 'bulkhead',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_turn_wall_east', 35.0, 38.5, -1.8, 2.6, 36.6, 43.2, {
+    rgb: [106, 106, 106],
+    decorIntent: 'dogleg-wall',
+    blockerReason: 'secret-tunnel-turn',
+  }),
+  shellBlock('service_tunnel_return_wall_west', 33.5, 36.0, -1.8, 2.6, 43.2, 49.6, {
+    rgb: [106, 106, 106],
+    decorIntent: 'dogleg-wall',
+    blockerReason: 'secret-tunnel-turn',
+  }),
+];
 
 const room3Blocks = [
   ...makeShell('pump_junction', ROOM3, {
@@ -319,32 +358,49 @@ const eastBridgeBounds = {
   maxZ: 34.0,
 };
 
-const tunnelSteps = [];
-for (let index = 0; index < 10; index += 1) {
-  const minZ = 34.0 + (index * 2.5);
-  const maxZ = minZ + 2.5;
-  const topY = -1.6 + (index * 0.1);
-  tunnelSteps.push(surfaceRect(`service_tunnel_step_${index + 1}`, 33.55, 38.45, topY, minZ, maxZ, 'service_tunnel_floor', {
+const tunnelSteps = [
+  surfaceRect('service_tunnel_floor_1', 33.55, 38.45, -1.6, 34.0, 39.0, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
     walkableClassification: 'service-tunnel-floor',
+  }),
+  surfaceRect('service_tunnel_floor_2', 33.55, 38.45, -1.6, 39.0, 44.0, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'service-tunnel-floor',
+  }),
+  surfaceRect('service_tunnel_floor_3', 33.55, 38.45, -1.6, 44.0, 49.0, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'service-tunnel-floor',
+  }),
+  surfaceRect('service_tunnel_floor_4', 33.55, 38.45, -1.6, 49.0, 51.0, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'service-tunnel-floor',
+  }),
+];
+
+const stairRisePerStep = 1.6 / 6.0;
+for (let index = 0; index < 6; index += 1) {
+  const minZ = 51.0 + (index * (8.0 / 6.0));
+  const maxZ = 51.0 + ((index + 1) * (8.0 / 6.0));
+  tunnelSteps.push(surfaceRect(`service_tunnel_stair_${index + 1}`, 33.7, 38.3, -1.6 + ((index + 1) * stairRisePerStep), minZ, maxZ, 'service_tunnel_floor', {
+    h: 0.28,
+    minThickness: 0.28,
+    walkableClassification: 'service-tunnel-stair',
   }));
 }
 
 const pumpNorthThresholds = [
-  surfaceRect('pump_north_step_1', 28.0, 52.0, -0.4, 58.0, 59.333, 'pump_junction_floor', {
-    h: 0.24,
-    minThickness: 0.24,
+  surfaceRect('pump_entry_landing', 33.7, 38.3, 0.0, 59.0, 60.8, 'pump_junction_floor', {
+    h: 0.3,
+    minThickness: 0.3,
     walkableClassification: 'threshold-floor',
   }),
-  surfaceRect('pump_north_step_2', 28.0, 52.0, -0.2, 59.333, 60.667, 'pump_junction_floor', {
-    h: 0.24,
-    minThickness: 0.24,
-    walkableClassification: 'threshold-floor',
-  }),
-  surfaceRect('pump_north_step_3', 28.0, 52.0, 0.0, 60.667, 62.0, 'pump_junction_floor', {
-    h: 0.24,
-    minThickness: 0.24,
+  surfaceRect('pump_entry_spread', 31.0, 41.0, 0.0, 60.8, 62.0, 'pump_junction_floor', {
+    h: 0.3,
+    minThickness: 0.3,
     walkableClassification: 'threshold-floor',
   }),
 ];
@@ -435,7 +491,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         ceilingY: 6.0,
         floorSurfaceType: 'starter_room_floor',
         wallLanguage: 'graybox_lab_shell',
-        landmarks: ['pool', 'south pool tunnel mouth'],
+        landmarks: ['pool', 'hidden south pool tunnel mouth'],
         shell: false,
         surfaces: [
           surfaceRect('starter_floor_north', 0.0, 48.0, 0.0, 0.0, 26.0, 'starter_room_floor', {
@@ -767,6 +823,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
       w: 16.0,
       h: 2.25,
       d: 8.0,
+      northExitStairs: false,
       southTunnelMouth: {
         centerX: 36.0,
         centerY: -1.15,
@@ -778,16 +835,28 @@ export const LEVEL5 = compileAuthoredEraLayout({
   ],
   submergedPassages: [
     {
-      name: 'service_tunnel_water',
+      name: 'service_tunnel_water_main',
       minX: 33.5,
       maxX: 38.5,
       minY: -1.8,
       maxY: 1.4,
       minZ: 34.0,
-      maxZ: 59.0,
-      waterSurfaceY: 1.2,
+      maxZ: 54.0,
+      waterSurfaceY: 1.0,
       floorStartY: -1.6,
-      floorEndY: -0.6,
+      floorEndY: -1.6,
+    },
+    {
+      name: 'service_tunnel_water_stairs',
+      minX: 33.5,
+      maxX: 38.5,
+      minY: -1.8,
+      maxY: 1.4,
+      minZ: 54.0,
+      maxZ: 59.0,
+      waterSurfaceY: -0.15,
+      floorStartY: -1.0,
+      floorEndY: 0.0,
     },
   ],
   ladders: [

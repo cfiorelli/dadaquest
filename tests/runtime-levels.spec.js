@@ -1578,6 +1578,38 @@ async function sampleLevel5Pose(page, pose, waitMs = 220) {
   }));
 }
 
+async function getLevel5SecretTunnelAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    /** @type {any[]} */
+    const meshes = scene?.meshes ?? [];
+    const sourceNameFor = (mesh) => String(mesh?.metadata?.sourceName || mesh?.name || '');
+    const camera = scene?.activeCamera ?? null;
+    const screenSamples = [
+      { id: 'left_stairs', x: 120, y: 300 },
+      { id: 'left_block', x: 260, y: 285 },
+      { id: 'top_strip', x: 640, y: 125 },
+      { id: 'pool_back', x: 290, y: 305 },
+    ];
+
+    return {
+      screenSamples: screenSamples.map((sample) => {
+        const hit = scene?.pick?.(
+          sample.x,
+          sample.y,
+          (mesh) => mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02,
+          false,
+          camera,
+        ) ?? null;
+        return {
+          id: sample.id,
+          sourceName: sourceNameFor(hit?.pickedMesh),
+        };
+      }),
+    };
+  });
+}
+
 async function climbLevel5Ladder(page, pose, holdMs = 2300) {
   await resetEra5Pose(page, pose);
   await page.waitForTimeout(120);
@@ -1661,6 +1693,16 @@ test('@level5 @era5 runtime: level 5 graybox route is traversable, both ladders 
       minY: -1.9,
     },
     {
+      pose: { x: 36.0, y: -0.95, z: 54.6, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 },
+      minY: -1.4,
+    },
+    {
+      pose: { x: 36.0, y: -0.25, z: 57.4, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 },
+      minY: -0.6,
+    },
+    {
       pose: { x: 31.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
       bounds: { minX: 28.0, maxX: 52.0, minY: -0.6, maxY: 7.4, minZ: 58.0, maxZ: 78.0 },
       minY: 0.2,
@@ -1712,6 +1754,27 @@ test('@level5 @era5 runtime: level 5 graybox route is traversable, both ladders 
   const ladderState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.graybox ?? null);
   expect(ladderState?.ladders?.map((ladder) => ladder.id)).toEqual(['west_ladder', 'east_ladder']);
   expect(ladderState?.activeLadderId ?? null).toBeNull();
+});
+
+test('@level5 @era5 runtime: level 5 secret pool tunnel stays hidden from Room 1 and the stair run exits the water halfway up', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await resetEra5Pose(page, { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 });
+  await page.waitForTimeout(300);
+
+  const audit = await getLevel5SecretTunnelAudit(page);
+  const visibleSources = (audit.screenSamples || []).map((sample) => sample.sourceName || '');
+  for (const sourceName of visibleSources) {
+    expect(sourceName.includes('pump_junction')).toBe(false);
+    expect(sourceName.includes('transfer_gallery')).toBe(false);
+    expect(sourceName.includes('grand_stadium_room')).toBe(false);
+    expect(sourceName.includes('service_tunnel_turn_wall_east')).toBe(false);
+    expect(sourceName.includes('service_tunnel_return_wall_west')).toBe(false);
+  }
+
 });
 
 test('@level5 @era5 runtime: level 5 manual reset respawns to the starter pool lab anchor', async ({ page }) => {
