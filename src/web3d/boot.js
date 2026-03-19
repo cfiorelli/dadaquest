@@ -3267,7 +3267,7 @@ export async function boot(options = {}) {
   function restoreEra5Vitals() {
     era5Hp = Math.max(1, Math.round(era5State.stats.hpMax ?? 3));
     era5Shield = Math.max(0, Math.round(era5State.stats.shieldMax ?? 1));
-    era5Oxygen = Math.max(0, getEra5MeterMax());
+    era5Oxygen = Math.max(4.0, getEra5MeterMax());
     era5OxygenDamageTimer = 0;
     era5WeaponCooldownMs = 0;
     era5ToolActive = false;
@@ -3433,13 +3433,12 @@ export async function boot(options = {}) {
     }
 
     // Apply to all meshes in tree.
-    // Group 3: same pass as player body + pool surface so the weapon depth-sorts
-    // correctly against the transparent water surface (which starts group 3 with a
-    // fresh depth clear; group 2 weapon pixels would be painted over by the water alpha).
+    // Group 4: renders after all pool geometry so weapon is always visible above/below water.
+    // (Group 3 caused the weapon tip to be hidden by pool stencil logic when underwater.)
     root.getChildMeshes().forEach((mesh) => {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
-      mesh.renderingGroupId = 3;
+      mesh.renderingGroupId = 4;
       mesh.alwaysSelectAsActiveMesh = true;
     });
     return root;
@@ -3739,7 +3738,7 @@ export async function boot(options = {}) {
     mat.forceDepthWrite = true;
     mat.backFaceCulling = false;
     mesh.material = mat;
-    mesh.renderingGroupId = 3;
+    mesh.renderingGroupId = 4; // above pool geometry so projectiles are visible underwater
     mesh.alphaIndex = 1000;
     mesh.alwaysSelectAsActiveMesh = true;
     mesh.checkCollisions = false;

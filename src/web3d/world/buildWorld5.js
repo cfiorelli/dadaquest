@@ -257,7 +257,7 @@ function createDeepWaterPocket(scene, def) {
     const inDeepWater = insideWaterColumn && depthAtZ >= DEEP_FLOAT_DEPTH_THRESHOLD;
     return {
       inDeepWater,
-      headSubmerged: insideWaterColumn && headY <= (WATER_SURFACE_Y - 0.03),
+      headSubmerged: headY <= (WATER_SURFACE_Y - 0.03),
       waterSurfaceY: WATER_SURFACE_Y,
       depthAtZ,
     };
@@ -480,26 +480,12 @@ function createDeepWaterPocket(scene, def) {
     { x: 0, y: -0.75, z: -2.00 }, 'walkable');
 
   // ── B5. Walkable deep floor collider ──────────────────────────────────────
-  // world X 36, Y -1.75, Z 32.40 → local x=0, z=2.40
-  createPoolCollider(`${def.name}_floor_deep_col`, { width: 15.80, height: 0.10, depth: 3.10 },
-    { x: 0, y: -1.75, z: 2.40 }, 'walkable');
-
-  // ── B6. Transition steps (8 hidden walkable steps along Z) ────────────────
-  // Each tread Z 0.325, each rise Y 0.125. World Z values → local z = worldZ - def.z.
-  const transStepDefs = [
-    { lz: -1.6375, ly: -0.825 },
-    { lz: -1.3125, ly: -0.950 },
-    { lz: -0.9875, ly: -1.075 },
-    { lz: -0.6625, ly: -1.200 },
-    { lz: -0.3375, ly: -1.325 },
-    { lz: -0.0125, ly: -1.450 },
-    { lz:  0.3125, ly: -1.575 },
-    { lz:  0.6375, ly: -1.700 },
-  ];
-  for (let i = 0; i < transStepDefs.length; i++) {
-    createPoolCollider(`${def.name}_trans_step_${i}_col`, { width: 15.80, height: 0.10, depth: 0.325 },
-      { x: 0, y: transStepDefs[i].ly, z: transStepDefs[i].lz }, 'walkable');
-  }
+  // Extended to cover from z=-1.20 (where shallow floor ends) all the way to z=+3.95.
+  // This eliminates the 8 transition steps that were blocking horizontal swimming
+  // at the pool midpoint. Players step off the shallow floor at z=-1.20 and drop ~1m
+  // to the deep floor — correct pool-entry feel. No more invisible staircase barrier.
+  createPoolCollider(`${def.name}_floor_deep_col`, { width: 15.80, height: 0.10, depth: 5.15 },
+    { x: 0, y: -1.75, z: 1.375 }, 'walkable');
 
   // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
   // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
@@ -834,7 +820,7 @@ function createJellyfish(scene, def, shadowGen) {
     hp: (def.hpMax ?? 3),
     hpMax: (def.hpMax ?? 3),
     alive: true,
-    stun(durationMs = 1500) {
+    stun(durationMs = 3000) {
       if (!this.alive) return false;
       this.stunnedMs = Math.max(this.stunnedMs, durationMs);
       applyMaterialLook();
@@ -1418,7 +1404,8 @@ export function buildWorld5(scene, options = {}) {
       selectedBy = 'scuba_empty';
     }
     // Combat defeat: always route to spawn, not nearest-anchor (avoids pool_edge when dying near pool).
-    if (!anchor && reason === 'defeat' && respawnAnchorMap.has('level5_spawn_anchor')) {
+    // reason is always `<source>_defeat` e.g. 'jellyfish_defeat', never bare 'defeat'.
+    if (!anchor && reason?.endsWith('_defeat') && respawnAnchorMap.has('level5_spawn_anchor')) {
       anchor = respawnAnchorMap.get('level5_spawn_anchor');
       selectedBy = 'defeat';
     }
@@ -1613,7 +1600,7 @@ export function buildWorld5(scene, options = {}) {
   function hitJellyfish(attack = {}) {
     const attackPos = attack.position || BABYLON.Vector3.Zero();
     const radius = Number.isFinite(attack.radius) ? attack.radius : 0.82;
-    const stunMs = Number.isFinite(attack.stunMs) ? attack.stunMs : 1500;
+    const stunMs = Number.isFinite(attack.stunMs) ? attack.stunMs : 3000;
     const damage = Number.isFinite(attack.damage) ? attack.damage : 1;
     for (const jelly of jellyfish) {
       if (!jelly.alive) continue;
