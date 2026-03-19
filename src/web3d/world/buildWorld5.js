@@ -2151,6 +2151,9 @@ export function buildWorld5(scene, options = {}) {
           maxY: passage.maxY,
           minZ: passage.minZ,
           maxZ: passage.maxZ,
+          waterSurfaceY: passage.waterSurfaceY ?? null,
+          floorStartY: passage.floorStartY ?? passage.minY,
+          floorEndY: passage.floorEndY ?? passage.minY,
         })),
         airBubbles: airBubblePickups.map((bubble) => ({
           name: bubble.name,

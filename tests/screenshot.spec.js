@@ -868,40 +868,40 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
 
   await frameRoom({
     path: 'docs/screenshots/level5-graybox-room1-hidden-exit.png',
-    pose: { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
+    pose: { x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 },
     view: {
       label: 'l5-graybox-room1-hidden-exit',
-      position: { x: 13.5, y: 2.7, z: 14.5 },
-      target: { x: 36.0, y: -1.1, z: 33.4 },
-      fov: 0.58,
+      position: { x: 36.0, y: -0.25, z: 26.8 },
+      target: { x: 36.0, y: -1.15, z: 41.5 },
+      fov: 0.54,
     },
   });
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 });
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(800);
   await captureProof('docs/screenshots/level5-graybox-room1-gameplay-view.png');
 
   await frameRoom({
     path: 'docs/screenshots/level5-graybox-room2-service-tunnel.png',
-    pose: { x: 36.0, y: -1.1, z: 42.0, yaw: Math.PI, cameraYaw: Math.PI },
+    pose: { x: 34.7, y: -1.1, z: 50.0, yaw: 0.0, cameraYaw: 0.0 },
     view: {
       label: 'l5-graybox-room2',
-      position: { x: 36.0, y: 0.2, z: 47.0 },
-      target: { x: 36.0, y: -0.9, z: 58.5 },
+      position: { x: 32.4, y: -0.1, z: 47.0 },
+      target: { x: 34.7, y: -1.0, z: 53.0 },
       fov: 0.62,
     },
   });
 
   await frameRoom({
     path: 'docs/screenshots/level5-graybox-room2-secret-stairs.png',
-    pose: { x: 36.0, y: -0.55, z: 56.2, yaw: Math.PI, cameraYaw: Math.PI },
+    pose: { x: 36.0, y: -0.45, z: 57.7, yaw: 0.0, cameraYaw: 0.0 },
     view: {
       label: 'l5-graybox-room2-secret-stairs',
-      position: { x: 40.2, y: 1.3, z: 58.8 },
-      target: { x: 36.0, y: -0.2, z: 55.8 },
+      position: { x: 40.2, y: 0.55, z: 59.2 },
+      target: { x: 36.0, y: -0.65, z: 57.6 },
       fov: 0.6,
     },
   });

@@ -1581,18 +1581,21 @@ async function sampleLevel5Pose(page, pose, waitMs = 220) {
 async function getLevel5SecretTunnelAudit(page) {
   return page.evaluate(() => {
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
-    /** @type {any[]} */
-    const meshes = scene?.meshes ?? [];
     const sourceNameFor = (mesh) => String(mesh?.metadata?.sourceName || mesh?.name || '');
     const camera = scene?.activeCamera ?? null;
+    const engine = scene?.getEngine?.() ?? null;
+    const width = engine?.getRenderWidth?.() ?? 1280;
+    const height = engine?.getRenderHeight?.() ?? 720;
     const screenSamples = [
-      { id: 'left_stairs', x: 120, y: 300 },
-      { id: 'left_block', x: 260, y: 285 },
-      { id: 'top_strip', x: 640, y: 125 },
-      { id: 'pool_back', x: 290, y: 305 },
+      { id: 'mouth_center', x: width * 0.50, y: height * 0.60 },
+      { id: 'mouth_left', x: width * 0.44, y: height * 0.60 },
+      { id: 'mouth_right', x: width * 0.56, y: height * 0.60 },
+      { id: 'mouth_upper', x: width * 0.50, y: height * 0.44 },
     ];
 
     return {
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      cameraPos: camera ? { x: camera.position.x, y: camera.position.y, z: camera.position.z } : null,
       screenSamples: screenSamples.map((sample) => {
         const hit = scene?.pick?.(
           sample.x,
@@ -1762,18 +1765,35 @@ test('@level5 @era5 runtime: level 5 secret pool tunnel stays hidden from Room 1
   await unlockEra5(page);
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
-  await resetEra5Pose(page, { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 });
-  await page.waitForTimeout(300);
+  await resetEra5Pose(page, { x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
+  await page.waitForTimeout(500);
 
   const audit = await getLevel5SecretTunnelAudit(page);
+  expect(audit.cameraPos).not.toBeNull();
+  expect(audit.cameraPos.z).toBeLessThanOrEqual(35.92);
   const visibleSources = (audit.screenSamples || []).map((sample) => sample.sourceName || '');
   for (const sourceName of visibleSources) {
     expect(sourceName.includes('pump_junction')).toBe(false);
     expect(sourceName.includes('transfer_gallery')).toBe(false);
     expect(sourceName.includes('grand_stadium_room')).toBe(false);
-    expect(sourceName.includes('service_tunnel_turn_wall_east')).toBe(false);
-    expect(sourceName.includes('service_tunnel_return_wall_west')).toBe(false);
+    expect(sourceName.includes('service_tunnel_stair_')).toBe(false);
+    expect(sourceName.includes('pump_entry_')).toBe(false);
   }
+  expect(visibleSources.some((name) => name.includes('service_tunnel_mouth_shroud') || name.includes('submerged_service_tunnel_north_wall'))).toBe(true);
+
+  const levelState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState ?? null);
+  const mainPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_main') ?? null;
+  const stairPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_stairs') ?? null;
+  expect(mainPassage).not.toBeNull();
+  expect(mainPassage.minZ).toBeLessThanOrEqual(34.0);
+  expect(mainPassage.maxZ).toBeGreaterThanOrEqual(56.35);
+  expect(mainPassage.waterSurfaceY).toBeGreaterThan(0.9);
+  expect(stairPassage).not.toBeNull();
+  expect(stairPassage.minZ).toBeGreaterThanOrEqual(56.35);
+  expect(stairPassage.maxZ).toBeLessThanOrEqual(59.05);
+  expect(Math.abs((stairPassage.waterSurfaceY ?? 0) - (-0.8))).toBeLessThan(0.06);
+  expect(stairPassage.floorStartY).toBeLessThan(-1.5);
+  expect(stairPassage.floorEndY).toBeGreaterThanOrEqual(0.0);
 
 });
 

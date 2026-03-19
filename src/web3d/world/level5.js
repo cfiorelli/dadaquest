@@ -215,6 +215,18 @@ const LAB_RGB = [138, 138, 138];
 const SERVICE_RGB = [120, 120, 120];
 const STADIUM_RGB = [146, 146, 146];
 const UPPER_RGB = [156, 156, 156];
+const TUNNEL_MOUTH_CENTER_X = 36.0;
+const TUNNEL_MOUTH_CENTER_Y = -1.25;
+const TUNNEL_MOUTH_WIDTH = 1.8;
+const TUNNEL_MOUTH_HEIGHT = 1.7;
+const TUNNEL_MOUTH_MIN_X = 35.1;
+const TUNNEL_MOUTH_MAX_X = 36.9;
+const TUNNEL_MOUTH_RUN_MAX_Z = 37.2;
+const TUNNEL_FIRST_TURN_MAX_Z = 50.2;
+const TUNNEL_SECOND_TURN_MAX_Z = 56.4;
+const TUNNEL_STAIR_START_Z = TUNNEL_SECOND_TURN_MAX_Z;
+const TUNNEL_STAIR_END_Z = 59.0;
+const TUNNEL_STAIR_STEP_DEPTH = (TUNNEL_STAIR_END_Z - TUNNEL_STAIR_START_Z) / 6.0;
 
 const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
   rgb: LAB_RGB,
@@ -225,7 +237,7 @@ const room1Blocks = makeShell('starter_pool_lab', ROOM1, {}, {
 
 const room2Blocks = [
   ...makeShell('submerged_service_tunnel', ROOM2, {
-    north: openingAlongX(36.0, -1.15, 2.8, 2.3),
+    north: openingAlongX(TUNNEL_MOUTH_CENTER_X, TUNNEL_MOUTH_CENTER_Y, TUNNEL_MOUTH_WIDTH, TUNNEL_MOUTH_HEIGHT),
     south: openingAlongX(36.0, -0.2, 3.0, 2.8),
   }, {
     rgb: SERVICE_RGB,
@@ -233,26 +245,82 @@ const room2Blocks = [
     wallTopY: 1.4,
     ceilingY: 1.4,
   }),
-  // A low swim slot plus a short dogleg keep the secret exit discoverable only from inside the pool.
-  shellBlock('service_tunnel_mouth_wall_east', 35.0, 38.5, -1.8, 2.6, 34.2, 36.6, {
-    rgb: [110, 110, 110],
-    decorIntent: 'bulkhead',
+  // Keep the pool read to a dark opening only. The first long straight run is narrow and enclosed,
+  // then two offset turns hide the stair breakout from the pool room.
+  shellBlock('service_tunnel_mouth_shroud_west', 33.5, TUNNEL_MOUTH_MIN_X, -1.8, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
+    rgb: [72, 72, 72],
+    decorIntent: 'secret-tunnel-shroud',
     blockerReason: 'secret-tunnel-occluder',
   }),
-  shellBlock('service_tunnel_mouth_header_west', 33.5, 35.0, -0.25, 2.6, 34.2, 36.6, {
-    rgb: [110, 110, 110],
-    decorIntent: 'bulkhead',
+  shellBlock('service_tunnel_mouth_shroud_east', TUNNEL_MOUTH_MAX_X, 38.5, -1.8, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
+    rgb: [72, 72, 72],
+    decorIntent: 'secret-tunnel-shroud',
     blockerReason: 'secret-tunnel-occluder',
   }),
-  shellBlock('service_tunnel_turn_wall_east', 35.0, 38.5, -1.8, 2.6, 36.6, 43.2, {
-    rgb: [106, 106, 106],
-    decorIntent: 'dogleg-wall',
+  shellBlock('service_tunnel_mouth_shroud_header', TUNNEL_MOUTH_MIN_X, TUNNEL_MOUTH_MAX_X, -0.25, 1.4, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, {
+    rgb: [68, 68, 68],
+    decorIntent: 'secret-tunnel-shroud',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_overburden', 33.5, 38.5, -0.55, 1.4, 34.0, 54.0, {
+    rgb: [64, 64, 64],
+    decorIntent: 'secret-tunnel-overburden',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_inner_bulkhead_west', 33.5, TUNNEL_MOUTH_MIN_X, -1.8, 1.4, 34.6, 35.2, {
+    rgb: [60, 60, 60],
+    decorIntent: 'secret-tunnel-bulkhead',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_inner_bulkhead_east', TUNNEL_MOUTH_MAX_X, 38.5, -1.8, 1.4, 34.6, 35.2, {
+    rgb: [60, 60, 60],
+    decorIntent: 'secret-tunnel-bulkhead',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_inner_bulkhead_header', TUNNEL_MOUTH_MIN_X, TUNNEL_MOUTH_MAX_X, -0.55, 1.4, 34.6, 35.2, {
+    rgb: [56, 56, 56],
+    decorIntent: 'secret-tunnel-bulkhead',
+    blockerReason: 'secret-tunnel-occluder',
+  }),
+  shellBlock('service_tunnel_first_turn_crosswall', 34.9, 38.5, -1.8, 1.4, TUNNEL_MOUTH_RUN_MAX_Z, 39.8, {
+    rgb: [82, 82, 82],
+    decorIntent: 'secret-tunnel-turn',
     blockerReason: 'secret-tunnel-turn',
   }),
-  shellBlock('service_tunnel_return_wall_west', 33.5, 36.0, -1.8, 2.6, 43.2, 49.6, {
-    rgb: [106, 106, 106],
-    decorIntent: 'dogleg-wall',
+  shellBlock('service_tunnel_first_turn_sidewall', 35.3, 38.5, -1.8, 1.4, 39.8, TUNNEL_FIRST_TURN_MAX_Z, {
+    rgb: [82, 82, 82],
+    decorIntent: 'secret-tunnel-turn',
     blockerReason: 'secret-tunnel-turn',
+  }),
+  shellBlock('service_tunnel_second_turn_crosswall', 33.5, 37.1, -1.8, 1.4, TUNNEL_FIRST_TURN_MAX_Z, 52.6, {
+    rgb: [82, 82, 82],
+    decorIntent: 'secret-tunnel-turn',
+    blockerReason: 'secret-tunnel-turn',
+  }),
+  shellBlock('service_tunnel_second_turn_sidewall', 33.5, 36.7, -1.8, 1.4, 52.6, TUNNEL_SECOND_TURN_MAX_Z, {
+    rgb: [82, 82, 82],
+    decorIntent: 'secret-tunnel-turn',
+    blockerReason: 'secret-tunnel-turn',
+  }),
+  // ── Exit corridor: narrow 4 m hall immediately after tunnel stair exit ────
+  // Tunnel stair section ends at z=59 (TUNNEL_STAIR_END_Z), y=0 deck level.
+  // These two walls narrow the pump-junction entry vestibule to 4 m wide
+  // (x=34..38) for the first 4.5 m, giving the player a confined hallway feel
+  // when they surface. Walls stop at z=63.5 so the pump_west_walk / pump_east_walk
+  // surfaces remain accessible from z=62+ without blocking future traversal.
+  shellBlock('exit_hall_west_wall', 28.0, 34.0, -0.6, 4.5, TUNNEL_STAIR_END_Z, 63.5, {
+    rgb: [108, 108, 108],
+    roughness: 0.92,
+    emissiveScale: 0.01,
+    decorIntent: 'exit-hallway',
+    blockerReason: 'exit-hallway-wall',
+  }),
+  shellBlock('exit_hall_east_wall', 38.0, 52.0, -0.6, 4.5, TUNNEL_STAIR_END_Z, 63.5, {
+    rgb: [108, 108, 108],
+    roughness: 0.92,
+    emissiveScale: 0.01,
+    decorIntent: 'exit-hallway',
+    blockerReason: 'exit-hallway-wall',
   }),
 ];
 
@@ -359,22 +427,22 @@ const eastBridgeBounds = {
 };
 
 const tunnelSteps = [
-  surfaceRect('service_tunnel_floor_1', 33.55, 38.45, -1.6, 34.0, 39.0, 'service_tunnel_floor', {
+  surfaceRect('service_tunnel_floor_1', 33.55, 38.45, -1.6, 34.0, TUNNEL_MOUTH_RUN_MAX_Z, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
     walkableClassification: 'service-tunnel-floor',
   }),
-  surfaceRect('service_tunnel_floor_2', 33.55, 38.45, -1.6, 39.0, 44.0, 'service_tunnel_floor', {
+  surfaceRect('service_tunnel_floor_2', 33.55, 38.45, -1.6, TUNNEL_MOUTH_RUN_MAX_Z, 44.0, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
     walkableClassification: 'service-tunnel-floor',
   }),
-  surfaceRect('service_tunnel_floor_3', 33.55, 38.45, -1.6, 44.0, 49.0, 'service_tunnel_floor', {
+  surfaceRect('service_tunnel_floor_3', 33.55, 38.45, -1.6, 44.0, TUNNEL_FIRST_TURN_MAX_Z, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
     walkableClassification: 'service-tunnel-floor',
   }),
-  surfaceRect('service_tunnel_floor_4', 33.55, 38.45, -1.6, 49.0, 51.0, 'service_tunnel_floor', {
+  surfaceRect('service_tunnel_floor_4', 33.55, 38.45, -1.6, TUNNEL_FIRST_TURN_MAX_Z, TUNNEL_SECOND_TURN_MAX_Z, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
     walkableClassification: 'service-tunnel-floor',
@@ -383,8 +451,8 @@ const tunnelSteps = [
 
 const stairRisePerStep = 1.6 / 6.0;
 for (let index = 0; index < 6; index += 1) {
-  const minZ = 51.0 + (index * (8.0 / 6.0));
-  const maxZ = 51.0 + ((index + 1) * (8.0 / 6.0));
+  const minZ = TUNNEL_STAIR_START_Z + (index * TUNNEL_STAIR_STEP_DEPTH);
+  const maxZ = TUNNEL_STAIR_START_Z + ((index + 1) * TUNNEL_STAIR_STEP_DEPTH);
   tunnelSteps.push(surfaceRect(`service_tunnel_stair_${index + 1}`, 33.7, 38.3, -1.6 + ((index + 1) * stairRisePerStep), minZ, maxZ, 'service_tunnel_floor', {
     h: 0.28,
     minThickness: 0.28,
@@ -696,7 +764,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         w: 2.8,
         d: 0.4,
         floorY: -1.6,
-        ceilingY: 0.0,
+        ceilingY: -0.25,
         floorSurfaceType: 'submerged_threshold',
         shell: false,
         surfaces: [],
@@ -825,11 +893,11 @@ export const LEVEL5 = compileAuthoredEraLayout({
       d: 8.0,
       northExitStairs: false,
       southTunnelMouth: {
-        centerX: 36.0,
-        centerY: -1.15,
+        centerX: TUNNEL_MOUTH_CENTER_X,
+        centerY: TUNNEL_MOUTH_CENTER_Y,
         centerZ: 33.95,
-        width: 2.8,
-        height: 2.3,
+        width: TUNNEL_MOUTH_WIDTH,
+        height: TUNNEL_MOUTH_HEIGHT,
       },
     },
   ],
@@ -841,7 +909,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
       minY: -1.8,
       maxY: 1.4,
       minZ: 34.0,
-      maxZ: 54.0,
+      maxZ: TUNNEL_STAIR_START_Z,
       waterSurfaceY: 1.0,
       floorStartY: -1.6,
       floorEndY: -1.6,
@@ -852,10 +920,10 @@ export const LEVEL5 = compileAuthoredEraLayout({
       maxX: 38.5,
       minY: -1.8,
       maxY: 1.4,
-      minZ: 54.0,
-      maxZ: 59.0,
-      waterSurfaceY: -0.15,
-      floorStartY: -1.0,
+      minZ: TUNNEL_STAIR_START_Z,
+      maxZ: TUNNEL_STAIR_END_Z,
+      waterSurfaceY: -0.8,
+      floorStartY: -1.6,
       floorEndY: 0.0,
     },
   ],
