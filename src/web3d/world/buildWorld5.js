@@ -162,19 +162,35 @@ function createDeepWaterPocket(scene, def) {
   const root = new BABYLON.TransformNode(def.name, scene);
   root.position.set(def.x, 0, def.z ?? 0);
 
-  const W = def.w;   // 16.00
-  const D = def.d;   // 8.00
+  // ── Geometry constants ────────────────────────────────────────────────────
+  const DECK_Y    = 0;
+  const SHALLOW_Y = -0.70;              // shallow floor top Y
+  const DEEP_Y    = -1.70;              // deep floor top Y
+  const WALL_T    = 0.50;               // wall box thickness
+  const HALF_W    = (def.w ?? 16) * 0.5;  // 8.0  (local X: -8..+8)
+  const HALF_D    = (def.d ?? 8)  * 0.5;  // 4.0  (local Z: -4..+4)
+  const IN_HW     = HALF_W - WALL_T;      // 7.5  inner half-width
+  const IN_HD     = HALF_D - WALL_T;      // 3.5  inner half-depth
+  const IN_W      = IN_HW * 2;            // 15.0
+  const IN_D      = IN_HD * 2;            // 7.0
+  const STAIR_HW  = 1.0;               // stair bay half-width (local x: -1..+1)
+  const STEP_DZ   = 0.35;              // step z-depth
+  const STEP_DY   = 0.175;             // step y-height (0.70 / 4)
+  // Transition zone: local Z -0.5 → +0.5  (4 steps of 0.25m each)
+  const TRANS_ZMIN = -0.5;
+  const TRANS_ZMAX = +0.5;
+  // Wall boxes: height 2.50, top Y +0.50, bottom Y -2.00, center Y -0.75.
+  // Top exceeds player-in-basin top (~+0.10), so AABB always resolves horizontally.
+  const WALL_H  = 2.50;
+  const WALL_CY = -0.75;
   const GRP = 3;
-  const DECK_Y = 0;
-  const SHALLOW_DEPTH = 0.70;   // shallow floor top at Y -0.70
-  const DEEP_DEPTH = 1.70;      // deep floor top at Y -1.70
   const WATER_SURFACE_Y = DECK_Y - 0.05;
   const DEEP_FLOAT_DEPTH_THRESHOLD = 1.05;
-
-  // Depth axis is Z (north = shallow, south = deep).
-  // Transition zone: world Z 28.90 → 30.85. In local Z: SHALLOW_MAX_LZ=-1.10, SLOPE_MAX_LZ=0.85.
-  const SHALLOW_MAX_LZ = 28.90 - (def.z ?? 0);  // -1.10 for def.z=30
-  const SLOPE_MAX_LZ   = 30.85 - (def.z ?? 0);  //  0.85
+  // Derived depth constants for water state logic
+  const SHALLOW_DEPTH = -SHALLOW_Y;   // 0.70
+  const DEEP_DEPTH = -DEEP_Y;         // 1.70
+  const SHALLOW_MAX_LZ = TRANS_ZMIN;  // -0.5 (where shallow zone ends)
+  const SLOPE_MAX_LZ = TRANS_ZMAX;    // +0.5 (where deep zone begins)
 
   const visualMeshes = [];
   const collisionMeshes = [];
@@ -501,17 +517,18 @@ function createDeepWaterPocket(scene, def) {
     { x:  7.90, y: -0.025, z:  0    }, 'blocker');
 
   // ── B3. Interior basin wall blockers (below deck, keep player in basin) ───
-  // Top Y -0.20, per-wall heights per spec.
-  createPoolCollider(`${def.name}_wall_nw`, { width: 7.20, height: 0.50, depth: 0.20 },
-    { x: -4.30, y: -0.45, z: -3.85 }, 'blocker');
-  createPoolCollider(`${def.name}_wall_ne`, { width: 7.20, height: 0.50, depth: 0.20 },
-    { x:  4.30, y: -0.45, z: -3.85 }, 'blocker');
-  createPoolCollider(`${def.name}_wall_s`,  { width: 15.90, height: 1.50, depth: 0.20 },
-    { x:  0,    y: -0.95, z:  3.85 }, 'blocker');
-  createPoolCollider(`${def.name}_wall_w`,  { width:  0.20, height: 1.50, depth: 7.70 },
-    { x: -7.85, y: -0.95, z:  0    }, 'blocker');
-  createPoolCollider(`${def.name}_wall_e`,  { width:  0.20, height: 1.50, depth: 7.70 },
-    { x:  7.85, y: -0.95, z:  0    }, 'blocker');
+  // WALL_H=2.50, WALL_CY=-0.75 → top Y=+0.50.
+  // Player-in-shallow top ≈ +0.10 < +0.50, so AABB always resolves horizontally (not upward).
+  createPoolCollider(`${def.name}_wall_nw`, { width: 7.20,  height: WALL_H, depth: WALL_T },
+    { x: -4.30, y: WALL_CY, z: -3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_ne`, { width: 7.20,  height: WALL_H, depth: WALL_T },
+    { x:  4.30, y: WALL_CY, z: -3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_s`,  { width: 15.90, height: WALL_H, depth: WALL_T },
+    { x:  0,    y: WALL_CY, z:  3.85 }, 'blocker');
+  createPoolCollider(`${def.name}_wall_w`,  { width: WALL_T, height: WALL_H, depth: 7.70 },
+    { x: -7.85, y: WALL_CY, z:  0    }, 'blocker');
+  createPoolCollider(`${def.name}_wall_e`,  { width: WALL_T, height: WALL_H, depth: 7.70 },
+    { x:  7.85, y: WALL_CY, z:  0    }, 'blocker');
 
   // ── B4. Walkable shallow floor collider ───────────────────────────────────
   // world X 36, Y -0.75, Z 28.00 → local x=0, z=-2.00
@@ -542,19 +559,22 @@ function createDeepWaterPocket(scene, def) {
 
   // ── B7. Exit stair colliders (4 steps + top landing) ──────────────────────
   // Width X 2.40 centered at X 36 (local x=0). World Z → local z = worldZ - def.z.
+  // h=0.30 (robust AABB detection — thin h=0.10 was missed at normal movement speed).
+  // ly = intended walkable top − 0.15 (half of new height), preserving same tread surfaces.
   const exitStairDefs = [
-    { lz: -3.475, ly: -0.175 },
-    { lz: -3.125, ly: -0.350 },
-    { lz: -2.775, ly: -0.525 },
-    { lz: -2.425, ly: -0.700 },
+    { lz: -3.475, ly: -0.275 },  // tread top y=-0.125
+    { lz: -3.125, ly: -0.450 },  // tread top y=-0.300
+    { lz: -2.775, ly: -0.625 },  // tread top y=-0.475
+    { lz: -2.425, ly: -0.800 },  // tread top y=-0.650
   ];
   for (let i = 0; i < exitStairDefs.length; i++) {
-    createPoolCollider(`${def.name}_exit_stair_${i + 1}_col`, { width: 2.40, height: 0.10, depth: 0.35 },
+    createPoolCollider(`${def.name}_exit_stair_${i + 1}_col`, { width: 2.40, height: 0.30, depth: 0.35 },
       { x: 0, y: exitStairDefs[i].ly, z: exitStairDefs[i].lz }, 'walkable');
   }
-  // Top landing: world X 36, Y -0.05, Z 26.175 → local z = -3.825
-  createPoolCollider(`${def.name}_exit_landing_col`, { width: 2.40, height: 0.10, depth: 0.35 },
-    { x: 0, y: -0.05, z: -3.825 }, 'walkable');
+  // Top landing: fills gap between deck floor (world Z ≤ 26) and stair 1 (world Z 26.30–26.65).
+  // h=0.30 prevents fall-through. Walkable top at y=0 (deck level), center y=-0.15.
+  createPoolCollider(`${def.name}_exit_landing_col`, { width: 2.40, height: 0.30, depth: 0.35 },
+    { x: 0, y: -0.15, z: -3.825 }, 'walkable');
 
   return {
     ...def,
@@ -572,7 +592,7 @@ function createDeepWaterPocket(scene, def) {
       return {
         x: def.x,
         y: DECK_Y + 0.42,
-        z: (def.z ?? 0) - (D * 0.5) - 0.6,
+        z: (def.z ?? 0) - HALF_D - 0.6,
       };
     },
     update(time) {
