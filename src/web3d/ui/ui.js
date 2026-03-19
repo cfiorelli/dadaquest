@@ -880,6 +880,9 @@ const CSS = `
   display: flex;
   gap: 6px;
 }
+.dada-era5-hearts .locked {
+  opacity: 0.2;
+}
 .dada-era5-heart,
 .dada-era5-shield {
   display: inline-flex;
@@ -1922,8 +1925,8 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-era5-hearts" data-era5-hearts></div>
         </div>
         <div class="dada-era5-block">
-          <div class="dada-era5-label">Shield</div>
-          <div class="dada-era5-shields" data-era5-shields></div>
+          <div class="dada-era5-label">Shield Gear</div>
+          <div class="dada-era5-meter-copy"><span data-era5-shield-label>No Shield</span><span data-era5-shield-tier>0 / 3</span></div>
         </div>
       </div>
       <div class="dada-era5-row">
@@ -1958,8 +1961,9 @@ export function createUI(uiRoot, options = {}) {
   const era5CompassCtx = era5CompassEl.getContext('2d');
 
   const era5HeartsEl = era5HudEl.querySelector('[data-era5-hearts]');
-  const era5ShieldsEl = era5HudEl.querySelector('[data-era5-shields]');
-  const era5ShieldBlockEl = era5ShieldsEl?.closest('.dada-era5-block') ?? null;
+  const era5ShieldLabelEl = era5HudEl.querySelector('[data-era5-shield-label]');
+  const era5ShieldTierEl = era5HudEl.querySelector('[data-era5-shield-tier]');
+  const era5ShieldBlockEl = era5ShieldLabelEl?.closest('.dada-era5-block') ?? null;
   const era5OxygenFillEl = era5HudEl.querySelector('[data-era5-oxygen-fill]');
   const era5OxygenCopyEl = era5HudEl.querySelector('[data-era5-oxygen-copy]');
   const era5OxygenRowEl = era5OxygenFillEl?.closest('.dada-era5-row') ?? null;
@@ -2574,6 +2578,7 @@ export function createUI(uiRoot, options = {}) {
       hpMax = 3,
       shield = 1,
       shieldMax = 1,
+      shieldLabel = 'No Shield',
       oxygen = 0,
       oxygenMax = 0,
       showOxygen = false,
@@ -2591,8 +2596,29 @@ export function createUI(uiRoot, options = {}) {
       era5HudEl.style.display = 'block';
       if (era5ToolLabelEl) era5ToolLabelEl.textContent = toolLabel;
       if (era5ToolHelpEl) era5ToolHelpEl.textContent = toolHelp;
-      renderPips(era5HeartsEl, hp, hpMax, 'dada-era5-heart', '♥');
-      if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = 'none';
+      if (era5HeartsEl) {
+        era5HeartsEl.innerHTML = '';
+        const hpSlots = Math.max(3, Math.round(hpMax));
+        const shieldSlots = 3;
+        for (let i = 0; i < hpSlots; i += 1) {
+          const pip = document.createElement('span');
+          pip.className = `dada-era5-heart ${i < hp ? 'filled' : 'empty'}`;
+          pip.textContent = '♥';
+          era5HeartsEl.appendChild(pip);
+        }
+        const shieldCapacity = Math.max(0, Math.min(shieldSlots, Math.round(shieldMax)));
+        for (let i = 0; i < shieldSlots; i += 1) {
+          const pip = document.createElement('span');
+          const filled = i < Math.max(0, Math.round(shield));
+          const unlocked = i < shieldCapacity;
+          pip.className = `dada-era5-shield ${filled ? 'filled' : 'empty'}${unlocked ? '' : ' locked'}`;
+          pip.textContent = '◈';
+          era5HeartsEl.appendChild(pip);
+        }
+      }
+      if (era5ShieldBlockEl) era5ShieldBlockEl.style.display = 'block';
+      if (era5ShieldLabelEl) era5ShieldLabelEl.textContent = shieldLabel;
+      if (era5ShieldTierEl) era5ShieldTierEl.textContent = `${Math.max(0, Math.min(3, Math.round(shieldMax)))} / 3`;
       if (era5OxygenRowEl) {
         era5OxygenRowEl.style.display = showOxygen ? 'block' : 'none';
         if (showOxygen && era5OxygenFillEl) {

@@ -3183,6 +3183,21 @@ export async function boot(options = {}) {
     return getItemDef(weaponInstance?.defId);
   }
 
+  function getEquippedEra5ShieldItem() {
+    let best = null;
+    for (const instanceId of Object.values(era5State.equipped || {})) {
+      if (!instanceId) continue;
+      const instance = era5State.inventory.find((item) => item.instanceId === instanceId);
+      const def = getItemDef(instance?.defId);
+      const bonus = Number(def?.stats?.shieldMax ?? 0);
+      if (!Number.isFinite(bonus) || bonus <= 0) continue;
+      if (!best || bonus > best.bonus) {
+        best = { def, bonus };
+      }
+    }
+    return best;
+  }
+
   function getEra5MeterMax(toolDef = getEquippedEra5ToolDef()) {
     return Math.max(0, era5State.stats.oxygenMax ?? 0);
   }
@@ -3278,6 +3293,7 @@ export async function boot(options = {}) {
     const toolDef = getEquippedEra5ToolDef();
     const weaponDef = getEquippedEra5WeaponDef();
     const meterMax = getEra5MeterMax(toolDef);
+    const shieldItem = getEquippedEra5ShieldItem();
     const inventoryHint = [
       era5InventoryOpen ? 'I Close' : 'I Inventory',
       progression.windGlideUnlocked ? 'G Glide' : '',
@@ -3302,6 +3318,7 @@ export async function boot(options = {}) {
       oxygen: era5Oxygen,
       oxygenMax: Math.max(4.0, getEra5MeterMax()),
       showOxygen: era5OxygenHideTimer > 0,
+      shieldLabel: shieldItem?.def?.name ?? 'Base Shield',
       toolLabel: getEra5BreathLabel(toolDef),
       weaponLabel: weaponDef?.name || 'No Weapon',
       weaponCooldownMs: era5WeaponCooldownMs,
@@ -6047,6 +6064,12 @@ export async function boot(options = {}) {
           world.era5Level.update(dt, {
             pos: player.mesh.position,
             player,
+            inputState: {
+              forwardAxis: rawMoveY,
+              strafeAxis: rawMoveX,
+              jumpHeld,
+              descendHeld,
+            },
             triggerDamage: applyEra5Damage,
             triggerNearMissCue,
             refillOxygen: refillEra5Oxygen,
