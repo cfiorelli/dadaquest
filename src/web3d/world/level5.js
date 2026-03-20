@@ -275,7 +275,7 @@ const tunnelBlocks = [
     wallBottomY: -1.8,
     wallTopY: 1.4,
     ceilingY: 1.4,
-  }),
+  }).filter((block) => block.name !== 'swim_tunnel_throat_north_wall_header'),
   ...makeShell('swim_tunnel_bend', TUNNEL_BEND, {
     east: openingAlongZ(39.4, -1.25, 1.8, 2.2),
     south: openingAlongX(33.0, -1.25, 3.0, 2.2),

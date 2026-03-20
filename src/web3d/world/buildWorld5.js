@@ -507,8 +507,12 @@ function createDeepWaterPocket(scene, def) {
       { x: 0, y: -0.025, z: -3.90 }, 'blocker');
   }
   if (southTunnel?.width > 0) {
-    createPoolCollider(`${def.name}_edge_s`, { width: 16.00, height: 0.25, depth: 0.20 },
-      { x: 0, y: -0.025, z: 3.90 }, 'blocker');
+    const edgeWidth = ((def.w ?? 16.0) - southTunnel.width) * 0.5;
+    const edgeOffset = (southTunnel.width * 0.5) + (edgeWidth * 0.5);
+    createPoolCollider(`${def.name}_edge_sw`, { width: edgeWidth, height: 0.25, depth: 0.20 },
+      { x: -edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
+    createPoolCollider(`${def.name}_edge_se`, { width: edgeWidth, height: 0.25, depth: 0.20 },
+      { x: edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
   } else {
     createPoolCollider(`${def.name}_edge_s`, { width: 16.00, height: 0.25, depth: 0.20 },
       { x: 0, y: -0.025, z: 3.90 }, 'blocker');

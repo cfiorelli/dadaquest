@@ -1719,6 +1719,86 @@ async function getLevel5SecretTunnelAudit(page) {
   });
 }
 
+async function getLevel5PoolMouthCollisionAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const summarizeBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      };
+    };
+    const colliders = (scene?.meshes || [])
+      .filter((mesh) => mesh?.checkCollisions === true && mesh?.metadata?.gameplayBlocker === true)
+      .map((mesh) => ({
+        name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
+        bounds: summarizeBounds(mesh),
+      }))
+      .filter((entry) => entry.bounds && entry.name.startsWith('starter_pool_'));
+    const opening = {
+      minX: 34.9,
+      maxX: 37.1,
+      minY: -2.0,
+      maxY: -0.31,
+      minZ: 33.75,
+      maxZ: 34.15,
+      planeMinZ: 33.75,
+      planeMaxZ: 34.05,
+    };
+
+    return {
+      opening,
+      colliders,
+      edgeBlockersAcrossMouth: colliders.filter((entry) => entry.name.includes('edge_s') && overlaps(entry.bounds.minX, entry.bounds.maxX, opening.minX, opening.maxX) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, opening.planeMinZ, opening.planeMaxZ)),
+      lowerBlockersAcrossOpening: colliders.filter((entry) => overlaps(entry.bounds.minX, entry.bounds.maxX, opening.minX, opening.maxX) && overlaps(entry.bounds.minY, entry.bounds.maxY, opening.minY, opening.maxY) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, opening.minZ, opening.maxZ)),
+    };
+  });
+}
+
+async function getLevel5PoolWallPatchAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const summarizeBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      };
+    };
+    const region = {
+      minX: 34.9,
+      maxX: 37.1,
+      minY: -0.3,
+      maxY: 1.5,
+      minZ: 36.0,
+      maxZ: 36.5,
+    };
+    const visibleMeshes = (scene?.meshes || [])
+      .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
+      .map((mesh) => ({
+        name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
+        bounds: summarizeBounds(mesh),
+      }))
+      .filter((entry) => entry.bounds && overlaps(entry.bounds.minX, entry.bounds.maxX, region.minX, region.maxX) && overlaps(entry.bounds.minY, entry.bounds.maxY, region.minY, region.maxY) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, region.minZ, region.maxZ))
+      .map((entry) => entry.name)
+      .sort();
+    return { region, visibleMeshes };
+  });
+}
+
 async function climbLevel5Ladder(page, pose, holdMs = 2300) {
   await resetEra5Pose(page, pose);
   await page.waitForTimeout(120);
@@ -1802,6 +1882,10 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
   });
   expectPositionInBounds(poolState.pos, { minX: 28.0, maxX: 44.0, minY: -1.8, maxY: 0.2, minZ: 26.0, maxZ: 34.0 });
 
+  const mouthCollisionAudit = await getLevel5PoolMouthCollisionAudit(page);
+  expect(mouthCollisionAudit.edgeBlockersAcrossMouth).toEqual([]);
+  expect(mouthCollisionAudit.lowerBlockersAcrossOpening).toEqual([]);
+
   await focusGameplay(page);
   await resetEra5Pose(page, {
     x: 36.0,
@@ -1811,7 +1895,14 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
     cameraYaw: 0.0,
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(2500);
+  const mouthThresholdState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(mouthThresholdState.pos.z).toBeGreaterThan(33.95);
+  expect(mouthThresholdState.pos.x).toBeGreaterThan(35.4);
+  expect(mouthThresholdState.pos.x).toBeLessThan(36.6);
+  await page.waitForTimeout(4500);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   await page.waitForTimeout(250);
   const swimEntryState = await page.evaluate(() => ({
@@ -1892,6 +1983,10 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   expect(visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('truth_overlay'))).toBe(false);
+
+  const wallPatchAudit = await getLevel5PoolWallPatchAudit(page);
+  expect(wallPatchAudit.visibleMeshes).toContain('starter_pool_lab_south_wall_header');
+  expect(wallPatchAudit.visibleMeshes).not.toContain('swim_tunnel_throat_north_wall_header');
 
   const levelState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState ?? null);
   const underdeckPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_underdeck') ?? null;

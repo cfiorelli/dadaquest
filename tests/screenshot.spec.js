@@ -939,6 +939,82 @@ async function getLevel5RenderPolicyAudit(page) {
   });
 }
 
+async function getLevel5PoolMouthCollisionAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const summarizeBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: box.minimumWorld.x,
+        maxX: box.maximumWorld.x,
+        minY: box.minimumWorld.y,
+        maxY: box.maximumWorld.y,
+        minZ: box.minimumWorld.z,
+        maxZ: box.maximumWorld.z,
+      };
+    };
+    const opening = {
+      minX: 34.9,
+      maxX: 37.1,
+      minY: -2.0,
+      maxY: -0.31,
+      minZ: 33.75,
+      maxZ: 34.15,
+      planeMinZ: 33.75,
+      planeMaxZ: 34.05,
+    };
+    const colliders = (scene?.meshes || [])
+      .filter((mesh) => mesh?.checkCollisions === true && mesh?.metadata?.gameplayBlocker === true)
+      .map((mesh) => ({
+        name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
+        bounds: summarizeBounds(mesh),
+      }))
+      .filter((entry) => entry.bounds && entry.name.startsWith('starter_pool_'));
+    return {
+      edgeBlockersAcrossMouth: colliders.filter((entry) => entry.name.includes('edge_s') && overlaps(entry.bounds.minX, entry.bounds.maxX, opening.minX, opening.maxX) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, opening.planeMinZ, opening.planeMaxZ)).map((entry) => entry.name),
+      lowerBlockersAcrossOpening: colliders.filter((entry) => overlaps(entry.bounds.minX, entry.bounds.maxX, opening.minX, opening.maxX) && overlaps(entry.bounds.minY, entry.bounds.maxY, opening.minY, opening.maxY) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, opening.minZ, opening.maxZ)).map((entry) => entry.name),
+    };
+  });
+}
+
+async function getLevel5PoolWallPatchAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const summarizeBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: box.minimumWorld.x,
+        maxX: box.maximumWorld.x,
+        minY: box.minimumWorld.y,
+        maxY: box.maximumWorld.y,
+        minZ: box.minimumWorld.z,
+        maxZ: box.maximumWorld.z,
+      };
+    };
+    const region = {
+      minX: 34.9,
+      maxX: 37.1,
+      minY: -0.3,
+      maxY: 1.5,
+      minZ: 36.0,
+      maxZ: 36.5,
+    };
+    return (scene?.meshes || [])
+      .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
+      .map((mesh) => ({
+        name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
+        bounds: summarizeBounds(mesh),
+      }))
+      .filter((entry) => entry.bounds && overlaps(entry.bounds.minX, entry.bounds.maxX, region.minX, region.maxX) && overlaps(entry.bounds.minY, entry.bounds.maxY, region.minY, region.maxY) && overlaps(entry.bounds.minZ, entry.bounds.maxZ, region.minZ, region.maxZ))
+      .map((entry) => entry.name)
+      .sort();
+  });
+}
+
 test('capture scene screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
@@ -1043,6 +1119,13 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
   }));
   expect(runtimeState.lastRuntimeError).toBeNull();
+
+  const mouthCollisionAudit = await getLevel5PoolMouthCollisionAudit(page);
+  expect(mouthCollisionAudit.edgeBlockersAcrossMouth).toEqual([]);
+  expect(mouthCollisionAudit.lowerBlockersAcrossOpening).toEqual([]);
+  const wallPatchAudit = await getLevel5PoolWallPatchAudit(page);
+  expect(wallPatchAudit).toContain('starter_pool_lab_south_wall_header');
+  expect(wallPatchAudit).not.toContain('swim_tunnel_throat_north_wall_header');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
