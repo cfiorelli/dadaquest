@@ -9,7 +9,6 @@ const approvedFiles = new Set([
   'src/web3d/render/renderPolicy.js',
 ]);
 const legacyExceptions = new Set([
-  'src/web3d/boot.js',
   'src/web3d/player/babyVisual.js',
   'src/web3d/world/characters.js',
   'src/web3d/world/cutouts.js',

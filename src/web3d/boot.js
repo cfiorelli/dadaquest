@@ -19,7 +19,10 @@ import { JuiceFx } from './util/juiceFx.js';
 import {
   applyHeldItemRenderPolicy,
   applyProjectileRenderPolicy,
+  applyRenderPolicy,
+  applyRenderPolicyToMeshes,
   applyVfxRenderPolicy,
+  prepareFadeOcclusionMaterial,
 } from './render/renderPolicy.js';
 import {
   applyHdriEnvironment,
@@ -317,13 +320,7 @@ function updatePlayerShadow(player) {
 }
 
 function prepareFadeMaterial(material) {
-  if (!material || material._dadaOcclusionPrepared) return;
-  material._dadaOcclusionPrepared = true;
-  material._dadaBaseAlpha = typeof material.alpha === 'number' ? material.alpha : 1;
-  material.alpha = material._dadaBaseAlpha;
-  if (material.transparencyMode === undefined || material.transparencyMode === null) {
-    material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-  }
+  prepareFadeOcclusionMaterial(material);
 }
 
 function disableAnimationsForShotMode() {
@@ -423,32 +420,6 @@ function applyRoleMetadata(meshes, roleName) {
       ...(mesh.metadata || {}),
       role: roleName,
     };
-  }
-}
-
-function setMeshesRenderingGroup(meshes, groupId) {
-  if (!Array.isArray(meshes)) return;
-  for (const mesh of meshes) {
-    if (mesh instanceof BABYLON.Mesh) {
-      mesh.renderingGroupId = groupId;
-    }
-  }
-}
-
-function configureMeshesAsAlphaCutout(meshes) {
-  if (!Array.isArray(meshes)) return;
-  for (const mesh of meshes) {
-    if (!(mesh instanceof BABYLON.Mesh) || !mesh.material) continue;
-    const mat = mesh.material;
-    if (mat.opacityTexture || mat.albedoTexture || mat.diffuseTexture) {
-      mat.needDepthPrePass = true;
-      if (Object.prototype.hasOwnProperty.call(mat, 'transparencyMode')) {
-        mat.transparencyMode = BABYLON.Material.MATERIAL_ALPHATEST;
-      }
-      if (Object.prototype.hasOwnProperty.call(mat, 'alphaCutOff')) {
-        mat.alphaCutOff = 0.4;
-      }
-    }
   }
 }
 
@@ -1374,11 +1345,8 @@ export async function boot(options = {}) {
       : await loadModelForRole(scene, roleName, options);
     if (result.loaded) {
       registerShadowCasters(world.shadowGen, result.meshes);
-      if (typeof options.renderingGroupId === 'number') {
-        setMeshesRenderingGroup(result.meshes, options.renderingGroupId);
-      }
-      if (options.alphaCutout) {
-        configureMeshesAsAlphaCutout(result.meshes);
+      if (typeof options.renderPolicy === 'string') {
+        applyRenderPolicy(result.meshes, options.renderPolicy);
       }
       hideMeshList(fallbackMeshes);
       if (options.actorRole) {
@@ -1444,8 +1412,8 @@ export async function boot(options = {}) {
   const goalFallbackMeshes = collectNodeMeshes(world.goalRoot).filter((mesh) => mesh.name !== 'goalTrigger');
   applyRoleMetadata(playerFallbackMeshes, 'player');
   applyRoleMetadata(goalFallbackMeshes, 'goal');
-  setMeshesRenderingGroup(playerFallbackMeshes, 3);
-  setMeshesRenderingGroup(goalFallbackMeshes, 3);
+  applyRenderPolicyToMeshes(playerFallbackMeshes, 'legacyOverlayOpaque');
+  applyRenderPolicyToMeshes(goalFallbackMeshes, 'legacyOverlayOpaque');
 
   const playerVisualRoot = new BABYLON.TransformNode('playerVisualRoot', scene);
   playerVisualRoot.parent = player.visual;
@@ -1561,7 +1529,7 @@ export async function boot(options = {}) {
       fallbackMaterial: 'plastic',
       rotation: new BABYLON.Vector3(0, Math.PI, 0),
       actorRole: 'player',
-      renderingGroupId: 3,
+      renderPolicy: 'legacyOverlayOpaque',
     });
   } else {
     const p = player.visual.getAbsolutePosition();
@@ -1591,7 +1559,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(signRoot),
       fallbackMaterial: 'cardboard',
       scaling: 0.9,
-      renderingGroupId: 2,
+      renderPolicy: 'legacyDecorOpaque',
     });
   }
 
@@ -1600,7 +1568,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(checkpoint.marker),
       fallbackMaterial: 'cardboard',
       scaling: 0.72,
-      renderingGroupId: 3,
+      renderPolicy: 'legacyOverlayOpaque',
     });
   }
 
@@ -1609,7 +1577,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(pickup.node),
       fallbackMaterial: 'plastic',
       scaling: 0.9,
-      renderingGroupId: 3,
+      renderPolicy: 'legacyOverlayOpaque',
     });
   }
 
@@ -1619,7 +1587,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(toy),
       fallbackMaterial: 'cardboard',
       scaling: 0.7,
-      renderingGroupId: 2,
+      renderPolicy: 'legacyDecorOpaque',
     });
   }
 
@@ -1628,7 +1596,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.hangingRing),
       fallbackMaterial: 'plastic',
       scaling: 0.95,
-      renderingGroupId: 3,
+      renderPolicy: 'legacyOverlayOpaque',
     });
   }
 
@@ -1637,7 +1605,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.goalBanner),
       fallbackMaterial: 'plastic',
       scaling: 1.2,
-      renderingGroupId: 3,
+      renderPolicy: 'legacyOverlayOpaque',
     });
   }
 
@@ -1646,8 +1614,7 @@ export async function boot(options = {}) {
       parent: resolveAttachParent(anchors.cribRail),
       fallbackMaterial: 'cardboard',
       scaling: [1.05, 0.9, 0.9],
-      renderingGroupId: 4,
-      alphaCutout: true,
+      renderPolicy: 'legacyForegroundCutout',
     });
   }
 
@@ -1658,8 +1625,7 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 1.9, 1.5],
-      renderingGroupId: 4,
-      alphaCutout: true,
+      renderPolicy: 'legacyForegroundCutout',
     });
     if (result.loaded) {
       pushForegroundMeshes(result.meshes);
@@ -1673,8 +1639,7 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.5, 2.6, 1.8],
-      renderingGroupId: 0,
-      alphaCutout: true,
+      renderPolicy: 'legacyBackdropCutout',
     });
   }
 
@@ -1685,8 +1650,7 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [2.1, 2.0, 1.5],
-      renderingGroupId: 1,
-      alphaCutout: true,
+      renderPolicy: 'legacyMidgroundCutout',
     });
   }
 
@@ -1697,8 +1661,7 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'paper',
       scaling: [1.9, 1.4, 1.4],
-      renderingGroupId: 0,
-      alphaCutout: true,
+      renderPolicy: 'legacyBackdropCutout',
     });
   }
 
@@ -1709,8 +1672,7 @@ export async function boot(options = {}) {
       position: pos,
       fallbackMaterial: 'felt',
       scaling: [1.2, 1.2, 1.0],
-      renderingGroupId: 1,
-      alphaCutout: true,
+      renderPolicy: 'legacyMidgroundCutout',
     });
   }
 
@@ -1810,7 +1772,7 @@ export async function boot(options = {}) {
           parent: targetAnchor,
           fallbackMeshes: fallback ? collectNodeMeshes(fallback) : collectNodeMeshes(targetAnchor),
           fallbackMaterial: 'plastic',
-          renderingGroupId: 2,
+          renderPolicy: 'legacyDecorOpaque',
         });
         if (result?.loaded) {
           for (const mesh of result.meshes || []) {
@@ -1947,7 +1909,7 @@ export async function boot(options = {}) {
       const result = await attachRoleModel('futureGoatPropModel', anchor, {
         parent: anchor,
         fallbackMaterial: 'cardboard',
-        renderingGroupId: 2,
+        renderPolicy: 'legacyDecorOpaque',
       });
       if (result.loaded) {
         const surface = getLevel1DecorSurface(anchor);
@@ -1984,7 +1946,7 @@ export async function boot(options = {}) {
       const result = await attachRoleModel('futureChickenPropModel', anchor, {
         parent: anchor,
         fallbackMaterial: 'cardboard',
-        renderingGroupId: 2,
+        renderPolicy: 'legacyDecorOpaque',
       });
       if (result.loaded) {
         const surface = getLevel1DecorSurface(anchor);
@@ -2020,7 +1982,7 @@ export async function boot(options = {}) {
       const result = await attachRoleModel('futureDinoPropModel', anchor, {
         parent: anchor,
         fallbackMaterial: 'cardboard',
-        renderingGroupId: 2,
+        renderPolicy: 'legacyDecorOpaque',
       });
       if (result.loaded) {
         const surface = getLevel1DecorSurface(anchor);
@@ -2054,7 +2016,7 @@ export async function boot(options = {}) {
         const result = await attachRoleModel('futurePigPropModel', anchor, {
           parent: anchor,
           fallbackMaterial: 'cardboard',
-          renderingGroupId: 2,
+          renderPolicy: 'legacyDecorOpaque',
         });
         if (result.loaded) {
           const surface = getLevel1DecorSurface(anchor);
@@ -2090,7 +2052,7 @@ export async function boot(options = {}) {
         const result = await attachRoleModel('futureElephantPropModel', anchor, {
           parent: anchor,
           fallbackMaterial: 'cardboard',
-          renderingGroupId: 2,
+          renderPolicy: 'legacyDecorOpaque',
         });
         if (result.loaded) {
           const surface = getLevel1DecorSurface(anchor);
@@ -2152,7 +2114,7 @@ export async function boot(options = {}) {
           parent: anchor,
           fallbackMeshes: collectNodeMeshes(anchor),
           fallbackMaterial: 'plastic',
-          renderingGroupId: 3,
+          renderPolicy: 'legacyOverlayOpaque',
         });
         if (!result?.loaded) continue;
         const anchorPos = anchor.getAbsolutePosition();
@@ -2284,7 +2246,7 @@ export async function boot(options = {}) {
       mesh.isPickable = false;
       mesh.checkCollisions = false;
       mesh.metadata = { ...(mesh.metadata || {}), cameraIgnore: true };
-      mesh.renderingGroupId = 3;
+      applyRenderPolicyToMeshes(mesh, 'legacyOverlayOpaque');
     }
     level1CoinFlyers.push({
       coin,
@@ -3027,11 +2989,11 @@ export async function boot(options = {}) {
       isVisible: mesh.isVisible !== false,
       visibility: roundNumber(mesh.visibility ?? 1),
       isPickable: !!mesh.isPickable,
-      renderingGroupId: mesh.renderingGroupId ?? 0,
+      renderGroup: mesh.renderingGroupId ?? 0,
       cameraIgnore: mesh.metadata?.cameraIgnore === true,
       materialAlpha: material && typeof material.alpha === 'number' ? roundNumber(material.alpha) : null,
       materialType: material?.getClassName?.() || material?.constructor?.name || null,
-      transparencyMode: material?.transparencyMode ?? null,
+      materialTransparencyMode: material?.transparencyMode ?? null,
       era5EnvKind: mesh.metadata?.era5EnvKind || null,
       gameplay: mesh.metadata?.gameplay === true,
       hazard: mesh.metadata?.hazard === true,

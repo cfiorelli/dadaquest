@@ -34,6 +34,11 @@ npm run check:render-policy
 | Projectile | `applyProjectileRenderPolicy` | 4 | 900 | alpha blend | true | true | false |
 | Enemy alpha | `applyEnemyAlphaRenderPolicy` | 3 | 250 | alpha blend | true | false | false |
 | VFX | `applyVfxRenderPolicy` | 3 | 500 | alpha blend | false | false | false |
+| Legacy decor opaque | `applyLegacyDecorOpaqueRenderPolicy` | 2 | 0 | preserve | preserve | preserve | preserve |
+| Legacy overlay opaque | `applyLegacyOverlayOpaqueRenderPolicy` | 3 | 0 | preserve | preserve | preserve | preserve |
+| Legacy backdrop cutout | `applyLegacyBackdropCutoutRenderPolicy` | 0 | 0 | alpha test | true | true | preserve |
+| Legacy midground cutout | `applyLegacyMidgroundCutoutRenderPolicy` | 1 | 0 | alpha test | true | true | preserve |
+| Legacy foreground cutout | `applyLegacyForegroundCutoutRenderPolicy` | 4 | 0 | alpha test | true | true | preserve |
 
 The helper names above are the only approved path for future gameplay-visible translucent work.
 
@@ -41,7 +46,6 @@ The helper names above are the only approved path for future gameplay-visible tr
 
 The enforcement check currently allows legacy direct render-property writes in these untouched files:
 
-- `src/web3d/boot.js`
 - `src/web3d/player/babyVisual.js`
 - `src/web3d/world/characters.js`
 - `src/web3d/world/cutouts.js`
@@ -52,6 +56,8 @@ The enforcement check currently allows legacy direct render-property writes in t
 - `src/web3d/world/buildWorld4.js`
 
 These remain allowed only to preserve existing shipped behavior until they are migrated.
+
+`src/web3d/boot.js` is no longer in the exception list. Its previous direct group/cutout/fade assignments now route through the shared policy module.
 
 ## Visibility Validation Matrix
 

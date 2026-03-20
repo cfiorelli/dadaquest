@@ -2,6 +2,7 @@ import * as BABYLON from '@babylonjs/core';
 
 const PRESERVE = 'preserve';
 const ALPHABLEND = BABYLON.Material.MATERIAL_ALPHABLEND;
+const ALPHATEST = BABYLON.Material.MATERIAL_ALPHATEST;
 
 function freezePolicy(id, definition) {
   return Object.freeze({
@@ -82,6 +83,56 @@ export const RENDER_POLICY_CATEGORIES = Object.freeze({
     depthWrite: false,
     backFaceCulling: false,
     alwaysSelectAsActiveMesh: true,
+  }),
+  legacyBackdropCutout: freezePolicy('legacyBackdropCutout', {
+    renderingGroupId: 0,
+    alphaIndex: 0,
+    transparencyMode: ALPHATEST,
+    needDepthPrePass: true,
+    depthWrite: true,
+    backFaceCulling: PRESERVE,
+    alphaCutOff: 0.4,
+    alwaysSelectAsActiveMesh: false,
+  }),
+  legacyMidgroundCutout: freezePolicy('legacyMidgroundCutout', {
+    renderingGroupId: 1,
+    alphaIndex: 0,
+    transparencyMode: ALPHATEST,
+    needDepthPrePass: true,
+    depthWrite: true,
+    backFaceCulling: PRESERVE,
+    alphaCutOff: 0.4,
+    alwaysSelectAsActiveMesh: false,
+  }),
+  legacyDecorOpaque: freezePolicy('legacyDecorOpaque', {
+    renderingGroupId: 2,
+    alphaIndex: 0,
+    transparencyMode: PRESERVE,
+    needDepthPrePass: PRESERVE,
+    depthWrite: PRESERVE,
+    backFaceCulling: PRESERVE,
+    alphaCutOff: PRESERVE,
+    alwaysSelectAsActiveMesh: false,
+  }),
+  legacyOverlayOpaque: freezePolicy('legacyOverlayOpaque', {
+    renderingGroupId: 3,
+    alphaIndex: 0,
+    transparencyMode: PRESERVE,
+    needDepthPrePass: PRESERVE,
+    depthWrite: PRESERVE,
+    backFaceCulling: PRESERVE,
+    alphaCutOff: PRESERVE,
+    alwaysSelectAsActiveMesh: false,
+  }),
+  legacyForegroundCutout: freezePolicy('legacyForegroundCutout', {
+    renderingGroupId: 4,
+    alphaIndex: 0,
+    transparencyMode: ALPHATEST,
+    needDepthPrePass: true,
+    depthWrite: true,
+    backFaceCulling: PRESERVE,
+    alphaCutOff: 0.4,
+    alwaysSelectAsActiveMesh: false,
   }),
 });
 
@@ -172,6 +223,9 @@ function applyPolicyToMaterial(material, policy) {
   if (policy.backFaceCulling !== PRESERVE && supportsProperty(material, 'backFaceCulling')) {
     material.backFaceCulling = policy.backFaceCulling;
   }
+  if (policy.alphaCutOff !== PRESERVE && supportsProperty(material, 'alphaCutOff')) {
+    material.alphaCutOff = policy.alphaCutOff;
+  }
   applyDepthWrite(material, policy.depthWrite);
   material._dadaRenderPolicyCategory = policy.id;
 }
@@ -247,4 +301,35 @@ export function applyEnemyAlphaRenderPolicy(target, options) {
 
 export function applyVfxRenderPolicy(target, options) {
   return applyRenderPolicy(target, 'vfx', options);
+}
+
+export function applyLegacyBackdropCutoutRenderPolicy(target, options) {
+  return applyRenderPolicy(target, 'legacyBackdropCutout', options);
+}
+
+export function applyLegacyMidgroundCutoutRenderPolicy(target, options) {
+  return applyRenderPolicy(target, 'legacyMidgroundCutout', options);
+}
+
+export function applyLegacyDecorOpaqueRenderPolicy(target, options) {
+  return applyRenderPolicy(target, 'legacyDecorOpaque', options);
+}
+
+export function applyLegacyOverlayOpaqueRenderPolicy(target, options) {
+  return applyRenderPolicy(target, 'legacyOverlayOpaque', options);
+}
+
+export function applyLegacyForegroundCutoutRenderPolicy(target, options) {
+  return applyRenderPolicy(target, 'legacyForegroundCutout', options);
+}
+
+export function prepareFadeOcclusionMaterial(material) {
+  if (!material || material._dadaOcclusionPrepared) return material;
+  material._dadaOcclusionPrepared = true;
+  material._dadaBaseAlpha = typeof material.alpha === 'number' ? material.alpha : 1;
+  material.alpha = material._dadaBaseAlpha;
+  if (material.transparencyMode === undefined || material.transparencyMode === null) {
+    material.transparencyMode = ALPHABLEND;
+  }
+  return material;
 }
