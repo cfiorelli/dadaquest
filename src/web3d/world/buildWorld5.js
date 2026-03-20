@@ -341,6 +341,8 @@ function createDeepWaterPocket(scene, def) {
     const tunnelHalfWidth = southTunnel.width * 0.5;
     const leftWidth = 7.95 - tunnelHalfWidth;
     const rightWidth = leftWidth;
+    const openingTopY = Math.min(DECK_Y, southTunnel.centerY + (southTunnel.height * 0.5));
+    const openingHeaderHeight = DECK_Y - openingTopY;
 
     const southWallWest = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_west_vis`, {
       width: leftWidth,
@@ -361,6 +363,18 @@ function createDeepWaterPocket(scene, def) {
     southWallEast.rotation.y = Math.PI;
     southWallEast.material = basinWallMat;
     tagPoolVisual(southWallEast);
+
+    if (openingHeaderHeight > 0.02) {
+      const southWallHeader = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_header_vis`, {
+        width: southTunnel.width,
+        height: openingHeaderHeight,
+      }, scene);
+      southWallHeader.parent = root;
+      southWallHeader.position.set(0, openingTopY + (openingHeaderHeight * 0.5), 3.95);
+      southWallHeader.rotation.y = Math.PI;
+      southWallHeader.material = basinWallMat;
+      tagPoolVisual(southWallHeader);
+    }
   } else {
     const southWall = BABYLON.MeshBuilder.CreatePlane(`${def.name}_basin_wall_south_vis`, {
       width: 15.90, height: 1.70,
@@ -493,12 +507,8 @@ function createDeepWaterPocket(scene, def) {
       { x: 0, y: -0.025, z: -3.90 }, 'blocker');
   }
   if (southTunnel?.width > 0) {
-    const edgeWidth = (16.0 - southTunnel.width) * 0.5;
-    const edgeOffset = (southTunnel.width * 0.5) + (edgeWidth * 0.5);
-    createPoolCollider(`${def.name}_edge_sw`, { width: edgeWidth, height: 0.25, depth: 0.20 },
-      { x: -edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
-    createPoolCollider(`${def.name}_edge_se`, { width: edgeWidth, height: 0.25, depth: 0.20 },
-      { x: edgeOffset, y: -0.025, z: 3.90 }, 'blocker');
+    createPoolCollider(`${def.name}_edge_s`, { width: 16.00, height: 0.25, depth: 0.20 },
+      { x: 0, y: -0.025, z: 3.90 }, 'blocker');
   } else {
     createPoolCollider(`${def.name}_edge_s`, { width: 16.00, height: 0.25, depth: 0.20 },
       { x: 0, y: -0.025, z: 3.90 }, 'blocker');
@@ -523,10 +533,17 @@ function createDeepWaterPocket(scene, def) {
   if (southTunnel?.width > 0) {
     const wallWidth = (15.90 - southTunnel.width) * 0.5;
     const wallOffset = (southTunnel.width * 0.5) + (wallWidth * 0.5);
+    const wallTopY = WALL_CY + (WALL_H * 0.5);
+    const openingTopY = Math.min(DECK_Y, southTunnel.centerY + (southTunnel.height * 0.5));
+    const headerHeight = wallTopY - openingTopY;
     createPoolCollider(`${def.name}_wall_sw`, { width: wallWidth, height: WALL_H, depth: WALL_T },
       { x: -wallOffset, y: WALL_CY, z: 3.85 }, 'blocker');
     createPoolCollider(`${def.name}_wall_se`, { width: wallWidth, height: WALL_H, depth: WALL_T },
       { x: wallOffset, y: WALL_CY, z: 3.85 }, 'blocker');
+    if (headerHeight > 0.02) {
+      createPoolCollider(`${def.name}_wall_s_header`, { width: southTunnel.width, height: headerHeight, depth: WALL_T },
+        { x: 0, y: openingTopY + (headerHeight * 0.5), z: 3.85 }, 'blocker');
+    }
   } else {
     createPoolCollider(`${def.name}_wall_s`, { width: 15.90, height: WALL_H, depth: WALL_T },
       { x: 0, y: WALL_CY, z: 3.85 }, 'blocker');
@@ -1380,36 +1397,6 @@ export function buildWorld5(scene, options = {}) {
     sourceVisuals.get(sourceName).push(mesh);
   }
 
-  // ── Room 1 sector gate ───────────────────────────────────────────────────
-  // All tunnel and hallway meshes are hidden while the player is inside Room 1
-  // (z < 36.0, the Room 1 south wall). They become visible the moment the
-  // player crosses the south wall threshold into the tunnel zone.
-  // This prevents tunnel walls, stair steps, and the hallway floor from leaking
-  // into Room 1 view space regardless of camera angle or pool position.
-  const ROOM1_GATE_Z = 36.0;
-  const room1GatedMeshes = [];
-  for (const mesh of truthVisualMeshes) {
-    const sn = mesh?.metadata?.sourceName || '';
-    if (sn.startsWith('submerged_service_tunnel') || sn.startsWith('service_tunnel') || sn.startsWith('hall_')) {
-      room1GatedMeshes.push(mesh);
-    }
-  }
-  // Platform visuals (floor slabs) are identified by node name, not metadata.
-  for (const node of truthGeometry.platformVisuals || []) {
-    const nm = String(node?.name || '');
-    if (nm.includes('service_tunnel') || nm.includes('hallway_floor')) {
-      room1GatedMeshes.push(node);
-    }
-  }
-  let room1GateActive = true;
-  for (const mesh of room1GatedMeshes) mesh.setEnabled(false);
-
-  function applyRoom1Gate(active) {
-    if (active === room1GateActive) return;
-    room1GateActive = active;
-    for (const mesh of room1GatedMeshes) mesh.setEnabled(!active);
-  }
-
   const truthOverlayRoot = new BABYLON.TransformNode('level5_truth_overlay_root', scene);
   truthOverlayRoot.setEnabled(false);
   markDecor(truthOverlayRoot);
@@ -1452,6 +1439,8 @@ export function buildWorld5(scene, options = {}) {
     mesh.position.copyFrom(position);
     mesh.material = material;
     markTruthOverlayMesh(mesh);
+    mesh.isVisible = false;
+    mesh.visibility = 0;
     mesh.setEnabled(false);
     return mesh;
   }
@@ -1500,18 +1489,26 @@ export function buildWorld5(scene, options = {}) {
     marker.position.set(anchor.x, anchor.y + 0.36, anchor.z);
     marker.material = respawnOverlayMat;
     markTruthOverlayMesh(marker);
+    marker.isVisible = false;
+    marker.visibility = 0;
     marker.setEnabled(false);
     respawnOverlayNodes.push(marker);
+  }
+
+  function setOverlayNodeState(node, enabled) {
+    node.setEnabled(enabled);
+    node.isVisible = enabled;
+    node.visibility = enabled ? 1 : 0;
   }
 
   function applyTruthOverlayState() {
     truthOverlayRoot.setEnabled(
       overlayState.walkables || overlayState.colliders || overlayState.respawnAnchors || overlayState.hazards,
     );
-    for (const node of walkableOverlayNodes) node.setEnabled(overlayState.walkables);
-    for (const node of colliderOverlayNodes) node.setEnabled(overlayState.colliders);
-    for (const node of hazardOverlayNodes) node.setEnabled(overlayState.hazards);
-    for (const node of respawnOverlayNodes) node.setEnabled(overlayState.respawnAnchors);
+    for (const node of walkableOverlayNodes) setOverlayNodeState(node, overlayState.walkables);
+    for (const node of colliderOverlayNodes) setOverlayNodeState(node, overlayState.colliders);
+    for (const node of hazardOverlayNodes) setOverlayNodeState(node, overlayState.hazards);
+    for (const node of respawnOverlayNodes) setOverlayNodeState(node, overlayState.respawnAnchors);
   }
 
   applyTruthOverlayState();
@@ -2005,8 +2002,6 @@ export function buildWorld5(scene, options = {}) {
       const pos = ctx.pos;
       const player = ctx.player;
       if (!pos || !player) return;
-
-      applyRoom1Gate(pos.z < ROOM1_GATE_Z);
       updateCurrentJets(dt, player);
       for (const pocket of deepWaterPockets) {
         pocket.update(runtimeTime);
@@ -2035,8 +2030,6 @@ export function buildWorld5(scene, options = {}) {
       currentPushZ = 0;
       lastResolvedRespawn = null;
       activeLadderId = null;
-      room1GateActive = !room1GateActive; // force applyRoom1Gate to re-run on first update
-      applyRoom1Gate(true); // player always respawns in Room 1
       baseLevel.reset();
       for (const jet of currentJets) {
         jet.playerInside = false;

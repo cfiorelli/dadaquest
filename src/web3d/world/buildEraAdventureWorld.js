@@ -2844,9 +2844,11 @@ export function buildEraAdventureWorld(scene, layout, options = {}) {
   const platformVisuals = groundVisual ? [groundVisual] : [];
 
   for (const def of layout.platforms || []) {
-    const visual = createStyledPlatform(scene, `${theme}_${def.name}`, def, shadowGen, theme);
-    setRenderingGroup(visual, 2);
-    platformVisuals.push(visual);
+    if (def.visible !== false) {
+      const visual = createStyledPlatform(scene, `${theme}_${def.name}`, def, shadowGen, theme);
+      setRenderingGroup(visual, 2);
+      platformVisuals.push(visual);
+    }
     allPlatforms.push(makeInvisibleCollider(scene, `${theme}_${def.name}_col`, def));
   }
 

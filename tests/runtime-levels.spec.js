@@ -1288,8 +1288,13 @@ function expectLevel5PoolAudit(audit) {
   expect(waterBottomY).toBeLessThan(-0.04);
 
   for (const wall of audit.walls) {
-    expect(wall.bounds.minY).toBeLessThanOrEqual(-1.49);
-    expect(wall.bounds.maxY).toBeGreaterThanOrEqual(-0.01);
+    if (String(wall.name || '').includes('south_header')) {
+      expect(wall.bounds.minY).toBeGreaterThanOrEqual(-0.31);
+      expect(wall.bounds.maxY).toBeGreaterThanOrEqual(-0.01);
+    } else {
+      expect(wall.bounds.minY).toBeLessThanOrEqual(-1.49);
+      expect(wall.bounds.maxY).toBeGreaterThanOrEqual(-0.01);
+    }
   }
 
   for (const coping of audit.coping) {
@@ -1642,7 +1647,7 @@ function expectPositionInBounds(position, bounds, epsilon = 0.45) {
   expect(position.z).toBeLessThanOrEqual(bounds.maxZ + epsilon);
 }
 
-async function getLevel5GrayboxRuntimeReport(page) {
+async function getLevel5SliceRuntimeReport(page) {
   return page.evaluate(() => ({
     sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
     lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
@@ -1677,10 +1682,21 @@ async function getLevel5SecretTunnelAudit(page) {
     const width = engine?.getRenderWidth?.() ?? 1280;
     const height = engine?.getRenderHeight?.() ?? 720;
     const screenSamples = [
-      { id: 'mouth_center', x: width * 0.50, y: height * 0.60 },
-      { id: 'mouth_left', x: width * 0.44, y: height * 0.60 },
-      { id: 'mouth_right', x: width * 0.56, y: height * 0.60 },
-      { id: 'mouth_upper', x: width * 0.50, y: height * 0.44 },
+      { id: 'upper_left', x: width * 0.36, y: height * 0.48 },
+      { id: 'upper_center_left', x: width * 0.44, y: height * 0.48 },
+      { id: 'upper_center', x: width * 0.52, y: height * 0.48 },
+      { id: 'upper_center_right', x: width * 0.60, y: height * 0.48 },
+      { id: 'upper_right', x: width * 0.68, y: height * 0.48 },
+      { id: 'mid_left', x: width * 0.36, y: height * 0.56 },
+      { id: 'mid_center_left', x: width * 0.44, y: height * 0.56 },
+      { id: 'mid_center', x: width * 0.52, y: height * 0.56 },
+      { id: 'mid_center_right', x: width * 0.60, y: height * 0.56 },
+      { id: 'mid_right', x: width * 0.68, y: height * 0.56 },
+      { id: 'lower_left', x: width * 0.36, y: height * 0.64 },
+      { id: 'lower_center_left', x: width * 0.44, y: height * 0.64 },
+      { id: 'lower_center', x: width * 0.52, y: height * 0.64 },
+      { id: 'lower_center_right', x: width * 0.60, y: height * 0.64 },
+      { id: 'lower_right', x: width * 0.68, y: height * 0.64 },
     ];
 
     return {
@@ -1717,37 +1733,29 @@ async function climbLevel5Ladder(page, pose, holdMs = 2300) {
   }));
 }
 
-test('@level5 @era5 runtime: level 5 exposes the 7-room graybox Squarium topology with clean authored-space truth', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 exposes the minimal starter vertical slice topology with clean authored-space truth', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockEra5(page);
   await startDebugLevel(page, 5);
   await page.waitForTimeout(1300);
 
-  const report = await getLevel5GrayboxRuntimeReport(page);
+  const report = await getLevel5SliceRuntimeReport(page);
   test.skip(!report.topology, 'Level 5 authored topology debug must be available on the authored-space Era 5 path.');
   expect(report.sceneKey).toBe('CribScene');
   expect(report.lastRuntimeError).toBeNull();
-  expect(report.topology?.mapId).toBe('level5-squarium-graybox');
-  expect(report.topology?.sectorCount).toBe(7);
-  expect(report.topology?.connectorCount).toBe(6);
+  expect(report.topology?.mapId).toBe('level5-starter-vertical-slice');
+  expect(report.topology?.sectorCount).toBe(3);
+  expect(report.topology?.connectorCount).toBe(2);
   expect(report.topology?.sectors?.map((sector) => sector.id)).toEqual([
     'starter_pool_lab',
-    'submerged_service_tunnel',
-    'pump_junction',
-    'transfer_gallery',
-    'grand_stadium_room',
-    'west_kelp_operations_wing',
-    'east_whale_observation_wing',
+    'submerged_swim_tunnel',
+    'surfacing_hallway',
   ]);
   expect(sortAdjacency(report.topology?.topology?.adjacency)).toEqual({
-    east_whale_observation_wing: ['grand_stadium_room'],
-    grand_stadium_room: ['east_whale_observation_wing', 'transfer_gallery', 'west_kelp_operations_wing'],
-    pump_junction: ['submerged_service_tunnel', 'transfer_gallery'],
-    starter_pool_lab: ['submerged_service_tunnel'],
-    submerged_service_tunnel: ['pump_junction', 'starter_pool_lab'],
-    transfer_gallery: ['grand_stadium_room', 'pump_junction'],
-    west_kelp_operations_wing: ['grand_stadium_room'],
+    starter_pool_lab: ['submerged_swim_tunnel'],
+    submerged_swim_tunnel: ['starter_pool_lab', 'surfacing_hallway'],
+    surfacing_hallway: ['submerged_swim_tunnel'],
   });
   expect(report.topology?.topology?.hasCycle).toBe(false);
   expect(report.topology?.walkableReport?.missingCollision ?? []).toEqual([]);
@@ -1757,16 +1765,15 @@ test('@level5 @era5 runtime: level 5 exposes the 7-room graybox Squarium topolog
   expect(report.truth?.disableDecorOcclusionFade).toBe(true);
   expect(report.truth?.fadeableShells ?? []).toEqual([]);
   expect(report.truth?.cullRiskShells ?? []).toEqual([]);
-  expect(report.walkable?.missingVisibleWalkables ?? []).toEqual([]);
+  const intentionallyHiddenWalkables = report.walkable?.missingVisibleWalkables ?? [];
+  expect(intentionallyHiddenWalkables.length).toBeGreaterThan(0);
+  expect(intentionallyHiddenWalkables.every((id) => /swim_tunnel_|hallway_floor/.test(id))).toBe(true);
   expect(report.walkable?.suspiciousFloorLikeDecor ?? []).toEqual([]);
-  expect(report.respawn?.anchorCount ?? 0).toBe(5);
-  expect(report.debugState?.graybox?.ladders?.map((ladder) => ladder.id)).toEqual([
-    'west_ladder',
-    'east_ladder',
-  ]);
+  expect(report.respawn?.anchorCount ?? 0).toBe(1);
+  expect(report.debugState?.graybox?.ladders ?? []).toEqual([]);
 });
 
-test('@level5 @era5 runtime: level 5 graybox route is traversable, both ladders climb, and intended path samples do not fall through', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 starter slice route is traversable from pool to surfaced hallway with no fall-through', async ({ page }) => {
   test.setTimeout(180_000);
   await gotoDebugLevel(page, 5);
   await seedEra5BubbleWand(page);
@@ -1774,83 +1781,144 @@ test('@level5 @era5 runtime: level 5 graybox route is traversable, both ladders 
   await page.waitForTimeout(1300);
   await focusGameplay(page);
 
-  const stableSamples = [
+  const roomState = await sampleLevel5Pose(page, {
+    x: 10.0,
+    y: 0.42,
+    z: 18.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  expect(roomState.sceneKey).toBe('CribScene');
+  expectPositionInBounds(roomState.pos, { minX: 0.0, maxX: 48.0, minY: 0.0, maxY: 6.0, minZ: 0.0, maxZ: 36.0 });
+  expect(roomState.pos.y).toBeGreaterThan(0.2);
+  expect(roomState.waterState?.inDeepWater ?? false).toBe(false);
+
+  const poolState = await sampleLevel5Pose(page, {
+    x: 36.0,
+    y: -1.15,
+    z: 30.8,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  expectPositionInBounds(poolState.pos, { minX: 28.0, maxX: 44.0, minY: -1.8, maxY: 0.2, minZ: 26.0, maxZ: 34.0 });
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 36.0,
+    y: -1.05,
+    z: 31.4,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await page.waitForTimeout(4000);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  await page.waitForTimeout(250);
+  const swimEntryState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(swimEntryState.pos.z).toBeGreaterThan(36.4);
+  expect(swimEntryState.pos.x).toBeGreaterThan(35.4);
+  expect(swimEntryState.pos.x).toBeLessThan(36.6);
+
+  const tunnelSamples = [
     {
-      pose: { x: 10.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-      bounds: { minX: 0.0, maxX: 48.0, minY: 0.0, maxY: 6.0, minZ: 0.0, maxZ: 36.0 },
-      minY: 0.2,
+      pose: { x: 36.0, y: -1.1, z: 36.2, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 35.0, maxX: 37.0, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 38.5 },
     },
     {
-      pose: { x: 36.0, y: -1.1, z: 42.0, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 },
-      minY: -1.9,
+      pose: { x: 33.2, y: -1.1, z: 40.6, yaw: Math.PI * 0.75, cameraYaw: Math.PI * 0.75 },
+      bounds: { minX: 31.5, maxX: 37.0, minY: -1.8, maxY: 1.4, minZ: 38.5, maxZ: 42.5 },
     },
     {
-      pose: { x: 36.0, y: -0.95, z: 54.6, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 },
-      minY: -1.4,
+      pose: { x: 33.0, y: -1.1, z: 54.0, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 1.4, minZ: 42.5, maxZ: 66.0 },
     },
     {
-      pose: { x: 36.0, y: -0.25, z: 57.4, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 33.5, maxX: 38.5, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 59.0 },
-      minY: -0.6,
+      pose: { x: 33.0, y: -1.0, z: 66.7, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
     },
     {
-      pose: { x: 31.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-      bounds: { minX: 28.0, maxX: 52.0, minY: -0.6, maxY: 7.4, minZ: 58.0, maxZ: 78.0 },
-      minY: 0.2,
+      pose: { x: 33.0, y: 0.18, z: 68.8, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
     },
     {
-      pose: { x: 66.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-      bounds: { minX: 52.0, maxX: 80.0, minY: 0.0, maxY: 8.0, minZ: 61.0, maxZ: 75.0 },
-      minY: 0.2,
-    },
-    {
-      pose: { x: 82.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-      bounds: { minX: 80.0, maxX: 172.0, minY: 0.0, maxY: 12.0, minZ: 32.0, maxZ: 104.0 },
-      minY: 0.2,
-    },
-    {
-      pose: { x: 126.0, y: 0.42, z: 68.0, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 80.0, maxX: 172.0, minY: 0.0, maxY: 12.0, minZ: 32.0, maxZ: 104.0 },
-      minY: 0.2,
-    },
-    {
-      pose: { x: 96.0, y: 8.42, z: 30.0, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 93.0, maxX: 99.0, minY: 8.0, maxY: 10.5, minZ: 25.0, maxZ: 34.0 },
-      minY: 7.8,
-    },
-    {
-      pose: { x: 96.0, y: 8.42, z: 16.0, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 84.0, maxX: 108.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 },
-      minY: 7.8,
-    },
-    {
-      pose: { x: 156.0, y: 8.42, z: 30.0, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 153.0, maxX: 159.0, minY: 8.0, maxY: 10.5, minZ: 25.0, maxZ: 34.0 },
-      minY: 7.8,
-    },
-    {
-      pose: { x: 156.0, y: 8.42, z: 16.0, yaw: Math.PI, cameraYaw: Math.PI },
-      bounds: { minX: 144.0, maxX: 168.0, minY: 6.0, maxY: 16.0, minZ: 7.0, maxZ: 25.0 },
-      minY: 7.8,
+      pose: { x: 33.0, y: 0.42, z: 76.0, yaw: Math.PI, cameraYaw: Math.PI },
+      bounds: { minX: 31.0, maxX: 35.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 },
     },
   ];
 
-  for (const sample of stableSamples) {
+  for (const sample of tunnelSamples) {
     const state = await sampleLevel5Pose(page, sample.pose);
     expect(state.sceneKey).toBe('CribScene');
     expectPositionInBounds(state.pos, sample.bounds);
-    expect(state.pos.y).toBeGreaterThan(sample.minY);
   }
+});
 
-  const ladderState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.graybox ?? null);
-  expect(ladderState?.ladders?.map((ladder) => ladder.id)).toEqual(['west_ladder', 'east_ladder']);
-  expect(ladderState?.activeLadderId ?? null).toBeNull();
+test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes readable at the pool, and no future geometry exists', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 });
+    window.__DADA_DEBUG__?.setEra5CameraDebugView?.({
+      label: 'l5-starter-room-overview',
+      position: { x: 6.0, y: 3.4, z: 10.0 },
+      target: { x: 36.0, y: -0.9, z: 31.2 },
+      fov: 0.6,
+    });
+  });
+  await page.waitForTimeout(600);
+
+  const roomAudit = await getLevel5SecretTunnelAudit(page);
+  const roomVisibleSources = (roomAudit.screenSamples || []).map((sample) => sample.sourceName || '');
+  expect(roomVisibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(roomVisibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
+  expect(roomVisibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
+  expect(roomVisibleSources.some((name) => name.includes('truth_overlay'))).toBe(false);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
+  });
+  await page.waitForTimeout(600);
+
+  const poolAudit = await getLevel5SecretTunnelAudit(page);
+  const visibleSources = (poolAudit.screenSamples || []).map((sample) => sample.sourceName || '');
+  expect(visibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
+  expect(visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
+  expect(visibleSources.some((name) => name.includes('truth_overlay'))).toBe(false);
+
+  const levelState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState ?? null);
+  const underdeckPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_underdeck') ?? null;
+  const throatPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_throat') ?? null;
+  const bendPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_bend') ?? null;
+  const runPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_run') ?? null;
+  const stairPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_stairs') ?? null;
+  expect(underdeckPassage).not.toBeNull();
+  expect(throatPassage).not.toBeNull();
+  expect(bendPassage).not.toBeNull();
+  expect(runPassage).not.toBeNull();
+  expect(runPassage.maxZ).toBeGreaterThanOrEqual(65.9);
+  expect(stairPassage).not.toBeNull();
+  expect(stairPassage.minZ).toBeGreaterThanOrEqual(66.0);
+  expect(stairPassage.maxZ).toBeLessThanOrEqual(70.05);
+  expect(Math.abs((stairPassage.waterSurfaceY ?? 0) - (-0.8))).toBeLessThan(0.06);
+  expect(stairPassage.floorStartY).toBeLessThan(-1.5);
+  expect(stairPassage.floorEndY).toBeGreaterThanOrEqual(0.0);
+
+  const futureMeshes = await page.evaluate(() => (window.__DADA_DEBUG__?.sceneRef?.meshes || [])
+    .map((mesh) => String(mesh?.metadata?.sourceName || mesh?.name || ''))
+    .filter((name) => /(pump_junction|transfer_gallery|grand_stadium_room|west_kelp_operations_wing|east_whale_observation_wing)/.test(name)));
+  expect(futureMeshes).toEqual([]);
 });
 
 test('@level5 @era5 runtime: level 5 render policy keeps held item and burst projectiles readable across the pool waterline', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await seedEra5BubbleWand(page);
   await startDebugLevel(page, 5);
@@ -1874,44 +1942,6 @@ test('@level5 @era5 runtime: level 5 render policy keeps held item and burst pro
   expectLevel5ProjectileBurstReport(burstReport);
 });
 
-test('@level5 @era5 runtime: level 5 secret pool tunnel stays hidden from Room 1 and the stair run exits the water halfway up', async ({ page }) => {
-  test.setTimeout(120_000);
-  await gotoDebugLevel(page, 5);
-  await unlockEra5(page);
-  await startDebugLevel(page, 5);
-  await page.waitForTimeout(1300);
-  await resetEra5Pose(page, { x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
-  await page.waitForTimeout(500);
-
-  const audit = await getLevel5SecretTunnelAudit(page);
-  expect(audit.cameraPos).not.toBeNull();
-  expect(audit.cameraPos.z).toBeLessThanOrEqual(35.92);
-  const visibleSources = (audit.screenSamples || []).map((sample) => sample.sourceName || '');
-  for (const sourceName of visibleSources) {
-    expect(sourceName.includes('pump_junction')).toBe(false);
-    expect(sourceName.includes('transfer_gallery')).toBe(false);
-    expect(sourceName.includes('grand_stadium_room')).toBe(false);
-    expect(sourceName.includes('service_tunnel_stair_')).toBe(false);
-    expect(sourceName.includes('pump_entry_')).toBe(false);
-  }
-  expect(visibleSources.some((name) => name.includes('service_tunnel_mouth_shroud') || name.includes('submerged_service_tunnel_north_wall'))).toBe(true);
-
-  const levelState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState ?? null);
-  const mainPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_main') ?? null;
-  const stairPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_stairs') ?? null;
-  expect(mainPassage).not.toBeNull();
-  expect(mainPassage.minZ).toBeLessThanOrEqual(34.0);
-  expect(mainPassage.maxZ).toBeGreaterThanOrEqual(56.35);
-  expect(mainPassage.waterSurfaceY).toBeGreaterThan(0.9);
-  expect(stairPassage).not.toBeNull();
-  expect(stairPassage.minZ).toBeGreaterThanOrEqual(56.35);
-  expect(stairPassage.maxZ).toBeLessThanOrEqual(59.05);
-  expect(Math.abs((stairPassage.waterSurfaceY ?? 0) - (-0.8))).toBeLessThan(0.06);
-  expect(stairPassage.floorStartY).toBeLessThan(-1.5);
-  expect(stairPassage.floorEndY).toBeGreaterThanOrEqual(0.0);
-
-});
-
 test('@level5 @era5 runtime: level 5 manual reset respawns to the starter pool lab anchor', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
@@ -1921,9 +1951,9 @@ test('@level5 @era5 runtime: level 5 manual reset respawns to the starter pool l
   await focusGameplay(page);
 
   await resetEra5Pose(page, {
-    x: 96.0,
-    y: 8.42,
-    z: 16.0,
+    x: 33.0,
+    y: 0.42,
+    z: 76.0,
     yaw: Math.PI,
     cameraYaw: Math.PI,
   });

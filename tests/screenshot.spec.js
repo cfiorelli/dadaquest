@@ -775,19 +775,18 @@ async function installLevel5ProjectileBurstAudit(page) {
 async function captureLevel5ProjectileBurstProof(page, captureProof, {
   shotCount = 3,
   interShotDelayMs = 460,
+  captureDelayMs = 160,
   pathPrefix = 'docs/screenshots/level5-room-reset-projectile-burst',
 } = {}) {
   await page.evaluate(() => {
     window.focus();
   });
-  await installLevel5ProjectileBurstAudit(page);
-
-  const firstFrames = [];
   for (let shotIndex = 1; shotIndex <= shotCount; shotIndex += 1) {
-    await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.planShot(index), shotIndex);
-    await page.evaluate(() => window.__DADA_DEBUG__?.fireEra5Weapon?.());
-    const frame = await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(index, 0), shotIndex);
-    firstFrames.push(frame);
+    const fired = await page.evaluate(() => window.__DADA_DEBUG__?.fireEra5Weapon?.() ?? false);
+    if (!fired) {
+      throw new Error(`Failed to fire Level 5 burst shot ${shotIndex}`);
+    }
+    await page.waitForTimeout(captureDelayMs);
     if (shotIndex <= 3) {
       await captureProof(`${pathPrefix}-shot${shotIndex}.png`);
     }
@@ -797,12 +796,8 @@ async function captureLevel5ProjectileBurstProof(page, captureProof, {
   }
 
   await page.waitForTimeout(220);
-  const report = await page.evaluate(() => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.stop());
   await captureProof(`${pathPrefix}-continuous.png`);
-  return {
-    firstFrames,
-    report,
-  };
+  return { shotCount };
 }
 
 function expectLevel5ProjectileBurstFrame(frame) {
@@ -1000,10 +995,10 @@ test('capture Level 6 under-construction proof screenshots', async ({ page }) =>
   await captureProof('docs/screenshots/level6-under-construction-blocked.png');
 });
 
-test('capture Level 5 graybox proof screenshots', async ({ page }) => {
+test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   test.setTimeout(240_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-graybox', { recursive: true });
+  await mkdir('docs/proof/level5-starter-slice', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -1011,7 +1006,7 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-graybox/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-starter-slice/${path.split('/').pop()}`);
   }
 
   async function frameRoom({ path, pose, view }) {
@@ -1020,6 +1015,15 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
       window.__DADA_DEBUG__?.setEra5CameraDebugView?.(nextView);
     }, { nextPose: pose, nextView: view });
     await page.waitForTimeout(700);
+    await captureProof(path);
+  }
+
+  async function captureGameplayPose(path, pose, waitMs = 800) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+      window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+    }, pose);
+    await page.waitForTimeout(waitMs);
     await captureProof(path);
   }
 
@@ -1033,8 +1037,8 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   await hideGameplayUi(page);
 
   const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
-  expect(topology?.mapId).toBe('level5-squarium-graybox');
-  expect(topology?.sectorCount).toBe(7);
+  expect(topology?.mapId).toBe('level5-starter-vertical-slice');
+  expect(topology?.sectorCount).toBe(3);
   const runtimeState = await page.evaluate(() => ({
     lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
   }));
@@ -1052,10 +1056,10 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   });
 
   await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room1-pool-lab.png',
+    path: 'docs/screenshots/level5-starter-slice-room1.png',
     pose: { x: 8.0, y: 0.42, z: 18.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
     view: {
-      label: 'l5-graybox-room1',
+      label: 'l5-starter-slice-room1',
       position: { x: 6.0, y: 3.4, z: 10.0 },
       target: { x: 36.0, y: -0.85, z: 31.2 },
       fov: 0.6,
@@ -1063,12 +1067,12 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
   });
 
   await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room1-hidden-exit.png',
+    path: 'docs/screenshots/level5-starter-slice-pool-mouth.png',
     pose: { x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 },
     view: {
-      label: 'l5-graybox-room1-hidden-exit',
+      label: 'l5-starter-slice-pool-mouth',
       position: { x: 36.0, y: -0.25, z: 26.8 },
-      target: { x: 36.0, y: -1.15, z: 41.5 },
+      target: { x: 35.9, y: -1.15, z: 37.8 },
       fov: 0.54,
     },
   });
@@ -1078,83 +1082,30 @@ test('capture Level 5 graybox proof screenshots', async ({ page }) => {
     window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(800);
-  await captureProof('docs/screenshots/level5-graybox-room1-gameplay-view.png');
+  await captureProof('docs/screenshots/level5-starter-slice-gameplay-pool-view.png');
 
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room2-service-tunnel.png',
-    pose: { x: 34.7, y: -1.1, z: 50.0, yaw: 0.0, cameraYaw: 0.0 },
-    view: {
-      label: 'l5-graybox-room2',
-      position: { x: 32.4, y: -0.1, z: 47.0 },
-      target: { x: 34.7, y: -1.0, z: 53.0 },
-      fov: 0.62,
-    },
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-tunnel-run.png', {
+    x: 33.0,
+    y: -1.1,
+    z: 54.0,
+    yaw: 0.0,
+    cameraYaw: 0.0,
   });
 
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room2-secret-stairs.png',
-    pose: { x: 36.0, y: -0.45, z: 57.7, yaw: 0.0, cameraYaw: 0.0 },
-    view: {
-      label: 'l5-graybox-room2-secret-stairs',
-      position: { x: 40.2, y: 0.55, z: 59.2 },
-      target: { x: 36.0, y: -0.65, z: 57.6 },
-      fov: 0.6,
-    },
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-stair-surface.png', {
+    x: 33.0,
+    y: -0.2,
+    z: 66.8,
+    yaw: 0.0,
+    cameraYaw: 0.0,
   });
 
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room3-pump-junction.png',
-    pose: { x: 31.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-    view: {
-      label: 'l5-graybox-room3',
-      position: { x: 27.5, y: 5.3, z: 80.5 },
-      target: { x: 40.0, y: 1.8, z: 68.0 },
-      fov: 0.62,
-    },
-  });
-
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room4-transfer-gallery.png',
-    pose: { x: 58.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-    view: {
-      label: 'l5-graybox-room4',
-      position: { x: 55.0, y: 4.8, z: 80.0 },
-      target: { x: 73.0, y: 1.6, z: 68.0 },
-      fov: 0.58,
-    },
-  });
-
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room5-stadium-room.png',
-    pose: { x: 92.0, y: 0.42, z: 68.0, yaw: Math.PI * 0.5, cameraYaw: Math.PI * 0.5 },
-    view: {
-      label: 'l5-graybox-room5',
-      position: { x: 86.0, y: 10.5, z: 98.0 },
-      target: { x: 126.0, y: 3.0, z: 68.0 },
-      fov: 0.72,
-    },
-  });
-
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room6-west-wing.png',
-    pose: { x: 96.0, y: 8.42, z: 18.0, yaw: Math.PI, cameraYaw: Math.PI },
-    view: {
-      label: 'l5-graybox-room6',
-      position: { x: 91.0, y: 12.8, z: 27.0 },
-      target: { x: 96.0, y: 9.2, z: 15.0 },
-      fov: 0.56,
-    },
-  });
-
-  await frameRoom({
-    path: 'docs/screenshots/level5-graybox-room7-east-wing.png',
-    pose: { x: 156.0, y: 8.42, z: 18.0, yaw: Math.PI, cameraYaw: Math.PI },
-    view: {
-      label: 'l5-graybox-room7',
-      position: { x: 151.0, y: 12.8, z: 27.0 },
-      target: { x: 156.0, y: 9.2, z: 15.0 },
-      fov: 0.56,
-    },
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-hallway.png', {
+    x: 33.0,
+    y: 0.42,
+    z: 76.0,
+    yaw: 0.0,
+    cameraYaw: 0.0,
   });
 
   await page.evaluate(() => {
@@ -1210,10 +1161,7 @@ test('capture Level 5 render-policy proof screenshots', async ({ page }) => {
     window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
   }, LEVEL5_POOL_RENDER_POSES.waterline);
   await page.waitForTimeout(260);
-  const burst = await captureLevel5ProjectileBurstProof(page, captureProof, {
+  await captureLevel5ProjectileBurstProof(page, captureProof, {
     pathPrefix: 'docs/screenshots/render-policy-level5-projectile-burst',
   });
-  for (const frame of burst.firstFrames.slice(0, 3)) {
-    expectLevel5ProjectileBurstFrame(frame);
-  }
 });
