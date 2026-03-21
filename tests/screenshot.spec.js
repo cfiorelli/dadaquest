@@ -49,7 +49,6 @@ const LEVEL5_POOL_RENDER_POSES = {
     cameraYaw: 0.0,
   },
 };
-
 async function gotoDebugLevel(page, levelId) {
   await page.goto(`http://127.0.0.1:4173/?level=${levelId}&debug=1`);
   await page.waitForFunction(() => typeof window.__DADA_DEBUG__?.startLevel === 'function', { timeout: 20_000 });
@@ -941,6 +940,8 @@ async function getLevel5RenderPolicyAudit(page) {
 
 async function getLevel5PoolMouthCollisionAudit(page) {
   return page.evaluate(() => {
+    const mouthMinX = 34.4;
+    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -956,8 +957,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
       };
     };
     const opening = {
-      minX: 34.9,
-      maxX: 37.1,
+      minX: mouthMinX,
+      maxX: mouthMaxX,
       minY: -2.0,
       maxY: -0.31,
       minZ: 33.75,
@@ -981,6 +982,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
 
 async function getLevel5PoolWallPatchAudit(page) {
   return page.evaluate(() => {
+    const mouthMinX = 34.4;
+    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -996,8 +999,8 @@ async function getLevel5PoolWallPatchAudit(page) {
       };
     };
     const region = {
-      minX: 34.9,
-      maxX: 37.1,
+      minX: mouthMinX,
+      maxX: mouthMaxX,
       minY: -0.3,
       maxY: 1.5,
       minZ: 36.0,

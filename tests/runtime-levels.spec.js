@@ -1675,6 +1675,8 @@ async function sampleLevel5Pose(page, pose, waitMs = 220) {
 
 async function getLevel5SecretTunnelAudit(page) {
   return page.evaluate(() => {
+    const mouthMinX = 34.4;
+    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const sourceNameFor = (mesh) => String(mesh?.metadata?.sourceName || mesh?.name || '');
     const camera = scene?.activeCamera ?? null;
@@ -1721,6 +1723,8 @@ async function getLevel5SecretTunnelAudit(page) {
 
 async function getLevel5PoolMouthCollisionAudit(page) {
   return page.evaluate(() => {
+    const mouthMinX = 34.4;
+    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -1743,8 +1747,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
       }))
       .filter((entry) => entry.bounds && entry.name.startsWith('starter_pool_'));
     const opening = {
-      minX: 34.9,
-      maxX: 37.1,
+      minX: mouthMinX,
+      maxX: mouthMaxX,
       minY: -2.0,
       maxY: -0.31,
       minZ: 33.75,
@@ -1764,6 +1768,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
 
 async function getLevel5PoolWallPatchAudit(page) {
   return page.evaluate(() => {
+    const mouthMinX = 34.4;
+    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -1779,8 +1785,8 @@ async function getLevel5PoolWallPatchAudit(page) {
       };
     };
     const region = {
-      minX: 34.9,
-      maxX: 37.1,
+      minX: mouthMinX,
+      maxX: mouthMaxX,
       minY: -0.3,
       maxY: 1.5,
       minZ: 36.0,
@@ -1888,7 +1894,7 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 36.0,
+    x: 35.65,
     y: -1.05,
     z: 31.4,
     yaw: 0.0,
@@ -1900,8 +1906,8 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
   expect(mouthThresholdState.pos.z).toBeGreaterThan(33.95);
-  expect(mouthThresholdState.pos.x).toBeGreaterThan(35.4);
-  expect(mouthThresholdState.pos.x).toBeLessThan(36.6);
+  expect(mouthThresholdState.pos.x).toBeGreaterThan(35.0);
+  expect(mouthThresholdState.pos.x).toBeLessThan(36.9);
   await page.waitForTimeout(4500);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   await page.waitForTimeout(250);
@@ -1909,8 +1915,8 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
   expect(swimEntryState.pos.z).toBeGreaterThan(36.4);
-  expect(swimEntryState.pos.x).toBeGreaterThan(35.4);
-  expect(swimEntryState.pos.x).toBeLessThan(36.6);
+  expect(swimEntryState.pos.x).toBeGreaterThan(35.0);
+  expect(swimEntryState.pos.x).toBeLessThan(36.9);
 
   const tunnelSamples = [
     {

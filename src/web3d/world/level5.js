@@ -222,8 +222,29 @@ const LEVEL5_CAMERA_PRESETS = {
 const PLAYER_SPAWN_Y = 0.42;
 const ROOM1 = { minX: 0.0, maxX: 48.0, minY: 0.0, maxY: 6.0, minZ: 0.0, maxZ: 36.0 };
 
-const TUNNEL_UNDERDECK = { minX: 34.9, maxX: 37.1, minY: -1.8, maxY: -0.15, minZ: 34.0, maxZ: 36.5 };
-const TUNNEL_THROAT = { minX: 34.9, maxX: 37.1, minY: -1.8, maxY: 1.4, minZ: 36.5, maxZ: 40.5 };
+const TUNNEL_MOUTH_CENTER_X = 36.0;
+const TUNNEL_MOUTH_CENTER_Y = -1.25;
+const TUNNEL_MOUTH_WIDTH = 3.2;
+const TUNNEL_MOUTH_HEIGHT = 1.9;
+const TUNNEL_MOUTH_CENTER_Z = 33.95;
+const TUNNEL_MOUTH_HALF_WIDTH = TUNNEL_MOUTH_WIDTH * 0.5;
+
+const TUNNEL_UNDERDECK = {
+  minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
+  maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
+  minY: -1.8,
+  maxY: -0.15,
+  minZ: 34.0,
+  maxZ: 36.5,
+};
+const TUNNEL_THROAT = {
+  minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
+  maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
+  minY: -1.8,
+  maxY: 1.4,
+  minZ: 36.5,
+  maxZ: 40.5,
+};
 const TUNNEL_BEND = { minX: 31.5, maxX: 34.9, minY: -1.8, maxY: 1.4, minZ: 38.8, maxZ: 43.5 };
 const TUNNEL_RUN = { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 1.4, minZ: 43.5, maxZ: 66.0 };
 const STAIR_SHAFT = { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 };
@@ -232,12 +253,6 @@ const HALLWAY = { minX: 31.0, maxX: 35.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ
 const LAB_RGB = [138, 138, 138];
 const TUNNEL_RGB = [46, 46, 46];
 const HALL_RGB = [104, 104, 104];
-
-const TUNNEL_MOUTH_CENTER_X = 36.0;
-const TUNNEL_MOUTH_CENTER_Y = -1.25;
-const TUNNEL_MOUTH_WIDTH = 2.2;
-const TUNNEL_MOUTH_HEIGHT = 1.9;
-const TUNNEL_MOUTH_CENTER_Z = 33.95;
 
 const TUNNEL_WATER_SURFACE_Y = 1.0;
 const TUNNEL_STAIR_WATER_SURFACE_Y = -0.8;
@@ -499,7 +514,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
         destinationSector: 'submerged_swim_tunnel',
         x: 36.0,
         z: 34.15,
-        w: 2.8,
+        w: TUNNEL_MOUTH_WIDTH,
         d: 0.4,
         floorY: -1.6,
         ceilingY: -0.3,
