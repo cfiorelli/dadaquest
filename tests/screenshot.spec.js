@@ -1152,6 +1152,14 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     },
   });
 
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-gameplay-room-view.png', {
+    x: 10.0,
+    y: 0.42,
+    z: 18.0,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+
   await frameRoom({
     path: 'docs/screenshots/level5-starter-slice-pool-mouth.png',
     pose: { x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 },
@@ -1171,7 +1179,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   await captureProof('docs/screenshots/level5-starter-slice-gameplay-pool-view.png');
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-tunnel-run.png', {
-    x: 33.0,
+    x: 36.0,
     y: -1.1,
     z: 54.0,
     yaw: 0.0,
@@ -1179,7 +1187,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-stair-surface.png', {
-    x: 33.0,
+    x: 36.0,
     y: -0.2,
     z: 66.8,
     yaw: 0.0,
@@ -1187,11 +1195,11 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-hallway.png', {
-    x: 33.0,
+    x: 36.0,
     y: 0.42,
-    z: 76.0,
-    yaw: 0.0,
-    cameraYaw: 0.0,
+    z: 78.0,
+    yaw: Math.PI,
+    cameraYaw: Math.PI,
   });
 
   await page.evaluate(() => {

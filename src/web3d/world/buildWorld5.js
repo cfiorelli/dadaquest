@@ -713,6 +713,17 @@ function createSubmergedPassage(def) {
   };
 }
 
+function containsBounds(bounds, pos) {
+  return !!bounds
+    && !!pos
+    && pos.x >= bounds.minX
+    && pos.x <= bounds.maxX
+    && pos.y >= bounds.minY
+    && pos.y <= bounds.maxY
+    && pos.z >= bounds.minZ
+    && pos.z <= bounds.maxZ;
+}
+
 function createGrayboxLadder(scene, def) {
   const root = new BABYLON.TransformNode(def.id, scene);
   root.position.set(def.centerX, (def.bottomY + def.topY) * 0.5, def.centerZ);
@@ -1190,6 +1201,11 @@ export function buildWorld5(scene, options = {}) {
   const jellyfish = (LEVEL5.jellyfish || []).map((def) => createJellyfish(scene, def, shadowGen));
   const sharkSweep = LEVEL5.sharkSweep ? createSharkSweep(scene, LEVEL5.sharkSweep) : null;
   const ladders = (LEVEL5.ladders || []).map((def) => createGrayboxLadder(scene, def));
+  const localCameraZones = (LEVEL5.localCameraZones || []).map((zone) => ({
+    ...zone,
+    preset: zone?.preset ? { ...zone.preset } : null,
+    cameraClampBounds: zone?.cameraClampBounds ? { ...zone.cameraClampBounds } : null,
+  }));
 
   // ── Spawn area decorations ─────────────────────────────────────────────────
   // Colorful curtains along the west wall near spawn (x=4, z=18).
@@ -2110,6 +2126,18 @@ export function buildWorld5(scene, options = {}) {
         waterSurfaceY: null,
         depthAtZ: null,
       };
+    },
+    getLocalCameraSettings(pos) {
+      for (const zone of localCameraZones) {
+        if (!containsBounds(zone, pos)) continue;
+        return {
+          id: zone.id || 'local_camera_zone',
+          preset: zone.preset ? { ...zone.preset } : null,
+          allowUnderwaterOcclusion: zone.allowUnderwaterOcclusion === true,
+          cameraClampBounds: zone.cameraClampBounds ? { ...zone.cameraClampBounds } : null,
+        };
+      }
+      return null;
     },
     tryHitByWeapon(attack = {}) {
       const hitResult = hitJellyfish(attack);

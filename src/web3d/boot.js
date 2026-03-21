@@ -2536,6 +2536,7 @@ export async function boot(options = {}) {
   let level2LoggedOccluderId = null;
   let era5CurrentOccluderName = null;
   let era5CurrentOcclusionInfo = null;
+  let era5CurrentLocalCameraZone = null;
   const era5DevOverlay = debugMode && isEra5Level ? createEra5DevOverlay() : null;
   const era5VisionQuery = debugMode && isEra5Level ? readEra5VisionQuery() : { enabled: false };
   const era5VisionState = {
@@ -3619,6 +3620,35 @@ export async function boot(options = {}) {
       clamp(position.y, bounds.minY ?? -Infinity, bounds.maxY ?? Infinity),
       clamp(position.z, bounds.minZ, bounds.maxZ),
     );
+  }
+
+  function constrainEra5CameraToBounds(position, bounds) {
+    if (!bounds || !(position instanceof BABYLON.Vector3)) return position;
+    return new BABYLON.Vector3(
+      clamp(position.x, bounds.minX ?? -Infinity, bounds.maxX ?? Infinity),
+      clamp(position.y, bounds.minY ?? -Infinity, bounds.maxY ?? Infinity),
+      clamp(position.z, bounds.minZ ?? -Infinity, bounds.maxZ ?? Infinity),
+    );
+  }
+
+  function getEra5LocalCameraSettings(pos = player.mesh.position) {
+    if (!isEra5Level || !pos) return null;
+    const level5Settings = typeof world.level5?.getLocalCameraSettings === 'function'
+      ? world.level5.getLocalCameraSettings(pos)
+      : null;
+    if (level5Settings) return level5Settings;
+    if (world.era5Level && world.era5Level !== world.level5 && typeof world.era5Level.getLocalCameraSettings === 'function') {
+      return world.era5Level.getLocalCameraSettings(pos);
+    }
+    return null;
+  }
+
+  function constrainEra5CameraPosition(position, localSettings = null) {
+    const localBounds = localSettings?.cameraClampBounds ?? null;
+    const localClamped = localBounds
+      ? constrainEra5CameraToBounds(position, localBounds)
+      : position;
+    return constrainEra5CameraToStarterRoom(localClamped);
   }
 
   function applyEra5FacingState() {
@@ -6189,7 +6219,19 @@ export async function boot(options = {}) {
       const px = player.mesh.position.x;
       const py = player.mesh.position.y;
       if (isEra5Level) {
-        const preset = getEra5CameraPreset();
+        const basePreset = getEra5CameraPreset();
+        const localCameraSettings = getEra5LocalCameraSettings(player.mesh.position);
+        const preset = localCameraSettings?.preset
+          ? { ...basePreset, ...localCameraSettings.preset }
+          : basePreset;
+        era5CurrentLocalCameraZone = localCameraSettings
+          ? {
+            id: localCameraSettings.id || 'local_camera_zone',
+            preset: localCameraSettings.preset ? { ...localCameraSettings.preset } : null,
+            allowUnderwaterOcclusion: localCameraSettings.allowUnderwaterOcclusion === true,
+            cameraClampBounds: localCameraSettings.cameraClampBounds ? { ...localCameraSettings.cameraClampBounds } : null,
+          }
+          : null;
         if (era5CameraDebugOverride) {
           const debugTarget = new BABYLON.Vector3(
             era5CameraDebugOverride.target.x,
@@ -6246,15 +6288,16 @@ export async function boot(options = {}) {
             effectiveCameraY,
             player.mesh.position.z - (cameraForward.z * preset.distance),
           );
-          // Skip occlusion when player is underwater: room walls would push camera to near-1st-person.
-          // constrainEra5CameraToStarterRoom still clamps camera inside room bounds.
+          // Global underwater skips stay in place, but local tight-space camera zones
+          // can opt back into occlusion so narrow tunnels remain readable.
           const isPlayerUnderwater = py < -0.1;
-          const occlusion = isPlayerUnderwater
+          const skipUnderwaterOcclusion = isPlayerUnderwater && localCameraSettings?.allowUnderwaterOcclusion !== true;
+          const occlusion = skipUnderwaterOcclusion
             ? { correctedPos: desiredCameraPos, hit: null, info: null }
             : resolveCameraOcclusion(scene, focusPos, desiredCameraPos, cameraIgnoredMeshes);
           era5CurrentOccluderName = occlusion.hit?.pickedMesh?.name || occlusion.hit?.mesh?.name || null;
           era5CurrentOcclusionInfo = occlusion.info || null;
-          camera.position.copyFrom(constrainEra5CameraToStarterRoom(occlusion.correctedPos));
+          camera.position.copyFrom(constrainEra5CameraPosition(occlusion.correctedPos, localCameraSettings));
           camera.setTarget(desiredTarget);
           camera.fov = preset.fov;
           updateEra5DecorOcclusion(dt, focusPos, camera.position);
@@ -6389,6 +6432,14 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.cameraDesiredYaw = Number(era5CameraDesiredYaw.toFixed(4));
     window.__DADA_DEBUG__.cameraYawVel = Number(era5CameraYawVel.toFixed(4));
     window.__DADA_DEBUG__.cameraPreset = isEra5Level ? getEra5CameraPreset() : null;
+    window.__DADA_DEBUG__.cameraLocalZone = era5CurrentLocalCameraZone
+      ? {
+        id: era5CurrentLocalCameraZone.id,
+        preset: era5CurrentLocalCameraZone.preset ? { ...era5CurrentLocalCameraZone.preset } : null,
+        allowUnderwaterOcclusion: era5CurrentLocalCameraZone.allowUnderwaterOcclusion,
+        cameraClampBounds: era5CurrentLocalCameraZone.cameraClampBounds ? { ...era5CurrentLocalCameraZone.cameraClampBounds } : null,
+      }
+      : null;
     window.__DADA_DEBUG__.cameraDebugOverride = isEra5Level && era5CameraDebugOverride
       ? {
         label: era5CameraDebugOverride.label,

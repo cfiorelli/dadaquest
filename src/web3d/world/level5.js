@@ -245,16 +245,54 @@ const TUNNEL_THROAT = {
   minZ: 36.5,
   maxZ: 40.5,
 };
-const TUNNEL_BEND = { minX: 31.5, maxX: 34.9, minY: -1.8, maxY: 1.4, minZ: 38.8, maxZ: 43.5 };
-const TUNNEL_RUN = { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 1.4, minZ: 43.5, maxZ: 66.0 };
-const STAIR_SHAFT = { minX: 31.5, maxX: 34.5, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 };
-const HALLWAY = { minX: 31.0, maxX: 35.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const TUNNEL_RUN = {
+  minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
+  maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
+  minY: -1.8,
+  maxY: 1.4,
+  minZ: 40.5,
+  maxZ: 66.0,
+};
+const STAIR_SHAFT = {
+  minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
+  maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
+  minY: -1.8,
+  maxY: 4.5,
+  minZ: 66.0,
+  maxZ: 70.0,
+};
+const HALLWAY = { minX: 34.0, maxX: 38.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const TUNNEL_CAMERA_ZONE = {
+  id: 'starter_slice_tunnel',
+  minX: HALLWAY.minX,
+  maxX: HALLWAY.maxX,
+  minY: -1.8,
+  maxY: 4.5,
+  minZ: TUNNEL_UNDERDECK.minZ,
+  maxZ: HALLWAY.maxZ,
+  preset: {
+    distance: 2.2,
+    height: 1.55,
+    focusHeight: 0.82,
+    lookAhead: 1.35,
+    fov: 1.08,
+  },
+  allowUnderwaterOcclusion: true,
+  cameraClampBounds: {
+    minX: TUNNEL_MOUTH_CENTER_X - 1.35,
+    maxX: TUNNEL_MOUTH_CENTER_X + 1.35,
+    minY: -0.4,
+    maxY: 3.75,
+    minZ: TUNNEL_UNDERDECK.minZ + 0.15,
+    maxZ: HALLWAY.maxZ - 0.2,
+  },
+};
 
 const LAB_RGB = [138, 138, 138];
 const TUNNEL_RGB = [46, 46, 46];
 const HALL_RGB = [104, 104, 104];
 
-const TUNNEL_WATER_SURFACE_Y = 1.0;
+const TUNNEL_WATER_SURFACE_Y = 1.38;
 const TUNNEL_STAIR_WATER_SURFACE_Y = -0.8;
 
 const room1Blocks = makeShell('starter_pool_lab', ROOM1, {
@@ -284,25 +322,16 @@ const tunnelBlocks = [
   }),
   ...makeShell('swim_tunnel_throat', TUNNEL_THROAT, {
     north: openingAlongX(TUNNEL_MOUTH_CENTER_X, TUNNEL_MOUTH_CENTER_Y, TUNNEL_MOUTH_WIDTH, TUNNEL_MOUTH_HEIGHT),
-    west: openingAlongZ(39.4, -1.25, 1.8, 2.2),
+    south: openingAlongX(TUNNEL_MOUTH_CENTER_X, -1.25, TUNNEL_MOUTH_WIDTH, 2.2),
   }, {
     rgb: TUNNEL_RGB,
     wallBottomY: -1.8,
     wallTopY: 1.4,
     ceilingY: 1.4,
   }).filter((block) => block.name !== 'swim_tunnel_throat_north_wall_header'),
-  ...makeShell('swim_tunnel_bend', TUNNEL_BEND, {
-    east: openingAlongZ(39.4, -1.25, 1.8, 2.2),
-    south: openingAlongX(33.0, -1.25, 3.0, 2.2),
-  }, {
-    rgb: TUNNEL_RGB,
-    wallBottomY: -1.8,
-    wallTopY: 1.4,
-    ceilingY: 1.4,
-  }),
   ...makeShell('swim_tunnel_run', TUNNEL_RUN, {
-    north: openingAlongX(33.0, -1.25, 3.0, 2.2),
-    south: openingAlongX(33.0, -0.3, 3.0, 2.8),
+    north: openingAlongX(TUNNEL_MOUTH_CENTER_X, -1.25, TUNNEL_MOUTH_WIDTH, 2.2),
+    south: openingAlongX(TUNNEL_MOUTH_CENTER_X, -0.3, TUNNEL_MOUTH_WIDTH, 2.8),
   }, {
     rgb: TUNNEL_RGB,
     wallBottomY: -1.8,
@@ -310,8 +339,8 @@ const tunnelBlocks = [
     ceilingY: 1.4,
   }),
   ...makeShell('swim_tunnel_stair_shaft', STAIR_SHAFT, {
-    north: openingAlongX(33.0, -0.3, 3.0, 2.8),
-    south: openingAlongX(33.0, 1.6, 3.0, 3.2),
+    north: openingAlongX(TUNNEL_MOUTH_CENTER_X, -0.3, TUNNEL_MOUTH_WIDTH, 2.8),
+    south: openingAlongX(TUNNEL_MOUTH_CENTER_X, 1.6, TUNNEL_MOUTH_WIDTH, 3.2),
   }, {
     rgb: TUNNEL_RGB,
     wallBottomY: -1.8,
@@ -338,13 +367,6 @@ const tunnelSurfaces = [
     rgb: [56, 56, 56],
     visible: false,
   }),
-  surfaceRect('swim_tunnel_bend_floor', TUNNEL_BEND.minX, TUNNEL_BEND.maxX, -1.6, TUNNEL_BEND.minZ, TUNNEL_BEND.maxZ, 'service_tunnel_floor', {
-    h: 0.24,
-    minThickness: 0.24,
-    walkableClassification: 'service-tunnel-floor',
-    rgb: [56, 56, 56],
-    visible: false,
-  }),
   surfaceRect('swim_tunnel_run_floor', TUNNEL_RUN.minX, TUNNEL_RUN.maxX, -1.6, TUNNEL_RUN.minZ, TUNNEL_RUN.maxZ, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
@@ -354,21 +376,29 @@ const tunnelSurfaces = [
   }),
 ];
 
-const TUNNEL_STAIR_STEP_COUNT = 8;
-const TUNNEL_STAIR_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_STEP_COUNT;
-const TUNNEL_STAIR_STEP_RISE = 1.6 / TUNNEL_STAIR_STEP_COUNT;
+const TUNNEL_STAIR_VISUAL_STEP_COUNT = 8;
+const TUNNEL_STAIR_VISUAL_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_VISUAL_STEP_COUNT;
+const TUNNEL_STAIR_VISUAL_STEP_RISE = 1.6 / TUNNEL_STAIR_VISUAL_STEP_COUNT;
+const TUNNEL_STAIR_COLLIDER_STEP_COUNT = 20;
+const TUNNEL_STAIR_COLLIDER_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
+const TUNNEL_STAIR_COLLIDER_STEP_RISE = 1.6 / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
 
-for (let index = 0; index < TUNNEL_STAIR_STEP_COUNT; index += 1) {
-  const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_STEP_DEPTH);
-  const maxZ = STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_STEP_DEPTH);
-  tunnelSurfaces.push(surfaceRect(`swim_tunnel_stair_${index + 1}`, 31.6, 34.4, -1.6 + ((index + 1) * TUNNEL_STAIR_STEP_RISE), minZ, maxZ, 'service_tunnel_floor', {
-    h: 0.28,
-    minThickness: 0.28,
+for (let index = 0; index < TUNNEL_STAIR_COLLIDER_STEP_COUNT; index += 1) {
+  const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_COLLIDER_STEP_DEPTH);
+  const maxZ = STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_COLLIDER_STEP_DEPTH);
+  tunnelSurfaces.push(surfaceRect(`swim_tunnel_stair_collider_${index + 1}`, STAIR_SHAFT.minX + 0.08, STAIR_SHAFT.maxX - 0.08, -1.6 + ((index + 1) * TUNNEL_STAIR_COLLIDER_STEP_RISE), minZ, maxZ, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
     walkableClassification: 'service-tunnel-stair',
     rgb: [62, 62, 62],
     visible: false,
   }));
-  tunnelBlocks.push(floorCover(`swim_tunnel_stair_cover_${index + 1}`, 31.6, 34.4, -1.52 + ((index + 1) * TUNNEL_STAIR_STEP_RISE), minZ, maxZ, {
+}
+
+for (let index = 0; index < TUNNEL_STAIR_VISUAL_STEP_COUNT; index += 1) {
+  const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_VISUAL_STEP_DEPTH);
+  const maxZ = STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_VISUAL_STEP_DEPTH);
+  tunnelBlocks.push(floorCover(`swim_tunnel_stair_cover_${index + 1}`, STAIR_SHAFT.minX + 0.1, STAIR_SHAFT.maxX - 0.1, -1.52 + ((index + 1) * TUNNEL_STAIR_VISUAL_STEP_RISE), minZ, maxZ, {
     rgb: [54, 54, 54],
     thickness: 0.14,
   }));
@@ -376,7 +406,7 @@ for (let index = 0; index < TUNNEL_STAIR_STEP_COUNT; index += 1) {
 
 const hallwayBlocks = [
   ...makeShell('surfacing_hallway', HALLWAY, {
-    north: openingAlongX(33.0, 1.6, 3.0, 3.2),
+    north: openingAlongX(TUNNEL_MOUTH_CENTER_X, 1.6, TUNNEL_MOUTH_WIDTH, 3.2),
   }, {
     rgb: HALL_RGB,
     wallBottomY: 0.0,
@@ -401,8 +431,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
   spawnYaw: Math.PI * 0.5,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
+  localCameraZones: [TUNNEL_CAMERA_ZONE],
   spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
-  goal: { x: 33.0, y: PLAYER_SPAWN_Y, z: 80.0 },
+  goal: { x: 36.0, y: PLAYER_SPAWN_Y, z: 80.0 },
   goalPresentation: 'trigger-only',
   theme: 'neutral',
   showGroundVisual: false,
@@ -467,9 +498,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
       {
         id: 'submerged_swim_tunnel',
         label: 'Hidden Swim Tunnel',
-        x: 34.25,
+        x: 36.0,
         z: 52.0,
-        w: 5.5,
+        w: 4.2,
         d: 36.0,
         floorY: -1.6,
         ceilingY: 4.5,
@@ -483,7 +514,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
       {
         id: 'surfacing_hallway',
         label: 'Surfacing Hallway',
-        x: 33.0,
+        x: 36.0,
         z: 77.0,
         w: 4.0,
         d: 14.0,
@@ -527,9 +558,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
         label: 'Tunnel To Hallway',
         sourceSector: 'submerged_swim_tunnel',
         destinationSector: 'surfacing_hallway',
-        x: 33.0,
+        x: 36.0,
         z: 69.8,
-        w: 3.0,
+        w: TUNNEL_MOUTH_WIDTH,
         d: 0.8,
         floorY: 0.0,
         ceilingY: 2.2,
@@ -581,18 +612,6 @@ export const LEVEL5 = compileAuthoredEraLayout({
       maxY: TUNNEL_THROAT.maxY,
       minZ: TUNNEL_THROAT.minZ,
       maxZ: TUNNEL_THROAT.maxZ,
-      waterSurfaceY: TUNNEL_WATER_SURFACE_Y,
-      floorStartY: -1.6,
-      floorEndY: -1.6,
-    },
-    {
-      name: 'service_tunnel_water_bend',
-      minX: TUNNEL_BEND.minX,
-      maxX: TUNNEL_BEND.maxX,
-      minY: TUNNEL_BEND.minY,
-      maxY: TUNNEL_BEND.maxY,
-      minZ: TUNNEL_BEND.minZ,
-      maxZ: TUNNEL_BEND.maxZ,
       waterSurfaceY: TUNNEL_WATER_SURFACE_Y,
       floorStartY: -1.6,
       floorEndY: -1.6,
