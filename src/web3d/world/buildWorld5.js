@@ -1417,6 +1417,536 @@ export function buildWorld5(scene, options = {}) {
     sourceVisuals.get(sourceName).push(mesh);
   }
 
+  function getSourceMeshes(sourceName) {
+    return sourceVisuals.get(sourceName) || [];
+  }
+
+  function getPrimarySourceMesh(sourceName) {
+    return getSourceMeshes(sourceName)[0] || null;
+  }
+
+  function setMeshTone(mesh, rgb, emissiveScale = 0.04) {
+    if (!(mesh?.material instanceof BABYLON.StandardMaterial)) return;
+    mesh.material.diffuseColor = new BABYLON.Color3(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255);
+    mesh.material.emissiveColor = new BABYLON.Color3(
+      (rgb[0] / 255) * emissiveScale,
+      (rgb[1] / 255) * emissiveScale,
+      (rgb[2] / 255) * emissiveScale,
+    );
+  }
+
+  function setSourceTone(sourceName, rgb, emissiveScale = 0.04) {
+    for (const mesh of getSourceMeshes(sourceName)) {
+      setMeshTone(mesh, rgb, emissiveScale);
+    }
+  }
+
+  function setNodeVisible(node, visible) {
+    if (!node) return;
+    node.setEnabled(visible);
+    const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
+    for (const mesh of meshes) {
+      mesh.isVisible = visible;
+      mesh.visibility = visible ? 1 : 0;
+    }
+  }
+
+  function createOpaqueHelperBox(name, {
+    width,
+    height,
+    depth,
+    x,
+    y,
+    z,
+    rgb = [114, 114, 114],
+    roughness = 0.92,
+    emissiveScale = 0.02,
+  }) {
+    const mesh = BABYLON.MeshBuilder.CreateBox(name, { width, height, depth }, scene);
+    mesh.position.set(x, y, z);
+    mesh.material = makePlastic(scene, `${name}_mat`, rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, { roughness });
+    mesh.material.emissiveColor = new BABYLON.Color3(
+      (rgb[0] / 255) * emissiveScale,
+      (rgb[1] / 255) * emissiveScale,
+      (rgb[2] / 255) * emissiveScale,
+    );
+    mesh.isPickable = false;
+    mesh.checkCollisions = false;
+    applyWorldOpaqueRenderPolicy(mesh);
+    markDecor(mesh);
+    return mesh;
+  }
+
+  function registerDynamicCollider(mesh) {
+    if (!Array.isArray(world.platforms)) return null;
+    const platformIndex = world.platforms.push(mesh) - 1;
+    return { mesh, platformIndex };
+  }
+
+  function syncDynamicCollider(entry, player) {
+    if (!entry || !player || !Array.isArray(player.colliders) || entry.platformIndex >= player.colliders.length) return;
+    entry.mesh?.computeWorldMatrix?.(true);
+    const bounds = entry.mesh?.getBoundingInfo?.()?.boundingBox;
+    if (!bounds) return;
+    player.colliders[entry.platformIndex] = {
+      minX: bounds.minimumWorld.x,
+      maxX: bounds.maximumWorld.x,
+      minY: bounds.minimumWorld.y,
+      maxY: bounds.maximumWorld.y,
+      minZ: bounds.minimumWorld.z,
+      maxZ: bounds.maximumWorld.z,
+    };
+  }
+
+  function syncDynamicColliders(entries, player) {
+    for (const entry of entries) syncDynamicCollider(entry, player);
+  }
+
+  function createRoomStateController(initialState = 'idle') {
+    let currentState = initialState;
+    return {
+      get state() {
+        return currentState;
+      },
+      setState(nextState) {
+        currentState = nextState;
+        return currentState;
+      },
+      is(state) {
+        return currentState === state;
+      },
+    };
+  }
+
+  function createRisingPlatformSystem({
+    mesh,
+    hiddenY,
+    raisedY,
+    durationSec = 1.2,
+  }) {
+    let progress = 0;
+    let target = 0;
+    mesh.position.y = hiddenY;
+    return {
+      mesh,
+      get progress() {
+        return progress;
+      },
+      get state() {
+        if (progress <= 0.001 && target <= 0) return 'hidden';
+        if (progress >= 0.999 && target >= 1) return 'raised';
+        return target > progress ? 'rising' : 'lowering';
+      },
+      raise() {
+        target = 1;
+      },
+      lower() {
+        target = 0;
+      },
+      lockRaised() {
+        progress = 1;
+        target = 1;
+        mesh.position.y = raisedY;
+      },
+      reset() {
+        progress = 0;
+        target = 0;
+        mesh.position.y = hiddenY;
+      },
+      update(dt) {
+        const step = Math.min(1, dt / Math.max(0.001, durationSec));
+        progress = target > progress
+          ? Math.min(target, progress + step)
+          : Math.max(target, progress - step);
+        mesh.position.y = lerp(hiddenY, raisedY, progress);
+      },
+    };
+  }
+
+  function createSlidingPanelSystem({
+    node,
+    closedX,
+    openX,
+    durationSec = 0.8,
+    hiddenWhenClosed = false,
+  }) {
+    let progress = hiddenWhenClosed ? 0 : 0;
+    let target = hiddenWhenClosed ? 0 : 0;
+    node.position.x = closedX;
+    if (hiddenWhenClosed) setNodeVisible(node, false);
+    return {
+      node,
+      get progress() {
+        return progress;
+      },
+      get state() {
+        if (progress <= 0.001 && target <= 0) return 'closed';
+        if (progress >= 0.999 && target >= 1) return 'open';
+        return target > progress ? 'opening' : 'closing';
+      },
+      open() {
+        target = 1;
+        if (hiddenWhenClosed) setNodeVisible(node, true);
+      },
+      close() {
+        target = 0;
+      },
+      reset() {
+        progress = 0;
+        target = 0;
+        node.position.x = closedX;
+        if (hiddenWhenClosed) setNodeVisible(node, false);
+      },
+      update(dt) {
+        const step = Math.min(1, dt / Math.max(0.001, durationSec));
+        progress = target > progress
+          ? Math.min(target, progress + step)
+          : Math.max(target, progress - step);
+        node.position.x = lerp(closedX, openX, progress);
+        if (hiddenWhenClosed && progress <= 0.001 && target <= 0) {
+          setNodeVisible(node, false);
+        }
+      },
+    };
+  }
+
+  function createTimedHazardLaneSystem({
+    visual,
+    laneBounds,
+    safeBounds,
+    warningDurationSec = 0.9,
+    activeDurationSec = 4.2,
+    resetDurationSec = 0.6,
+  }) {
+    let phase = 'off';
+    let timer = 0;
+    setNodeVisible(visual, false);
+    return {
+      get phase() {
+        return phase;
+      },
+      get timer() {
+        return timer;
+      },
+      start() {
+        phase = 'warning';
+        timer = warningDurationSec;
+        setNodeVisible(visual, true);
+        setMeshTone(visual, [176, 144, 78], 0.08);
+      },
+      stop() {
+        phase = 'off';
+        timer = 0;
+        setNodeVisible(visual, false);
+      },
+      reset() {
+        phase = 'off';
+        timer = 0;
+        setNodeVisible(visual, false);
+      },
+      update(dt, pos) {
+        if (phase === 'off') return { hit: false, phase };
+        timer = Math.max(0, timer - dt);
+        if (phase === 'warning') {
+          setMeshTone(visual, [196, 164, 88], 0.1 + (0.05 * Math.sin(timer * 18)));
+          if (timer <= 0) {
+            phase = 'active';
+            timer = activeDurationSec;
+            setMeshTone(visual, [184, 82, 82], 0.14);
+          }
+          return { hit: false, phase };
+        }
+        if (phase === 'active') {
+          setMeshTone(visual, [184, 82, 82], 0.12 + (0.04 * Math.sin(timer * 20)));
+          const inLane = pos
+            && pos.x >= laneBounds.minX
+            && pos.x <= laneBounds.maxX
+            && pos.z >= laneBounds.minZ
+            && pos.z <= laneBounds.maxZ
+            && pos.y >= laneBounds.minY
+            && pos.y <= laneBounds.maxY;
+          const inSafeBounds = pos
+            && pos.x >= safeBounds.minX
+            && pos.x <= safeBounds.maxX
+            && pos.z >= safeBounds.minZ
+            && pos.z <= safeBounds.maxZ
+            && pos.y >= safeBounds.minY
+            && pos.y <= safeBounds.maxY;
+          if (inLane && !inSafeBounds) {
+            phase = 'reset';
+            timer = resetDurationSec;
+            setMeshTone(visual, [148, 84, 84], 0.05);
+            return { hit: true, phase };
+          }
+          if (timer <= 0) {
+            phase = 'reset';
+            timer = resetDurationSec;
+            setMeshTone(visual, [148, 84, 84], 0.05);
+          }
+          return { hit: false, phase };
+        }
+        if (phase === 'reset' && timer <= 0) {
+          phase = 'off';
+          setNodeVisible(visual, false);
+        }
+        return { hit: false, phase };
+      },
+    };
+  }
+
+  function createTimedBridgeSystem({
+    platformSystem,
+    openDurationSec = 4.4,
+  }) {
+    let phase = 'hidden';
+    let timer = 0;
+    let lockedRaised = false;
+    return {
+      get phase() {
+        return phase;
+      },
+      get timer() {
+        return timer;
+      },
+      startWindow() {
+        lockedRaised = false;
+        phase = 'raising';
+        timer = openDurationSec;
+        platformSystem.raise();
+      },
+      lockRaised() {
+        lockedRaised = true;
+        phase = 'locked';
+        timer = 0;
+        platformSystem.lockRaised();
+      },
+      reset() {
+        lockedRaised = false;
+        phase = 'hidden';
+        timer = 0;
+        platformSystem.reset();
+      },
+      update(dt) {
+        platformSystem.update(dt);
+        if (lockedRaised) return;
+        if (phase === 'raising' && platformSystem.progress >= 0.999) {
+          phase = 'open';
+        } else if (phase === 'open') {
+          timer = Math.max(0, timer - dt);
+          if (timer <= 0) {
+            phase = 'lowering';
+            platformSystem.lower();
+          }
+        } else if (phase === 'lowering' && platformSystem.progress <= 0.001) {
+          phase = 'hidden';
+        }
+      },
+    };
+  }
+
+  const CHAMBER_STATES = Object.freeze({
+    idle: 'idle',
+    pedestalActivated: 'pedestal_activated',
+    platformRaised: 'platform_raised',
+    sideConsoleRevealed: 'side_console_revealed',
+    hazardCycleActive: 'hazard_cycle_active',
+    crossingWindowOpen: 'crossing_window_open',
+    chamberStepComplete: 'chamber_step_complete',
+  });
+
+  const puzzleChamberBounds = {
+    minX: 29.0,
+    maxX: 43.0,
+    minY: 0.0,
+    maxY: 8.0,
+    minZ: 84.0,
+    maxZ: 106.0,
+  };
+  const puzzlePedestalInteract = { x: 36.0, y: 0.55, z: 88.5, radius: 1.8 };
+  const puzzleSeamInteract = { x: 41.9, y: 1.0, z: 96.0, radius: 2.0 };
+  const puzzleConsoleInteract = { x: 41.5, y: 1.15, z: 96.0, radius: 1.9 };
+  const puzzleRewardBounds = {
+    minX: 34.65,
+    maxX: 37.35,
+    minY: 0.0,
+    maxY: 2.0,
+    minZ: 101.8,
+    maxZ: 104.2,
+  };
+  const puzzleEntryResetPose = { x: 36.0, y: 0.42, z: 86.2 };
+  const puzzleHazardLaneBounds = {
+    minX: 29.2,
+    maxX: 42.8,
+    minY: 0.0,
+    maxY: 2.0,
+    minZ: 97.75,
+    maxZ: 100.25,
+  };
+  const puzzleBridgeSafeBounds = {
+    minX: 34.35,
+    maxX: 37.65,
+    minY: -0.1,
+    maxY: 1.2,
+    minZ: 97.8,
+    maxZ: 100.2,
+  };
+
+  const pedestalCapMesh = getPrimarySourceMesh('puzzle_chamber_pedestal_cap');
+  const seamPanelMesh = getPrimarySourceMesh('puzzle_chamber_side_seam_panel');
+  const rewardPadMesh = getPrimarySourceMesh('puzzle_chamber_reward_pad');
+
+  const puzzlePlatformMesh = createOpaqueHelperBox('level5_puzzle_platform', {
+    width: 3.0,
+    height: 0.5,
+    depth: 3.0,
+    x: 36.0,
+    y: -0.75,
+    z: 94.5,
+    rgb: [116, 116, 116],
+  });
+  const puzzleBridgeMesh = createOpaqueHelperBox('level5_puzzle_bridge', {
+    width: 3.4,
+    height: 0.12,
+    depth: 2.8,
+    x: 36.0,
+    y: -0.18,
+    z: 99.0,
+    rgb: [124, 124, 124],
+  });
+  const puzzleHazardLaneVisual = createOpaqueHelperBox('level5_puzzle_hazard_lane', {
+    width: 13.6,
+    height: 0.06,
+    depth: 2.5,
+    x: 36.0,
+    y: 0.03,
+    z: 99.0,
+    rgb: [168, 86, 86],
+    roughness: 0.96,
+    emissiveScale: 0.08,
+  });
+
+  const puzzleConsoleRoot = new BABYLON.TransformNode('level5_puzzle_console_root', scene);
+  puzzleConsoleRoot.position.set(43.18, 1.02, 96.0);
+  markDecor(puzzleConsoleRoot);
+  const puzzleConsoleBody = createOpaqueHelperBox('level5_puzzle_console_body', {
+    width: 0.72,
+    height: 1.24,
+    depth: 0.42,
+    x: 0,
+    y: 0,
+    z: 0,
+    rgb: [112, 112, 112],
+  });
+  puzzleConsoleBody.parent = puzzleConsoleRoot;
+  const puzzleConsoleFace = createOpaqueHelperBox('level5_puzzle_console_face', {
+    width: 0.52,
+    height: 0.72,
+    depth: 0.08,
+    x: -0.24,
+    y: 0.08,
+    z: 0.0,
+    rgb: [126, 144, 124],
+    roughness: 0.84,
+    emissiveScale: 0.06,
+  });
+  puzzleConsoleFace.parent = puzzleConsoleRoot;
+  setNodeVisible(puzzleConsoleRoot, false);
+
+  const dynamicColliders = [
+    registerDynamicCollider(puzzlePlatformMesh),
+    registerDynamicCollider(puzzleBridgeMesh),
+  ].filter(Boolean);
+
+  const puzzlePlatform = createRisingPlatformSystem({
+    mesh: puzzlePlatformMesh,
+    hiddenY: -0.75,
+    raisedY: 0.75,
+    durationSec: 1.5,
+  });
+  const puzzleBridgePlatform = createRisingPlatformSystem({
+    mesh: puzzleBridgeMesh,
+    hiddenY: -0.18,
+    raisedY: 0.06,
+    durationSec: 0.65,
+  });
+  const puzzleSeamPanel = seamPanelMesh
+    ? createSlidingPanelSystem({
+      node: seamPanelMesh,
+      closedX: seamPanelMesh.position.x,
+      openX: seamPanelMesh.position.x + 0.22,
+      durationSec: 0.65,
+      hiddenWhenClosed: false,
+    })
+    : null;
+  const puzzleConsole = createSlidingPanelSystem({
+    node: puzzleConsoleRoot,
+    closedX: 43.18,
+    openX: 42.52,
+    durationSec: 0.75,
+    hiddenWhenClosed: true,
+  });
+  const puzzleHazardLane = createTimedHazardLaneSystem({
+    visual: puzzleHazardLaneVisual,
+    laneBounds: puzzleHazardLaneBounds,
+    safeBounds: puzzleBridgeSafeBounds,
+    warningDurationSec: 0.75,
+    activeDurationSec: 7.2,
+  });
+  const puzzleBridge = createTimedBridgeSystem({
+    platformSystem: puzzleBridgePlatform,
+    openDurationSec: 7.6,
+  });
+  const puzzleRoomState = createRoomStateController(CHAMBER_STATES.idle);
+
+  function isWithinSphere(pos, target) {
+    if (!pos || !target) return false;
+    const dx = pos.x - target.x;
+    const dy = pos.y - target.y;
+    const dz = pos.z - target.z;
+    return ((dx ** 2) + (dy ** 2) + (dz ** 2)) <= ((target.radius || 1.5) ** 2);
+  }
+
+  function isWithinBounds(pos, bounds) {
+    return containsBounds(bounds, pos);
+  }
+
+  function resetPuzzleRoomState() {
+    puzzleRoomState.setState(CHAMBER_STATES.idle);
+    puzzlePlatform.reset();
+    puzzleBridge.reset();
+    puzzleConsole.reset();
+    puzzleSeamPanel?.reset();
+    puzzleHazardLane.reset();
+    setSourceTone('puzzle_chamber_pedestal_cap', [124, 124, 124], 0.04);
+    setSourceTone('puzzle_chamber_side_seam_panel', [112, 112, 112], 0.0);
+    setSourceTone('puzzle_chamber_reward_pad', [118, 118, 118], 0.03);
+  }
+
+  function updatePuzzleRoomVisuals() {
+    const sideConsoleAvailable = puzzleRoomState.is(CHAMBER_STATES.sideConsoleRevealed)
+      || puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive)
+      || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen)
+      || puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete);
+    if (pedestalCapMesh) {
+      const active = puzzleRoomState.is(CHAMBER_STATES.idle);
+      setSourceTone('puzzle_chamber_pedestal_cap', active ? [148, 148, 148] : [124, 124, 124], active ? 0.08 : 0.02);
+    }
+    if (seamPanelMesh) {
+      const seamHint = puzzleRoomState.is(CHAMBER_STATES.platformRaised) || sideConsoleAvailable;
+      setSourceTone('puzzle_chamber_side_seam_panel', seamHint ? [128, 138, 128] : [112, 112, 112], seamHint ? 0.05 : 0.0);
+    }
+    if (rewardPadMesh) {
+      const completed = puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete);
+      setSourceTone('puzzle_chamber_reward_pad', completed ? [138, 160, 138] : [118, 118, 118], completed ? 0.08 : 0.03);
+    }
+    setMeshTone(puzzlePlatformMesh, puzzlePlatform.progress > 0.02 ? [126, 126, 126] : [116, 116, 116], puzzlePlatform.progress > 0.02 ? 0.03 : 0.0);
+    setMeshTone(puzzleBridgeMesh, puzzleBridge.phase === 'open' || puzzleBridge.phase === 'locked' ? [132, 144, 132] : [124, 124, 124], puzzleBridge.phase === 'open' || puzzleBridge.phase === 'locked' ? 0.04 : 0.01);
+    if (puzzleConsoleFace?.material instanceof BABYLON.StandardMaterial) {
+      const hot = sideConsoleAvailable;
+      setMeshTone(puzzleConsoleFace, hot ? [148, 182, 148] : [126, 144, 124], hot ? 0.12 : 0.06);
+    }
+  }
+
   const truthOverlayRoot = new BABYLON.TransformNode('level5_truth_overlay_root', scene);
   truthOverlayRoot.setEnabled(false);
   markDecor(truthOverlayRoot);
@@ -2014,6 +2544,98 @@ export function buildWorld5(scene, options = {}) {
     return true;
   }
 
+  function restartPuzzleCrossing(player) {
+    if (player?.mesh?.position) {
+      player.mesh.position.set(puzzleEntryResetPose.x, puzzleEntryResetPose.y, puzzleEntryResetPose.z);
+      player.vx = 0;
+      player.vy = 0;
+      player.vz = 0;
+      player.grounded = true;
+    }
+    puzzleHazardLane.reset();
+    puzzleBridge.reset();
+    puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+  }
+
+  function updatePuzzleRoom(dt, ctx = {}) {
+    const pos = ctx.pos;
+    const player = ctx.player;
+
+    puzzlePlatform.update(dt);
+    puzzleSeamPanel?.update(dt);
+    puzzleConsole.update(dt);
+    puzzleBridge.update(dt);
+    const hazardResult = puzzleHazardLane.update(dt, pos);
+    syncDynamicColliders(dynamicColliders, player);
+
+    if (puzzleRoomState.is(CHAMBER_STATES.pedestalActivated) && puzzlePlatform.progress >= 0.999) {
+      puzzleRoomState.setState(CHAMBER_STATES.platformRaised);
+    }
+
+    if (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) && puzzleBridge.phase === 'open') {
+      puzzleRoomState.setState(CHAMBER_STATES.crossingWindowOpen);
+    }
+
+    if (
+      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen))
+      && hazardResult.hit
+    ) {
+      restartPuzzleCrossing(player);
+    } else if (
+      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen))
+      && puzzleBridge.phase === 'hidden'
+      && puzzleHazardLane.phase === 'off'
+    ) {
+      puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+    }
+
+    if (
+      !puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete)
+      && pos
+      && isWithinBounds(pos, puzzleRewardBounds)
+      && (
+        puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen)
+        || puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive)
+      )
+    ) {
+      puzzleBridge.lockRaised();
+      puzzleHazardLane.stop();
+      puzzleRoomState.setState(CHAMBER_STATES.chamberStepComplete);
+      ctx.playCue?.('checkpoint');
+    }
+
+    updatePuzzleRoomVisuals();
+  }
+
+  function tryInteractWithPuzzleRoom({ pos, playCue } = {}) {
+    if (!pos || !isWithinBounds(pos, puzzleChamberBounds)) return false;
+
+    if (puzzleRoomState.is(CHAMBER_STATES.idle) && isWithinSphere(pos, puzzlePedestalInteract)) {
+      puzzlePlatform.raise();
+      puzzleRoomState.setState(CHAMBER_STATES.pedestalActivated);
+      playCue?.('checkpoint');
+      return true;
+    }
+
+    if (puzzleRoomState.is(CHAMBER_STATES.platformRaised) && isWithinSphere(pos, puzzleSeamInteract)) {
+      puzzleSeamPanel?.open();
+      puzzleConsole.open();
+      puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+      playCue?.('checkpoint');
+      return true;
+    }
+
+    if (puzzleRoomState.is(CHAMBER_STATES.sideConsoleRevealed) && isWithinSphere(pos, puzzleConsoleInteract)) {
+      puzzleHazardLane.start();
+      puzzleBridge.startWindow();
+      puzzleRoomState.setState(CHAMBER_STATES.hazardCycleActive);
+      playCue?.('nearMiss');
+      return true;
+    }
+
+    return false;
+  }
+
   const level5 = {
     ...baseLevel,
     update(dt, ctx = {}) {
@@ -2042,6 +2664,7 @@ export function buildWorld5(scene, options = {}) {
       }
       updateJellyfish(dt, pos, ctx.triggerDamage, ctx.triggerNearMissCue);
       sharkHazard?.update(dt, { pos, player, triggerDamage: ctx.triggerDamage });
+      updatePuzzleRoom(dt, ctx);
     },
     reset() {
       runtimeTime = 0;
@@ -2068,8 +2691,10 @@ export function buildWorld5(scene, options = {}) {
         bubble.reset();
       }
       sharkHazard?.reset();
+      resetPuzzleRoomState();
       resolveRespawnPosition(world.spawn);
       applyTruthOverlayState();
+      updatePuzzleRoomVisuals();
     },
     debugForceHazard(name, { pos, player, triggerDamage } = {}) {
       if (name === 'shark' || name === LEVEL5.sharkSweep?.name) {
@@ -2182,6 +2807,10 @@ export function buildWorld5(scene, options = {}) {
     setTruthOverlay(nextState = {}) {
       return setTruthOverlay(nextState);
     },
+    tryInteract({ pos, player, playCue } = {}) {
+      if (tryInteractWithPuzzleRoom({ pos, player, playCue })) return true;
+      return false;
+    },
     getDebugState() {
       return mergeDebugState(baseLevel.getDebugState?.() ?? {}, {
         currentPushTimer: Number(currentPushTimer.toFixed(3)),
@@ -2225,6 +2854,22 @@ export function buildWorld5(scene, options = {}) {
         jellyfish: getEnemyReport().enemies,
         enemyDebug: { ...enemyDebugState },
         truthOverlay: { ...overlayState },
+        puzzleChamber: {
+          state: puzzleRoomState.state,
+          platformProgress: Number(puzzlePlatform.progress.toFixed(3)),
+          platformState: puzzlePlatform.state,
+          seamProgress: Number((puzzleSeamPanel?.progress ?? 0).toFixed(3)),
+          seamState: puzzleSeamPanel?.state ?? 'missing',
+          consoleProgress: Number(puzzleConsole.progress.toFixed(3)),
+          consoleState: puzzleConsole.state,
+          bridgeProgress: Number(puzzleBridgePlatform.progress.toFixed(3)),
+          bridgeState: puzzleBridgePlatform.state,
+          bridgePhase: puzzleBridge.phase,
+          bridgeTimer: Number(puzzleBridge.timer.toFixed(3)),
+          hazardPhase: puzzleHazardLane.phase,
+          hazardTimer: Number(puzzleHazardLane.timer.toFixed(3)),
+          rewardReached: puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete),
+        },
         graybox: {
           ladders: ladders.map((ladder) => ({
             id: ladder.id,

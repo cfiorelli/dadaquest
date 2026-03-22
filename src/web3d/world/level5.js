@@ -221,11 +221,12 @@ const LEVEL5_CAMERA_PRESETS = {
 
 const PLAYER_SPAWN_Y = 0.42;
 const ROOM1 = { minX: 0.0, maxX: 48.0, minY: 0.0, maxY: 6.0, minZ: 0.0, maxZ: 36.0 };
+const FUTURE_CHAMBER_GOAL = { x: 36.0, y: PLAYER_SPAWN_Y, z: 118.0 };
 
 const TUNNEL_MOUTH_CENTER_X = 36.0;
 const TUNNEL_MOUTH_CENTER_Y = -1.25;
-const TUNNEL_MOUTH_WIDTH = 3.2;
-const TUNNEL_MOUTH_HEIGHT = 1.9;
+const TUNNEL_MOUTH_WIDTH = 4.0;
+const TUNNEL_MOUTH_HEIGHT = 2.1;
 const TUNNEL_MOUTH_CENTER_Z = 33.95;
 const TUNNEL_MOUTH_HALF_WIDTH = TUNNEL_MOUTH_WIDTH * 0.5;
 
@@ -234,7 +235,7 @@ const TUNNEL_UNDERDECK = {
   maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
   minY: -1.8,
   maxY: -0.15,
-  minZ: 34.0,
+  minZ: 33.75,
   maxZ: 36.5,
 };
 const TUNNEL_THROAT = {
@@ -262,6 +263,50 @@ const STAIR_SHAFT = {
   maxZ: 70.0,
 };
 const HALLWAY = { minX: 34.0, maxX: 38.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const CHAMBER_ENTRY = { x: 36.0, y: 0.0, z: HALLWAY.maxZ };
+const PUZZLE_CHAMBER = {
+  minX: CHAMBER_ENTRY.x - 7.0,
+  maxX: CHAMBER_ENTRY.x + 7.0,
+  minY: 0.0,
+  maxY: 8.0,
+  minZ: CHAMBER_ENTRY.z,
+  maxZ: CHAMBER_ENTRY.z + 22.0,
+};
+const HALLWAY_CHAMBER_OPENING_WIDTH = 4.0;
+const HALLWAY_CHAMBER_OPENING_HEIGHT = 3.2;
+const HALLWAY_CHAMBER_OPENING_CENTER_Y = 1.6;
+const CHAMBER_PEDESTAL = {
+  minX: CHAMBER_ENTRY.x - 0.6,
+  maxX: CHAMBER_ENTRY.x + 0.6,
+  minY: 0.0,
+  maxY: 1.1,
+  minZ: CHAMBER_ENTRY.z + 3.9,
+  maxZ: CHAMBER_ENTRY.z + 5.1,
+};
+const CHAMBER_DOOR = {
+  minX: CHAMBER_ENTRY.x - 1.5,
+  maxX: CHAMBER_ENTRY.x + 1.5,
+  minY: 0.0,
+  maxY: 4.0,
+  minZ: PUZZLE_CHAMBER.maxZ - 0.18,
+  maxZ: PUZZLE_CHAMBER.maxZ - 0.04,
+};
+const CHAMBER_SEAM = {
+  minX: PUZZLE_CHAMBER.maxX - 0.08,
+  maxX: PUZZLE_CHAMBER.maxX - 0.02,
+  minY: 0.5,
+  maxY: 3.5,
+  minZ: CHAMBER_ENTRY.z + 10.9,
+  maxZ: CHAMBER_ENTRY.z + 13.1,
+};
+const CHAMBER_REWARD_PAD = {
+  minX: CHAMBER_ENTRY.x - 1.35,
+  maxX: CHAMBER_ENTRY.x + 1.35,
+  minZ: CHAMBER_ENTRY.z + 17.8,
+  maxZ: CHAMBER_ENTRY.z + 20.2,
+};
+const HAZARD_LANE_MIN_Z = CHAMBER_ENTRY.z + 13.75;
+const HAZARD_LANE_MAX_Z = CHAMBER_ENTRY.z + 16.25;
 const TUNNEL_CAMERA_ZONE = {
   id: 'starter_slice_tunnel',
   minX: HALLWAY.minX,
@@ -291,9 +336,10 @@ const TUNNEL_CAMERA_ZONE = {
 const LAB_RGB = [138, 138, 138];
 const TUNNEL_RGB = [46, 46, 46];
 const HALL_RGB = [104, 104, 104];
+const CHAMBER_RGB = [120, 120, 120];
 
 const TUNNEL_WATER_SURFACE_Y = 1.38;
-const TUNNEL_STAIR_WATER_SURFACE_Y = -0.8;
+const TUNNEL_STAIR_WATER_SURFACE_Y = 0.8;
 
 const room1Blocks = makeShell('starter_pool_lab', ROOM1, {
   south: openingAlongX(TUNNEL_MOUTH_CENTER_X, TUNNEL_MOUTH_CENTER_Y, TUNNEL_MOUTH_WIDTH, TUNNEL_MOUTH_HEIGHT),
@@ -379,13 +425,21 @@ const tunnelSurfaces = [
 const TUNNEL_STAIR_VISUAL_STEP_COUNT = 8;
 const TUNNEL_STAIR_VISUAL_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_VISUAL_STEP_COUNT;
 const TUNNEL_STAIR_VISUAL_STEP_RISE = 1.6 / TUNNEL_STAIR_VISUAL_STEP_COUNT;
-const TUNNEL_STAIR_COLLIDER_STEP_COUNT = 20;
+const TUNNEL_STAIR_COLLIDER_STEP_COUNT = 24;
 const TUNNEL_STAIR_COLLIDER_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
 const TUNNEL_STAIR_COLLIDER_STEP_RISE = 1.6 / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
+const TUNNEL_STAIR_COLLIDER_FORWARD_OVERLAP = 0.72;
+const TUNNEL_STAIR_HELPER_COUNT = 12;
+const TUNNEL_STAIR_HELPER_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_HELPER_COUNT;
+const TUNNEL_STAIR_HELPER_RISE = 1.6 / TUNNEL_STAIR_HELPER_COUNT;
+const TUNNEL_STAIR_HELPER_FORWARD_OVERLAP = 1.2;
 
 for (let index = 0; index < TUNNEL_STAIR_COLLIDER_STEP_COUNT; index += 1) {
   const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_COLLIDER_STEP_DEPTH);
-  const maxZ = STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_COLLIDER_STEP_DEPTH);
+  const maxZ = Math.min(
+    STAIR_SHAFT.maxZ,
+    STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_COLLIDER_STEP_DEPTH) + TUNNEL_STAIR_COLLIDER_FORWARD_OVERLAP,
+  );
   tunnelSurfaces.push(surfaceRect(`swim_tunnel_stair_collider_${index + 1}`, STAIR_SHAFT.minX + 0.08, STAIR_SHAFT.maxX - 0.08, -1.6 + ((index + 1) * TUNNEL_STAIR_COLLIDER_STEP_RISE), minZ, maxZ, 'service_tunnel_floor', {
     h: 0.24,
     minThickness: 0.24,
@@ -394,6 +448,29 @@ for (let index = 0; index < TUNNEL_STAIR_COLLIDER_STEP_COUNT; index += 1) {
     visible: false,
   }));
 }
+
+for (let index = 0; index < TUNNEL_STAIR_HELPER_COUNT; index += 1) {
+  const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_HELPER_DEPTH);
+  const maxZ = Math.min(
+    HALLWAY.minZ + 0.9,
+    STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_HELPER_DEPTH) + TUNNEL_STAIR_HELPER_FORWARD_OVERLAP,
+  );
+  tunnelSurfaces.push(surfaceRect(`swim_tunnel_stair_helper_${index + 1}`, STAIR_SHAFT.minX + 0.04, STAIR_SHAFT.maxX - 0.04, -1.6 + ((index + 1) * TUNNEL_STAIR_HELPER_RISE), minZ, maxZ, 'service_tunnel_floor', {
+    h: 0.24,
+    minThickness: 0.24,
+    walkableClassification: 'service-tunnel-stair',
+    rgb: [62, 62, 62],
+    visible: false,
+  }));
+}
+
+tunnelSurfaces.push(surfaceRect('swim_tunnel_hallway_threshold_helper', HALLWAY.minX, HALLWAY.maxX, 0.0, STAIR_SHAFT.maxZ - 0.35, HALLWAY.minZ + 0.9, 'hallway_floor', {
+  h: 0.24,
+  minThickness: 0.24,
+  walkableClassification: 'room-floor',
+  rgb: [70, 70, 70],
+  visible: false,
+}));
 
 for (let index = 0; index < TUNNEL_STAIR_VISUAL_STEP_COUNT; index += 1) {
   const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_VISUAL_STEP_DEPTH);
@@ -407,6 +484,7 @@ for (let index = 0; index < TUNNEL_STAIR_VISUAL_STEP_COUNT; index += 1) {
 const hallwayBlocks = [
   ...makeShell('surfacing_hallway', HALLWAY, {
     north: openingAlongX(TUNNEL_MOUTH_CENTER_X, 1.6, TUNNEL_MOUTH_WIDTH, 3.2),
+    south: openingAlongX(CHAMBER_ENTRY.x, HALLWAY_CHAMBER_OPENING_CENTER_Y, HALLWAY_CHAMBER_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
   }, {
     rgb: HALL_RGB,
     wallBottomY: 0.0,
@@ -419,6 +497,64 @@ const hallwayBlocks = [
   }),
 ];
 
+const chamberBlocks = [
+  ...makeShell('puzzle_chamber', PUZZLE_CHAMBER, {
+    north: openingAlongX(CHAMBER_ENTRY.x, HALLWAY_CHAMBER_OPENING_CENTER_Y, HALLWAY_CHAMBER_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  }, {
+    rgb: CHAMBER_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 8.0,
+    ceilingY: 8.0,
+  }),
+  floorCover('puzzle_chamber_floor_cover', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.08, PUZZLE_CHAMBER.minZ, PUZZLE_CHAMBER.maxZ, {
+    rgb: [96, 96, 96],
+    thickness: 0.12,
+  }),
+  blockBounds('puzzle_chamber_pedestal_body', CHAMBER_PEDESTAL.minX, CHAMBER_PEDESTAL.maxX, CHAMBER_PEDESTAL.minY, CHAMBER_PEDESTAL.maxY, CHAMBER_PEDESTAL.minZ, CHAMBER_PEDESTAL.maxZ, {
+    rgb: [108, 108, 108],
+    roughness: 0.95,
+    emissiveScale: 0.0,
+    solid: true,
+    structuralShell: false,
+    cameraIgnore: false,
+    cameraBlocker: false,
+    cameraFadeable: false,
+    decorIntent: 'pedestal',
+  }),
+  floorCover('puzzle_chamber_pedestal_cap', CHAMBER_PEDESTAL.minX - 0.08, CHAMBER_PEDESTAL.maxX + 0.08, CHAMBER_PEDESTAL.maxY, CHAMBER_PEDESTAL.minZ - 0.08, CHAMBER_PEDESTAL.maxZ + 0.08, {
+    rgb: [124, 124, 124],
+    thickness: 0.1,
+    decorIntent: 'pedestal-top',
+  }),
+  blockBounds('puzzle_chamber_far_sealed_door_panel', CHAMBER_DOOR.minX, CHAMBER_DOOR.maxX, CHAMBER_DOOR.minY, CHAMBER_DOOR.maxY, CHAMBER_DOOR.minZ, CHAMBER_DOOR.maxZ, {
+    rgb: [132, 132, 132],
+    roughness: 0.9,
+    emissiveScale: 0.0,
+    solid: false,
+    structuralShell: false,
+    cameraIgnore: false,
+    cameraBlocker: false,
+    cameraFadeable: false,
+    decorIntent: 'sealed-door',
+  }),
+  blockBounds('puzzle_chamber_side_seam_panel', CHAMBER_SEAM.minX, CHAMBER_SEAM.maxX, CHAMBER_SEAM.minY, CHAMBER_SEAM.maxY, CHAMBER_SEAM.minZ, CHAMBER_SEAM.maxZ, {
+    rgb: [112, 112, 112],
+    roughness: 0.96,
+    emissiveScale: 0.0,
+    solid: false,
+    structuralShell: false,
+    cameraIgnore: false,
+    cameraBlocker: false,
+    cameraFadeable: false,
+    decorIntent: 'wall-seam',
+  }),
+  floorCover('puzzle_chamber_reward_pad', CHAMBER_REWARD_PAD.minX, CHAMBER_REWARD_PAD.maxX, 0.06, CHAMBER_REWARD_PAD.minZ, CHAMBER_REWARD_PAD.maxZ, {
+    rgb: [118, 118, 118],
+    thickness: 0.08,
+    decorIntent: 'progression-pad',
+  }),
+];
+
 export const LEVEL5 = compileAuthoredEraLayout({
   totalCollectibles: 0,
   graybox: true,
@@ -426,14 +562,14 @@ export const LEVEL5 = compileAuthoredEraLayout({
     minX: -0.5,
     maxX: 48.5,
     minZ: -0.5,
-    maxZ: 84.5,
+    maxZ: 128.5,
   },
   spawnYaw: Math.PI * 0.5,
   defaultCameraPreset: 'closer',
   cameraPresets: LEVEL5_CAMERA_PRESETS,
   localCameraZones: [TUNNEL_CAMERA_ZONE],
   spawn: { x: 4.0, y: PLAYER_SPAWN_Y, z: 18.0 },
-  goal: { x: 36.0, y: PLAYER_SPAWN_Y, z: 80.0 },
+  goal: FUTURE_CHAMBER_GOAL,
   goalPresentation: 'trigger-only',
   theme: 'neutral',
   showGroundVisual: false,
@@ -456,7 +592,7 @@ export const LEVEL5 = compileAuthoredEraLayout({
   authoredMap: {
     id: 'level5-starter-vertical-slice',
     startSector: 'starter_pool_lab',
-    goalSector: 'surfacing_hallway',
+    goalSector: 'puzzle_chamber',
     sectors: [
       {
         id: 'starter_pool_lab',
@@ -536,6 +672,47 @@ export const LEVEL5 = compileAuthoredEraLayout({
         ],
         decorBlocks: hallwayBlocks,
       },
+      {
+        id: 'puzzle_chamber',
+        label: 'Simple Puzzle Chamber',
+        x: CHAMBER_ENTRY.x,
+        z: CHAMBER_ENTRY.z + 11.0,
+        w: 14.0,
+        d: 22.0,
+        floorY: 0.0,
+        ceilingY: 8.0,
+        floorSurfaceType: 'chamber_floor',
+        wallLanguage: 'graybox_chamber_shell',
+        landmarks: ['pedestal', 'sealed far door', 'wall seam'],
+        shell: false,
+        surfaces: [
+          surfaceRect('puzzle_chamber_floor_south', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.0, PUZZLE_CHAMBER.minZ, HAZARD_LANE_MIN_Z, 'chamber_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [98, 98, 98],
+            visible: false,
+          }),
+          surfaceRect('puzzle_chamber_floor_lane', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.0, HAZARD_LANE_MIN_Z, HAZARD_LANE_MAX_Z, 'chamber_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [96, 96, 96],
+            visible: false,
+          }),
+          surfaceRect('puzzle_chamber_floor_north', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.0, HAZARD_LANE_MAX_Z, PUZZLE_CHAMBER.maxZ, 'chamber_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [98, 98, 98],
+            visible: false,
+          }),
+        ],
+        decorBlocks: chamberBlocks,
+      },
     ],
     connectors: [
       {
@@ -564,6 +741,21 @@ export const LEVEL5 = compileAuthoredEraLayout({
         d: 0.8,
         floorY: 0.0,
         ceilingY: 2.2,
+        floorSurfaceType: 'threshold_floor',
+        shell: false,
+        surfaces: [],
+      },
+      {
+        id: 'hallway_to_puzzle_chamber',
+        label: 'Hallway To Puzzle Chamber',
+        sourceSector: 'surfacing_hallway',
+        destinationSector: 'puzzle_chamber',
+        x: CHAMBER_ENTRY.x,
+        z: CHAMBER_ENTRY.z + 0.2,
+        w: HALLWAY_CHAMBER_OPENING_WIDTH,
+        d: 0.4,
+        floorY: 0.0,
+        ceilingY: HALLWAY_CHAMBER_OPENING_CENTER_Y + (HALLWAY_CHAMBER_OPENING_HEIGHT * 0.5),
         floorSurfaceType: 'threshold_floor',
         shell: false,
         surfaces: [],

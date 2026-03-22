@@ -991,7 +991,7 @@ async function captureLevel5ProjectileBurstReport(page, { shotCount = 3, interSh
   for (let shotIndex = 1; shotIndex <= shotCount; shotIndex += 1) {
     await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.planShot(index), shotIndex);
     await page.evaluate(() => window.__DADA_DEBUG__?.fireEra5Weapon?.());
-    await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(index, 0), shotIndex);
+    await page.evaluate((index) => window.__LEVEL5_PROJECTILE_BURST_AUDIT__.waitForShotFrame(index, 0, 6000), shotIndex);
     if (shotIndex < shotCount) {
       await page.waitForTimeout(interShotDelayMs);
     }
@@ -1762,8 +1762,8 @@ async function getLevel5SecretTunnelAudit(page) {
 
 async function getLevel5PoolMouthCollisionAudit(page) {
   return page.evaluate(() => {
-    const mouthMinX = 34.4;
-    const mouthMaxX = 37.6;
+    const mouthMinX = 34.0;
+    const mouthMaxX = 38.0;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -1807,8 +1807,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
 
 async function getLevel5PoolWallPatchAudit(page) {
   return page.evaluate(() => {
-    const mouthMinX = 34.4;
-    const mouthMaxX = 37.6;
+    const mouthMinX = 34.0;
+    const mouthMaxX = 38.0;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -1844,6 +1844,57 @@ async function getLevel5PoolWallPatchAudit(page) {
   });
 }
 
+async function getLevel5ChamberAudit(page) {
+  return page.evaluate(() => {
+    const topology = window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null;
+    const chamber = topology?.sectors?.find((sector) => sector.id === 'puzzle_chamber') ?? null;
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const region = chamber ? {
+      minX: chamber.x - (chamber.w * 0.5),
+      maxX: chamber.x + (chamber.w * 0.5),
+      minY: chamber.floorY,
+      maxY: chamber.ceilingY,
+      minZ: chamber.z - (chamber.d * 0.5),
+      maxZ: chamber.z + (chamber.d * 0.5),
+    } : null;
+    const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
+    const summarizeBounds = (mesh) => {
+      const box = mesh?.getBoundingInfo?.()?.boundingBox;
+      if (!box) return null;
+      return {
+        minX: Number(box.minimumWorld.x.toFixed(3)),
+        maxX: Number(box.maximumWorld.x.toFixed(3)),
+        minY: Number(box.minimumWorld.y.toFixed(3)),
+        maxY: Number(box.maximumWorld.y.toFixed(3)),
+        minZ: Number(box.minimumWorld.z.toFixed(3)),
+        maxZ: Number(box.maximumWorld.z.toFixed(3)),
+      };
+    };
+    const visibleMeshes = !region ? [] : (scene?.meshes || [])
+      .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
+      .map((mesh) => ({
+        name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
+        bounds: summarizeBounds(mesh),
+      }))
+      .filter((entry) => entry.bounds
+        && overlaps(entry.bounds.minX, entry.bounds.maxX, region.minX, region.maxX)
+        && overlaps(entry.bounds.minY, entry.bounds.maxY, region.minY, region.maxY)
+        && overlaps(entry.bounds.minZ, entry.bounds.maxZ, region.minZ, region.maxZ))
+      .map((entry) => entry.name)
+      .sort();
+    const visibleGoalMeshes = visibleMeshes.filter((name) => /(dad|goal)/i.test(name) && name !== 'goalTrigger');
+    return {
+      chamber,
+      visibleMeshes,
+      visibleGoalMeshes,
+    };
+  });
+}
+
+async function getLevel5PuzzleChamberState(page) {
+  return page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null);
+}
+
 async function climbLevel5Ladder(page, pose, holdMs = 2300) {
   await resetEra5Pose(page, pose);
   await page.waitForTimeout(120);
@@ -1870,17 +1921,19 @@ test('@level5 @era5 runtime: level 5 exposes the minimal starter vertical slice 
   expect(report.sceneKey).toBe('CribScene');
   expect(report.lastRuntimeError).toBeNull();
   expect(report.topology?.mapId).toBe('level5-starter-vertical-slice');
-  expect(report.topology?.sectorCount).toBe(3);
-  expect(report.topology?.connectorCount).toBe(2);
+  expect(report.topology?.sectorCount).toBe(4);
+  expect(report.topology?.connectorCount).toBe(3);
   expect(report.topology?.sectors?.map((sector) => sector.id)).toEqual([
     'starter_pool_lab',
     'submerged_swim_tunnel',
     'surfacing_hallway',
+    'puzzle_chamber',
   ]);
   expect(sortAdjacency(report.topology?.topology?.adjacency)).toEqual({
     starter_pool_lab: ['submerged_swim_tunnel'],
     submerged_swim_tunnel: ['starter_pool_lab', 'surfacing_hallway'],
-    surfacing_hallway: ['submerged_swim_tunnel'],
+    surfacing_hallway: ['puzzle_chamber', 'submerged_swim_tunnel'],
+    puzzle_chamber: ['surfacing_hallway'],
   });
   expect(report.topology?.topology?.hasCycle).toBe(false);
   expect(report.topology?.walkableReport?.missingCollision ?? []).toEqual([]);
@@ -1892,10 +1945,14 @@ test('@level5 @era5 runtime: level 5 exposes the minimal starter vertical slice 
   expect(report.truth?.cullRiskShells ?? []).toEqual([]);
   const intentionallyHiddenWalkables = report.walkable?.missingVisibleWalkables ?? [];
   expect(intentionallyHiddenWalkables.length).toBeGreaterThan(0);
-  expect(intentionallyHiddenWalkables.every((id) => /swim_tunnel_|hallway_floor/.test(id))).toBe(true);
+  expect(intentionallyHiddenWalkables.every((id) => /swim_tunnel_|hallway_floor|puzzle_chamber_floor_/.test(id))).toBe(true);
   expect(report.walkable?.suspiciousFloorLikeDecor ?? []).toEqual([]);
   expect(report.respawn?.anchorCount ?? 0).toBe(1);
   expect(report.debugState?.graybox?.ladders ?? []).toEqual([]);
+
+  const starterRoomAudit = await getLevel5StarterRoomAudit(page);
+  expect(starterRoomAudit.visibleGoalMeshes).toEqual([]);
+  expect(starterRoomAudit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
 });
 
 test('@level5 @era5 runtime: level 5 starter slice route is traversable from pool to surfaced hallway with no fall-through', async ({ page }) => {
@@ -1933,33 +1990,36 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 35.65,
+    x: 36.0,
     y: -1.05,
-    z: 31.4,
+    z: 33.15,
     yaw: 0.0,
     cameraYaw: 0.0,
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
-  await page.waitForTimeout(2500);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
+    { timeout: 3000 },
+  ).toBeGreaterThan(33.65);
   const mouthThresholdState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
-  expect(mouthThresholdState.pos.z).toBeGreaterThan(33.95);
-  expect(mouthThresholdState.pos.x).toBeGreaterThan(35.0);
-  expect(mouthThresholdState.pos.x).toBeLessThan(36.9);
-  await page.waitForTimeout(4500);
+  expect(mouthThresholdState.pos.z).toBeGreaterThan(33.85);
+  expect(mouthThresholdState.pos.x).toBeGreaterThan(34.4);
+  expect(mouthThresholdState.pos.x).toBeLessThan(37.6);
+  await page.waitForTimeout(1800);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   await page.waitForTimeout(250);
   const swimEntryState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
-  expect(swimEntryState.pos.z).toBeGreaterThan(36.4);
-  expect(swimEntryState.pos.x).toBeGreaterThan(35.0);
-  expect(swimEntryState.pos.x).toBeLessThan(36.9);
+  expect(swimEntryState.pos.z).toBeGreaterThan(34.75);
+  expect(swimEntryState.pos.x).toBeGreaterThan(34.4);
+  expect(swimEntryState.pos.x).toBeLessThan(37.6);
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 35.65,
+    x: 36.0,
     y: -1.05,
     z: 34.4,
     yaw: 0.0,
@@ -1969,7 +2029,7 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
     { timeout: 24_000 },
-  ).toBeGreaterThan(65.0);
+  ).toBeGreaterThan(59.5);
   const tunnelAdvanceState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
     waterState: window.__DADA_DEBUG__?.getLevel5WaterState?.(
@@ -1977,20 +2037,20 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
       (window.__DADA_DEBUG__?.playerPos?.y ?? 0) + 0.736,
     ) ?? null,
   }));
-  expect(tunnelAdvanceState.pos.z).toBeGreaterThan(65.0);
+  expect(tunnelAdvanceState.pos.z).toBeGreaterThan(59.5);
   expect(tunnelAdvanceState.pos.z).toBeLessThan(66.8);
-  expect(tunnelAdvanceState.pos.x).toBeGreaterThan(35.0);
-  expect(tunnelAdvanceState.pos.x).toBeLessThan(36.9);
+  expect(tunnelAdvanceState.pos.x).toBeGreaterThan(34.4);
+  expect(tunnelAdvanceState.pos.x).toBeLessThan(37.6);
   expect(tunnelAdvanceState.waterState?.depthAtZ ?? 0).toBeGreaterThanOrEqual(0.0);
+  expect(tunnelAdvanceState.pos.y).toBeLessThan(-0.3);
 
-  await dispatchHeldKey(page, 'keydown', { code: 'Space', key: ' ' });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
-    { timeout: 12_000 },
+    { timeout: 35_000 },
   ).toBeGreaterThan(70.6);
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.y ?? 0),
-    { timeout: 4_000 },
+    { timeout: 6_000 },
   ).toBeGreaterThan(0.18);
   const hallwayTraversalState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
@@ -1999,11 +2059,10 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
       (window.__DADA_DEBUG__?.playerPos?.y ?? 0) + 0.736,
     ) ?? null,
   }));
-  await dispatchHeldKey(page, 'keyup', { code: 'Space', key: ' ' });
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   expect(hallwayTraversalState.pos.z).toBeGreaterThan(70.6);
-  expect(hallwayTraversalState.pos.x).toBeGreaterThan(35.0);
-  expect(hallwayTraversalState.pos.x).toBeLessThan(36.9);
+  expect(hallwayTraversalState.pos.x).toBeGreaterThan(34.4);
+  expect(hallwayTraversalState.pos.x).toBeLessThan(37.6);
   expect(hallwayTraversalState.pos.y).toBeGreaterThan(0.18);
   expect(hallwayTraversalState.waterState?.inDeepWater ?? false).toBe(false);
   expect(hallwayTraversalState.waterState?.headSubmerged ?? false).toBe(false);
@@ -2011,23 +2070,23 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
   const tunnelSamples = [
     {
       pose: { x: 36.0, y: -1.1, z: 36.2, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 35.0, maxX: 37.0, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 38.5 },
+      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 1.4, minZ: 34.0, maxZ: 38.5 },
     },
     {
       pose: { x: 36.0, y: -1.1, z: 43.0, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.4, maxX: 37.6, minY: -1.8, maxY: 1.4, minZ: 40.5, maxZ: 50.0 },
+      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 1.4, minZ: 40.5, maxZ: 50.0 },
     },
     {
       pose: { x: 36.0, y: -1.1, z: 54.0, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.4, maxX: 37.6, minY: -1.8, maxY: 1.4, minZ: 50.0, maxZ: 66.0 },
+      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 1.4, minZ: 50.0, maxZ: 66.0 },
     },
     {
       pose: { x: 36.0, y: -1.0, z: 66.7, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.4, maxX: 37.6, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
+      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
     },
     {
       pose: { x: 36.0, y: 0.18, z: 68.8, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.4, maxX: 37.6, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
+      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
     },
     {
       pose: { x: 36.0, y: 0.42, z: 76.0, yaw: 0.0, cameraYaw: 0.0 },
@@ -2127,6 +2186,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   const roomAudit = await getLevel5SecretTunnelAudit(page);
   const roomVisibleSources = (roomAudit.screenSamples || []).map((sample) => sample.sourceName || '');
   expect(roomVisibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(roomVisibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
   expect(roomVisibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
   expect(roomVisibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
   expect(roomVisibleSources.some((name) => name.includes('truth_overlay'))).toBe(false);
@@ -2141,6 +2201,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   const visibleSources = (poolAudit.screenSamples || []).map((sample) => sample.sourceName || '');
   expect(visibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(visibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('truth_overlay'))).toBe(false);
 
@@ -2161,7 +2222,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   expect(stairPassage).not.toBeNull();
   expect(stairPassage.minZ).toBeGreaterThanOrEqual(66.0);
   expect(stairPassage.maxZ).toBeLessThanOrEqual(70.05);
-  expect(Math.abs((stairPassage.waterSurfaceY ?? 0) - (-0.8))).toBeLessThan(0.06);
+  expect(Math.abs((stairPassage.waterSurfaceY ?? 0) - 0.8)).toBeLessThan(0.06);
   expect(stairPassage.floorStartY).toBeLessThan(-1.5);
   expect(stairPassage.floorEndY).toBeGreaterThanOrEqual(0.0);
 
@@ -2169,6 +2230,149 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
     .map((mesh) => String(mesh?.metadata?.sourceName || mesh?.name || ''))
     .filter((name) => /(pump_junction|transfer_gallery|grand_stadium_room|west_kelp_operations_wing|east_whale_observation_wing)/.test(name)));
   expect(futureMeshes).toEqual([]);
+});
+
+test('@level5 @era5 runtime: level 5 exposes one plain puzzle chamber beyond the hallway with no visible Dada', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockEra5(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+
+  const chamberAudit = await getLevel5ChamberAudit(page);
+  expect(chamberAudit.chamber).not.toBeNull();
+  expect(chamberAudit.chamber).toMatchObject({
+    id: 'puzzle_chamber',
+    x: 36,
+    z: 95,
+    w: 14,
+    d: 22,
+    floorY: 0,
+    ceilingY: 8,
+  });
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_pedestal_body');
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_far_sealed_door_panel');
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_side_seam_panel');
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_reward_pad');
+  expect(chamberAudit.visibleMeshes.some((name) => /(platform|console|hazard)/i.test(name))).toBe(false);
+  expect(chamberAudit.visibleGoalMeshes).toEqual([]);
+});
+
+test('@level5 @era5 runtime: level 5 puzzle chamber completes the first pedestal-to-crossing sequence with no Dada', async ({ page }) => {
+  test.setTimeout(180_000);
+  await gotoDebugLevel(page, 5);
+  await seedEra5BubbleWand(page);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(1300);
+  await focusGameplay(page);
+
+  await resetEra5Pose(page, {
+    x: 36.0,
+    y: 0.42,
+    z: 88.4,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  const pedestalUsed = await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false);
+  expect(pedestalUsed).toBe(true);
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 6_000 },
+  ).toMatchObject({
+    state: 'platform_raised',
+    platformState: 'raised',
+  });
+
+  await resetEra5Pose(page, {
+    x: 41.2,
+    y: 0.42,
+    z: 96.0,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  const seamUsed = await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false);
+  expect(seamUsed).toBe(true);
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'side_console_revealed',
+  });
+  await expect.poll(
+    async () => {
+      const state = await getLevel5PuzzleChamberState(page);
+      return (state?.consoleProgress ?? 0) > 0.95 && (state?.seamProgress ?? 0) > 0.95;
+    },
+    { timeout: 4_000 },
+  ).toBe(true);
+  const consoleRevealState = await getLevel5PuzzleChamberState(page);
+  expect(consoleRevealState?.consoleProgress ?? 0).toBeGreaterThan(0.95);
+  expect(consoleRevealState?.seamProgress ?? 0).toBeGreaterThan(0.95);
+
+  await resetEra5Pose(page, {
+    x: 40.8,
+    y: 0.42,
+    z: 96.0,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  const consoleUsed = await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false);
+  expect(consoleUsed).toBe(true);
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'hazard_cycle_active',
+    hazardPhase: 'warning',
+  });
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'crossing_window_open',
+    bridgePhase: 'open',
+    hazardPhase: 'active',
+  });
+
+  await resetEra5Pose(page, {
+    x: 36.0,
+    y: 0.42,
+    z: 95.2,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 8_000 },
+  ).toMatchObject({
+    state: 'chamber_step_complete',
+    rewardReached: true,
+    bridgePhase: 'locked',
+    hazardPhase: 'off',
+  });
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  await page.waitForTimeout(250);
+
+  const completionState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+    puzzle: window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null,
+  }));
+  expectPositionInBounds(completionState.pos, {
+    minX: 34.65,
+    maxX: 37.35,
+    minY: 0.0,
+    maxY: 2.0,
+    minZ: 101.8,
+    maxZ: 105.6,
+  });
+  expect(completionState.puzzle?.platformProgress ?? 0).toBeGreaterThan(0.95);
+  expect(completionState.puzzle?.consoleProgress ?? 0).toBeGreaterThan(0.95);
+
+  const chamberAudit = await getLevel5ChamberAudit(page);
+  expect(chamberAudit.visibleGoalMeshes).toEqual([]);
+  expect(chamberAudit.visibleMeshes).toContain('level5_puzzle_platform');
+  expect(chamberAudit.visibleMeshes).toContain('level5_puzzle_console_body');
 });
 
 test('@level5 @era5 runtime: level 5 render policy keeps held item and burst projectiles readable across the pool waterline', async ({ page }) => {

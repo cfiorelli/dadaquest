@@ -940,8 +940,8 @@ async function getLevel5RenderPolicyAudit(page) {
 
 async function getLevel5PoolMouthCollisionAudit(page) {
   return page.evaluate(() => {
-    const mouthMinX = 34.4;
-    const mouthMaxX = 37.6;
+    const mouthMinX = 34.0;
+    const mouthMaxX = 38.0;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -982,8 +982,8 @@ async function getLevel5PoolMouthCollisionAudit(page) {
 
 async function getLevel5PoolWallPatchAudit(page) {
   return page.evaluate(() => {
-    const mouthMinX = 34.4;
-    const mouthMaxX = 37.6;
+    const mouthMinX = 34.0;
+    const mouthMaxX = 38.0;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const overlaps = (minA, maxA, minB, maxB) => (Math.min(maxA, maxB) - Math.max(minA, minB)) > 0.01;
     const summarizeBounds = (mesh) => {
@@ -1117,7 +1117,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
 
   const topology = await page.evaluate(() => window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null);
   expect(topology?.mapId).toBe('level5-starter-vertical-slice');
-  expect(topology?.sectorCount).toBe(3);
+  expect(topology?.sectorCount).toBe(4);
   const runtimeState = await page.evaluate(() => ({
     lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
   }));
@@ -1201,6 +1201,138 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     yaw: Math.PI,
     cameraYaw: Math.PI,
   });
+
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-entry.png', {
+    x: 36.0,
+    y: 0.42,
+    z: 82.6,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+
+  await frameRoom({
+    path: 'docs/screenshots/level5-starter-slice-chamber-overview.png',
+    pose: { x: 36.0, y: 0.42, z: 86.0, yaw: 0.0, cameraYaw: 0.0 },
+    view: {
+      label: 'l5-starter-slice-chamber-overview',
+      position: { x: 29.2, y: 5.8, z: 86.4 },
+      target: { x: 36.0, y: 1.9, z: 96.0 },
+      fov: 0.72,
+    },
+  });
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, {
+    x: 36.0,
+    y: 0.42,
+    z: 88.4,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false)).toBe(true);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
+    { timeout: 6_000 },
+  ).toMatchObject({
+    state: 'platform_raised',
+    platformState: 'raised',
+  });
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-platform-raised.png', {
+    x: 36.0,
+    y: 0.42,
+    z: 90.2,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  }, 500);
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, {
+    x: 41.2,
+    y: 0.42,
+    z: 96.0,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false)).toBe(true);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'side_console_revealed',
+  });
+  await expect.poll(
+    () => page.evaluate(() => {
+      const state = window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null;
+      return (state?.consoleProgress ?? 0) > 0.95 && (state?.seamProgress ?? 0) > 0.95;
+    }),
+    { timeout: 4_000 },
+  ).toBe(true);
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-console-revealed.png', {
+    x: 38.7,
+    y: 0.42,
+    z: 95.2,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  }, 500);
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, {
+    x: 40.8,
+    y: 0.42,
+    z: 96.0,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__DADA_DEBUG__?.gameplayHotkey?.('KeyE') ?? false)).toBe(true);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'crossing_window_open',
+    bridgePhase: 'open',
+    hazardPhase: 'active',
+  });
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-crossing-window.png', {
+    x: 36.0,
+    y: 0.42,
+    z: 95.0,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  }, 500);
+
+  await focusGameplay(page);
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, {
+    x: 36.0,
+    y: 0.42,
+    z: 102.0,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await page.waitForTimeout(150);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
+    { timeout: 8_000 },
+  ).toMatchObject({
+    state: 'chamber_step_complete',
+    rewardReached: true,
+  });
+  await page.waitForTimeout(250);
+  await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-complete.png', {
+    x: 36.0,
+    y: 0.42,
+    z: 101.8,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  }, 500);
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();

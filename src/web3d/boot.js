@@ -4811,6 +4811,13 @@ export async function boot(options = {}) {
     }
     if (code === 'KeyE') {
       if (isEra5Level) {
+        if (world.era5Level?.tryInteract?.({
+          pos: player.mesh.position.clone(),
+          player,
+          playCue: (cueName) => audio.playCue(levelId, cueName),
+        })) {
+          return true;
+        }
         return toggleEra5Tool();
       }
       if (levelId !== 4 || flourPuffCooldownMs > 0 || respawnState) return false;
