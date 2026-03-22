@@ -1225,9 +1225,9 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
   }, {
-    x: 36.0,
+    x: 38.8,
     y: 0.42,
-    z: 88.4,
+    z: 90.8,
     yaw: 0.0,
     cameraYaw: 0.0,
   });

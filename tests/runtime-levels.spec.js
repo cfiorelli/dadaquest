@@ -1870,7 +1870,7 @@ async function getLevel5ChamberAudit(page) {
         maxZ: Number(box.maximumWorld.z.toFixed(3)),
       };
     };
-    const visibleMeshes = !region ? [] : (scene?.meshes || [])
+    const visibleEntries = !region ? [] : (scene?.meshes || [])
       .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
       .map((mesh) => ({
         name: String(mesh?.metadata?.sourceName || mesh?.name || ''),
@@ -1880,11 +1880,12 @@ async function getLevel5ChamberAudit(page) {
         && overlaps(entry.bounds.minX, entry.bounds.maxX, region.minX, region.maxX)
         && overlaps(entry.bounds.minY, entry.bounds.maxY, region.minY, region.maxY)
         && overlaps(entry.bounds.minZ, entry.bounds.maxZ, region.minZ, region.maxZ))
-      .map((entry) => entry.name)
-      .sort();
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const visibleMeshes = visibleEntries.map((entry) => entry.name);
     const visibleGoalMeshes = visibleMeshes.filter((name) => /(dad|goal)/i.test(name) && name !== 'goalTrigger');
     return {
       chamber,
+      visibleEntries,
       visibleMeshes,
       visibleGoalMeshes,
     };
@@ -2250,11 +2251,30 @@ test('@level5 @era5 runtime: level 5 exposes one plain puzzle chamber beyond the
     floorY: 0,
     ceilingY: 8,
   });
+  const entryByName = (name) => chamberAudit.visibleEntries.find((entry) => entry.name === name) ?? null;
   expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_pedestal_body');
   expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_far_sealed_door_panel');
   expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_side_seam_panel');
-  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_reward_pad');
-  expect(chamberAudit.visibleMeshes.some((name) => /(platform|console|hazard)/i.test(name))).toBe(false);
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_west_seam_panel');
+  expect(chamberAudit.visibleMeshes).toContain('puzzle_chamber_visible_floor_plate');
+  expect(chamberAudit.visibleMeshes).not.toContain('puzzle_chamber_reward_pad');
+  expect(chamberAudit.visibleMeshes.some((name) => /(platform|console|hazard|bridge)/i.test(name))).toBe(false);
+  expect(chamberAudit.visibleMeshes.filter((name) => /floor_plate/i.test(name))).toEqual(['puzzle_chamber_visible_floor_plate']);
+  expect(entryByName('puzzle_chamber_pedestal_body')?.bounds).toMatchObject({
+    minX: 38.1,
+    maxX: 39.5,
+    minY: 0.0,
+    maxY: 1.1,
+    minZ: 91.3,
+    maxZ: 92.7,
+  });
+  expect(entryByName('puzzle_chamber_visible_floor_plate')?.bounds).toMatchObject({
+    minX: 33.3,
+    maxX: 35.9,
+    maxY: 0.08,
+    minZ: 91.7,
+    maxZ: 93.9,
+  });
   expect(chamberAudit.visibleGoalMeshes).toEqual([]);
 });
 
@@ -2267,9 +2287,9 @@ test('@level5 @era5 runtime: level 5 puzzle chamber completes the first pedestal
   await focusGameplay(page);
 
   await resetEra5Pose(page, {
-    x: 36.0,
+    x: 38.8,
     y: 0.42,
-    z: 88.4,
+    z: 90.8,
     yaw: 0.0,
     cameraYaw: 0.0,
   });

@@ -1762,9 +1762,9 @@ export function buildWorld5(scene, options = {}) {
     minZ: 84.0,
     maxZ: 106.0,
   };
-  const puzzlePedestalInteract = { x: 36.0, y: 0.55, z: 88.5, radius: 1.8 };
+  const puzzlePedestalInteract = { x: 38.8, y: 0.55, z: 92.0, radius: 1.75 };
   const puzzleSeamInteract = { x: 41.9, y: 1.0, z: 96.0, radius: 2.0 };
-  const puzzleConsoleInteract = { x: 41.5, y: 1.15, z: 96.0, radius: 1.9 };
+  const puzzleConsoleInteract = { x: 42.1, y: 1.2, z: 96.0, radius: 2.0 };
   const puzzleRewardBounds = {
     minX: 34.65,
     maxX: 37.35,
@@ -1797,10 +1797,10 @@ export function buildWorld5(scene, options = {}) {
 
   const puzzlePlatformMesh = createOpaqueHelperBox('level5_puzzle_platform', {
     width: 3.0,
-    height: 0.5,
+    height: 0.3,
     depth: 3.0,
     x: 36.0,
-    y: -0.75,
+    y: -1.2,
     z: 94.5,
     rgb: [116, 116, 116],
   });
@@ -1826,12 +1826,12 @@ export function buildWorld5(scene, options = {}) {
   });
 
   const puzzleConsoleRoot = new BABYLON.TransformNode('level5_puzzle_console_root', scene);
-  puzzleConsoleRoot.position.set(43.18, 1.02, 96.0);
+  puzzleConsoleRoot.position.set(43.7, 1.5, 96.0);
   markDecor(puzzleConsoleRoot);
   const puzzleConsoleBody = createOpaqueHelperBox('level5_puzzle_console_body', {
-    width: 0.72,
-    height: 1.24,
-    depth: 0.42,
+    width: 1.2,
+    height: 1.6,
+    depth: 1.2,
     x: 0,
     y: 0,
     z: 0,
@@ -1839,11 +1839,11 @@ export function buildWorld5(scene, options = {}) {
   });
   puzzleConsoleBody.parent = puzzleConsoleRoot;
   const puzzleConsoleFace = createOpaqueHelperBox('level5_puzzle_console_face', {
-    width: 0.52,
-    height: 0.72,
+    width: 0.56,
+    height: 0.88,
     depth: 0.08,
-    x: -0.24,
-    y: 0.08,
+    x: -0.56,
+    y: 0.0,
     z: 0.0,
     rgb: [126, 144, 124],
     roughness: 0.84,
@@ -1859,7 +1859,7 @@ export function buildWorld5(scene, options = {}) {
 
   const puzzlePlatform = createRisingPlatformSystem({
     mesh: puzzlePlatformMesh,
-    hiddenY: -0.75,
+    hiddenY: -1.2,
     raisedY: 0.75,
     durationSec: 1.5,
   });
@@ -1880,8 +1880,8 @@ export function buildWorld5(scene, options = {}) {
     : null;
   const puzzleConsole = createSlidingPanelSystem({
     node: puzzleConsoleRoot,
-    closedX: 43.18,
-    openX: 42.52,
+    closedX: 43.7,
+    openX: 42.96,
     durationSec: 0.75,
     hiddenWhenClosed: true,
   });

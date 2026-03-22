@@ -272,38 +272,52 @@ const PUZZLE_CHAMBER = {
   minZ: CHAMBER_ENTRY.z,
   maxZ: CHAMBER_ENTRY.z + 22.0,
 };
-const HALLWAY_CHAMBER_OPENING_WIDTH = 4.0;
-const HALLWAY_CHAMBER_OPENING_HEIGHT = 3.2;
-const HALLWAY_CHAMBER_OPENING_CENTER_Y = 1.6;
+const HALLWAY_CHAMBER_OPENING_WIDTH = 3.2;
+const HALLWAY_CHAMBER_OPENING_HEIGHT = 2.8;
+const HALLWAY_CHAMBER_OPENING_CENTER_Y = 1.4;
 const CHAMBER_PEDESTAL = {
-  minX: CHAMBER_ENTRY.x - 0.6,
-  maxX: CHAMBER_ENTRY.x + 0.6,
+  minX: CHAMBER_ENTRY.x + 2.1,
+  maxX: CHAMBER_ENTRY.x + 3.5,
   minY: 0.0,
   maxY: 1.1,
-  minZ: CHAMBER_ENTRY.z + 3.9,
-  maxZ: CHAMBER_ENTRY.z + 5.1,
+  minZ: CHAMBER_ENTRY.z + 7.3,
+  maxZ: CHAMBER_ENTRY.z + 8.7,
 };
 const CHAMBER_DOOR = {
   minX: CHAMBER_ENTRY.x - 1.5,
   maxX: CHAMBER_ENTRY.x + 1.5,
   minY: 0.0,
   maxY: 4.0,
-  minZ: PUZZLE_CHAMBER.maxZ - 0.18,
-  maxZ: PUZZLE_CHAMBER.maxZ - 0.04,
+  minZ: PUZZLE_CHAMBER.maxZ - 0.06,
+  maxZ: PUZZLE_CHAMBER.maxZ + 0.06,
 };
-const CHAMBER_SEAM = {
-  minX: PUZZLE_CHAMBER.maxX - 0.08,
-  maxX: PUZZLE_CHAMBER.maxX - 0.02,
-  minY: 0.5,
-  maxY: 3.5,
-  minZ: CHAMBER_ENTRY.z + 10.9,
-  maxZ: CHAMBER_ENTRY.z + 13.1,
+const CHAMBER_VISIBLE_FLOOR_PLATE = {
+  minX: CHAMBER_ENTRY.x - 2.7,
+  maxX: CHAMBER_ENTRY.x - 0.1,
+  minZ: CHAMBER_ENTRY.z + 7.7,
+  maxZ: CHAMBER_ENTRY.z + 9.9,
+};
+const CHAMBER_EAST_SEAM = {
+  minX: PUZZLE_CHAMBER.maxX - 0.07,
+  maxX: PUZZLE_CHAMBER.maxX - 0.01,
+  minY: 0.6,
+  maxY: 3.6,
+  minZ: CHAMBER_ENTRY.z + 10.8,
+  maxZ: CHAMBER_ENTRY.z + 13.2,
+};
+const CHAMBER_WEST_SEAM = {
+  minX: PUZZLE_CHAMBER.minX + 0.01,
+  maxX: PUZZLE_CHAMBER.minX + 0.07,
+  minY: 0.6,
+  maxY: 3.6,
+  minZ: CHAMBER_ENTRY.z + 10.8,
+  maxZ: CHAMBER_ENTRY.z + 13.2,
 };
 const CHAMBER_REWARD_PAD = {
-  minX: CHAMBER_ENTRY.x - 1.35,
-  maxX: CHAMBER_ENTRY.x + 1.35,
-  minZ: CHAMBER_ENTRY.z + 17.8,
-  maxZ: CHAMBER_ENTRY.z + 20.2,
+  minX: CHAMBER_ENTRY.x - 1.4,
+  maxX: CHAMBER_ENTRY.x + 1.4,
+  minZ: CHAMBER_ENTRY.z + 17.1,
+  maxZ: CHAMBER_ENTRY.z + 19.9,
 };
 const HAZARD_LANE_MIN_Z = CHAMBER_ENTRY.z + 13.75;
 const HAZARD_LANE_MAX_Z = CHAMBER_ENTRY.z + 16.25;
@@ -510,6 +524,12 @@ const chamberBlocks = [
     rgb: [96, 96, 96],
     thickness: 0.12,
   }),
+  floorCover('puzzle_chamber_visible_floor_plate', CHAMBER_VISIBLE_FLOOR_PLATE.minX, CHAMBER_VISIBLE_FLOOR_PLATE.maxX, 0.08, CHAMBER_VISIBLE_FLOOR_PLATE.minZ, CHAMBER_VISIBLE_FLOOR_PLATE.maxZ, {
+    rgb: [122, 122, 122],
+    thickness: 0.08,
+    roughness: 0.94,
+    decorIntent: 'floor-plate',
+  }),
   blockBounds('puzzle_chamber_pedestal_body', CHAMBER_PEDESTAL.minX, CHAMBER_PEDESTAL.maxX, CHAMBER_PEDESTAL.minY, CHAMBER_PEDESTAL.maxY, CHAMBER_PEDESTAL.minZ, CHAMBER_PEDESTAL.maxZ, {
     rgb: [108, 108, 108],
     roughness: 0.95,
@@ -521,9 +541,9 @@ const chamberBlocks = [
     cameraFadeable: false,
     decorIntent: 'pedestal',
   }),
-  floorCover('puzzle_chamber_pedestal_cap', CHAMBER_PEDESTAL.minX - 0.08, CHAMBER_PEDESTAL.maxX + 0.08, CHAMBER_PEDESTAL.maxY, CHAMBER_PEDESTAL.minZ - 0.08, CHAMBER_PEDESTAL.maxZ + 0.08, {
+  floorCover('puzzle_chamber_pedestal_cap', CHAMBER_PEDESTAL.minX - 0.04, CHAMBER_PEDESTAL.maxX + 0.04, CHAMBER_PEDESTAL.maxY, CHAMBER_PEDESTAL.minZ - 0.04, CHAMBER_PEDESTAL.maxZ + 0.04, {
     rgb: [124, 124, 124],
-    thickness: 0.1,
+    thickness: 0.08,
     decorIntent: 'pedestal-top',
   }),
   blockBounds('puzzle_chamber_far_sealed_door_panel', CHAMBER_DOOR.minX, CHAMBER_DOOR.maxX, CHAMBER_DOOR.minY, CHAMBER_DOOR.maxY, CHAMBER_DOOR.minZ, CHAMBER_DOOR.maxZ, {
@@ -537,8 +557,19 @@ const chamberBlocks = [
     cameraFadeable: false,
     decorIntent: 'sealed-door',
   }),
-  blockBounds('puzzle_chamber_side_seam_panel', CHAMBER_SEAM.minX, CHAMBER_SEAM.maxX, CHAMBER_SEAM.minY, CHAMBER_SEAM.maxY, CHAMBER_SEAM.minZ, CHAMBER_SEAM.maxZ, {
-    rgb: [112, 112, 112],
+  blockBounds('puzzle_chamber_side_seam_panel', CHAMBER_EAST_SEAM.minX, CHAMBER_EAST_SEAM.maxX, CHAMBER_EAST_SEAM.minY, CHAMBER_EAST_SEAM.maxY, CHAMBER_EAST_SEAM.minZ, CHAMBER_EAST_SEAM.maxZ, {
+    rgb: [118, 118, 118],
+    roughness: 0.97,
+    emissiveScale: 0.0,
+    solid: false,
+    structuralShell: false,
+    cameraIgnore: false,
+    cameraBlocker: false,
+    cameraFadeable: false,
+    decorIntent: 'wall-seam',
+  }),
+  blockBounds('puzzle_chamber_west_seam_panel', CHAMBER_WEST_SEAM.minX, CHAMBER_WEST_SEAM.maxX, CHAMBER_WEST_SEAM.minY, CHAMBER_WEST_SEAM.maxY, CHAMBER_WEST_SEAM.minZ, CHAMBER_WEST_SEAM.maxZ, {
+    rgb: [118, 118, 118],
     roughness: 0.96,
     emissiveScale: 0.0,
     solid: false,
@@ -548,9 +579,9 @@ const chamberBlocks = [
     cameraFadeable: false,
     decorIntent: 'wall-seam',
   }),
-  floorCover('puzzle_chamber_reward_pad', CHAMBER_REWARD_PAD.minX, CHAMBER_REWARD_PAD.maxX, 0.06, CHAMBER_REWARD_PAD.minZ, CHAMBER_REWARD_PAD.maxZ, {
+  floorCover('puzzle_chamber_reward_pad', CHAMBER_REWARD_PAD.minX, CHAMBER_REWARD_PAD.maxX, -0.3, CHAMBER_REWARD_PAD.minZ, CHAMBER_REWARD_PAD.maxZ, {
     rgb: [118, 118, 118],
-    thickness: 0.08,
+    thickness: 0.2,
     decorIntent: 'progression-pad',
   }),
 ];
