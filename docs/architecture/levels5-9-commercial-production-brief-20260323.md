@@ -178,6 +178,9 @@ Production beads:
 - `5.19` Pacing and checkpoint tuning
 - `5.20` Level 5 production lock
 
+Locked pack artifact:
+- [level5-aquarium-drift-production-pack-20260323.md](/Users/lolm/dadaquest/docs/architecture/level5-aquarium-drift-production-pack-20260323.md)
+
 ## Level 6 - Pressure Works
 
 Theme:
