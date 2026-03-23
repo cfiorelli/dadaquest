@@ -1018,6 +1018,46 @@ async function getLevel5PoolWallPatchAudit(page) {
   });
 }
 
+async function getLevel5SecretTunnelAudit(page) {
+  return page.evaluate(() => {
+    const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
+    const sourceNameFor = (mesh) => String(mesh?.metadata?.sourceName || mesh?.name || '');
+    const camera = scene?.activeCamera ?? null;
+    const engine = scene?.getEngine?.() ?? null;
+    const width = engine?.getRenderWidth?.() ?? 1280;
+    const height = engine?.getRenderHeight?.() ?? 720;
+    const region = {
+      minX: width * 0.28,
+      maxX: width * 0.74,
+      minY: height * 0.34,
+      maxY: height * 0.82,
+      cols: 15,
+      rows: 11,
+    };
+    const samples = [];
+    for (let row = 0; row < region.rows; row += 1) {
+      const y = region.minY + ((region.maxY - region.minY) * (row / Math.max(1, region.rows - 1)));
+      for (let col = 0; col < region.cols; col += 1) {
+        const x = region.minX + ((region.maxX - region.minX) * (col / Math.max(1, region.cols - 1)));
+        const hit = scene?.pick?.(
+          x,
+          y,
+          (mesh) => mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02,
+          false,
+          camera,
+        ) ?? null;
+        samples.push({
+          id: `r${row}_c${col}`,
+          sourceName: sourceNameFor(hit?.pickedMesh),
+        });
+      }
+    }
+    return {
+      visibleSources: [...new Set(samples.map((sample) => sample.sourceName).filter(Boolean))].sort(),
+    };
+  });
+}
+
 test('capture scene screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
@@ -1173,9 +1213,14 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 24.8, yaw: 0.0, cameraYaw: 0.0 });
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 25.4, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(800);
+  const poolSightlineAudit = await getLevel5SecretTunnelAudit(page);
+  expect(poolSightlineAudit.visibleSources.some((name) => name.includes('swim_tunnel_stair_shaft'))).toBe(false);
+  expect(poolSightlineAudit.visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(poolSightlineAudit.visibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
+  expect(poolSightlineAudit.visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
   await captureProof('docs/screenshots/level5-starter-slice-gameplay-pool-view.png');
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-tunnel-run.png', {
@@ -1187,17 +1232,17 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-stair-surface.png', {
-    x: 36.0,
-    y: -0.2,
-    z: 66.8,
+    x: 31.6,
+    y: 0.42,
+    z: 76.0,
     yaw: 0.0,
     cameraYaw: 0.0,
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-hallway.png', {
-    x: 36.0,
+    x: 35.6,
     y: 0.42,
-    z: 78.0,
+    z: 82.0,
     yaw: Math.PI,
     cameraYaw: Math.PI,
   });
@@ -1205,7 +1250,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-entry.png', {
     x: 36.0,
     y: 0.42,
-    z: 82.6,
+    z: 84.6,
     yaw: 0.0,
     cameraYaw: 0.0,
   });

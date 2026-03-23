@@ -280,7 +280,15 @@ const STAIR_SHAFT = {
   minZ: 66.0,
   maxZ: 70.0,
 };
-const HALLWAY = { minX: 34.0, maxX: 38.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const DRY_VESTIBULE = { minX: 33.6, maxX: 36.0, minY: 0.0, maxY: 2.8, minZ: 70.0, maxZ: 73.6 };
+const DRY_TURN = { minX: 30.4, maxX: 33.6, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 };
+const DRY_STAIR_SHAFT = { minX: 30.4, maxX: 32.8, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 };
+const DRY_UPPER_HALL = { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 3.2, minZ: 80.0, maxZ: 84.0 };
+const HALLWAY = { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const DRY_TURN_OPENING_CENTER_Z = 72.4;
+const DRY_TURN_OPENING_WIDTH = 2.4;
+const DRY_STAIR_OPENING_CENTER_X = 31.6;
+const DRY_STAIR_OPENING_WIDTH = 2.4;
 const CHAMBER_ENTRY = { x: 36.0, y: 0.0, z: HALLWAY.maxZ };
 const PUZZLE_CHAMBER = {
   minX: CHAMBER_ENTRY.x - 7.0,
@@ -476,9 +484,6 @@ const tunnelSurfaces = [
   }),
 ];
 
-const TUNNEL_STAIR_VISUAL_STEP_COUNT = 8;
-const TUNNEL_STAIR_VISUAL_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_VISUAL_STEP_COUNT;
-const TUNNEL_STAIR_VISUAL_STEP_RISE = 1.6 / TUNNEL_STAIR_VISUAL_STEP_COUNT;
 const TUNNEL_STAIR_COLLIDER_STEP_COUNT = 24;
 const TUNNEL_STAIR_COLLIDER_STEP_DEPTH = (STAIR_SHAFT.maxZ - STAIR_SHAFT.minZ) / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
 const TUNNEL_STAIR_COLLIDER_STEP_RISE = 1.6 / TUNNEL_STAIR_COLLIDER_STEP_COUNT;
@@ -518,38 +523,77 @@ for (let index = 0; index < TUNNEL_STAIR_HELPER_COUNT; index += 1) {
   }));
 }
 
-tunnelSurfaces.push(surfaceRect('swim_tunnel_hallway_threshold_helper', HALLWAY.minX, HALLWAY.maxX, 0.0, STAIR_SHAFT.maxZ - 0.35, HALLWAY.minZ + 0.9, 'hallway_floor', {
+tunnelSurfaces.push(surfaceRect('swim_tunnel_hallway_threshold_helper', DRY_VESTIBULE.minX, DRY_VESTIBULE.maxX, 0.0, STAIR_SHAFT.maxZ - 0.35, DRY_VESTIBULE.minZ + 0.9, 'hallway_floor', {
   h: 0.24,
   minThickness: 0.24,
   walkableClassification: 'room-floor',
   rgb: [70, 70, 70],
   visible: false,
 }));
-
-for (let index = 0; index < TUNNEL_STAIR_VISUAL_STEP_COUNT; index += 1) {
-  const minZ = STAIR_SHAFT.minZ + (index * TUNNEL_STAIR_VISUAL_STEP_DEPTH);
-  const maxZ = STAIR_SHAFT.minZ + ((index + 1) * TUNNEL_STAIR_VISUAL_STEP_DEPTH);
-  tunnelBlocks.push(floorCover(`swim_tunnel_stair_cover_${index + 1}`, STAIR_SHAFT.minX + 0.1, STAIR_SHAFT.maxX - 0.1, -1.52 + ((index + 1) * TUNNEL_STAIR_VISUAL_STEP_RISE), minZ, maxZ, {
-    rgb: [54, 54, 54],
-    thickness: 0.14,
-  }));
-}
+const DRY_STAIR_VISUAL_STEP_COUNT = 6;
+const DRY_STAIR_VISUAL_STEP_DEPTH = (DRY_STAIR_SHAFT.maxZ - DRY_STAIR_SHAFT.minZ) / DRY_STAIR_VISUAL_STEP_COUNT;
+const DRY_STAIR_VISUAL_STEP_RISE = 0.12 / DRY_STAIR_VISUAL_STEP_COUNT;
 
 const hallwayBlocks = [
-  ...makeShell('surfacing_hallway', HALLWAY, {
-    north: openingAlongX(TUNNEL_MOUTH_CENTER_X, 1.6, TUNNEL_MOUTH_WIDTH, 3.2),
-    south: openingAlongX(CHAMBER_ENTRY.x, HALLWAY_CHAMBER_OPENING_CENTER_Y, HALLWAY_CHAMBER_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  ...makeShell('surfacing_hallway_vestibule', DRY_VESTIBULE, {
+    north: openingAlongX(TUNNEL_BEND_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, TUNNEL_BEND_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    west: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  }, {
+    rgb: HALL_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 2.8,
+    ceilingY: 2.8,
+  }),
+  floorCover('surfacing_hallway_vestibule_floor_cover', DRY_VESTIBULE.minX, DRY_VESTIBULE.maxX, 0.08, DRY_VESTIBULE.minZ, DRY_VESTIBULE.maxZ, {
+    rgb: [88, 88, 88],
+    thickness: 0.12,
+  }),
+  ...makeShell('surfacing_hallway_turn', DRY_TURN, {
+    east: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    south: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  }, {
+    rgb: HALL_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 2.8,
+    ceilingY: 2.8,
+  }),
+  floorCover('surfacing_hallway_turn_floor_cover', DRY_TURN.minX, DRY_TURN.maxX, 0.08, DRY_TURN.minZ, DRY_TURN.maxZ, {
+    rgb: [86, 86, 86],
+    thickness: 0.12,
+  }),
+  ...makeShell('surfacing_hallway_stair_shaft', DRY_STAIR_SHAFT, {
+    north: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    south: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
   }, {
     rgb: HALL_RGB,
     wallBottomY: 0.0,
     wallTopY: 4.5,
     ceilingY: 4.5,
   }),
-  floorCover('surfacing_hallway_floor_cover', HALLWAY.minX, HALLWAY.maxX, 0.08, HALLWAY.minZ, HALLWAY.maxZ, {
+  ...makeShell('surfacing_hallway_upper', DRY_UPPER_HALL, {
+    north: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    south: openingAlongX(CHAMBER_ENTRY.x, HALLWAY_CHAMBER_OPENING_CENTER_Y, HALLWAY_CHAMBER_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  }, {
+    rgb: HALL_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 3.2,
+    ceilingY: 3.2,
+  }),
+  floorCover('surfacing_hallway_upper_floor_cover', DRY_UPPER_HALL.minX, DRY_UPPER_HALL.maxX, 0.08, DRY_UPPER_HALL.minZ, DRY_UPPER_HALL.maxZ, {
     rgb: [88, 88, 88],
     thickness: 0.12,
   }),
 ];
+
+for (let index = 0; index < DRY_STAIR_VISUAL_STEP_COUNT; index += 1) {
+  const minZ = DRY_STAIR_SHAFT.minZ + (index * DRY_STAIR_VISUAL_STEP_DEPTH);
+  const maxZ = DRY_STAIR_SHAFT.minZ + ((index + 1) * DRY_STAIR_VISUAL_STEP_DEPTH);
+  hallwayBlocks.push(floorCover(`surfacing_hallway_stair_cover_${index + 1}`, DRY_STAIR_SHAFT.minX + 0.08, DRY_STAIR_SHAFT.maxX - 0.08, 0.08 + ((index + 1) * DRY_STAIR_VISUAL_STEP_RISE), minZ, maxZ, {
+    rgb: [92, 92, 92],
+    thickness: 0.12,
+    decorIntent: 'dry-stair',
+  }));
+}
 
 const chamberBlocks = [
   ...makeShell('puzzle_chamber', PUZZLE_CHAMBER, {
@@ -721,18 +765,42 @@ export const LEVEL5 = compileAuthoredEraLayout({
       {
         id: 'surfacing_hallway',
         label: 'Surfacing Hallway',
-        x: 36.0,
+        x: (HALLWAY.minX + HALLWAY.maxX) * 0.5,
         z: 77.0,
-        w: 4.0,
+        w: HALLWAY.maxX - HALLWAY.minX,
         d: 14.0,
         floorY: 0.0,
         ceilingY: 4.5,
         floorSurfaceType: 'hallway_floor',
         wallLanguage: 'graybox_hallway_shell',
-        landmarks: ['narrow hallway'],
+        landmarks: ['dry vestibule', 'blind turn', 'enclosed stairs', 'narrow hallway'],
         shell: false,
         surfaces: [
-          surfaceRect('hallway_floor', HALLWAY.minX, HALLWAY.maxX, 0.0, HALLWAY.minZ, HALLWAY.maxZ, 'hallway_floor', {
+          surfaceRect('hallway_floor_vestibule', DRY_VESTIBULE.minX, DRY_VESTIBULE.maxX, 0.0, DRY_VESTIBULE.minZ, DRY_VESTIBULE.maxZ, 'hallway_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [94, 94, 94],
+            visible: false,
+          }),
+          surfaceRect('hallway_floor_turn', DRY_TURN.minX, DRY_TURN.maxX, 0.0, DRY_TURN.minZ, DRY_TURN.maxZ, 'hallway_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [94, 94, 94],
+            visible: false,
+          }),
+          surfaceRect('hallway_floor_stair_shaft', DRY_STAIR_SHAFT.minX, DRY_STAIR_SHAFT.maxX, 0.0, DRY_STAIR_SHAFT.minZ, DRY_STAIR_SHAFT.maxZ, 'hallway_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [94, 94, 94],
+            visible: false,
+          }),
+          surfaceRect('hallway_floor_upper', DRY_UPPER_HALL.minX, DRY_UPPER_HALL.maxX, 0.0, DRY_UPPER_HALL.minZ, DRY_UPPER_HALL.maxZ, 'hallway_floor', {
             h: 0.4,
             minThickness: 0.4,
             walkableClassification: 'room-floor',
@@ -806,9 +874,9 @@ export const LEVEL5 = compileAuthoredEraLayout({
         label: 'Tunnel To Hallway',
         sourceSector: 'submerged_swim_tunnel',
         destinationSector: 'surfacing_hallway',
-        x: 36.0,
+        x: TUNNEL_BEND_STAIR_OPENING_CENTER_X,
         z: 69.8,
-        w: TUNNEL_MOUTH_WIDTH,
+        w: TUNNEL_BEND_STAIR_OPENING_WIDTH,
         d: 0.8,
         floorY: 0.0,
         ceilingY: 2.2,

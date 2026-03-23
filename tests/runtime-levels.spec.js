@@ -1714,51 +1714,52 @@ async function getLevel5TunnelCameraAudit(page) {
 
 async function getLevel5SecretTunnelAudit(page) {
   return page.evaluate(() => {
-    const mouthMinX = 34.4;
-    const mouthMaxX = 37.6;
     const scene = window.__DADA_DEBUG__?.sceneRef ?? null;
     const sourceNameFor = (mesh) => String(mesh?.metadata?.sourceName || mesh?.name || '');
     const camera = scene?.activeCamera ?? null;
     const engine = scene?.getEngine?.() ?? null;
     const width = engine?.getRenderWidth?.() ?? 1280;
     const height = engine?.getRenderHeight?.() ?? 720;
-    const screenSamples = [
-      { id: 'upper_left', x: width * 0.36, y: height * 0.48 },
-      { id: 'upper_center_left', x: width * 0.44, y: height * 0.48 },
-      { id: 'upper_center', x: width * 0.52, y: height * 0.48 },
-      { id: 'upper_center_right', x: width * 0.60, y: height * 0.48 },
-      { id: 'upper_right', x: width * 0.68, y: height * 0.48 },
-      { id: 'mid_left', x: width * 0.36, y: height * 0.56 },
-      { id: 'mid_center_left', x: width * 0.44, y: height * 0.56 },
-      { id: 'mid_center', x: width * 0.52, y: height * 0.56 },
-      { id: 'mid_center_right', x: width * 0.60, y: height * 0.56 },
-      { id: 'mid_right', x: width * 0.68, y: height * 0.56 },
-      { id: 'lower_left', x: width * 0.36, y: height * 0.64 },
-      { id: 'lower_center_left', x: width * 0.44, y: height * 0.64 },
-      { id: 'lower_center', x: width * 0.52, y: height * 0.64 },
-      { id: 'lower_center_right', x: width * 0.60, y: height * 0.64 },
-      { id: 'lower_right', x: width * 0.68, y: height * 0.64 },
-      { id: 'deep_lower_left', x: width * 0.38, y: height * 0.72 },
-      { id: 'deep_lower_center', x: width * 0.52, y: height * 0.72 },
-      { id: 'deep_lower_right', x: width * 0.66, y: height * 0.72 },
-    ];
+    const region = {
+      minX: width * 0.28,
+      maxX: width * 0.74,
+      minY: height * 0.34,
+      maxY: height * 0.82,
+      cols: 15,
+      rows: 11,
+    };
+    const screenSamples = [];
+    for (let row = 0; row < region.rows; row += 1) {
+      const y = region.minY + ((region.maxY - region.minY) * (row / Math.max(1, region.rows - 1)));
+      for (let col = 0; col < region.cols; col += 1) {
+        const x = region.minX + ((region.maxX - region.minX) * (col / Math.max(1, region.cols - 1)));
+        screenSamples.push({
+          id: `r${row}_c${col}`,
+          x,
+          y,
+        });
+      }
+    }
 
+    const samples = screenSamples.map((sample) => {
+      const hit = scene?.pick?.(
+        sample.x,
+        sample.y,
+        (mesh) => mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02,
+        false,
+        camera,
+      ) ?? null;
+      return {
+        id: sample.id,
+        sourceName: sourceNameFor(hit?.pickedMesh),
+      };
+    });
     return {
       playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
       cameraPos: camera ? { x: camera.position.x, y: camera.position.y, z: camera.position.z } : null,
-      screenSamples: screenSamples.map((sample) => {
-        const hit = scene?.pick?.(
-          sample.x,
-          sample.y,
-          (mesh) => mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02,
-          false,
-          camera,
-        ) ?? null;
-        return {
-          id: sample.id,
-          sourceName: sourceNameFor(hit?.pickedMesh),
-        };
-      }),
+      sampleRegion: region,
+      screenSamples: samples,
+      visibleSources: [...new Set(samples.map((sample) => sample.sourceName).filter(Boolean))].sort(),
     };
   });
 }
@@ -1959,7 +1960,7 @@ test('@level5 @era5 runtime: level 5 exposes the minimal starter vertical slice 
   expect(starterRoomAudit.unexpectedVisibleActorsOutsideRoom).toEqual([]);
 });
 
-test('@level5 @era5 runtime: level 5 starter slice route is traversable from pool to surfaced hallway with no fall-through', async ({ page }) => {
+test('@level5 @era5 runtime: level 5 starter slice route is traversable from pool through the blind dogleg transition to the chamber with no fall-through', async ({ page }) => {
   test.setTimeout(180_000);
   await gotoDebugLevel(page, 5);
   await seedEra5BubbleWand(page);
@@ -2079,6 +2080,7 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
     cameraYaw: 0.0,
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await dispatchHeldKey(page, 'keydown', { code: 'Space', key: ' ' });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
     { timeout: 35_000 },
@@ -2095,12 +2097,100 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
     ) ?? null,
   }));
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  await dispatchHeldKey(page, 'keyup', { code: 'Space', key: ' ' });
   expect(hallwayTraversalState.pos.z).toBeGreaterThan(70.6);
-  expect(hallwayTraversalState.pos.x).toBeGreaterThan(34.4);
-  expect(hallwayTraversalState.pos.x).toBeLessThan(37.6);
+  expect(hallwayTraversalState.pos.x).toBeGreaterThan(33.4);
+  expect(hallwayTraversalState.pos.x).toBeLessThan(36.2);
   expect(hallwayTraversalState.pos.y).toBeGreaterThan(0.18);
   expect(hallwayTraversalState.waterState?.inDeepWater ?? false).toBe(false);
   expect(hallwayTraversalState.waterState?.headSubmerged ?? false).toBe(false);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 34.7,
+    y: 0.42,
+    z: 72.3,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
+    { timeout: 5_000 },
+  ).toBeLessThan(33.05);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const turnTraversalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(turnTraversalState.pos.x).toBeLessThan(33.1);
+  expect(turnTraversalState.pos.x).toBeGreaterThan(30.2);
+  expect(turnTraversalState.pos.z).toBeGreaterThan(71.0);
+  expect(turnTraversalState.pos.z).toBeLessThan(73.8);
+  expect(turnTraversalState.pos.y).toBeGreaterThan(0.18);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 31.6,
+    y: 0.42,
+    z: 74.0,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
+    { timeout: 8_000 },
+  ).toBeGreaterThan(79.0);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const stairTraversalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(stairTraversalState.pos.x).toBeGreaterThan(30.2);
+  expect(stairTraversalState.pos.x).toBeLessThan(32.9);
+  expect(stairTraversalState.pos.z).toBeGreaterThan(79.0);
+  expect(stairTraversalState.pos.z).toBeLessThan(80.5);
+  expect(stairTraversalState.pos.y).toBeGreaterThan(0.18);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 31.8,
+    y: 0.42,
+    z: 81.4,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
+    { timeout: 6_000 },
+  ).toBeGreaterThan(34.4);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const upperHallTraversalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(upperHallTraversalState.pos.x).toBeGreaterThan(34.4);
+  expect(upperHallTraversalState.pos.x).toBeLessThan(37.8);
+  expect(upperHallTraversalState.pos.z).toBeGreaterThan(80.0);
+  expect(upperHallTraversalState.pos.z).toBeLessThan(84.2);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 36.0,
+    y: 0.42,
+    z: 83.2,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
+    { timeout: 5_000 },
+  ).toBeGreaterThan(84.2);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const chamberEntryState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expectPositionInBounds(chamberEntryState.pos, { minX: 29.0, maxX: 43.0, minY: 0.0, maxY: 8.0, minZ: 84.0, maxZ: 88.0 });
 
   const tunnelSamples = [
     {
@@ -2116,16 +2206,24 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
       bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 1.4, minZ: 50.0, maxZ: 66.0 },
     },
     {
-      pose: { x: 36.0, y: -1.0, z: 66.7, yaw: 0.0, cameraYaw: 0.0 },
+      pose: { x: 34.8, y: -1.0, z: 66.7, yaw: 0.0, cameraYaw: 0.0 },
       bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
     },
     {
-      pose: { x: 36.0, y: 0.18, z: 68.8, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.0, maxX: 38.0, minY: -1.8, maxY: 4.5, minZ: 66.0, maxZ: 70.0 },
+      pose: { x: 34.8, y: 0.42, z: 72.0, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 33.6, maxX: 36.0, minY: 0.0, maxY: 2.8, minZ: 70.0, maxZ: 73.6 },
     },
     {
-      pose: { x: 36.0, y: 0.42, z: 76.0, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 34.0, maxX: 38.0, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 },
+      pose: { x: 32.0, y: 0.42, z: 72.4, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 30.4, maxX: 33.6, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 },
+    },
+    {
+      pose: { x: 31.6, y: 0.42, z: 77.4, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 30.4, maxX: 32.8, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 },
+    },
+    {
+      pose: { x: 36.0, y: 0.42, z: 82.0, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 4.5, minZ: 80.0, maxZ: 84.0 },
     },
   ];
 
@@ -2219,7 +2317,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   await page.waitForTimeout(600);
 
   const roomAudit = await getLevel5SecretTunnelAudit(page);
-  const roomVisibleSources = (roomAudit.screenSamples || []).map((sample) => sample.sourceName || '');
+  const roomVisibleSources = roomAudit.visibleSources || [];
   expect(roomVisibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
   expect(roomVisibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
   expect(roomVisibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
@@ -2228,13 +2326,14 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 24.8, yaw: 0.0, cameraYaw: 0.0 });
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 25.4, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(600);
 
   const poolAudit = await getLevel5SecretTunnelAudit(page);
-  const visibleSources = (poolAudit.screenSamples || []).map((sample) => sample.sourceName || '');
+  const visibleSources = poolAudit.visibleSources || [];
   expect(visibleSources.some((name) => name.includes('swim_tunnel_run'))).toBe(false);
+  expect(visibleSources.some((name) => name.includes('swim_tunnel_stair_shaft'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
   expect(visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
