@@ -11,6 +11,7 @@
 - Branch: `archive/era5-3d-squarium`
 - Tag: `archive-era5-3d-squarium-20260323`
 - Inventory document: [era5-archive-20260323.md](/Users/lolm/dadaquest/docs/architecture/era5-archive-20260323.md)
+- Active production brief: [levels5-9-commercial-production-brief-20260323.md](/Users/lolm/dadaquest/docs/architecture/levels5-9-commercial-production-brief-20260323.md)
 
 ## Theme mapping used on main
 
