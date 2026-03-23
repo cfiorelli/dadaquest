@@ -1830,10 +1830,10 @@ async function getLevel5PoolWallPatchAudit(page) {
     const region = {
       minX: mouthMinX,
       maxX: mouthMaxX,
-      minY: -0.3,
-      maxY: 1.5,
+      minY: 1.0,
+      maxY: 5.9,
       minZ: 36.0,
-      maxZ: 36.5,
+      maxZ: 37.9,
     };
     const visibleMeshes = (scene?.meshes || [])
       .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
@@ -2107,30 +2107,53 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 34.7,
+    x: 35.0,
     y: 0.42,
     z: 72.3,
-    yaw: -Math.PI * 0.5,
-    cameraYaw: -Math.PI * 0.5,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
     { timeout: 5_000 },
-  ).toBeLessThan(33.05);
+  ).toBeGreaterThan(36.7);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   const turnTraversalState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
-  expect(turnTraversalState.pos.x).toBeLessThan(33.1);
-  expect(turnTraversalState.pos.x).toBeGreaterThan(30.2);
+  expect(turnTraversalState.pos.x).toBeGreaterThan(36.8);
+  expect(turnTraversalState.pos.x).toBeLessThan(39.4);
   expect(turnTraversalState.pos.z).toBeGreaterThan(71.0);
   expect(turnTraversalState.pos.z).toBeLessThan(73.8);
   expect(turnTraversalState.pos.y).toBeGreaterThan(0.18);
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 31.6,
+    x: 38.4,
+    y: 0.42,
+    z: 72.4,
+    yaw: Math.PI * 0.5,
+    cameraYaw: Math.PI * 0.5,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
+    { timeout: 6_000 },
+  ).toBeGreaterThan(40.0);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const postTurnTraversalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(postTurnTraversalState.pos.x).toBeGreaterThan(40.0);
+  expect(postTurnTraversalState.pos.x).toBeLessThan(42.4);
+  expect(postTurnTraversalState.pos.z).toBeGreaterThan(71.0);
+  expect(postTurnTraversalState.pos.z).toBeLessThan(73.8);
+  expect(postTurnTraversalState.pos.y).toBeGreaterThan(0.18);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 41.2,
     y: 0.42,
     z: 74.0,
     yaw: 0.0,
@@ -2145,25 +2168,25 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
   const stairTraversalState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
   }));
-  expect(stairTraversalState.pos.x).toBeGreaterThan(30.2);
-  expect(stairTraversalState.pos.x).toBeLessThan(32.9);
+  expect(stairTraversalState.pos.x).toBeGreaterThan(40.0);
+  expect(stairTraversalState.pos.x).toBeLessThan(42.5);
   expect(stairTraversalState.pos.z).toBeGreaterThan(79.0);
-  expect(stairTraversalState.pos.z).toBeLessThan(80.5);
+  expect(stairTraversalState.pos.z).toBeLessThan(81.2);
   expect(stairTraversalState.pos.y).toBeGreaterThan(0.18);
 
   await focusGameplay(page);
   await resetEra5Pose(page, {
-    x: 31.8,
+    x: 41.0,
     y: 0.42,
     z: 81.4,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
     { timeout: 6_000 },
-  ).toBeGreaterThan(34.4);
+  ).toBeLessThan(37.8);
   await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
   const upperHallTraversalState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
@@ -2218,12 +2241,16 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
       bounds: { minX: 30.4, maxX: 33.6, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 },
     },
     {
-      pose: { x: 31.6, y: 0.42, z: 77.4, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 30.4, maxX: 32.8, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 },
+      pose: { x: 28.8, y: 0.42, z: 72.4, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 27.2, maxX: 30.4, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 },
+    },
+    {
+      pose: { x: 28.4, y: 0.42, z: 77.4, yaw: 0.0, cameraYaw: 0.0 },
+      bounds: { minX: 27.2, maxX: 29.6, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 },
     },
     {
       pose: { x: 36.0, y: 0.42, z: 82.0, yaw: 0.0, cameraYaw: 0.0 },
-      bounds: { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 4.5, minZ: 80.0, maxZ: 84.0 },
+      bounds: { minX: 27.2, maxX: 37.6, minY: 0.0, maxY: 4.5, minZ: 80.0, maxZ: 84.0 },
     },
   ];
 
@@ -2273,7 +2300,7 @@ test('@level5 @era5 runtime: level 5 tunnel camera tightens locally and restores
   expect(tunnelAudit.cameraPos.z).toBeLessThan(54.0);
 
   await resetEra5Pose(page, {
-    x: 36.0,
+    x: 41.2,
     y: 0.42,
     z: 76.0,
     yaw: 0.0,
@@ -2326,6 +2353,18 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 22.0, y: 0.42, z: 18.0, yaw: -0.3, cameraYaw: -0.3 });
+  });
+  await page.waitForTimeout(600);
+
+  const angledRoomAudit = await getLevel5SecretTunnelAudit(page);
+  const angledVisibleSources = angledRoomAudit.visibleSources || [];
+  expect(angledVisibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(angledVisibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
+  expect(angledVisibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
+
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
     window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 25.4, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(600);
@@ -2342,6 +2381,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   const wallPatchAudit = await getLevel5PoolWallPatchAudit(page);
   expect(wallPatchAudit.visibleMeshes).toContain('starter_pool_lab_south_wall_header');
   expect(wallPatchAudit.visibleMeshes).not.toContain('swim_tunnel_throat_north_wall_header');
+  expect(wallPatchAudit.visibleMeshes).not.toContain('swim_tunnel_throat_ceiling');
 
   const levelState = await page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState ?? null);
   const underdeckPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_underdeck') ?? null;

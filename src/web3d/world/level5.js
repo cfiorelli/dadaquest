@@ -242,7 +242,7 @@ const TUNNEL_THROAT = {
   minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
   maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
   minY: -1.8,
-  maxY: 1.4,
+  maxY: -0.15,
   minZ: 36.5,
   maxZ: 40.5,
 };
@@ -250,7 +250,7 @@ const TUNNEL_RUN = {
   minX: TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH,
   maxX: TUNNEL_MOUTH_CENTER_X + TUNNEL_MOUTH_HALF_WIDTH,
   minY: -1.8,
-  maxY: 1.4,
+  maxY: -0.15,
   minZ: 40.5,
   maxZ: 60.0,
 };
@@ -281,13 +281,14 @@ const STAIR_SHAFT = {
   maxZ: 70.0,
 };
 const DRY_VESTIBULE = { minX: 33.6, maxX: 36.0, minY: 0.0, maxY: 2.8, minZ: 70.0, maxZ: 73.6 };
-const DRY_TURN = { minX: 30.4, maxX: 33.6, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 };
-const DRY_STAIR_SHAFT = { minX: 30.4, maxX: 32.8, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 };
-const DRY_UPPER_HALL = { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 3.2, minZ: 80.0, maxZ: 84.0 };
-const HALLWAY = { minX: 30.4, maxX: 37.6, minY: 0.0, maxY: 4.5, minZ: 70.0, maxZ: 84.0 };
+const DRY_TURN = { minX: 36.0, maxX: 39.2, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 };
+const DRY_POST_TURN = { minX: 39.2, maxX: 42.4, minY: 0.0, maxY: 2.8, minZ: 71.2, maxZ: 73.6 };
+const DRY_STAIR_SHAFT = { minX: 40.0, maxX: 42.4, minY: 0.0, maxY: 4.5, minZ: 73.6, maxZ: 80.0 };
+const DRY_UPPER_HALL = { minX: 34.4, maxX: 42.4, minY: 0.0, maxY: 6.0, minZ: 80.0, maxZ: 84.0 };
+const HALLWAY = { minX: 33.6, maxX: 42.4, minY: 0.0, maxY: 6.0, minZ: 70.0, maxZ: 84.0 };
 const DRY_TURN_OPENING_CENTER_Z = 72.4;
 const DRY_TURN_OPENING_WIDTH = 2.4;
-const DRY_STAIR_OPENING_CENTER_X = 31.6;
+const DRY_STAIR_OPENING_CENTER_X = 41.2;
 const DRY_STAIR_OPENING_WIDTH = 2.4;
 const CHAMBER_ENTRY = { x: 36.0, y: 0.0, z: HALLWAY.maxZ };
 const PUZZLE_CHAMBER = {
@@ -364,8 +365,8 @@ const TUNNEL_CAMERA_ZONE = {
   },
   allowUnderwaterOcclusion: true,
   cameraClampBounds: {
-    minX: TUNNEL_MOUTH_CENTER_X - 1.35,
-    maxX: TUNNEL_MOUTH_CENTER_X + 1.35,
+    minX: HALLWAY.minX + 0.2,
+    maxX: HALLWAY.maxX - 0.2,
     minY: -0.4,
     maxY: 3.75,
     minZ: TUNNEL_UNDERDECK.minZ + 0.15,
@@ -389,6 +390,22 @@ const room1Blocks = makeShell('starter_pool_lab', ROOM1, {
   wallTopY: 6.0,
   ceilingY: 6.0,
 });
+room1Blocks.push(
+  shellBlock('starter_pool_lab_south_wall_west_liner', ROOM1.minX, TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH, -2.0, 6.0, ROOM1.maxZ - 0.4, ROOM1.maxZ, {
+    rgb: LAB_RGB,
+    roughness: 0.92,
+    emissiveScale: 0.01,
+    decorIntent: 'wall',
+    blockerReason: 'room-boundary-liner',
+  }),
+  shellBlock('starter_pool_lab_south_wall_west_backer', ROOM1.minX, TUNNEL_MOUTH_CENTER_X - TUNNEL_MOUTH_HALF_WIDTH, -2.0, 3.2, ROOM1.maxZ, TUNNEL_BEND.maxZ, {
+    rgb: LAB_RGB,
+    roughness: 0.92,
+    emissiveScale: 0.01,
+    decorIntent: 'wall',
+    blockerReason: 'room-boundary-backer',
+  }),
+);
 
 const tunnelBlocks = [
   ...makeShell('swim_tunnel_underdeck', TUNNEL_UNDERDECK, {
@@ -412,8 +429,8 @@ const tunnelBlocks = [
   }, {
     rgb: TUNNEL_RGB,
     wallBottomY: -1.8,
-    wallTopY: 1.4,
-    ceilingY: 1.4,
+    wallTopY: -0.15,
+    ceilingY: -0.15,
   }).filter((block) => block.name !== 'swim_tunnel_throat_north_wall_header'),
   ...makeShell('swim_tunnel_run', TUNNEL_RUN, {
     north: openingAlongX(TUNNEL_MOUTH_CENTER_X, -1.25, TUNNEL_MOUTH_WIDTH, 2.2),
@@ -421,8 +438,8 @@ const tunnelBlocks = [
   }, {
     rgb: TUNNEL_RGB,
     wallBottomY: -1.8,
-    wallTopY: 1.4,
-    ceilingY: 1.4,
+    wallTopY: -0.15,
+    ceilingY: -0.15,
   }),
   ...makeShell('swim_tunnel_bend', TUNNEL_BEND, {
     north: openingAlongX(TUNNEL_MOUTH_CENTER_X, -1.25, TUNNEL_MOUTH_WIDTH, 2.2),
@@ -537,7 +554,7 @@ const DRY_STAIR_VISUAL_STEP_RISE = 0.12 / DRY_STAIR_VISUAL_STEP_COUNT;
 const hallwayBlocks = [
   ...makeShell('surfacing_hallway_vestibule', DRY_VESTIBULE, {
     north: openingAlongX(TUNNEL_BEND_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, TUNNEL_BEND_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
-    west: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    east: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
   }, {
     rgb: HALL_RGB,
     wallBottomY: 0.0,
@@ -549,8 +566,8 @@ const hallwayBlocks = [
     thickness: 0.12,
   }),
   ...makeShell('surfacing_hallway_turn', DRY_TURN, {
+    west: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
     east: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
-    south: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
   }, {
     rgb: HALL_RGB,
     wallBottomY: 0.0,
@@ -558,6 +575,19 @@ const hallwayBlocks = [
     ceilingY: 2.8,
   }),
   floorCover('surfacing_hallway_turn_floor_cover', DRY_TURN.minX, DRY_TURN.maxX, 0.08, DRY_TURN.minZ, DRY_TURN.maxZ, {
+    rgb: [86, 86, 86],
+    thickness: 0.12,
+  }),
+  ...makeShell('surfacing_hallway_post_turn', DRY_POST_TURN, {
+    west: openingAlongZ(DRY_TURN_OPENING_CENTER_Z, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_TURN_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+    south: openingAlongX(DRY_STAIR_OPENING_CENTER_X, HALLWAY_CHAMBER_OPENING_CENTER_Y, DRY_STAIR_OPENING_WIDTH, HALLWAY_CHAMBER_OPENING_HEIGHT),
+  }, {
+    rgb: HALL_RGB,
+    wallBottomY: 0.0,
+    wallTopY: 2.8,
+    ceilingY: 2.8,
+  }),
+  floorCover('surfacing_hallway_post_turn_floor_cover', DRY_POST_TURN.minX, DRY_POST_TURN.maxX, 0.08, DRY_POST_TURN.minZ, DRY_POST_TURN.maxZ, {
     rgb: [86, 86, 86],
     thickness: 0.12,
   }),
@@ -604,9 +634,9 @@ const chamberBlocks = [
     wallTopY: 8.0,
     ceilingY: 8.0,
   }),
-  floorCover('puzzle_chamber_floor_cover', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.08, PUZZLE_CHAMBER.minZ, PUZZLE_CHAMBER.maxZ, {
+  floorCover('puzzle_chamber_floor_cover', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.0, PUZZLE_CHAMBER.minZ, PUZZLE_CHAMBER.maxZ, {
     rgb: [96, 96, 96],
-    thickness: 0.12,
+    thickness: 0.02,
   }),
   floorCover('puzzle_chamber_visible_floor_plate', CHAMBER_VISIBLE_FLOOR_PLATE.minX, CHAMBER_VISIBLE_FLOOR_PLATE.maxX, 0.08, CHAMBER_VISIBLE_FLOOR_PLATE.minZ, CHAMBER_VISIBLE_FLOOR_PLATE.maxZ, {
     rgb: [122, 122, 122],
@@ -785,6 +815,14 @@ export const LEVEL5 = compileAuthoredEraLayout({
             visible: false,
           }),
           surfaceRect('hallway_floor_turn', DRY_TURN.minX, DRY_TURN.maxX, 0.0, DRY_TURN.minZ, DRY_TURN.maxZ, 'hallway_floor', {
+            h: 0.4,
+            minThickness: 0.4,
+            walkableClassification: 'room-floor',
+            roomSurface: true,
+            rgb: [94, 94, 94],
+            visible: false,
+          }),
+          surfaceRect('hallway_floor_post_turn', DRY_POST_TURN.minX, DRY_POST_TURN.maxX, 0.0, DRY_POST_TURN.minZ, DRY_POST_TURN.maxZ, 'hallway_floor', {
             h: 0.4,
             minThickness: 0.4,
             walkableClassification: 'room-floor',

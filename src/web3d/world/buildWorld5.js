@@ -1523,10 +1523,12 @@ export function buildWorld5(scene, options = {}) {
     hiddenY,
     raisedY,
     durationSec = 1.2,
+    hideWhenHidden = false,
   }) {
     let progress = 0;
     let target = 0;
     mesh.position.y = hiddenY;
+    if (hideWhenHidden) setNodeVisible(mesh, false);
     return {
       mesh,
       get progress() {
@@ -1538,6 +1540,7 @@ export function buildWorld5(scene, options = {}) {
         return target > progress ? 'rising' : 'lowering';
       },
       raise() {
+        if (hideWhenHidden) setNodeVisible(mesh, true);
         target = 1;
       },
       lower() {
@@ -1546,19 +1549,27 @@ export function buildWorld5(scene, options = {}) {
       lockRaised() {
         progress = 1;
         target = 1;
+        if (hideWhenHidden) setNodeVisible(mesh, true);
         mesh.position.y = raisedY;
       },
       reset() {
         progress = 0;
         target = 0;
         mesh.position.y = hiddenY;
+        if (hideWhenHidden) setNodeVisible(mesh, false);
       },
       update(dt) {
         const step = Math.min(1, dt / Math.max(0.001, durationSec));
         progress = target > progress
           ? Math.min(target, progress + step)
           : Math.max(target, progress - step);
+        if (hideWhenHidden && (target > 0 || progress > 0.001)) {
+          setNodeVisible(mesh, true);
+        }
         mesh.position.y = lerp(hiddenY, raisedY, progress);
+        if (hideWhenHidden && progress <= 0.001 && target <= 0) {
+          setNodeVisible(mesh, false);
+        }
       },
     };
   }
@@ -1800,7 +1811,7 @@ export function buildWorld5(scene, options = {}) {
     height: 0.3,
     depth: 3.0,
     x: 36.0,
-    y: -1.2,
+    y: -2.0,
     z: 94.5,
     rgb: [116, 116, 116],
   });
@@ -1809,7 +1820,7 @@ export function buildWorld5(scene, options = {}) {
     height: 0.12,
     depth: 2.8,
     x: 36.0,
-    y: -0.18,
+    y: 8.6,
     z: 99.0,
     rgb: [124, 124, 124],
   });
@@ -1859,15 +1870,17 @@ export function buildWorld5(scene, options = {}) {
 
   const puzzlePlatform = createRisingPlatformSystem({
     mesh: puzzlePlatformMesh,
-    hiddenY: -1.2,
+    hiddenY: -2.0,
     raisedY: 0.75,
     durationSec: 1.5,
+    hideWhenHidden: true,
   });
   const puzzleBridgePlatform = createRisingPlatformSystem({
     mesh: puzzleBridgeMesh,
-    hiddenY: -0.18,
+    hiddenY: 8.6,
     raisedY: 0.06,
     durationSec: 0.65,
+    hideWhenHidden: true,
   });
   const puzzleSeamPanel = seamPanelMesh
     ? createSlidingPanelSystem({

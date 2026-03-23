@@ -1001,10 +1001,10 @@ async function getLevel5PoolWallPatchAudit(page) {
     const region = {
       minX: mouthMinX,
       maxX: mouthMaxX,
-      minY: -0.3,
-      maxY: 1.5,
+      minY: 1.0,
+      maxY: 5.9,
       minZ: 36.0,
-      maxZ: 36.5,
+      maxZ: 37.9,
     };
     return (scene?.meshes || [])
       .filter((mesh) => mesh?.isEnabled?.() !== false && mesh?.isVisible !== false && (mesh?.visibility ?? 1) > 0.02)
@@ -1169,6 +1169,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   const wallPatchAudit = await getLevel5PoolWallPatchAudit(page);
   expect(wallPatchAudit).toContain('starter_pool_lab_south_wall_header');
   expect(wallPatchAudit).not.toContain('swim_tunnel_throat_north_wall_header');
+  expect(wallPatchAudit).not.toContain('swim_tunnel_throat_ceiling');
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.setEra5CameraPreset?.('closer');
@@ -1192,13 +1193,16 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     },
   });
 
-  await captureGameplayPose('docs/screenshots/level5-starter-slice-gameplay-room-view.png', {
-    x: 10.0,
-    y: 0.42,
-    z: 18.0,
-    yaw: Math.PI * 0.5,
-    cameraYaw: Math.PI * 0.5,
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 22.0, y: 0.42, z: 18.0, yaw: -0.3, cameraYaw: -0.3 });
   });
+  await page.waitForTimeout(800);
+  const roomSightlineAudit = await getLevel5SecretTunnelAudit(page);
+  expect(roomSightlineAudit.visibleSources.some((name) => name.includes('surfacing_hallway'))).toBe(false);
+  expect(roomSightlineAudit.visibleSources.some((name) => name.includes('puzzle_chamber'))).toBe(false);
+  expect(roomSightlineAudit.visibleSources.some((name) => name.includes('swim_tunnel_stair_'))).toBe(false);
+  await captureProof('docs/screenshots/level5-starter-slice-gameplay-room-view.png');
 
   await frameRoom({
     path: 'docs/screenshots/level5-starter-slice-pool-mouth.png',
@@ -1232,7 +1236,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-stair-surface.png', {
-    x: 31.6,
+    x: 41.2,
     y: 0.42,
     z: 76.0,
     yaw: 0.0,
@@ -1240,7 +1244,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
   });
 
   await captureGameplayPose('docs/screenshots/level5-starter-slice-hallway.png', {
-    x: 35.6,
+    x: 35.2,
     y: 0.42,
     z: 82.0,
     yaw: Math.PI,
