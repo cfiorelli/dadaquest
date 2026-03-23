@@ -1173,7 +1173,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 24.8, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(800);
   await captureProof('docs/screenshots/level5-starter-slice-gameplay-pool-view.png');

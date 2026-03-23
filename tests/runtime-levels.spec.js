@@ -1738,6 +1738,9 @@ async function getLevel5SecretTunnelAudit(page) {
       { id: 'lower_center', x: width * 0.52, y: height * 0.64 },
       { id: 'lower_center_right', x: width * 0.60, y: height * 0.64 },
       { id: 'lower_right', x: width * 0.68, y: height * 0.64 },
+      { id: 'deep_lower_left', x: width * 0.38, y: height * 0.72 },
+      { id: 'deep_lower_center', x: width * 0.52, y: height * 0.72 },
+      { id: 'deep_lower_right', x: width * 0.66, y: height * 0.72 },
     ];
 
     return {
@@ -2030,7 +2033,7 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
     { timeout: 24_000 },
-  ).toBeGreaterThan(59.5);
+  ).toBeGreaterThan(50.0);
   const tunnelAdvanceState = await page.evaluate(() => ({
     pos: window.__DADA_DEBUG__?.playerPos ?? null,
     waterState: window.__DADA_DEBUG__?.getLevel5WaterState?.(
@@ -2038,13 +2041,44 @@ test('@level5 @era5 runtime: level 5 starter slice route is traversable from poo
       (window.__DADA_DEBUG__?.playerPos?.y ?? 0) + 0.736,
     ) ?? null,
   }));
-  expect(tunnelAdvanceState.pos.z).toBeGreaterThan(59.5);
-  expect(tunnelAdvanceState.pos.z).toBeLessThan(66.8);
+  expect(tunnelAdvanceState.pos.z).toBeGreaterThan(50.0);
+  expect(tunnelAdvanceState.pos.z).toBeLessThan(60.5);
   expect(tunnelAdvanceState.pos.x).toBeGreaterThan(34.4);
   expect(tunnelAdvanceState.pos.x).toBeLessThan(37.6);
   expect(tunnelAdvanceState.waterState?.depthAtZ ?? 0).toBeGreaterThanOrEqual(0.0);
   expect(tunnelAdvanceState.pos.y).toBeLessThan(-0.3);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
 
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 35.3,
+    y: -1.05,
+    z: 61.2,
+    yaw: -Math.PI * 0.5,
+    cameraYaw: -Math.PI * 0.5,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0),
+    { timeout: 6_000 },
+  ).toBeLessThan(34.55);
+  await dispatchHeldKey(page, 'keyup', { code: 'ArrowUp', key: 'ArrowUp' });
+  const bendTraversalState = await page.evaluate(() => ({
+    pos: window.__DADA_DEBUG__?.playerPos ?? null,
+  }));
+  expect(bendTraversalState.pos.x).toBeLessThan(34.55);
+  expect(bendTraversalState.pos.z).toBeGreaterThan(60.3);
+  expect(bendTraversalState.pos.z).toBeLessThan(65.4);
+
+  await focusGameplay(page);
+  await resetEra5Pose(page, {
+    x: 34.55,
+    y: -1.05,
+    z: 65.2,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
   await expect.poll(
     () => page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.z ?? 0),
     { timeout: 35_000 },
@@ -2194,7 +2228,7 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
 
   await page.evaluate(() => {
     window.__DADA_DEBUG__?.clearEra5CameraDebugView?.();
-    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: -1.05, z: 31.4, yaw: 0.0, cameraYaw: 0.0 });
+    window.__DADA_DEBUG__?.setEra5Pose?.({ x: 36.0, y: 0.42, z: 24.8, yaw: 0.0, cameraYaw: 0.0 });
   });
   await page.waitForTimeout(600);
 
@@ -2214,12 +2248,15 @@ test('@level5 @era5 runtime: level 5 tunnel stays hidden from room view, becomes
   const underdeckPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_underdeck') ?? null;
   const throatPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_throat') ?? null;
   const runPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_run') ?? null;
+  const bendPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_bend') ?? null;
   const stairPassage = levelState?.submergedPassages?.find((passage) => passage.name === 'service_tunnel_water_stairs') ?? null;
   expect(underdeckPassage).not.toBeNull();
   expect(throatPassage).not.toBeNull();
   expect(runPassage).not.toBeNull();
-  expect(levelState?.submergedPassages?.some((passage) => passage.name === 'service_tunnel_water_bend') ?? false).toBe(false);
-  expect(runPassage.maxZ).toBeGreaterThanOrEqual(65.9);
+  expect(bendPassage).not.toBeNull();
+  expect(runPassage.maxZ).toBeLessThanOrEqual(60.05);
+  expect(bendPassage.minX).toBeLessThan(32.0);
+  expect(bendPassage.maxZ).toBeGreaterThanOrEqual(65.9);
   expect(stairPassage).not.toBeNull();
   expect(stairPassage.minZ).toBeGreaterThanOrEqual(66.0);
   expect(stairPassage.maxZ).toBeLessThanOrEqual(70.05);
