@@ -1478,6 +1478,7 @@ export function buildWorld5(scene, options = {}) {
   }
 
   function registerDynamicCollider(mesh) {
+    if (!mesh) return null;
     if (!Array.isArray(world.platforms)) return null;
     const platformIndex = world.platforms.push(mesh) - 1;
     return { mesh, platformIndex };
@@ -1485,6 +1486,18 @@ export function buildWorld5(scene, options = {}) {
 
   function syncDynamicCollider(entry, player) {
     if (!entry || !player || !Array.isArray(player.colliders) || entry.platformIndex >= player.colliders.length) return;
+    const keepColliderWhenHidden = entry.mesh?.metadata?.keepColliderWhenHidden === true;
+    if (!keepColliderWhenHidden && (entry.mesh?.isEnabled?.() === false || entry.mesh?.isVisible === false || (entry.mesh?.visibility ?? 1) <= 0.001)) {
+      player.colliders[entry.platformIndex] = {
+        minX: 0,
+        maxX: 0,
+        minY: -999,
+        maxY: -999,
+        minZ: 0,
+        maxZ: 0,
+      };
+      return;
+    }
     entry.mesh?.computeWorldMatrix?.(true);
     const bounds = entry.mesh?.getBoundingInfo?.()?.boundingBox;
     if (!bounds) return;
@@ -1759,9 +1772,9 @@ export function buildWorld5(scene, options = {}) {
     idle: 'idle',
     pedestalActivated: 'pedestal_activated',
     platformRaised: 'platform_raised',
-    sideConsoleRevealed: 'side_console_revealed',
+    eastConsoleRevealed: 'east_console_revealed',
     hazardCycleActive: 'hazard_cycle_active',
-    crossingWindowOpen: 'crossing_window_open',
+    bridgeWindowOpen: 'bridge_window_open',
     chamberStepComplete: 'chamber_step_complete',
   });
 
@@ -1777,12 +1790,12 @@ export function buildWorld5(scene, options = {}) {
   const puzzleSeamInteract = { x: 41.9, y: 1.0, z: 96.0, radius: 2.0 };
   const puzzleConsoleInteract = { x: 42.1, y: 1.2, z: 96.0, radius: 2.0 };
   const puzzleRewardBounds = {
-    minX: 34.65,
-    maxX: 37.35,
+    minX: 34.6,
+    maxX: 37.4,
     minY: 0.0,
     maxY: 2.0,
-    minZ: 101.8,
-    maxZ: 104.2,
+    minZ: 101.1,
+    maxZ: 103.9,
   };
   const puzzleEntryResetPose = { x: 36.0, y: 0.42, z: 86.2 };
   const puzzleHazardLaneBounds = {
@@ -1794,16 +1807,18 @@ export function buildWorld5(scene, options = {}) {
     maxZ: 100.25,
   };
   const puzzleBridgeSafeBounds = {
-    minX: 34.35,
-    maxX: 37.65,
+    minX: 34.0,
+    maxX: 38.0,
     minY: -0.1,
     maxY: 1.2,
-    minZ: 97.8,
-    maxZ: 100.2,
+    minZ: 98.4,
+    maxZ: 99.6,
   };
 
   const pedestalCapMesh = getPrimarySourceMesh('puzzle_chamber_pedestal_cap');
   const seamPanelMesh = getPrimarySourceMesh('puzzle_chamber_side_seam_panel');
+  const westSeamPanelMesh = getPrimarySourceMesh('puzzle_chamber_west_seam_panel');
+  const sealedDoorMesh = getPrimarySourceMesh('puzzle_chamber_far_sealed_door_panel');
   const rewardPadMesh = getPrimarySourceMesh('puzzle_chamber_reward_pad');
 
   const puzzlePlatformMesh = createOpaqueHelperBox('level5_puzzle_platform', {
@@ -1811,16 +1826,16 @@ export function buildWorld5(scene, options = {}) {
     height: 0.3,
     depth: 3.0,
     x: 36.0,
-    y: -2.0,
+    y: -1.2,
     z: 94.5,
     rgb: [116, 116, 116],
   });
   const puzzleBridgeMesh = createOpaqueHelperBox('level5_puzzle_bridge', {
-    width: 3.4,
-    height: 0.12,
-    depth: 2.8,
+    width: 4.0,
+    height: 0.2,
+    depth: 1.2,
     x: 36.0,
-    y: 8.6,
+    y: -0.8,
     z: 99.0,
     rgb: [124, 124, 124],
   });
@@ -1837,11 +1852,11 @@ export function buildWorld5(scene, options = {}) {
   });
 
   const puzzleConsoleRoot = new BABYLON.TransformNode('level5_puzzle_console_root', scene);
-  puzzleConsoleRoot.position.set(43.7, 1.5, 96.0);
+  puzzleConsoleRoot.position.set(43.7, 1.0, 96.0);
   markDecor(puzzleConsoleRoot);
   const puzzleConsoleBody = createOpaqueHelperBox('level5_puzzle_console_body', {
     width: 1.2,
-    height: 1.6,
+    height: 1.4,
     depth: 1.2,
     x: 0,
     y: 0,
@@ -1862,24 +1877,40 @@ export function buildWorld5(scene, options = {}) {
   });
   puzzleConsoleFace.parent = puzzleConsoleRoot;
   setNodeVisible(puzzleConsoleRoot, false);
+  const puzzleWestFakeConsole = createOpaqueHelperBox('level5_puzzle_west_console_block', {
+    width: 1.2,
+    height: 1.4,
+    depth: 1.2,
+    x: 28.3,
+    y: 1.0,
+    z: 96.0,
+    rgb: [112, 112, 112],
+  });
+  setNodeVisible(puzzleWestFakeConsole, false);
 
   const dynamicColliders = [
     registerDynamicCollider(puzzlePlatformMesh),
-    registerDynamicCollider(puzzleBridgeMesh),
   ].filter(Boolean);
 
   const puzzlePlatform = createRisingPlatformSystem({
     mesh: puzzlePlatformMesh,
-    hiddenY: -2.0,
+    hiddenY: -1.2,
     raisedY: 0.75,
-    durationSec: 1.5,
+    durationSec: 2.8,
     hideWhenHidden: true,
   });
   const puzzleBridgePlatform = createRisingPlatformSystem({
     mesh: puzzleBridgeMesh,
-    hiddenY: 8.6,
-    raisedY: 0.06,
+    hiddenY: -0.8,
+    raisedY: 0.1,
     durationSec: 0.65,
+    hideWhenHidden: true,
+  });
+  const puzzleRewardPad = createRisingPlatformSystem({
+    mesh: rewardPadMesh,
+    hiddenY: -0.4,
+    raisedY: 0.04,
+    durationSec: 0.6,
     hideWhenHidden: true,
   });
   const puzzleSeamPanel = seamPanelMesh
@@ -1894,7 +1925,7 @@ export function buildWorld5(scene, options = {}) {
   const puzzleConsole = createSlidingPanelSystem({
     node: puzzleConsoleRoot,
     closedX: 43.7,
-    openX: 42.96,
+    openX: 42.1,
     durationSec: 0.75,
     hiddenWhenClosed: true,
   });
@@ -1902,12 +1933,13 @@ export function buildWorld5(scene, options = {}) {
     visual: puzzleHazardLaneVisual,
     laneBounds: puzzleHazardLaneBounds,
     safeBounds: puzzleBridgeSafeBounds,
-    warningDurationSec: 0.75,
-    activeDurationSec: 7.2,
+    warningDurationSec: 1.0,
+    activeDurationSec: 2.0,
+    resetDurationSec: 1.5,
   });
   const puzzleBridge = createTimedBridgeSystem({
     platformSystem: puzzleBridgePlatform,
-    openDurationSec: 7.6,
+    openDurationSec: 5.0,
   });
   const puzzleRoomState = createRoomStateController(CHAMBER_STATES.idle);
 
@@ -1927,18 +1959,21 @@ export function buildWorld5(scene, options = {}) {
     puzzleRoomState.setState(CHAMBER_STATES.idle);
     puzzlePlatform.reset();
     puzzleBridge.reset();
+    puzzleRewardPad.reset();
     puzzleConsole.reset();
     puzzleSeamPanel?.reset();
     puzzleHazardLane.reset();
     setSourceTone('puzzle_chamber_pedestal_cap', [124, 124, 124], 0.04);
     setSourceTone('puzzle_chamber_side_seam_panel', [112, 112, 112], 0.0);
-    setSourceTone('puzzle_chamber_reward_pad', [118, 118, 118], 0.03);
+    setSourceTone('puzzle_chamber_west_seam_panel', [112, 112, 112], 0.0);
+    setSourceTone('puzzle_chamber_far_sealed_door_panel', [156, 156, 156], 0.02);
+    setSourceTone('puzzle_chamber_reward_pad', [118, 118, 118], 0.0);
   }
 
   function updatePuzzleRoomVisuals() {
-    const sideConsoleAvailable = puzzleRoomState.is(CHAMBER_STATES.sideConsoleRevealed)
+    const sideConsoleAvailable = puzzleRoomState.is(CHAMBER_STATES.eastConsoleRevealed)
       || puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive)
-      || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen)
+      || puzzleRoomState.is(CHAMBER_STATES.bridgeWindowOpen)
       || puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete);
     if (pedestalCapMesh) {
       const active = puzzleRoomState.is(CHAMBER_STATES.idle);
@@ -1948,9 +1983,15 @@ export function buildWorld5(scene, options = {}) {
       const seamHint = puzzleRoomState.is(CHAMBER_STATES.platformRaised) || sideConsoleAvailable;
       setSourceTone('puzzle_chamber_side_seam_panel', seamHint ? [128, 138, 128] : [112, 112, 112], seamHint ? 0.05 : 0.0);
     }
+    if (westSeamPanelMesh) {
+      setSourceTone('puzzle_chamber_west_seam_panel', [112, 112, 112], 0.0);
+    }
+    if (sealedDoorMesh) {
+      setSourceTone('puzzle_chamber_far_sealed_door_panel', [156, 156, 156], 0.02);
+    }
     if (rewardPadMesh) {
       const completed = puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete);
-      setSourceTone('puzzle_chamber_reward_pad', completed ? [138, 160, 138] : [118, 118, 118], completed ? 0.08 : 0.03);
+      setSourceTone('puzzle_chamber_reward_pad', completed ? [138, 160, 138] : [118, 118, 118], completed ? 0.08 : 0.0);
     }
     setMeshTone(puzzlePlatformMesh, puzzlePlatform.progress > 0.02 ? [126, 126, 126] : [116, 116, 116], puzzlePlatform.progress > 0.02 ? 0.03 : 0.0);
     setMeshTone(puzzleBridgeMesh, puzzleBridge.phase === 'open' || puzzleBridge.phase === 'locked' ? [132, 144, 132] : [124, 124, 124], puzzleBridge.phase === 'open' || puzzleBridge.phase === 'locked' ? 0.04 : 0.01);
@@ -2567,7 +2608,8 @@ export function buildWorld5(scene, options = {}) {
     }
     puzzleHazardLane.reset();
     puzzleBridge.reset();
-    puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+    puzzleRewardPad.reset();
+    puzzleRoomState.setState(CHAMBER_STATES.eastConsoleRevealed);
   }
 
   function updatePuzzleRoom(dt, ctx = {}) {
@@ -2578,6 +2620,7 @@ export function buildWorld5(scene, options = {}) {
     puzzleSeamPanel?.update(dt);
     puzzleConsole.update(dt);
     puzzleBridge.update(dt);
+    puzzleRewardPad.update(dt);
     const hazardResult = puzzleHazardLane.update(dt, pos);
     syncDynamicColliders(dynamicColliders, player);
 
@@ -2586,20 +2629,23 @@ export function buildWorld5(scene, options = {}) {
     }
 
     if (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) && puzzleBridge.phase === 'open') {
-      puzzleRoomState.setState(CHAMBER_STATES.crossingWindowOpen);
+      puzzleRewardPad.raise();
+      puzzleRoomState.setState(CHAMBER_STATES.bridgeWindowOpen);
     }
 
     if (
-      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen))
+      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.bridgeWindowOpen))
       && hazardResult.hit
     ) {
       restartPuzzleCrossing(player);
     } else if (
-      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen))
+      (puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive) || puzzleRoomState.is(CHAMBER_STATES.bridgeWindowOpen))
       && puzzleBridge.phase === 'hidden'
       && puzzleHazardLane.phase === 'off'
+      && (!pos || pos.z < HAZARD_LANE_MIN_Z)
     ) {
-      puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+      puzzleRewardPad.reset();
+      puzzleRoomState.setState(CHAMBER_STATES.eastConsoleRevealed);
     }
 
     if (
@@ -2607,11 +2653,12 @@ export function buildWorld5(scene, options = {}) {
       && pos
       && isWithinBounds(pos, puzzleRewardBounds)
       && (
-        puzzleRoomState.is(CHAMBER_STATES.crossingWindowOpen)
+        puzzleRoomState.is(CHAMBER_STATES.bridgeWindowOpen)
         || puzzleRoomState.is(CHAMBER_STATES.hazardCycleActive)
       )
     ) {
       puzzleBridge.lockRaised();
+      puzzleRewardPad.lockRaised();
       puzzleHazardLane.stop();
       puzzleRoomState.setState(CHAMBER_STATES.chamberStepComplete);
       ctx.playCue?.('checkpoint');
@@ -2633,12 +2680,12 @@ export function buildWorld5(scene, options = {}) {
     if (puzzleRoomState.is(CHAMBER_STATES.platformRaised) && isWithinSphere(pos, puzzleSeamInteract)) {
       puzzleSeamPanel?.open();
       puzzleConsole.open();
-      puzzleRoomState.setState(CHAMBER_STATES.sideConsoleRevealed);
+      puzzleRoomState.setState(CHAMBER_STATES.eastConsoleRevealed);
       playCue?.('checkpoint');
       return true;
     }
 
-    if (puzzleRoomState.is(CHAMBER_STATES.sideConsoleRevealed) && isWithinSphere(pos, puzzleConsoleInteract)) {
+    if (puzzleRoomState.is(CHAMBER_STATES.eastConsoleRevealed) && isWithinSphere(pos, puzzleConsoleInteract)) {
       puzzleHazardLane.start();
       puzzleBridge.startWindow();
       puzzleRoomState.setState(CHAMBER_STATES.hazardCycleActive);
@@ -2881,6 +2928,8 @@ export function buildWorld5(scene, options = {}) {
           bridgeTimer: Number(puzzleBridge.timer.toFixed(3)),
           hazardPhase: puzzleHazardLane.phase,
           hazardTimer: Number(puzzleHazardLane.timer.toFixed(3)),
+          rewardPadProgress: Number(puzzleRewardPad.progress.toFixed(3)),
+          rewardPadState: puzzleRewardPad.state,
           rewardReached: puzzleRoomState.is(CHAMBER_STATES.chamberStepComplete),
         },
         graybox: {

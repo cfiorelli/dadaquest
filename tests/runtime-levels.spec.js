@@ -2436,6 +2436,14 @@ test('@level5 @era5 runtime: level 5 exposes one plain puzzle chamber beyond the
   expect(chamberAudit.visibleMeshes).not.toContain('puzzle_chamber_reward_pad');
   expect(chamberAudit.visibleMeshes.some((name) => /(platform|console|hazard|bridge)/i.test(name))).toBe(false);
   expect(chamberAudit.visibleMeshes.filter((name) => /floor_plate/i.test(name))).toEqual(['puzzle_chamber_visible_floor_plate']);
+  expect(entryByName('puzzle_chamber_far_sealed_door_panel')?.bounds).toMatchObject({
+    minX: 34.5,
+    maxX: 37.5,
+    minY: 0.0,
+    maxY: 4.0,
+    minZ: 105.9,
+    maxZ: 106.1,
+  });
   expect(entryByName('puzzle_chamber_pedestal_body')?.bounds).toMatchObject({
     minX: 38.1,
     maxX: 39.5,
@@ -2450,6 +2458,22 @@ test('@level5 @era5 runtime: level 5 exposes one plain puzzle chamber beyond the
     maxY: 0.08,
     minZ: 91.7,
     maxZ: 93.9,
+  });
+  expect(entryByName('puzzle_chamber_side_seam_panel')?.bounds).toMatchObject({
+    minX: 42.93,
+    maxX: 42.99,
+    minY: 0.6,
+    maxY: 3.6,
+    minZ: 94.8,
+    maxZ: 97.2,
+  });
+  expect(entryByName('puzzle_chamber_west_seam_panel')?.bounds).toMatchObject({
+    minX: 29.01,
+    maxX: 29.07,
+    minY: 0.6,
+    maxY: 3.6,
+    minZ: 94.8,
+    maxZ: 97.2,
   });
   expect(chamberAudit.visibleGoalMeshes).toEqual([]);
 });
@@ -2492,7 +2516,7 @@ test('@level5 @era5 runtime: level 5 puzzle chamber completes the first pedestal
     () => getLevel5PuzzleChamberState(page),
     { timeout: 4_000 },
   ).toMatchObject({
-    state: 'side_console_revealed',
+    state: 'east_console_revealed',
   });
   await expect.poll(
     async () => {
@@ -2525,17 +2549,24 @@ test('@level5 @era5 runtime: level 5 puzzle chamber completes the first pedestal
     () => getLevel5PuzzleChamberState(page),
     { timeout: 4_000 },
   ).toMatchObject({
-    state: 'crossing_window_open',
+    state: 'bridge_window_open',
     bridgePhase: 'open',
     hazardPhase: 'active',
   });
-
   await resetEra5Pose(page, {
     x: 36.0,
     y: 0.42,
-    z: 95.2,
+    z: 97.1,
     yaw: 0.0,
     cameraYaw: 0.0,
+  });
+  await expect.poll(
+    () => getLevel5PuzzleChamberState(page),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'bridge_window_open',
+    bridgePhase: 'open',
+    hazardPhase: 'reset',
   });
   await dispatchHeldKey(page, 'keydown', { code: 'ArrowUp', key: 'ArrowUp' });
   await expect.poll(
@@ -2555,15 +2586,16 @@ test('@level5 @era5 runtime: level 5 puzzle chamber completes the first pedestal
     puzzle: window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null,
   }));
   expectPositionInBounds(completionState.pos, {
-    minX: 34.65,
-    maxX: 37.35,
+    minX: 34.6,
+    maxX: 37.4,
     minY: 0.0,
     maxY: 2.0,
-    minZ: 101.8,
-    maxZ: 105.6,
+    minZ: 101.1,
+    maxZ: 103.9,
   });
   expect(completionState.puzzle?.platformProgress ?? 0).toBeGreaterThan(0.95);
   expect(completionState.puzzle?.consoleProgress ?? 0).toBeGreaterThan(0.95);
+  expect(completionState.puzzle?.rewardPadProgress ?? 0).toBeGreaterThan(0.95);
 
   const chamberAudit = await getLevel5ChamberAudit(page);
   expect(chamberAudit.visibleGoalMeshes).toEqual([]);

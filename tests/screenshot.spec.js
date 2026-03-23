@@ -1312,7 +1312,7 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
     { timeout: 4_000 },
   ).toMatchObject({
-    state: 'side_console_revealed',
+    state: 'east_console_revealed',
   });
   await expect.poll(
     () => page.evaluate(() => {
@@ -1344,17 +1344,35 @@ test('capture Level 5 starter-slice proof screenshots', async ({ page }) => {
     () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
     { timeout: 4_000 },
   ).toMatchObject({
-    state: 'crossing_window_open',
+    state: 'bridge_window_open',
     bridgePhase: 'open',
     hazardPhase: 'active',
   });
   await captureGameplayPose('docs/screenshots/level5-starter-slice-chamber-crossing-window.png', {
     x: 36.0,
     y: 0.42,
-    z: 95.0,
+    z: 97.1,
     yaw: 0.0,
     cameraYaw: 0.0,
   }, 500);
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.setEra5Pose?.(nextPose);
+  }, {
+    x: 36.0,
+    y: 0.42,
+    z: 97.1,
+    yaw: 0.0,
+    cameraYaw: 0.0,
+  });
+  await page.waitForTimeout(150);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.era5LevelState?.puzzleChamber ?? null),
+    { timeout: 4_000 },
+  ).toMatchObject({
+    state: 'bridge_window_open',
+    bridgePhase: 'open',
+    hazardPhase: 'reset',
+  });
 
   await focusGameplay(page);
   await page.evaluate((nextPose) => {

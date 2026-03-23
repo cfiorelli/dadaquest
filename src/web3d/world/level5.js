@@ -315,8 +315,8 @@ const CHAMBER_DOOR = {
   maxX: CHAMBER_ENTRY.x + 1.5,
   minY: 0.0,
   maxY: 4.0,
-  minZ: PUZZLE_CHAMBER.maxZ - 0.06,
-  maxZ: PUZZLE_CHAMBER.maxZ + 0.06,
+  minZ: PUZZLE_CHAMBER.maxZ - 0.1,
+  maxZ: PUZZLE_CHAMBER.maxZ + 0.1,
 };
 const CHAMBER_VISIBLE_FLOOR_PLATE = {
   minX: CHAMBER_ENTRY.x - 2.7,
@@ -635,8 +635,9 @@ const chamberBlocks = [
     ceilingY: 8.0,
   }),
   floorCover('puzzle_chamber_floor_cover', PUZZLE_CHAMBER.minX, PUZZLE_CHAMBER.maxX, 0.0, PUZZLE_CHAMBER.minZ, PUZZLE_CHAMBER.maxZ, {
-    rgb: [96, 96, 96],
-    thickness: 0.02,
+    rgb: [118, 118, 118],
+    thickness: 0.01,
+    roughness: 0.995,
   }),
   floorCover('puzzle_chamber_visible_floor_plate', CHAMBER_VISIBLE_FLOOR_PLATE.minX, CHAMBER_VISIBLE_FLOOR_PLATE.maxX, 0.08, CHAMBER_VISIBLE_FLOOR_PLATE.minZ, CHAMBER_VISIBLE_FLOOR_PLATE.maxZ, {
     rgb: [122, 122, 122],
@@ -661,9 +662,9 @@ const chamberBlocks = [
     decorIntent: 'pedestal-top',
   }),
   blockBounds('puzzle_chamber_far_sealed_door_panel', CHAMBER_DOOR.minX, CHAMBER_DOOR.maxX, CHAMBER_DOOR.minY, CHAMBER_DOOR.maxY, CHAMBER_DOOR.minZ, CHAMBER_DOOR.maxZ, {
-    rgb: [132, 132, 132],
-    roughness: 0.9,
-    emissiveScale: 0.0,
+    rgb: [156, 156, 156],
+    roughness: 0.88,
+    emissiveScale: 0.01,
     solid: false,
     structuralShell: false,
     cameraIgnore: false,
