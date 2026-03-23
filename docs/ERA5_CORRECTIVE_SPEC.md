@@ -1,5 +1,7 @@
-# Era 5 Corrective Pass — Spec
+# Archived Era 5 Corrective Pass — Spec
 Date: 2026-03-09
+
+Historical note: this spec belongs to the archived Era 5 `3D/free-move/aquatic` work preserved at branch `archive/era5-3d-squarium` and tag `archive-era5-3d-squarium-20260323`. It does not define the active mainline architecture for Levels 5–9.
 
 ## Goal
 Fix three root-cause failures in Era 5 (Levels 5–9):

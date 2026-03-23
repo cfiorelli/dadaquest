@@ -27,6 +27,12 @@ MAP → DISCUSS → PLAN → EXECUTE → VERIFY → COMMIT
 - One commit per bead. Do not batch beads into one commit.
 - Push after every commit.
 
+## Active Architecture
+
+- The Era 5 `3D/free-move/aquatic` branch is archived at `archive/era5-3d-squarium` and `archive-era5-3d-squarium-20260323`.
+- Active mainline Levels `5` through `9` now follow the `2.5D` family on `main`.
+- Do not reactivate the archived Era 5 pool/tunnel/chamber route on `main` unless the task explicitly targets archive work.
+
 ---
 
 ## 3D / Spatial Work Rules

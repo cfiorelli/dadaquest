@@ -1,5 +1,7 @@
-# Level 5–9 Visual Pass — Self-Check Report
+# Archived Era 5 Visual Pass — Self-Check Report
 Date: 2026-03-09
+
+Historical note: this document describes the archived Era 5 `3D/free-move/aquatic` branch preserved at `archive/era5-3d-squarium` and tag `archive-era5-3d-squarium-20260323`. It is not the active mainline expectation for Levels 5–9.
 
 ## What changed
 
@@ -79,4 +81,4 @@ Date: 2026-03-09
 - All backdrop near-walls placed at Z=13 (behind gameplay lane at Z=0) — no geometry intersects gameplay
 
 ## Test results
-All 16 @era5 tests pass. Build succeeds.
+Historical result on the archived Era 5 branch: all 16 `@era5` tests passed and the build succeeded at the time of capture.

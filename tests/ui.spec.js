@@ -36,7 +36,7 @@ test.beforeEach(async ({ page }) => {
   await installCleanStorage(page);
 });
 
-test('ui: title menu exposes Era 5 level names and preview details without entering a level', async ({ page }) => {
+test('ui: title menu exposes active 2.5D level 5 through 9 entries and preview details without entering a level', async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 720 });
   await gotoDebugLevel(page, 1);
@@ -44,21 +44,20 @@ test('ui: title menu exposes Era 5 level names and preview details without enter
   await expect(page.locator('#levelBtn5')).toContainText('Aquarium Drift');
   await expect(page.locator('#levelBtn7')).toContainText('Storm Cliffs');
   await expect(page.locator('#levelBtn9')).toContainText('Lantern Camp');
-  await expect(page.locator('#levelBtn5')).toHaveClass(/under-construction/);
-  await expect(page.locator('#levelBtn6')).toHaveClass(/under-construction/);
-  await expect(page.locator('#levelBtn7')).toHaveClass(/under-construction/);
-  await expect(page.locator('#levelBtn8')).toHaveClass(/under-construction/);
-  await expect(page.locator('#levelBtn9')).toHaveClass(/under-construction/);
-  await expect(page.locator('#levelBtn6 .dada-level-btn-band')).toHaveText('Under Construction');
+  await expect(page.locator('#levelBtn5')).not.toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn6')).not.toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn7')).not.toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn8')).not.toHaveClass(/under-construction/);
+  await expect(page.locator('#levelBtn9')).not.toHaveClass(/under-construction/);
 
   await page.click('#levelBtn8');
   await expect(page.locator('#titlePreviewTitle')).toHaveText('Haunted Library');
   await expect(page.locator('#titlePreviewTheme')).toContainText('grand nighttime library');
-  await expect(page.locator('#titlePreviewMechanic')).toContainText('Lantern reveals');
+  await expect(page.locator('#titlePreviewMechanic')).toContainText('2.5D gallery navigation');
 
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#titlePreviewTitle')).toHaveText('Lantern Camp');
-  await expect(page.locator('#titlePreviewMechanic')).toContainText('branching finale navigation');
+  await expect(page.locator('#titlePreviewMechanic')).toContainText('2.5D lantern routes');
 });
 
 test('ui: play again restarts from deterministic end scene', async ({ page }) => {

@@ -68,8 +68,8 @@ curl -I http://127.0.0.1:4173/
 ### Level integrity rules
 
 - Levels `1` through `4` must remain unchanged in content, controls, camera feel, and music unless a task explicitly targets them.
-- Era 5 work must stay on the authored-space system.
-- Do not revert Era 5 levels to legacy slab/path authoring.
+- The Era 5 `3D/free-move/aquatic` experiment is archived at branch `archive/era5-3d-squarium` and tag `archive-era5-3d-squarium-20260323`.
+- Active mainline Levels `5` through `9` use the `2.5D` path on `main`. Do not route mainline gameplay back into the archived Era 5 pool/tunnel/chamber path unless a task explicitly targets archive work.
 
 ### Truth-first rule
 

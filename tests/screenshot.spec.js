@@ -1,12 +1,21 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { copyFile, mkdir } from 'node:fs/promises';
+import { getLevelMeta, getLevelRuntimeFamily, getLevelThemeKey } from '../src/web3d/world/levelMeta.js';
 
 const SHOT_SCENES = [
   { scene: 'title', key: 'TitleScene', file: 'title' },
   { scene: 'crib', key: 'CribScene', file: 'crib' },
   { scene: 'end', key: 'EndScene', file: 'end' },
 ];
+const ACTIVE_LEVEL5PLUS_RUNTIME = getLevelRuntimeFamily(5);
+const ERA5_MAINLINE_ACTIVE = ACTIVE_LEVEL5PLUS_RUNTIME === 'era5';
+const describeEra5Mainline = ERA5_MAINLINE_ACTIVE ? test.describe : test.describe.skip;
+const LEVEL5PLUS_CASES = [5, 6, 7, 8, 9].map((id) => ({
+  id,
+  meta: getLevelMeta(id),
+  themeKey: getLevelThemeKey(id),
+}));
 const LEVEL5_DOORWAY_START_POSE = {
   x: 45.4,
   y: 0.42,
@@ -1085,6 +1094,62 @@ test('capture scene screenshots', async ({ page }) => {
   }
 });
 
+test('capture Level 5 through 9 2.5D placeholder proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5plus-2d-placeholders', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5plus-2d-placeholders/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 1);
+  for (const { id, meta } of LEVEL5PLUS_CASES) {
+    await expect(page.locator(`#levelBtn${id}`)).toContainText(meta.title);
+    await expect(page.locator(`#levelBtn${id}`)).not.toHaveClass(/under-construction/);
+  }
+  await page.click('#levelBtn5');
+  await expect(page.locator('#titlePreviewTitle')).toHaveText('Aquarium Drift');
+  await captureProof('docs/screenshots/level5plus-2d-title-menu.png');
+
+  for (const { id, meta, themeKey } of LEVEL5PLUS_CASES) {
+    await gotoDebugLevel(page, id);
+    await unlockThroughLevel(page, Math.max(4, id - 1));
+    await page.evaluate((targetLevelId) => {
+      window.__DADA_DEBUG__?.startLevel?.(targetLevelId);
+    }, id);
+    await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+    await page.waitForTimeout(1200);
+    await hideGameplayUi(page);
+
+    const report = await page.evaluate(() => ({
+      sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+      lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+      runtimeFamily: window.__DADA_DEBUG__?.levelRuntimeFamily ?? null,
+      themeKey: window.__DADA_DEBUG__?.levelThemeKey ?? null,
+      topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
+    }));
+    expect(report).toEqual({
+      sceneKey: 'CribScene',
+      lastRuntimeError: null,
+      runtimeFamily: '2.5d',
+      themeKey,
+      topology: null,
+    });
+
+    await captureProof(`docs/screenshots/level${id}-2d-placeholder.png`);
+
+    // Restore UI root for the next level capture.
+    await page.reload({ waitUntil: 'networkidle' });
+  }
+});
+
+describeEra5Mainline('Archived Era 5 mainline proof screenshots', () => {
 test('capture Level 6 under-construction proof screenshots', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir('docs/screenshots', { recursive: true });
@@ -1457,4 +1522,5 @@ test('capture Level 5 render-policy proof screenshots', async ({ page }) => {
   await captureLevel5ProjectileBurstProof(page, captureProof, {
     pathPrefix: 'docs/screenshots/render-policy-level5-projectile-burst',
   });
+});
 });

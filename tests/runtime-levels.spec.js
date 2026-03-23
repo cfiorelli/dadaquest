@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import { getLevelMeta, getLevelRuntimeFamily, getLevelThemeKey } from '../src/web3d/world/levelMeta.js';
 
 const PROGRESS_KEY = 'dadaquest:progress:v1';
 const LEVEL_CASES = [
@@ -7,6 +8,14 @@ const LEVEL_CASES = [
   { id: 2, url: 'http://127.0.0.1:4173/?level=2&debug=1' },
   { id: 3, url: 'http://127.0.0.1:4173/?level=3&debug=1' },
 ];
+const ACTIVE_LEVEL5PLUS_RUNTIME = getLevelRuntimeFamily(5);
+const ERA5_MAINLINE_ACTIVE = ACTIVE_LEVEL5PLUS_RUNTIME === 'era5';
+const describeEra5Mainline = ERA5_MAINLINE_ACTIVE ? test.describe : test.describe.skip;
+const LEVEL5PLUS_CASES = [5, 6, 7, 8, 9].map((id) => ({
+  id,
+  meta: getLevelMeta(id),
+  themeKey: getLevelThemeKey(id),
+}));
 const LEVEL5_DOORWAY_START_POSE = {
   x: 45.4,
   y: 0.42,
@@ -84,6 +93,39 @@ async function startDebugLevel(page, levelId) {
     sceneKey: 'CribScene',
     lastRuntimeError: null,
   });
+}
+
+async function getLevel5PlusPlaceholderReport(page) {
+  return page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    runtimeFamily: window.__DADA_DEBUG__?.levelRuntimeFamily ?? null,
+    themeKey: window.__DADA_DEBUG__?.levelThemeKey ?? null,
+    musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+    topology: window.__DADA_DEBUG__?.era5TopologyReport?.() ?? null,
+    era5State: window.__DADA_DEBUG__?.era5LevelState ?? null,
+    cameraPreset: window.__DADA_DEBUG__?.cameraPreset?.id ?? null,
+    cameraLocalZone: window.__DADA_DEBUG__?.cameraLocalZone?.id ?? null,
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    floorTopY: window.__DADA_DEBUG__?.floorTopY ?? null,
+    goalGate: window.__DADA_DEBUG__?.goalGate ?? null,
+    underConstructionLevelId: window.__DADA_DEBUG__?.underConstructionLevelId ?? null,
+  }));
+}
+
+function expectLevel5PlusPlaceholderReport(report, { id, themeKey }) {
+  expect(report.sceneKey).toBe('CribScene');
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.runtimeFamily).toBe('2.5d');
+  expect(report.themeKey).toBe(themeKey);
+  expect(report.musicLevelId).toBe(id);
+  expect(report.topology).toBeNull();
+  expect(report.era5State).toBeNull();
+  expect(report.cameraPreset).toBeNull();
+  expect(report.cameraLocalZone).toBeNull();
+  expect(report.underConstructionLevelId).toBeNull();
+  expect(report.playerPos).not.toBeNull();
+  expect(report.goalGate?.minX ?? null).not.toBeNull();
 }
 
 async function getUnderConstructionReport(page) {
@@ -1578,6 +1620,73 @@ test('runtime: level 4 stays locked until progress unlocks it, then starts and f
   ).toBe('EndScene');
 });
 
+test('@progression runtime: title menu exposes levels 5 through 9 as active 2.5D entries with no under-construction overlays', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+
+  const lockState = await page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.() ?? null);
+  expect(lockState).not.toBeNull();
+  expect(lockState.underConstruction).toMatchObject({
+    5: false,
+    6: false,
+    7: false,
+    8: false,
+    9: false,
+  });
+
+  for (const { id, meta } of LEVEL5PLUS_CASES) {
+    await expect(page.locator(`#levelBtn${id}`)).toContainText(meta.title);
+    await expect(page.locator(`#levelBtn${id}`)).not.toHaveClass(/under-construction/);
+  }
+
+  await page.click('#levelBtn8');
+  await expect(page.locator('#titlePreviewTitle')).toHaveText('Haunted Library');
+  await expect(page.locator('#titlePreviewMechanic')).toContainText('2.5D gallery navigation');
+});
+
+test('@progression runtime: title click plus start for level 6 launches the active 2.5D placeholder', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 1);
+  await unlockThroughLevel(page, 5);
+  await expect.poll(
+    () => page.evaluate(() => window.__DADA_DEBUG__?.getMenuLockState?.()?.[6] ?? true),
+    { timeout: 5_000 },
+  ).toBe(false);
+  await page.click('#levelBtn6');
+  await expect(page.locator('#titlePreviewTitle')).toHaveText('Pressure Works');
+  await page.mouse.click(40, 40);
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  const report = await page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+    underConstructionLevelId: window.__DADA_DEBUG__?.underConstructionLevelId ?? null,
+  }));
+  expect(report).toEqual({
+    sceneKey: 'CribScene',
+    lastRuntimeError: null,
+    musicLevelId: 6,
+    underConstructionLevelId: null,
+  });
+});
+
+for (const { id, meta, themeKey } of LEVEL5PLUS_CASES) {
+  test(`@progression runtime: level ${id} launches the active 2.5D placeholder for ${meta.title}`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await gotoDebugLevel(page, id);
+    await unlockThroughLevel(page, Math.max(4, id - 1));
+    await startDebugLevel(page, id);
+    await page.waitForTimeout(800);
+
+    const report = await getLevel5PlusPlaceholderReport(page);
+    expectLevel5PlusPlaceholderReport(report, { id, themeKey });
+    expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
+    expect(report.floorTopY).toBeLessThan(report.playerPos.y);
+  });
+}
+
+describeEra5Mainline('Archived Era 5 mainline expectations', () => {
 test('@level5 @era5 @progression runtime: level 5 stays locked until Level 4 is completed, then runs cleanly for 10 seconds', async ({ page }) => {
   test.setTimeout(240_000);
   const consoleErrors = [];
@@ -2718,6 +2827,7 @@ test('@era5 @progression runtime: direct auto-start for level 6 remains blocked 
   await page.waitForTimeout(1200);
   const report = await getUnderConstructionReport(page);
   expectUnderConstructionReport(report, 6);
+});
 });
 
 test('runtime: gameplay hotkey R resets to last checkpoint', async ({ page }) => {
