@@ -3,7 +3,7 @@ import { buildWorld, createCoin } from './world/buildWorld.js';
 import { buildWorld2 } from './world/buildWorld2.js';
 import { buildWorld3 } from './world/buildWorld3.js';
 import { buildWorld4 } from './world/buildWorld4.js';
-import { buildWorld5 } from './world/buildWorld5.js';
+import { buildWorld5Plus2d } from './world/buildWorld5Plus2d.js';
 import { buildUnderConstructionWorld } from './world/buildUnderConstructionWorld.js';
 import { AnimalWanderController } from './world/animalWander.js';
 import { PlayerController } from './player/PlayerController.js';
@@ -36,9 +36,12 @@ import { LEVEL1 } from './world/level1.js';
 import { LEVEL2 } from './world/level2.js';
 import { LEVEL3 } from './world/level3.js';
 import { LEVEL4 } from './world/level4.js';
-import { LEVEL5 } from './world/level5.js';
 import {
+  LEVEL_ORDER,
+  getLevelMeta,
   getLevelConstructionMessage,
+  getLevelRuntimeFamily,
+  getLevelThemeKey,
   isLevelLaunchable,
 } from './world/levelMeta.js';
 import {
@@ -1067,13 +1070,15 @@ export async function boot(options = {}) {
     2: getLevelCollectibleTotal(LEVEL2),
     3: getLevelCollectibleTotal(LEVEL3),
     4: getLevelCollectibleTotal(LEVEL4),
-    5: getLevelCollectibleTotal(LEVEL5),
-    6: 0,
-    7: 0,
-    8: 0,
-    9: 0,
+    5: getLevelCollectibleTotal(getLevelMeta(5)),
+    6: getLevelCollectibleTotal(getLevelMeta(6)),
+    7: getLevelCollectibleTotal(getLevelMeta(7)),
+    8: getLevelCollectibleTotal(getLevelMeta(8)),
+    9: getLevelCollectibleTotal(getLevelMeta(9)),
   };
-  const isEra5Level = levelId >= 5;
+  const runtimeFamily = getLevelRuntimeFamily(levelId);
+  const themeKey = getLevelThemeKey(levelId);
+  const isEra5Level = runtimeFamily === 'era5';
   const isLaunchableLevel = isLevelLaunchable(levelId);
   const getLockedMessage = (targetLevelId, state = progression) => {
     if (targetLevelId === 4) {
@@ -1100,36 +1105,25 @@ export async function boot(options = {}) {
   let progression = ensureProgressTotals(loadProgress(levelTotals), levelTotals);
   const syncProgressState = (nextProgress) => {
     progression = ensureProgressTotals(nextProgress, levelTotals);
-    ui.setLockedLevels({
-      4: !isLevelUnlocked(progression, 4),
-      5: !isLevelUnlocked(progression, 5),
-      6: false,
-      7: false,
-      8: false,
-      9: false,
-    }, {
-      4: getLockedMessage(4, progression),
-      5: getLockedMessage(5, progression),
-    });
-    ui.setUnderConstructionLevels({
-      5: true,
-      6: true,
-      7: true,
-      8: true,
-      9: true,
-    }, {
-      5: getConstructionMessage(5),
-      6: getConstructionMessage(6),
-      7: getConstructionMessage(7),
-      8: getConstructionMessage(8),
-      9: getConstructionMessage(9),
-    }, {
-      5: false,
-      6: true,
-      7: true,
-      8: true,
-      9: true,
-    });
+    const nextLockedLevels = Object.fromEntries(
+      LEVEL_ORDER.map((id) => [id, !isLevelUnlocked(progression, id)]),
+    );
+    const nextLockMessages = Object.fromEntries(
+      LEVEL_ORDER
+        .filter((id) => nextLockedLevels[id])
+        .map((id) => [id, getLockedMessage(id, progression)]),
+    );
+    const nextUnderConstructionLevels = Object.fromEntries(
+      LEVEL_ORDER.map((id) => [id, false]),
+    );
+    const nextConstructionMessages = Object.fromEntries(
+      LEVEL_ORDER.map((id) => [id, getConstructionMessage(id)]),
+    );
+    const nextBlockedLevels = Object.fromEntries(
+      LEVEL_ORDER.map((id) => [id, false]),
+    );
+    ui.setLockedLevels(nextLockedLevels, nextLockMessages);
+    ui.setUnderConstructionLevels(nextUnderConstructionLevels, nextConstructionMessages, nextBlockedLevels);
     window.__DADA_DEBUG__.progressState = progression;
   };
   syncProgressState(progression);
@@ -1252,8 +1246,8 @@ export async function boot(options = {}) {
   try {
     world = !isLaunchableLevel
       ? buildUnderConstructionWorld(scene, levelId)
-      : levelId === 5
-      ? buildWorld5(scene, { animateGoal: !shotMode })
+      : levelId >= 5
+      ? buildWorld5Plus2d(scene, levelId, { animateGoal: !shotMode })
       : levelId === 4
       ? buildWorld4(scene, { animateGoal: !shotMode })
       : levelId === 3
@@ -4481,10 +4475,6 @@ export async function boot(options = {}) {
   function finishRun() {
     const completionResult = markLevelCompleted(progression, levelId, levelTotals);
     persistProgressState(completionResult.state);
-    if (completionResult.era5UnlockedNow && !progression.unlocksShown?.era5) {
-      persistProgressState(markUnlockShown(progression, 'era5', levelTotals));
-      ui.showEra5Teaser(3600);
-    }
     if (completionResult.windGlideUnlockedNow && !progression.unlocksShown?.windGlide) {
       maybeShowUnlockBanner('GLIDE INSTALLED!', 'Press G while airborne to slow your fall.', 'windGlide', 3000);
     }
@@ -5223,6 +5213,8 @@ export async function boot(options = {}) {
       titleHint: document.getElementById('titleHint')?.textContent ?? '',
     });
     window.__DADA_DEBUG__.underConstructionLevelId = world.underConstructionLevelId ?? null;
+    window.__DADA_DEBUG__.levelRuntimeFamily = runtimeFamily;
+    window.__DADA_DEBUG__.levelThemeKey = themeKey;
   }
 
   // Single unconditional keydown handler on window — fires regardless of which

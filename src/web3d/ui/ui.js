@@ -4,6 +4,7 @@ import {
   getLevelConstructionMessage as getMetaLevelConstructionMessage,
   getLevelDescriptor as getMetaLevelDescriptor,
   getLevelMechanic as getMetaLevelMechanic,
+  getLevelRuntimeFamily as getMetaLevelRuntimeFamily,
   getLevelSubtitle as getMetaLevelSubtitle,
   getLevelTheme as getMetaLevelTheme,
   getLevelTitle as getMetaLevelTitle,
@@ -1385,7 +1386,7 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function isEra5UiLevel(levelId) {
-    return Number(levelId) >= 5;
+    return getMetaLevelRuntimeFamily(levelId) === 'era5';
   }
 
   function getEra5WeaponHelp(levelId) {

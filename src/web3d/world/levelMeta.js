@@ -1,10 +1,12 @@
 export const LEVEL_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-export const UNDER_CONSTRUCTION_LEVEL_IDS = new Set([5, 6, 7, 8, 9]);
-export const NON_PLAYABLE_LEVEL_IDS = new Set([6, 7, 8, 9]);
+export const UNDER_CONSTRUCTION_LEVEL_IDS = new Set([]);
+export const NON_PLAYABLE_LEVEL_IDS = new Set([]);
 
 export const LEVEL_META = {
   1: {
     id: 1,
+    runtimeFamily: '2.5d',
+    themeKey: 'petting_zoo',
     title: 'Petting Zoo',
     subtitle: 'Level 1 — Petting Zoo',
     descriptor: 'barnyard intro, simple bounce path',
@@ -13,6 +15,8 @@ export const LEVEL_META = {
   },
   2: {
     id: 2,
+    runtimeFamily: '2.5d',
+    themeKey: 'condo_garden',
     title: 'Condo Garden',
     subtitle: 'Level 2 — Condo Garden',
     descriptor: 'hedges, planters, garden hops',
@@ -21,6 +25,8 @@ export const LEVEL_META = {
   },
   3: {
     id: 3,
+    runtimeFamily: '2.5d',
+    themeKey: 'grandmas_house',
     title: 'Grandma\'s House',
     subtitle: 'Level 3 — Grandma\'s House',
     descriptor: 'stairs, tables, cozy rooms',
@@ -29,6 +35,8 @@ export const LEVEL_META = {
   },
   4: {
     id: 4,
+    runtimeFamily: '2.5d',
+    themeKey: 'super_sourdough',
     title: 'Super Sourdough',
     subtitle: 'Level 4 — Super Sourdough',
     descriptor: 'bakery chaos, flour puffs, finale',
@@ -37,43 +45,58 @@ export const LEVEL_META = {
   },
   5: {
     id: 5,
+    runtimeFamily: '2.5d',
+    themeKey: 'aquarium',
     title: 'Aquarium Drift',
     subtitle: 'Level 5 — Aquarium Drift',
     descriptor: 'glass tanks, service catwalks, short jumps',
     theme: 'A wide aquarium exhibit stitched together with wet decks, viewing glass, and service bridges.',
-    mechanic: 'Current jets, oxygen pockets, and short tank-side jump timing.',
+    mechanic: '2.5D aquarium decks, viewing bridges, and short tank-side jump timing.',
+    totalCollectibles: 0,
   },
   6: {
     id: 6,
+    runtimeFamily: '2.5d',
+    themeKey: 'factory',
     title: 'Pressure Works',
     subtitle: 'Level 6 — Pressure Works',
     descriptor: 'factory bays, pistons, industrial timing',
     theme: 'A pressure-loaded factory run through furnace bays, catwalks, and heavy machine timing.',
-    mechanic: 'Conveyor traction, presses, and tight industrial strafing.',
+    mechanic: '2.5D factory catwalk timing, conveyors, and press reads.',
+    totalCollectibles: 0,
   },
   7: {
     id: 7,
+    runtimeFamily: '2.5d',
+    themeKey: 'storm',
     title: 'Storm Cliffs',
     subtitle: 'Level 7 — Storm Cliffs',
     descriptor: 'exposed ledges, wind recovery, kite rig',
     theme: 'An exposed cliffside route with wind spans, recovery shelves, and high-altitude crossings.',
-    mechanic: 'Gust recovery, lightning reads, and kite-assisted glide control.',
+    mechanic: '2.5D cliff traversal with gust reads and recovery jumps.',
+    totalCollectibles: 0,
   },
   8: {
     id: 8,
+    runtimeFamily: '2.5d',
+    themeKey: 'library',
     title: 'Haunted Library',
     subtitle: 'Level 8 — Haunted Library',
     descriptor: 'shelves, galleries, lantern reveals, flying books',
     theme: 'A grand nighttime library of reading rooms, galleries, and hidden lantern-lit routes.',
-    mechanic: 'Lantern reveals, ink hazards, folding bridges, and tighter room navigation.',
+    mechanic: '2.5D gallery navigation with lantern reveals and folding routes.',
+    totalCollectibles: 0,
   },
   9: {
     id: 9,
+    runtimeFamily: '2.5d',
+    themeKey: 'camp',
     title: 'Lantern Camp',
     subtitle: 'Level 9 — Lantern Camp',
     descriptor: 'forest paths, bonfire clearing, final rise',
     theme: 'A moonlit forest arrival with lantern boardwalks, a bonfire heart, and a final family overlook.',
-    mechanic: 'Light-safe pockets, puppet sweeps, and branching finale navigation.',
+    mechanic: '2.5D lantern routes, safe pockets, and finale climbs.',
+    totalCollectibles: 0,
   },
 };
 
@@ -95,14 +118,19 @@ export function getLevelConstructionLabel(levelId) {
 export function getLevelConstructionMessage(levelId) {
   const id = Number(levelId);
   if (!isLevelUnderConstruction(id)) return '';
-  if (id === 5) {
-    return 'Level 5 is under construction, but this rebuild target remains playable.';
-  }
-  return `Level ${id} is under construction. This follow-on Era 5 slice is temporarily unavailable.`;
+  return `Level ${id} is under construction.`;
 }
 
 export function getLevelMeta(levelId) {
   return LEVEL_META[levelId] || LEVEL_META[1];
+}
+
+export function getLevelRuntimeFamily(levelId) {
+  return getLevelMeta(levelId).runtimeFamily || '2.5d';
+}
+
+export function getLevelThemeKey(levelId) {
+  return getLevelMeta(levelId).themeKey || 'petting_zoo';
 }
 
 export function getLevelSubtitle(levelId) {
