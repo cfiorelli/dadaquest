@@ -5629,7 +5629,7 @@ export async function boot(options = {}) {
       if (pickup.collected) continue;
       const dx = pos.x - pickup.position.x;
       const dy = pos.y - pickup.position.y;
-      const dz = isEra5Level ? (pos.z - pickup.position.z) : 0;
+      const dz = hasEra5Systems ? (pos.z - pickup.position.z) : 0;
       const r = pickup.radius ?? 0.85;
       if ((dx * dx + dy * dy + dz * dz) <= (r * r)) {
         pickup.collected = true;
@@ -5644,6 +5644,14 @@ export async function boot(options = {}) {
           onesieCollectedThisRun = true;
           ui.showOnesieBoostCard();
           ui.showStatus('Onesie boost!', 1400);
+        } else if (pickup.type === 'heart') {
+          if (era5Hp < (era5State.stats.hpMax ?? 3)) {
+            era5Hp = Math.min(era5State.stats.hpMax ?? 3, era5Hp + 1);
+            ui.showStatus('❤ Heart +1', 1200);
+            syncEra5Ui();
+          } else {
+            ui.showStatus('Already full health', 900);
+          }
         } else if (pickup.type === 'item') {
           grantEra5Item(pickup.defId, {
             autoEquip: pickup.autoEquip !== false,

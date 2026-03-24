@@ -2411,6 +2411,50 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
 
   const finalDeck = layout.platforms.find((surface) => surface.name === 'e14_goal_lock') || layout.platforms[layout.platforms.length - 1];
 
+  // --- Pickups ---
+  function createPickupNode(name, x, y, z, rgbHex) {
+    const mat = new BABYLON.StandardMaterial(`${name}_mat`, scene);
+    mat.emissiveColor = BABYLON.Color3.FromHexString(rgbHex);
+    mat.disableLighting = true;
+    const mesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 0.48, segments: 6 }, scene);
+    mesh.position.set(x, y, z);
+    mesh.material = mat;
+    setRenderingGroup(mesh, 3);
+    return mesh;
+  }
+
+  const pickupDefs = [
+    // Heart: recovery pickup near spawn — teaches that health restores exist
+    {
+      type: 'heart',
+      position: { x: -20.0, y: 1.40, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_heart', -20.0, 1.40, LANE_Z, '#ff4466'),
+    },
+    // Weapon: foam_blaster on E1 compare strip (glass upper route reward)
+    {
+      type: 'item',
+      defId: 'foam_blaster',
+      autoEquip: true,
+      title: 'Foam Blaster',
+      subtitle: 'Equips to weapon slot',
+      position: { x: -13.5, y: 1.78, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_foam_blaster', -13.5, 1.78, LANE_Z, '#ffe066'),
+    },
+    // Armor: hard_hat on E3 high bridge (optional bridge route reward)
+    {
+      type: 'item',
+      defId: 'hard_hat',
+      autoEquip: true,
+      title: 'Hard Hat',
+      subtitle: 'Equips to head slot',
+      position: { x: 21.0, y: 2.58, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_hard_hat', 21.0, 2.58, LANE_Z, '#66aaff'),
+    },
+  ].map((def) => ({ ...def, collected: false }));
+
   const level = {
     id: 5,
     runtimeFamily: '2.5d',
@@ -2445,7 +2489,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     extents: layout.extents,
     spawn: layout.spawn,
     checkpoints,
-    pickups: [],
+    pickups: pickupDefs,
     coins: [],
     hazards,
     crumbles: [],
