@@ -464,13 +464,13 @@ function buildLayout() {
   const add = (def) => surfaces.push(def);
 
   const ground = deckDef('aquarium_drift_ground_start', -24, -12, 0.55, { encounterId: 'L5-E1' });
-  add(deckDef('e1_compare_strip', -17.0, -13.0, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' }));
+  add(deckDef('e1_compare_strip', -17.0, -13.0, 0.95, { depth: 2.8, kind: 'glass', height: 0.40, encounterId: 'L5-E1' }));
   addStairRun(surfaces, 'e1_compare_steps', -19.8, -16.8, 0.55, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' });
   add(deckDef('e1_exit_apron', -12, -6, 0.75, { encounterId: 'L5-E1' }));
 
   add(deckDef('e2_floor_lane', -6, 8, 0.75, { encounterId: 'L5-E2' }));
-  add(deckDef('e2_kiosk_bypass_a', -2.5, 2.2, 1.35, { depth: 3.0, kind: 'glass', encounterId: 'L5-E2' }));
-  add(deckDef('e2_kiosk_bypass_b', 4.4, 9.5, 1.35, { depth: 3.0, kind: 'glass', encounterId: 'L5-E2' }));
+  add(deckDef('e2_kiosk_bypass_a', -2.5, 2.2, 1.35, { depth: 3.0, kind: 'glass', height: 0.42, encounterId: 'L5-E2' }));
+  add(deckDef('e2_kiosk_bypass_b', 4.4, 9.5, 1.35, { depth: 3.0, kind: 'glass', height: 0.42, encounterId: 'L5-E2' }));
   addStairRun(surfaces, 'e2_kiosk_up', -6.2, -2.4, 0.75, 1.35, { depth: 2.8, kind: 'glass', encounterId: 'L5-E2' });
   addStairRun(surfaces, 'e2_kiosk_down', 8.2, 10.2, 1.35, 1.15, { depth: 2.8, kind: 'glass', encounterId: 'L5-E2' });
   addStairRun(surfaces, 'e2_merge_rise', 6.0, 10.0, 0.75, 1.15, { depth: 3.2, kind: 'public', encounterId: 'L5-E2' });
@@ -1433,22 +1433,77 @@ function buildSpawnSliceReadability(scene, shadowGen) {
     shadowGen,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_pipe' },
   });
-  const sign = createWelcomeSign(scene, {
-    name: 'level5_spawn_kelp_tank_sign',
-    x: -6.8,
-    y: 0.0,
-    z: 4.92,
-    shadowGen,
-    textLines: ['KELP', 'TANK'],
-    width: 4.0,
-    height: 1.3,
-    postHeight: 4.0,
-    postSpread: 2.34,
-    boardColor: PROFILE.warning,
-    postColor: PROFILE.pipeDark,
-    boardName: 'level5_spawn_kelp_tank_sign',
+  // ── Aquarium viewing window — dominant spawn landmark ───────────────────
+  // A framed porthole window into the kelp tank, positioned at mid-depth
+  // so it reads clearly from spawn without competing with route geometry.
+  const winRoot = createDecorRoot(scene, 'l5_spawn_tank_win', {
+    x: -7.8,
+    y: 2.0,
+    z: 4.74,
+    metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window' },
   });
-  setRenderingGroup(sign, 2);
+  // Frame: vertical posts (left / right)
+  for (const [i, lx] of [-2.12, 2.12].entries()) {
+    createDecorBox(scene, `l5_spawn_tank_win_post_${i}`, {
+      parent: winRoot, x: lx, y: 0, z: 0,
+      w: 0.38, h: 3.72, d: 0.28,
+      rgb: PROFILE.glassFrame,
+      shadowGen,
+      metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window_frame' },
+    });
+  }
+  // Frame: horizontal bars (top / bottom)
+  for (const [i, ly] of [-1.67, 1.67].entries()) {
+    createDecorBox(scene, `l5_spawn_tank_win_bar_${i}`, {
+      parent: winRoot, x: 0, y: ly, z: 0,
+      w: 4.62, h: 0.38, d: 0.28,
+      rgb: PROFILE.glassFrame,
+      shadowGen,
+      metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window_frame' },
+    });
+  }
+  // Dark water fill inside frame (behind posts)
+  createAlphaPanel(scene, 'l5_spawn_tank_win_water', {
+    parent: winRoot, x: 0, y: 0, z: 0.04,
+    w: 3.80, h: 2.92,
+    rgb: PROFILE.tankGlow,
+    alpha: 0.34,
+    metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window_water' },
+  });
+  // Kelp strands inside window
+  for (const [i, s] of [
+    { x: -1.1, y: -0.3, w: 0.62, h: 2.2 },
+    { x:  0.1, y: -0.1, w: 0.52, h: 2.6 },
+    { x:  1.2, y: -0.4, w: 0.58, h: 2.0 },
+  ].entries()) {
+    createAlphaPanel(scene, `l5_spawn_tank_win_kelp_${i}`, {
+      parent: winRoot, x: s.x, y: s.y, z: 0.02,
+      w: s.w, h: s.h,
+      rgb: i % 2 === 0 ? PROFILE.kelpDark : PROFILE.kelpLight,
+      alpha: 0.62,
+      metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window_kelp' },
+    });
+  }
+  // Top cap — service/machine read, overhangs frame
+  createDecorBox(scene, 'l5_spawn_tank_win_cap', {
+    parent: winRoot, x: 0, y: 2.06, z: -0.06,
+    w: 4.72, h: 0.50, d: 0.42,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_tank_window_cap' },
+  });
+  setRenderingGroup(winRoot, 2);
+
+  // ── Pipe run brackets — unify the two overhead pipe cylinders ───────────
+  for (const [i, bx] of [-14, 3].entries()) {
+    createDecorBox(scene, `l5_spawn_pipe_bracket_${i}`, {
+      x: bx, y: 5.40, z: 3.26,
+      w: 0.22, h: 0.50, d: 0.22,
+      rgb: PROFILE.pipeDark,
+      shadowGen,
+      metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_pipe_bracket' },
+    });
+  }
 }
 
 function addSupportColumns(scene, shadowGen, def) {
