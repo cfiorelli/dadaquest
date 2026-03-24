@@ -44,6 +44,10 @@ const PROFILE = {
   warning: [214, 176, 86],
   pumpCore: [112, 126, 138],
   pumpTrim: [72, 168, 196],
+  shockBright: [108, 232, 255],
+  shockDim: [76, 122, 148],
+  shockRail: [188, 220, 228],
+  shockCore: [28, 108, 144],
 };
 
 const ACTS = [
@@ -93,7 +97,7 @@ const MAINLINE_ENCOUNTERS = [
     decision: 'Hold the higher public gallery or drop early to the service shelf.',
     xMin: 36,
     xMax: 52,
-    sample: { x: 43.5, topY: 2.15 },
+    sample: { x: 43.1, topY: 2.15 },
   },
   {
     id: 'L5-E5',
@@ -802,6 +806,7 @@ function buildCurrentJetPlan(layout) {
       phaseOffsetMs: 0,
       laneType: 'narrow_bridge',
       recoveryLine: 'e3_maintenance_line',
+      sampleX: 20.95,
       tell: 'floor_arrows_nozzle_lights',
     },
     {
@@ -821,6 +826,7 @@ function buildCurrentJetPlan(layout) {
       laneType: 'checkpoint_leadin',
       recoveryLine: 'e3_bridge_exit',
       checkpointLeadIn: true,
+      sampleX: 30.7,
       tell: 'floor_arrows_nozzle_lights',
     },
     {
@@ -839,6 +845,7 @@ function buildCurrentJetPlan(layout) {
       phaseOffsetMs: 340,
       laneType: 'narrow_bridge',
       recoveryLine: 'e4_service_drop',
+      sampleX: 46.35,
       tell: 'floor_arrows_nozzle_lights',
     },
     {
@@ -857,6 +864,7 @@ function buildCurrentJetPlan(layout) {
       phaseOffsetMs: 1080,
       laneType: 'service_lane',
       recoveryLine: 'e4_service_drop',
+      sampleX: 54.7,
       tell: 'floor_arrows_nozzle_lights',
     },
   ];
@@ -864,6 +872,129 @@ function buildCurrentJetPlan(layout) {
     bridgeCrossingCount: lanes.filter((lane) => lane.laneType === 'narrow_bridge').length,
     checkpointLeadInLaneId: lanes.find((lane) => lane.checkpointLeadIn)?.id ?? null,
     lanes,
+  };
+}
+
+function buildElectrifiedPuddlePlan(layout) {
+  const e4Gallery = getLayoutSurface(layout, 'e4_gallery_overlook');
+  const e4Bridge = getLayoutSurface(layout, 'e4_panorama_bridge');
+  const e4Service = getLayoutSurface(layout, 'e4_service_drop');
+  const e5Crosswalk = getLayoutSurface(layout, 'e5_crosswalk');
+  const e5SideShelf = getLayoutSurface(layout, 'e5_side_shelf');
+  const activeMs = 1400;
+  const safeMs = 1600;
+  const bands = [
+    {
+      id: 'L5-PUD-01',
+      encounterId: 'L5-E4',
+      xMin: 43.45,
+      xMax: 44.95,
+      topY: e4Gallery.topY,
+      y: Number((e4Gallery.topY + 0.405).toFixed(3)),
+      depth: e4Gallery.d,
+      phaseOffsetMs: 0,
+      laneId: 'upper_gallery',
+      tell: 'charge_strips_and_hum',
+    },
+    {
+      id: 'L5-PUD-02',
+      encounterId: 'L5-E4',
+      xMin: 46.55,
+      xMax: 48.75,
+      topY: e4Bridge.topY,
+      y: Number((e4Bridge.topY + 0.405).toFixed(3)),
+      depth: e4Bridge.d,
+      phaseOffsetMs: 760,
+      laneId: 'upper_gallery',
+      tell: 'charge_strips_and_hum',
+    },
+    {
+      id: 'L5-PUD-03',
+      encounterId: 'L5-E4',
+      xMin: 51.05,
+      xMax: 54.45,
+      topY: e4Service.topY,
+      y: Number((e4Service.topY + 0.405).toFixed(3)),
+      depth: e4Service.d,
+      phaseOffsetMs: 1560,
+      laneId: 'service_drop_fastline',
+      tell: 'charge_strips_and_hum',
+    },
+    {
+      id: 'L5-PUD-04',
+      encounterId: 'L5-E5',
+      xMin: 60.85,
+      xMax: 62.95,
+      topY: e5Crosswalk.topY,
+      y: Number((e5Crosswalk.topY + 0.405).toFixed(3)),
+      depth: e5Crosswalk.d,
+      phaseOffsetMs: 420,
+      laneId: 'public_crosswalk',
+      tell: 'charge_strips_and_hum',
+    },
+    {
+      id: 'L5-PUD-05',
+      encounterId: 'L5-E5',
+      xMin: 65.05,
+      xMax: 68.25,
+      topY: e5SideShelf.topY,
+      y: Number((e5SideShelf.topY + 0.405).toFixed(3)),
+      depth: e5SideShelf.d,
+      phaseOffsetMs: 1180,
+      laneId: 'side_shelf_fastline',
+      tell: 'charge_strips_and_hum',
+    },
+  ].map((band) => ({
+    ...band,
+    activeMs,
+    safeMs,
+  }));
+
+  const safeIslands = [
+    {
+      id: 'L5-PUD-SAFE-01',
+      encounterId: 'L5-E4',
+      xMin: 42.8,
+      xMax: 43.45,
+      topY: e4Gallery.topY,
+      role: 'gallery_wait_pad',
+    },
+    {
+      id: 'L5-PUD-SAFE-02',
+      encounterId: 'L5-E4',
+      xMin: 54.45,
+      xMax: 56.15,
+      topY: e4Service.topY,
+      role: 'service_reset_pocket',
+    },
+    {
+      id: 'L5-PUD-SAFE-03',
+      encounterId: 'L5-E5',
+      xMin: 62.95,
+      xMax: 64.7,
+      topY: e5Crosswalk.topY,
+      role: 'crosswalk_respite',
+    },
+  ];
+
+  const alternateHighRiskLine = {
+    routeId: 'e4_service_drop',
+    encounterIds: ['L5-E4', 'L5-E5'],
+    xMin: 46.4,
+    xMax: 70.5,
+    topY: e4Service.topY,
+    descriptor: 'early_service_drop_fastline',
+    riskDrivers: ['current_jet_overlap', 'longer_electrified_band', 'lower_recovery_clearance'],
+  };
+
+  return {
+    activeMs,
+    safeMs,
+    bandCount: bands.length,
+    safeIslandCount: safeIslands.length,
+    alternateHighRiskLine,
+    safeIslands,
+    bands,
   };
 }
 
@@ -1565,12 +1696,109 @@ function createCurrentJetVisual(scene, def) {
   };
 }
 
+function createElectrifiedPuddleVisual(scene, def) {
+  const metadata = {
+    encounterId: def.encounterId,
+    hazardId: def.id,
+    hazardType: 'electrifiedPuddle',
+  };
+  const root = createDecorRoot(scene, `${def.id}_root`, {
+    x: (def.xMin + def.xMax) * 0.5,
+    y: def.topY + 0.034,
+    z: LANE_Z,
+    metadata,
+  });
+  const width = Number((def.xMax - def.xMin).toFixed(3));
+  const mats = [];
+  const base = BABYLON.MeshBuilder.CreatePlane(`${def.id}_base`, {
+    width,
+    height: def.depth * 0.94,
+  }, scene);
+  base.parent = root;
+  base.rotation.x = Math.PI * 0.5;
+  base.position.set(0, 0, 0);
+  base.material = createAlphaMaterial(scene, `${def.id}_base_mat`, PROFILE.shockDim, 0.22);
+  applyWorldAlphaRenderPolicy(base);
+  markDecor(base, metadata);
+  mats.push(base.material);
+
+  const railPlanes = [];
+  for (const side of [-1, 1]) {
+    const rail = BABYLON.MeshBuilder.CreatePlane(`${def.id}_rail_${side}`, {
+      width,
+      height: 0.18,
+    }, scene);
+    rail.parent = root;
+    rail.rotation.x = Math.PI * 0.5;
+    rail.position.set(0, 0.012, side * (def.depth * 0.34));
+    rail.material = createAlphaMaterial(scene, `${def.id}_rail_${side}_mat`, PROFILE.shockRail, 0.18);
+    applyWorldAlphaRenderPolicy(rail);
+    markDecor(rail, metadata);
+    railPlanes.push(rail);
+    mats.push(rail.material);
+  }
+
+  const cracklePlanes = [];
+  for (const offset of [-0.3, 0, 0.3]) {
+    const crackle = BABYLON.MeshBuilder.CreatePlane(`${def.id}_crackle_${offset}`, {
+      width: Math.max(0.42, width * 0.24),
+      height: def.depth * 0.72,
+    }, scene);
+    crackle.parent = root;
+    crackle.rotation.x = Math.PI * 0.5;
+    crackle.position.set(offset * width, 0.016, 0);
+    crackle.material = createAlphaMaterial(scene, `${def.id}_crackle_${offset}_mat`, PROFILE.shockBright, 0.06);
+    applyWorldAlphaRenderPolicy(crackle);
+    markDecor(crackle, metadata);
+    cracklePlanes.push(crackle);
+    mats.push(crackle.material);
+  }
+
+  const coreStrip = BABYLON.MeshBuilder.CreatePlane(`${def.id}_core_strip`, {
+    width: Math.max(0.62, width * 0.16),
+    height: def.depth * 0.62,
+  }, scene);
+  coreStrip.parent = root;
+  coreStrip.rotation.x = Math.PI * 0.5;
+  coreStrip.position.set(0, 0.018, 0);
+  coreStrip.material = createAlphaMaterial(scene, `${def.id}_core_strip_mat`, PROFILE.shockCore, 0.1);
+  applyWorldAlphaRenderPolicy(coreStrip);
+  markDecor(coreStrip, metadata);
+  mats.push(coreStrip.material);
+
+  let active = false;
+  const setActive = (nextActive = false) => {
+    if (active === nextActive) return;
+    active = nextActive;
+    base.material.alpha = nextActive ? 0.48 : 0.22;
+    base.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockDim).scale(nextActive ? 0.56 : 0.18);
+    coreStrip.material.alpha = nextActive ? 0.66 : 0.1;
+    coreStrip.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockCore).scale(nextActive ? 0.82 : 0.22);
+    for (const rail of railPlanes) {
+      rail.material.alpha = nextActive ? 0.44 : 0.18;
+      rail.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockRail).scale(nextActive ? 0.6 : 0.12);
+    }
+    for (const crackle of cracklePlanes) {
+      crackle.material.alpha = nextActive ? 0.68 : 0.06;
+      crackle.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockDim).scale(nextActive ? 0.92 : 0.1);
+    }
+  };
+
+  return {
+    root,
+    mesh: base,
+    setActive,
+    mats,
+  };
+}
+
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const meta = getLevelMeta(5);
   const layout = buildLayout();
   const visualPlan = buildVisualPlan(layout);
   const slickDeck = buildSlickDeckPlan(layout);
   const currentJets = buildCurrentJetPlan(layout);
+  const electrifiedPuddles = buildElectrifiedPuddlePlan(layout);
   layout.layoutReport.visualKit = visualPlan.report;
   layout.layoutReport.slickDeck = {
     safeComparison: slickDeck.safeComparison,
@@ -1599,12 +1827,39 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       topY: lane.topY,
       directionX: lane.directionX,
       directionLabel: lane.directionLabel,
+      sampleX: lane.sampleX,
       activeMs: lane.activeMs,
       safeMs: lane.safeMs,
       laneType: lane.laneType,
       recoveryLine: lane.recoveryLine,
       checkpointLeadIn: !!lane.checkpointLeadIn,
       tell: lane.tell,
+    })),
+  };
+  layout.layoutReport.electrifiedPuddles = {
+    bandCount: electrifiedPuddles.bandCount,
+    safeIslandCount: electrifiedPuddles.safeIslandCount,
+    activeMs: electrifiedPuddles.activeMs,
+    safeMs: electrifiedPuddles.safeMs,
+    alternateHighRiskLine: electrifiedPuddles.alternateHighRiskLine,
+    safeIslands: electrifiedPuddles.safeIslands.map((island) => ({
+      id: island.id,
+      encounterId: island.encounterId,
+      xMin: island.xMin,
+      xMax: island.xMax,
+      topY: island.topY,
+      role: island.role,
+    })),
+    bands: electrifiedPuddles.bands.map((band) => ({
+      id: band.id,
+      encounterId: band.encounterId,
+      xMin: band.xMin,
+      xMax: band.xMax,
+      topY: band.topY,
+      laneId: band.laneId,
+      activeMs: band.activeMs,
+      safeMs: band.safeMs,
+      tell: band.tell,
     })),
   };
 
@@ -1656,7 +1911,27 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       visualRoot: visual.root,
     };
   });
-  const hazards = [...slickHazards, ...currentJetHazards];
+  const electrifiedPuddleHazards = electrifiedPuddles.bands.map((band) => {
+    const visual = createElectrifiedPuddleVisual(scene, band);
+    return {
+      id: band.id,
+      type: 'electrifiedPuddle',
+      encounterId: band.encounterId,
+      minX: band.xMin,
+      maxX: band.xMax,
+      minY: band.y - 0.34,
+      maxY: band.y + 0.34,
+      activeMs: band.activeMs,
+      safeMs: band.safeMs,
+      phaseOffsetMs: band.phaseOffsetMs,
+      laneId: band.laneId,
+      tell: band.tell,
+      setActive: visual.setActive,
+      mesh: visual.mesh,
+      visualRoot: visual.root,
+    };
+  });
+  const hazards = [...slickHazards, ...currentJetHazards, ...electrifiedPuddleHazards];
 
   const surfaceVisuals = {};
   const allColliders = [];

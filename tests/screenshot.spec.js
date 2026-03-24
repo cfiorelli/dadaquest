@@ -1141,6 +1141,7 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
   });
   expect(report.layout?.slickDeck?.patchCount).toBe(3);
   expect(report.layout?.currentJets?.laneCount).toBe(4);
+  expect(report.layout?.electrifiedPuddles?.bandCount).toBe(5);
 
   await captureProof('docs/screenshots/level5-aquarium-visual-start.png');
 
@@ -1245,6 +1246,57 @@ test('capture Level 5 Aquarium Drift current-jet proof screenshots', async ({ pa
   await captureLane('docs/screenshots/level5-aquarium-jets-e4.png', 'L5-JET-03', {
     x: 47.6,
     y: Number((2.15 + 0.405).toFixed(3)),
+    z: 0,
+  });
+});
+
+test('capture Level 5 Aquarium Drift electrified-puddle proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-electrified-puddles', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-aquarium-electrified-puddles/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+    window.__DADA_DEBUG__?.setProgress?.({ bubbleShieldUnlocked: false });
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1200);
+  await hideGameplayUi(page);
+
+  const layout = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null);
+  expect(layout?.electrifiedPuddles?.bandCount).toBe(5);
+
+  async function captureBand(path, puddleId, pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+    }, pose);
+    await page.waitForFunction((targetPuddleId) => {
+      const state = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
+      return !!state && state.active === true;
+    }, puddleId);
+    await page.waitForTimeout(220);
+    await captureProof(path);
+  }
+
+  await captureBand('docs/screenshots/level5-aquarium-puddles-e4.png', 'L5-PUD-02', {
+    x: 47.2,
+    y: Number((2.15 + 0.405).toFixed(3)),
+    z: 0,
+  });
+  await captureBand('docs/screenshots/level5-aquarium-puddles-e5.png', 'L5-PUD-04', {
+    x: 61.8,
+    y: Number((1.55 + 0.405).toFixed(3)),
     z: 0,
   });
 });

@@ -5657,6 +5657,8 @@ export async function boot(options = {}) {
     let externalForceX = 0;
     const currentJetStates = [];
     const activeCurrentJetHazardIds = [];
+    const electrifiedPuddleStates = [];
+    const activeElectrifiedPuddleIds = [];
     const hazardClockMs = performance.now();
 
     // Puddle hazard: touching it resets player to spawn start.
@@ -5696,6 +5698,35 @@ export async function boot(options = {}) {
         }
       }
 
+      if (hazard.type === 'electrifiedPuddle') {
+        const activeMs = Math.max(0, hazard.activeMs ?? 1400);
+        const safeMs = Math.max(0, hazard.safeMs ?? 1600);
+        const cycleMs = Math.max(1, activeMs + safeMs);
+        const phaseMs = (hazardClockMs + (hazard.phaseOffsetMs ?? 0)) % cycleMs;
+        const active = phaseMs < activeMs;
+        hazard.setActive?.(active);
+        electrifiedPuddleStates.push({
+          id: hazard.id,
+          encounterId: hazard.encounterId ?? null,
+          active,
+          phaseMs: Number(phaseMs.toFixed(1)),
+          activeMs,
+          safeMs,
+          laneId: hazard.laneId ?? null,
+          tell: hazard.tell ?? null,
+        });
+        if (inside && active) {
+          activeElectrifiedPuddleIds.push(hazard.id || '');
+        }
+        if (inside && active && player.grounded && puddleInvulnMs <= 0 && !respawnState) {
+          const knockDir = player.mesh.position.x <= ((hazard.minX + hazard.maxX) * 0.5) ? -1 : 1;
+          const resetTriggered = triggerReset('electrified_puddle', knockDir);
+          if (resetTriggered) {
+            puddleInvulnMs = 1500;
+          }
+        }
+      }
+
       if (inside && hazard.type === 'slick' && player.grounded) {
         surfaceAccelMultiplier = Math.min(surfaceAccelMultiplier, hazard.accelMultiplier ?? 0.58);
         surfaceDecelMultiplier = Math.min(surfaceDecelMultiplier, hazard.decelMultiplier ?? 0.16);
@@ -5718,6 +5749,8 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.surfaceDecelMultiplier = surfaceDecelMultiplier;
     window.__DADA_DEBUG__.jetHazards = currentJetStates;
     window.__DADA_DEBUG__.activeCurrentJetHazardIds = activeCurrentJetHazardIds.filter(Boolean);
+    window.__DADA_DEBUG__.electrifiedPuddles = electrifiedPuddleStates;
+    window.__DADA_DEBUG__.activeElectrifiedPuddleIds = activeElectrifiedPuddleIds.filter(Boolean);
     window.__DADA_DEBUG__.externalForceX = externalForceX;
 
     let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1.15) : 1;

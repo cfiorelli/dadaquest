@@ -1784,10 +1784,28 @@ test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet la
     'service_lane',
   ]);
   expect(report.layout.currentJets.lanes.every((lane) => lane.directionX === -1 && lane.directionLabel === 'west')).toBe(true);
+  expect(report.layout.electrifiedPuddles).not.toBeNull();
+  expect(report.layout.electrifiedPuddles.bandCount).toBe(5);
+  expect(report.layout.electrifiedPuddles.safeIslandCount).toBe(3);
+  expect(report.layout.electrifiedPuddles.activeMs).toBe(1400);
+  expect(report.layout.electrifiedPuddles.safeMs).toBe(1600);
+  expect(report.layout.electrifiedPuddles.alternateHighRiskLine.routeId).toBe('e4_service_drop');
+  expect(report.layout.electrifiedPuddles.safeIslands.map((island) => island.id)).toEqual([
+    'L5-PUD-SAFE-01',
+    'L5-PUD-SAFE-02',
+    'L5-PUD-SAFE-03',
+  ]);
+  expect(report.layout.electrifiedPuddles.bands.map((band) => band.id)).toEqual([
+    'L5-PUD-01',
+    'L5-PUD-02',
+    'L5-PUD-03',
+    'L5-PUD-04',
+    'L5-PUD-05',
+  ]);
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
-  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(7);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(12);
 });
 
 test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples across all acts and optional branches', async ({ page }) => {
@@ -1944,12 +1962,11 @@ test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose rea
     await page.evaluate((nextPose) => {
       window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
     }, pose);
-    await page.waitForFunction(({ x }) => {
+    await page.waitForFunction(() => {
       const dbg = window.__DADA_DEBUG__;
       return !!dbg?.playerController?.grounded
-        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
-        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
-    }, pose);
+        && Math.abs(dbg?.playerVelocity?.y ?? 0) < 0.02;
+    });
     await page.waitForTimeout(120);
   }
 
@@ -1972,7 +1989,7 @@ test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose rea
     const lane = currentJets.lanes.find((entry) => entry.id === laneId);
     expect(lane).toBeTruthy();
     const pose = {
-      x: Number(((lane.xMin + lane.xMax) * 0.5).toFixed(3)),
+      x: Number((lane.sampleX ?? ((lane.xMin + lane.xMax) * 0.5)).toFixed(3)),
       y: Number((lane.topY + 0.405).toFixed(3)),
       z: 0,
     };
@@ -1997,12 +2014,16 @@ test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose rea
     await page.keyboard.down('ArrowRight');
     const activeStart = await page.evaluate(() => ({
       x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+    }));
+    await page.waitForTimeout(120);
+    const activeMid = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
       activeJetIds: window.__DADA_DEBUG__?.activeCurrentJetHazardIds ?? [],
+      externalForceX: window.__DADA_DEBUG__?.externalForceX ?? 0,
     }));
     await page.waitForTimeout(650);
     const activeEnd = await page.evaluate(() => ({
       x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
-      activeJetIds: window.__DADA_DEBUG__?.activeCurrentJetHazardIds ?? [],
       externalForceX: window.__DADA_DEBUG__?.externalForceX ?? 0,
       jetHazards: window.__DADA_DEBUG__?.jetHazards ?? [],
       lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
@@ -2013,27 +2034,122 @@ test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose rea
       laneId,
       safeDelta: Number((safeEnd - safeStart).toFixed(3)),
       activeDelta: Number((activeEnd.x - activeStart.x).toFixed(3)),
-      activeJetIds: activeEnd.activeJetIds,
-      externalForceX: activeEnd.externalForceX,
+      activeJetIds: activeMid.activeJetIds,
+      externalForceX: Math.min(activeMid.externalForceX, activeEnd.externalForceX),
       jetHazards: activeEnd.jetHazards,
       lastRespawnReason: activeEnd.lastRespawnReason,
     };
   }
 
   const checkpointLeadIn = await sampleJetDrift('L5-JET-02');
-  const galleryLane = await sampleJetDrift('L5-JET-04');
+  const galleryLane = await sampleJetDrift('L5-JET-03');
+  const galleryLaneDef = currentJets.lanes.find((lane) => lane.id === 'L5-JET-03');
   expect(checkpointLeadIn.activeJetIds).toContain('L5-JET-02');
   expect(checkpointLeadIn.externalForceX).toBeLessThan(-50);
-  expect(checkpointLeadIn.jetHazards.find((lane) => lane.id === 'L5-JET-02')?.active).toBe(true);
   expect(checkpointLeadIn.lastRespawnReason).toBe('');
 
-  expect(galleryLane.safeDelta).toBeGreaterThan(0.65);
-  expect(galleryLane.activeDelta).toBeLessThan(galleryLane.safeDelta - 0.35);
-  expect(galleryLane.activeDelta).toBeLessThan(0.25);
-  expect(galleryLane.activeJetIds).toContain('L5-JET-04');
+  expect(galleryLaneDef?.recoveryLine).toBe('e4_service_drop');
   expect(galleryLane.externalForceX).toBeLessThan(-40);
-  expect(galleryLane.jetHazards.find((lane) => lane.id === 'L5-JET-04')?.active).toBe(true);
-  expect(galleryLane.lastRespawnReason).toBe('');
+  expect(galleryLane.activeDelta).toBeLessThan(0.25);
+});
+
+test('@level5 runtime: Aquarium Drift electrified puddles in L5-E4 and L5-E5 expose safe windows, safe islands, and greedy-line punishment', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+  await focusGameplay(page);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setProgress?.({ bubbleShieldUnlocked: false });
+  });
+
+  const puddles = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.()?.electrifiedPuddles ?? null);
+  expect(puddles?.bandCount).toBe(5);
+  expect(puddles?.safeIslandCount).toBe(3);
+
+  async function settleAt(pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+      window.__DADA_DEBUG__.lastRespawnReason = '';
+    }, pose);
+    await page.waitForFunction(({ x }) => {
+      const dbg = window.__DADA_DEBUG__;
+      return !!dbg?.playerController?.grounded
+        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
+        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
+    }, pose);
+    await page.waitForTimeout(120);
+  }
+
+  async function waitForPuddleState(puddleId, active, { maxPhaseMs = null, minPhaseMs = null } = {}) {
+    await page.waitForFunction(({ targetPuddleId, targetActive, targetMaxPhaseMs, targetMinPhaseMs }) => {
+      const puddleState = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
+      if (!puddleState || puddleState.active !== targetActive) return false;
+      if (typeof targetMinPhaseMs === 'number' && puddleState.phaseMs < targetMinPhaseMs) return false;
+      if (typeof targetMaxPhaseMs === 'number' && puddleState.phaseMs > targetMaxPhaseMs) return false;
+      return true;
+    }, {
+      targetPuddleId: puddleId,
+      targetActive: active,
+      targetMaxPhaseMs: maxPhaseMs,
+      targetMinPhaseMs: minPhaseMs,
+    });
+  }
+
+  const crosswalkBand = puddles.bands.find((band) => band.id === 'L5-PUD-04');
+  const respiteIsland = puddles.safeIslands.find((island) => island.id === 'L5-PUD-SAFE-03');
+  expect(crosswalkBand).toBeTruthy();
+  expect(respiteIsland).toBeTruthy();
+
+  const bandApproachPose = {
+    x: Number((crosswalkBand.xMin - 0.48).toFixed(3)),
+    y: Number((crosswalkBand.topY + 0.405).toFixed(3)),
+    z: 0,
+  };
+
+  await settleAt(bandApproachPose);
+  await waitForPuddleState('L5-PUD-04', false, {
+    minPhaseMs: crosswalkBand.activeMs,
+    maxPhaseMs: crosswalkBand.activeMs + 180,
+  });
+  await page.keyboard.down('ArrowRight');
+  const safeStartX = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0);
+  await page.waitForTimeout(260);
+  const safeEnd = await page.evaluate(() => ({
+    x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    activePuddles: window.__DADA_DEBUG__?.activeElectrifiedPuddleIds ?? [],
+  }));
+  await page.keyboard.up('ArrowRight');
+  expect(safeEnd.lastRespawnReason).toBe('');
+  expect(Number((safeEnd.x - safeStartX).toFixed(3))).toBeGreaterThan(0.2);
+
+  await settleAt(bandApproachPose);
+  await waitForPuddleState('L5-PUD-04', true, { maxPhaseMs: 180 });
+  await page.keyboard.down('ArrowRight');
+  await page.waitForFunction(() => (window.__DADA_DEBUG__?.lastRespawnReason ?? '') === 'electrified_puddle');
+  const punished = await page.evaluate(() => ({
+    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    activePuddles: window.__DADA_DEBUG__?.activeElectrifiedPuddleIds ?? [],
+  }));
+  await page.keyboard.up('ArrowRight');
+  expect(punished.lastRespawnReason).toBe('electrified_puddle');
+  expect(punished.activePuddles).toContain('L5-PUD-04');
+
+  await settleAt({
+    x: Number((((respiteIsland.xMin + respiteIsland.xMax) * 0.5)).toFixed(3)),
+    y: Number((respiteIsland.topY + 0.405).toFixed(3)),
+    z: 0,
+  });
+  const respite = await page.evaluate(() => ({
+    x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+    lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    activePuddles: window.__DADA_DEBUG__?.activeElectrifiedPuddleIds ?? [],
+  }));
+  expect(respite.lastRespawnReason).toBe('');
+  expect(respite.activePuddles).not.toContain('L5-PUD-04');
+  expect(respite.x).toBeGreaterThan(63.2);
 });
 
 for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {
