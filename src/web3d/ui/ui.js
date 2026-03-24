@@ -1386,7 +1386,7 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function isEra5UiLevel(levelId) {
-    return getMetaLevelRuntimeFamily(levelId) === 'era5';
+    return getMetaLevelRuntimeFamily(levelId) === 'era5' || levelId >= 5;
   }
 
   function getEra5WeaponHelp(levelId) {
@@ -1402,28 +1402,20 @@ export function createUI(uiRoot, options = {}) {
     if (levelId === 8) return 'Lantern beam toggle / boost: E';
     if (levelId === 7) return 'Kite Rig glide: hold Jump in air';
     if (levelId === 6) return 'Conveyor Boots traction: passive';
-    return 'Scuba Tank: Space ascend, C descend in deep pockets';
+    return 'Scuba Tank: Space ascend, C descend in deep water';
   }
 
   function getGameplayLegendMarkup(levelId) {
     if (isEra5UiLevel(levelId)) {
       return `
-        <div><span>↑ / ↓</span> Move forward / back</div>
-        <div><span>← / →</span> Turn left / right</div>
-        <div><span>Alt + ← / →</span> Strafe left / right</div>
-        <div><span>, / .</span> Strafe left / right</div>
-        <div><span>W / S</span> Forward / back alias</div>
-        <div><span>A / D</span> Strafe alias</div>
-        <div><span>Space</span> Jump / ascend in float</div>
-        <div><span>C</span> Descend in float</div>
+        <div><span>A / D</span> Move</div>
         <div><span>Shift</span> Run</div>
+        <div><span>Space</span> Jump</div>
         <div>${getEra5WeaponHelp(levelId)}</div>
         <div>${getEra5ToolHelp(levelId)}</div>
-        <div><span>[</span> / <span>]</span> Camera yaw</div>
-        <div><span>\\</span> Recenter camera</div>
         <div><span>I</span> Inventory</div>
+        <div><span>1–5</span> Weapon slots</div>
         <div><span>R</span> Reset checkpoint</div>
-        <div><span>G</span> Glide (when unlocked)</div>
         <div><span>M</span> Mute</div>
         <div><span>ESC</span> Menu</div>
       `;
@@ -1441,11 +1433,13 @@ export function createUI(uiRoot, options = {}) {
   }
 
   function getControlHintMarkup(era5 = false, levelId = 1) {
-    if (era5) {
-      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Click</span>/<span>F</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
-    }
+    // Level 5+: 2.5D movement with era5 combat (F/Click = fire, I = inventory, E = tool)
     if (levelId >= 5) {
-      return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>F</span> Flip &nbsp; <span>Shift</span> Sprint`;
+      return `<span>A</span>/<span>D</span> Move &nbsp; <span>F</span>/<span>Click</span> Fire &nbsp; <span>Space</span> Jump &nbsp; <span>I</span> Inventory &nbsp; <span>E</span> Tool`;
+    }
+    if (era5) {
+      // Legacy era5 free-move path (archive only — not active in any live level)
+      return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Click</span>/<span>F</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
     }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
