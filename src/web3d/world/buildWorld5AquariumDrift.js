@@ -38,6 +38,8 @@ const PROFILE = {
   tankDeep: [20, 66, 84],
   tankGlow: [72, 156, 180],
   silhouette: [18, 40, 48],
+  kelpDark: [34, 78, 74],
+  kelpLight: [72, 124, 112],
   railMetal: [198, 208, 214],
   pipeLight: [108, 130, 146],
   pipeDark: [70, 86, 98],
@@ -1042,6 +1044,7 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
     });
 
     if (act.kind === 'public') {
+      const spawnReadSlice = encounter.id === 'L5-E1' || encounter.id === 'L5-E2' || encounter.id === 'L5-E3';
       createDecorBox(scene, `${encounter.id}_frame_left`, {
         x: centerX - ((width * 0.5) - 0.55),
         y: midTop + 1.9,
@@ -1077,15 +1080,28 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
       });
       createDecorBox(scene, `${encounter.id}_window_band`, {
         x: centerX,
-        y: midTop + 0.75,
+        y: spawnReadSlice ? midTop + 2.15 : midTop + 0.75,
         z: 5.78,
         w: Math.max(4.0, width - 1.4),
-        h: 1.3,
+        h: spawnReadSlice ? 0.58 : 1.3,
         d: 0.22,
-        rgb: PROFILE.accent,
+        rgb: spawnReadSlice ? PROFILE.pipeDark : PROFILE.accent,
         shadowGen,
         metadata: { encounterId: encounter.id, visualRole: 'window_band' },
       });
+      if (spawnReadSlice) {
+        createDecorBox(scene, `${encounter.id}_route_shadow_band`, {
+          x: centerX,
+          y: midTop + 0.2,
+          z: 5.52,
+          w: Math.max(4.0, width - 1.8),
+          h: 1.1,
+          d: 0.42,
+          rgb: PROFILE.silhouette,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'route_shadow_band' },
+        });
+      }
       if (encounter.id === 'L5-E4') {
         createDecorBox(scene, `${encounter.id}_gallery_crack_block`, {
           x: centerX + 2.2,
@@ -1193,9 +1209,53 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
       w: module.w,
       h: module.h,
       rgb: PROFILE.tankGlow,
-      alpha: 0.34,
+      alpha: module.variant === 'kelp' ? 0.24 : 0.34,
       metadata: { encounterIds: module.encounterIds, visualRole: 'tank_water' },
     });
+    if (module.variant === 'kelp') {
+      createDecorBox(scene, `${module.id}_upper_cap`, {
+        parent: root,
+        x: 0,
+        y: (module.h * 0.5) - 0.34,
+        z: 0.06,
+        w: module.w,
+        h: 0.52,
+        d: 0.28,
+        rgb: PROFILE.pipeDark,
+        shadowGen,
+        metadata: { encounterIds: module.encounterIds, visualRole: 'tank_upper_cap' },
+      });
+      for (const [index, strand] of [
+        { x: -0.36, y: -0.05, w: 1.2, h: 3.5, rgb: PROFILE.kelpDark },
+        { x: -0.18, y: 0.18, w: 1.0, h: 4.2, rgb: PROFILE.kelpLight },
+        { x: 0.04, y: -0.12, w: 1.4, h: 3.9, rgb: PROFILE.kelpDark },
+        { x: 0.2, y: 0.08, w: 0.9, h: 4.4, rgb: PROFILE.kelpLight },
+        { x: 0.34, y: -0.02, w: 1.1, h: 3.6, rgb: PROFILE.kelpDark },
+      ].entries()) {
+        createAlphaPanel(scene, `${module.id}_kelp_${index}`, {
+          parent: root,
+          x: module.w * strand.x,
+          y: (strand.y * module.h) - 0.28,
+          z: -0.03,
+          w: strand.w,
+          h: strand.h,
+          rgb: strand.rgb,
+          alpha: 0.58,
+          metadata: { encounterIds: module.encounterIds, visualRole: 'tank_kelp' },
+        });
+      }
+      createAlphaPanel(scene, `${module.id}_shoal_shadow`, {
+        parent: root,
+        x: module.w * 0.12,
+        y: module.h * 0.18,
+        z: -0.05,
+        w: 5.2,
+        h: 1.2,
+        rgb: PROFILE.silhouette,
+        alpha: 0.56,
+        metadata: { encounterIds: module.encounterIds, visualRole: 'tank_shoal_shadow' },
+      });
+    }
     createDecorBox(scene, `${module.id}_base`, {
       parent: root,
       x: 0,
@@ -1222,6 +1282,158 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
       });
     }
   }
+}
+
+function buildSpawnSliceReadability(scene, shadowGen) {
+  createDecorBox(scene, 'l5_spawn_foreground_frame', {
+    x: -27.4,
+    y: 3.25,
+    z: 1.34,
+    w: 1.18,
+    h: 6.4,
+    d: 1.1,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_foreground_frame' },
+  });
+  createDecorBox(scene, 'l5_spawn_foreground_brace', {
+    x: -25.8,
+    y: 4.78,
+    z: 1.68,
+    w: 3.4,
+    h: 0.42,
+    d: 0.6,
+    rgb: PROFILE.support,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_foreground_brace' },
+  });
+  createDecorBox(scene, 'l5_spawn_ceiling_mass', {
+    x: -6.0,
+    y: 7.15,
+    z: 2.56,
+    w: 38.0,
+    h: 2.1,
+    d: 4.4,
+    rgb: PROFILE.backMass,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_ceiling_mass' },
+  });
+  createDecorBox(scene, 'l5_spawn_canopy_lintel', {
+    x: -4.6,
+    y: 5.98,
+    z: 3.06,
+    w: 27.5,
+    h: 0.56,
+    d: 1.14,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_canopy_lintel' },
+  });
+  for (const [index, y] of [5.18, 5.62].entries()) {
+    createDecorCylinder(scene, `l5_spawn_pipe_run_${index}`, {
+      x: -4.0,
+      y,
+      z: 3.26,
+      height: 28.0,
+      diameter: index === 0 ? 0.48 : 0.34,
+      rgb: index === 0 ? PROFILE.pipeDark : PROFILE.pipeLight,
+      shadowGen,
+      rotation: { z: Math.PI * 0.5 },
+      metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_pipe_run' },
+    });
+  }
+  const landmark = createDecorRoot(scene, 'l5_spawn_filter_tower', {
+    x: 2.8,
+    y: 3.25,
+    z: 4.56,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark' },
+  });
+  createDecorBox(scene, 'l5_spawn_filter_tower_body', {
+    parent: landmark,
+    x: 0,
+    y: 0,
+    z: 0,
+    w: 4.2,
+    h: 6.7,
+    d: 1.28,
+    rgb: PROFILE.backMass,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_body' },
+  });
+  createDecorBox(scene, 'l5_spawn_filter_tower_cap', {
+    parent: landmark,
+    x: 0,
+    y: 2.72,
+    z: 0,
+    w: 4.7,
+    h: 0.62,
+    d: 1.5,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_cap' },
+  });
+  createDecorBox(scene, 'l5_spawn_filter_tower_trim', {
+    parent: landmark,
+    x: 0,
+    y: 0.92,
+    z: -0.52,
+    w: 4.34,
+    h: 0.28,
+    d: 0.24,
+    rgb: PROFILE.warning,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_trim' },
+  });
+  createAlphaPanel(scene, 'l5_spawn_filter_tower_glow', {
+    parent: landmark,
+    x: -0.42,
+    y: 0.1,
+    z: -0.68,
+    w: 1.06,
+    h: 4.0,
+    rgb: PROFILE.tankGlow,
+    alpha: 0.46,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_glow' },
+  });
+  createAlphaPanel(scene, 'l5_spawn_filter_tower_glow_b', {
+    parent: landmark,
+    x: 0.62,
+    y: -0.18,
+    z: -0.68,
+    w: 0.72,
+    h: 2.6,
+    rgb: PROFILE.glassPanel,
+    alpha: 0.28,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_glow' },
+  });
+  createDecorBox(scene, 'l5_spawn_filter_tower_pipe', {
+    parent: landmark,
+    x: -1.1,
+    y: 1.5,
+    z: -0.72,
+    w: 0.34,
+    h: 3.2,
+    d: 0.34,
+    rgb: PROFILE.pipeLight,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_pipe' },
+  });
+  const sign = createWelcomeSign(scene, {
+    name: 'level5_spawn_kelp_tank_sign',
+    x: -6.8,
+    y: 0.0,
+    z: 4.92,
+    shadowGen,
+    textLines: ['KELP', 'TANK'],
+    width: 4.0,
+    height: 1.3,
+    postHeight: 4.0,
+    postSpread: 2.34,
+    boardColor: PROFILE.warning,
+    postColor: PROFILE.pipeDark,
+    boardName: 'level5_spawn_kelp_tank_sign',
+  });
+  setRenderingGroup(sign, 2);
 }
 
 function addSupportColumns(scene, shadowGen, def) {
@@ -1872,6 +2084,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
 
   buildBackdrops(scene, shadowGen, layout, visualPlan);
   buildVisualModules(scene, shadowGen, visualPlan);
+  buildSpawnSliceReadability(scene, shadowGen);
 
   const slickHazards = slickDeck.patches.map((patch) => {
     const visual = createSlickPatchVisual(scene, patch);
