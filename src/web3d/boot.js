@@ -4664,22 +4664,7 @@ export async function boot(options = {}) {
     ui.hideTitle();
     ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: hasEra5Systems, levelId });
     if (hasEra5Systems) {
-      console.log('Era5ControllerV2 active');
-      // Auto-grant all weapons for testing so number key switcher is usable
-      const allWeaponIds = ['bubble_wand', 'foam_blaster', 'paper_fan', 'bookmark_boomerang', 'kite_string_whip'];
-      let weaponGrantChanged = false;
-      let autoGrantState = era5State;
-      for (const wid of allWeaponIds) {
-        const result = addItemToEra5State(autoGrantState, wid, { autoEquip: false });
-        if (result.added) {
-          autoGrantState = result.state;
-          weaponGrantChanged = true;
-        }
-      }
-      if (weaponGrantChanged) {
-        persistEra5State(autoGrantState);
-        restoreEra5Vitals();
-      }
+      restoreEra5Vitals();
       ui.showEra5Hud();
       syncEra5Ui();
       updateEra5WeaponMesh(getEquippedEra5WeaponDef()?.defId ?? null);
