@@ -1139,6 +1139,7 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
     tankBackgrounds: 3,
     pumpHeroes: 2,
   });
+  expect(report.layout?.slickDeck?.patchCount).toBe(3);
 
   await captureProof('docs/screenshots/level5-aquarium-visual-start.png');
 
@@ -1156,6 +1157,45 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
     await page.waitForTimeout(350);
     await captureProof(path);
   }
+});
+
+test('capture Level 5 Aquarium Drift slick-deck proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-slick-deck', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-aquarium-slick-deck/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1200);
+  await hideGameplayUi(page);
+
+  const slickDeck = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.()?.slickDeck ?? null);
+  expect(slickDeck?.patchCount).toBe(3);
+
+  await page.evaluate((pose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(pose.x, pose.y, pose.z ?? 0);
+  }, { x: -18.5, y: 1.355, z: 0 });
+  await page.waitForTimeout(350);
+  await captureProof('docs/screenshots/level5-aquarium-slick-e1.png');
+
+  await page.evaluate((pose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(pose.x, pose.y, pose.z ?? 0);
+  }, { x: 1.0, y: 1.755, z: 0 });
+  await page.waitForTimeout(350);
+  await captureProof('docs/screenshots/level5-aquarium-slick-e2.png');
 });
 
 test('capture Level 6 through 9 2.5D placeholder proof screenshots', async ({ page }) => {

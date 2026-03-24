@@ -5651,6 +5651,10 @@ export async function boot(options = {}) {
       }
     }
 
+    let surfaceAccelMultiplier = 1;
+    let surfaceDecelMultiplier = 1;
+    let activeSlickHazardId = '';
+
     // Puddle hazard: touching it resets player to spawn start.
     if (puddleInvulnMs > 0) {
       puddleInvulnMs = Math.max(0, puddleInvulnMs - dt * 1000);
@@ -5663,6 +5667,12 @@ export async function boot(options = {}) {
 
       if (hazard.handledByLevelRuntime) continue;
 
+      if (inside && hazard.type === 'slick' && player.grounded) {
+        surfaceAccelMultiplier = Math.min(surfaceAccelMultiplier, hazard.accelMultiplier ?? 0.58);
+        surfaceDecelMultiplier = Math.min(surfaceDecelMultiplier, hazard.decelMultiplier ?? 0.16);
+        activeSlickHazardId = hazard.id || activeSlickHazardId;
+      }
+
       if (inside && hazard.type === 'slip' && puddleInvulnMs <= 0 && !respawnState) {
         activeCheckpointIndex = 0;
         respawnPoint = { ...spawnPoint };
@@ -5674,6 +5684,9 @@ export async function boot(options = {}) {
         puddleInvulnMs = 4000;
       }
     }
+    window.__DADA_DEBUG__.activeSlickHazardId = activeSlickHazardId;
+    window.__DADA_DEBUG__.surfaceAccelMultiplier = surfaceAccelMultiplier;
+    window.__DADA_DEBUG__.surfaceDecelMultiplier = surfaceDecelMultiplier;
 
     let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1.15) : 1;
     let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
@@ -5698,6 +5711,8 @@ export async function boot(options = {}) {
     }
 
     player.setMovementModifiers({
+      surfaceAccelMultiplier,
+      surfaceDecelMultiplier,
       jumpVelocityMultiplier: onesieJumpBoost * (isEra5Level ? (ERA5_JUMP_MULTIPLIER * Math.max(0.9, era5State.stats.jumpMultiplier ?? 1)) : 1),
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
       speedMultiplier,

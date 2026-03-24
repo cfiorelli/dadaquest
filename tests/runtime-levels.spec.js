@@ -1688,7 +1688,7 @@ test('@progression runtime: title click plus start for level 6 launches the acti
   });
 });
 
-test('@level5 runtime: Aquarium Drift installs the full visual kit across the active 2.5D route', async ({ page }) => {
+test('@level5 runtime: Aquarium Drift visual kit and slick-deck teaching spaces are authored on the active 2.5D route', async ({ page }) => {
   test.setTimeout(120_000);
   expect(LEVEL5_CASE).toBeTruthy();
   await gotoDebugLevel(page, 5);
@@ -1751,10 +1751,26 @@ test('@level5 runtime: Aquarium Drift installs the full visual kit across the ac
     routeRead: 'public',
     visualProfile: 'crown_tank',
   });
+  expect(report.layout.slickDeck).not.toBeNull();
+  expect(report.layout.slickDeck.patchCount).toBe(3);
+  expect(report.layout.slickDeck.safeComparison).toMatchObject({
+    id: 'L5-SAFE-01',
+    encounterId: 'L5-E1',
+  });
+  expect(report.layout.slickDeck.patches.map((patch) => patch.id)).toEqual([
+    'L5-SLICK-01',
+    'L5-SLICK-02',
+    'L5-SLICK-03',
+  ]);
+  expect(report.layout.slickDeck.patches.map((patch) => patch.pairedChallenge)).toEqual([
+    'harmless_apron',
+    'upper_gap',
+    'narrow_merge',
+  ]);
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
-  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(0);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(3);
 });
 
 test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples across all acts and optional branches', async ({ page }) => {
@@ -1787,6 +1803,113 @@ test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples acro
     expect(state.lastRespawnReason).toBe('');
     expect(state.playerPos.y).toBeGreaterThan(sample.y - 0.02);
   }
+});
+
+test('@level5 runtime: Aquarium Drift slick deck changes traction in the Act 1 teach spaces without lethal overload', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+  await focusGameplay(page);
+
+  const slickDeck = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.()?.slickDeck ?? null);
+  expect(slickDeck?.patchCount).toBe(3);
+  const safeComparison = slickDeck.safeComparison;
+  const firstPatch = slickDeck.patches[0];
+
+  async function runGlideSample(startPose, holdMs) {
+    await page.evaluate((pose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(pose.x, pose.y, pose.z ?? 0);
+    }, startPose);
+    await page.waitForFunction(({ x }) => {
+      const dbg = window.__DADA_DEBUG__;
+      const grounded = !!dbg?.playerController?.grounded;
+      const vx = Math.abs(dbg?.playerVelocity?.x ?? 0);
+      const px = dbg?.playerPos?.x ?? 0;
+      return grounded && vx < 0.02 && Math.abs(px - x) < 0.05;
+    }, startPose);
+    await page.waitForTimeout(120);
+    const settled = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      y: window.__DADA_DEBUG__?.playerPos?.y ?? 0,
+      slickId: window.__DADA_DEBUG__?.activeSlickHazardId ?? '',
+      surfaceAccelMultiplier: window.__DADA_DEBUG__?.surfaceAccelMultiplier ?? 1,
+      surfaceDecelMultiplier: window.__DADA_DEBUG__?.surfaceDecelMultiplier ?? 1,
+      grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+      floorTopY: window.__DADA_DEBUG__?.floorTopY ?? 0,
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    }));
+    await page.keyboard.down('ArrowRight');
+    const motionSamples = [];
+    const sampleCount = 3;
+    for (let index = 0; index < sampleCount; index += 1) {
+      await page.waitForTimeout(Math.max(40, Math.round(holdMs / sampleCount)));
+      motionSamples.push(await page.evaluate(() => ({
+        x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+        y: window.__DADA_DEBUG__?.playerPos?.y ?? 0,
+        slickId: window.__DADA_DEBUG__?.activeSlickHazardId ?? '',
+        surfaceAccelMultiplier: window.__DADA_DEBUG__?.surfaceAccelMultiplier ?? 1,
+        surfaceDecelMultiplier: window.__DADA_DEBUG__?.surfaceDecelMultiplier ?? 1,
+        grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+      })));
+    }
+    const onRelease = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      y: window.__DADA_DEBUG__?.playerPos?.y ?? 0,
+      slickId: window.__DADA_DEBUG__?.activeSlickHazardId ?? '',
+      surfaceAccelMultiplier: window.__DADA_DEBUG__?.surfaceAccelMultiplier ?? 1,
+      surfaceDecelMultiplier: window.__DADA_DEBUG__?.surfaceDecelMultiplier ?? 1,
+      grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    }));
+    await page.keyboard.up('ArrowRight');
+    await page.waitForTimeout(500);
+    const afterRelease = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    }));
+    return {
+      settledX: settled.x,
+      releaseX: onRelease.x,
+      endX: afterRelease.x,
+      glideDistance: Number((afterRelease.x - onRelease.x).toFixed(3)),
+      settledSlickId: settled.slickId,
+      slickId: onRelease.slickId,
+      settledSurfaceAccelMultiplier: settled.surfaceAccelMultiplier,
+      settledSurfaceDecelMultiplier: settled.surfaceDecelMultiplier,
+      motionSamples,
+      surfaceAccelMultiplier: onRelease.surfaceAccelMultiplier,
+      surfaceDecelMultiplier: onRelease.surfaceDecelMultiplier,
+      lastRespawnReason: afterRelease.lastRespawnReason || onRelease.lastRespawnReason || settled.lastRespawnReason,
+    };
+  }
+
+  const safe = await runGlideSample({
+    x: (safeComparison.xMin + safeComparison.xMax) * 0.5,
+    y: Number((safeComparison.topY + 0.405).toFixed(3)),
+    z: 0,
+  }, 180);
+  const slick = await runGlideSample({
+    x: (firstPatch.xMin + firstPatch.xMax) * 0.5,
+    y: Number((firstPatch.topY + 0.405).toFixed(3)),
+    z: 0,
+  }, 180);
+
+  expect(safe.settledSlickId).toBe('');
+  expect(safe.settledSurfaceAccelMultiplier).toBe(1);
+  expect(safe.settledSurfaceDecelMultiplier).toBe(1);
+  expect(safe.motionSamples.every((sample) => sample.slickId === '' && sample.surfaceDecelMultiplier === 1)).toBe(true);
+  expect(safe.lastRespawnReason).toBe('');
+
+  const slickObserved = slick.motionSamples.some((sample) => sample.slickId === 'L5-SLICK-01');
+  const slickMinAccel = Math.min(slick.settledSurfaceAccelMultiplier, slick.surfaceAccelMultiplier, ...slick.motionSamples.map((sample) => sample.surfaceAccelMultiplier));
+  const slickMinDecel = Math.min(slick.settledSurfaceDecelMultiplier, slick.surfaceDecelMultiplier, ...slick.motionSamples.map((sample) => sample.surfaceDecelMultiplier));
+  expect(slickObserved || slick.settledSlickId === 'L5-SLICK-01' || slickMinDecel < 1 || slickMinAccel < 1).toBe(true);
+  expect(slickMinAccel).toBeLessThan(1);
+  expect(slickMinDecel).toBeLessThan(0.2);
+  expect(slick.lastRespawnReason).toBe('');
+  expect(slick.glideDistance).toBeGreaterThan(safe.glideDistance + 0.1);
 });
 
 for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {

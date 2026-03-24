@@ -63,7 +63,7 @@ const MAINLINE_ENCOUNTERS = [
     decision: 'Stay on the wide wet apron or climb the short comparison strip.',
     xMin: -24,
     xMax: -8,
-    sample: { x: -18.5, topY: 0.55 },
+    sample: { x: -21.4, topY: 0.55 },
   },
   {
     id: 'L5-E2',
@@ -458,12 +458,13 @@ function buildLayout() {
   const add = (def) => surfaces.push(def);
 
   const ground = deckDef('aquarium_drift_ground_start', -24, -12, 0.55, { encounterId: 'L5-E1' });
-  add(deckDef('e1_compare_strip', -21, -13, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' }));
-  addStairRun(surfaces, 'e1_compare_steps', -23.4, -20.8, 0.55, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' });
+  add(deckDef('e1_compare_strip', -17.0, -13.0, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' }));
+  addStairRun(surfaces, 'e1_compare_steps', -19.8, -16.8, 0.55, 0.95, { depth: 2.8, kind: 'glass', encounterId: 'L5-E1' });
   add(deckDef('e1_exit_apron', -12, -6, 0.75, { encounterId: 'L5-E1' }));
 
   add(deckDef('e2_floor_lane', -6, 8, 0.75, { encounterId: 'L5-E2' }));
-  add(deckDef('e2_kiosk_bypass', -2.5, 9.5, 1.35, { depth: 3.0, kind: 'glass', encounterId: 'L5-E2' }));
+  add(deckDef('e2_kiosk_bypass_a', -2.5, 2.2, 1.35, { depth: 3.0, kind: 'glass', encounterId: 'L5-E2' }));
+  add(deckDef('e2_kiosk_bypass_b', 4.4, 9.5, 1.35, { depth: 3.0, kind: 'glass', encounterId: 'L5-E2' }));
   addStairRun(surfaces, 'e2_kiosk_up', -6.2, -2.4, 0.75, 1.35, { depth: 2.8, kind: 'glass', encounterId: 'L5-E2' });
   addStairRun(surfaces, 'e2_kiosk_down', 8.2, 10.2, 1.35, 1.15, { depth: 2.8, kind: 'glass', encounterId: 'L5-E2' });
   addStairRun(surfaces, 'e2_merge_rise', 6.0, 10.0, 0.75, 1.15, { depth: 3.2, kind: 'public', encounterId: 'L5-E2' });
@@ -710,6 +711,71 @@ function buildVisualPlan(layout) {
         visualTags: [...entry.genericTags, ...entry.moduleTypes],
       })),
     },
+  };
+}
+
+function getLayoutSurface(layout, name) {
+  if (layout.ground?.name === name) return layout.ground;
+  return layout.platforms.find((surface) => surface.name === name) || null;
+}
+
+function buildSlickDeckPlan(layout) {
+  const safeCompare = getLayoutSurface(layout, 'e1_compare_strip');
+  const patch1Surface = layout.ground;
+  const patch2Surface = getLayoutSurface(layout, 'e2_kiosk_bypass_a');
+  const patch3Surface = getLayoutSurface(layout, 'e2_kiosk_bypass_b');
+  const safeComparison = {
+    id: 'L5-SAFE-01',
+    encounterId: 'L5-E1',
+    xMin: safeCompare.xMin,
+    xMax: safeCompare.xMax,
+    topY: safeCompare.topY,
+    purpose: 'Dry comparison strip for traction contrast.',
+  };
+  const patches = [
+    {
+      id: 'L5-SLICK-01',
+      encounterId: 'L5-E1',
+      xMin: -23.4,
+      xMax: -20.2,
+      y: Number((patch1Surface.topY + 0.405).toFixed(3)),
+      topY: patch1Surface.topY,
+      depth: 3.0,
+      accelMultiplier: 0.64,
+      decelMultiplier: 0.16,
+      severity: 'low',
+      pairedChallenge: 'harmless_apron',
+    },
+    {
+      id: 'L5-SLICK-02',
+      encounterId: 'L5-E2',
+      xMin: patch2Surface.xMin + 0.2,
+      xMax: patch2Surface.xMax - 0.2,
+      y: Number((patch2Surface.topY + 0.405).toFixed(3)),
+      topY: patch2Surface.topY,
+      depth: 2.4,
+      accelMultiplier: 0.58,
+      decelMultiplier: 0.14,
+      severity: 'medium',
+      pairedChallenge: 'upper_gap',
+    },
+    {
+      id: 'L5-SLICK-03',
+      encounterId: 'L5-E2',
+      xMin: patch3Surface.xMin + 0.4,
+      xMax: patch3Surface.xMax - 0.2,
+      y: Number((patch3Surface.topY + 0.405).toFixed(3)),
+      topY: patch3Surface.topY,
+      depth: 2.4,
+      accelMultiplier: 0.54,
+      decelMultiplier: 0.12,
+      severity: 'medium',
+      pairedChallenge: 'narrow_merge',
+    },
+  ];
+  return {
+    safeComparison,
+    patches,
   };
 }
 
@@ -1258,11 +1324,81 @@ function buildVisualModules(scene, shadowGen, visualPlan) {
   for (const def of visualPlan.pumpHeroes) createPumpHeroModule(scene, shadowGen, def);
 }
 
+function createSlickPatchVisual(scene, def) {
+  const metadata = {
+    encounterId: def.encounterId,
+    hazardId: def.id,
+    hazardType: 'slick',
+  };
+  const root = createDecorRoot(scene, `${def.id}_root`, {
+    x: (def.xMin + def.xMax) * 0.5,
+    y: def.topY + 0.032,
+    z: LANE_Z,
+    metadata,
+  });
+  const width = Number((def.xMax - def.xMin).toFixed(3));
+  const base = BABYLON.MeshBuilder.CreatePlane(`${def.id}_slick_surface`, {
+    width,
+    height: def.depth,
+  }, scene);
+  base.parent = root;
+  base.rotation.x = Math.PI * 0.5;
+  base.position.set(0, 0, 0);
+  base.material = createAlphaMaterial(scene, `${def.id}_slick_surface_mat`, PROFILE.glassPanel, 0.52);
+  applyWorldAlphaRenderPolicy(base);
+  markDecor(base, metadata);
+
+  for (const [index, offset] of [-0.26, 0.0, 0.26].entries()) {
+    const stripe = BABYLON.MeshBuilder.CreatePlane(`${def.id}_stripe_${index}`, {
+      width: Math.max(0.45, width * 0.14),
+      height: def.depth * 0.82,
+    }, scene);
+    stripe.parent = root;
+    stripe.rotation.x = Math.PI * 0.5;
+    stripe.position.set(width * offset, 0.01, 0);
+    stripe.material = createAlphaMaterial(scene, `${def.id}_stripe_${index}_mat`, PROFILE.railMetal, 0.3);
+    applyWorldAlphaRenderPolicy(stripe);
+    markDecor(stripe, metadata);
+  }
+
+  const arrow = BABYLON.MeshBuilder.CreatePlane(`${def.id}_arrow`, {
+    width: Math.max(0.9, width * 0.16),
+    height: def.depth * 0.44,
+  }, scene);
+  arrow.parent = root;
+  arrow.rotation.x = Math.PI * 0.5;
+  arrow.position.set(width * 0.3, 0.015, 0);
+  arrow.material = createAlphaMaterial(scene, `${def.id}_arrow_mat`, PROFILE.warning, 0.46);
+  applyWorldAlphaRenderPolicy(arrow);
+  markDecor(arrow, metadata);
+
+  return {
+    root,
+    mesh: base,
+  };
+}
+
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const meta = getLevelMeta(5);
   const layout = buildLayout();
   const visualPlan = buildVisualPlan(layout);
+  const slickDeck = buildSlickDeckPlan(layout);
   layout.layoutReport.visualKit = visualPlan.report;
+  layout.layoutReport.slickDeck = {
+    safeComparison: slickDeck.safeComparison,
+    patchCount: slickDeck.patches.length,
+    patches: slickDeck.patches.map((patch) => ({
+      id: patch.id,
+      encounterId: patch.encounterId,
+      xMin: patch.xMin,
+      xMax: patch.xMax,
+      topY: patch.topY,
+      severity: patch.severity,
+      pairedChallenge: patch.pairedChallenge,
+      accelMultiplier: patch.accelMultiplier,
+      decelMultiplier: patch.decelMultiplier,
+    })),
+  };
 
   scene.clearColor = new BABYLON.Color4(...PROFILE.clearColor, 1);
 
@@ -1273,6 +1409,22 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
 
   buildBackdrops(scene, shadowGen, layout, visualPlan);
   buildVisualModules(scene, shadowGen, visualPlan);
+
+  const hazards = slickDeck.patches.map((patch) => {
+    const visual = createSlickPatchVisual(scene, patch);
+    return {
+      id: patch.id,
+      type: 'slick',
+      encounterId: patch.encounterId,
+      minX: patch.xMin,
+      maxX: patch.xMax,
+      minY: patch.y - 0.34,
+      maxY: patch.y + 0.34,
+      accelMultiplier: patch.accelMultiplier,
+      decelMultiplier: patch.decelMultiplier,
+      mesh: visual.mesh,
+    };
+  });
 
   const surfaceVisuals = {};
   const allColliders = [];
@@ -1389,7 +1541,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     checkpoints,
     pickups: [],
     coins: [],
-    hazards: [],
+    hazards,
     crumbles: [],
     level,
     signs: [sign],
