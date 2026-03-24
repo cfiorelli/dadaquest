@@ -5699,20 +5699,33 @@ export async function boot(options = {}) {
       }
 
       if (hazard.type === 'electrifiedPuddle') {
+        const warnMs = Math.max(0, hazard.warnMs ?? 0);
         const activeMs = Math.max(0, hazard.activeMs ?? 1400);
         const safeMs = Math.max(0, hazard.safeMs ?? 1600);
-        const cycleMs = Math.max(1, activeMs + safeMs);
+        const cycleMs = Math.max(1, warnMs + activeMs + safeMs);
         const phaseMs = (hazardClockMs + (hazard.phaseOffsetMs ?? 0)) % cycleMs;
-        const active = phaseMs < activeMs;
-        hazard.setActive?.(active);
+        const warn = warnMs > 0 && phaseMs < warnMs;
+        const active = phaseMs >= warnMs && phaseMs < (warnMs + activeMs);
+        const state = active ? 'active' : (warn ? 'warn' : 'off');
+        const stateElapsedMs = active ? phaseMs - warnMs : (warn ? phaseMs : Math.max(0, phaseMs - warnMs - activeMs));
+        const stateDurationMs = active ? activeMs : (warn ? warnMs : safeMs);
+        const stateProgress = stateDurationMs > 0 ? Math.max(0, Math.min(1, stateElapsedMs / stateDurationMs)) : 1;
+        hazard.setState?.(state, stateProgress);
+        if (!hazard.setState) {
+          hazard.setActive?.(active);
+        }
         electrifiedPuddleStates.push({
           id: hazard.id,
           encounterId: hazard.encounterId ?? null,
+          state,
           active,
+          warn,
           phaseMs: Number(phaseMs.toFixed(1)),
+          warnMs,
           activeMs,
           safeMs,
           laneId: hazard.laneId ?? null,
+          readProfile: hazard.readProfile ?? 'legacy',
           tell: hazard.tell ?? null,
         });
         if (inside && active) {

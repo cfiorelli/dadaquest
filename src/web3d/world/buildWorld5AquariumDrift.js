@@ -925,13 +925,16 @@ function buildElectrifiedPuddlePlan(layout) {
     {
       id: 'L5-PUD-04',
       encounterId: 'L5-E5',
-      xMin: 60.85,
-      xMax: 62.95,
+      xMin: 61.2,
+      xMax: 62.5,
       topY: e5Crosswalk.topY,
       y: Number((e5Crosswalk.topY + 0.405).toFixed(3)),
       depth: e5Crosswalk.d,
       phaseOffsetMs: 420,
       laneId: 'public_crosswalk',
+      readProfile: 'single_lane_truth',
+      warnMs: 600,
+      safeIslandId: 'L5-PUD-SAFE-03',
       tell: 'charge_strips_and_hum',
     },
     {
@@ -959,6 +962,7 @@ function buildElectrifiedPuddlePlan(layout) {
       xMin: 42.8,
       xMax: 43.45,
       topY: e4Gallery.topY,
+      depth: e4Gallery.d,
       role: 'gallery_wait_pad',
     },
     {
@@ -967,14 +971,16 @@ function buildElectrifiedPuddlePlan(layout) {
       xMin: 54.45,
       xMax: 56.15,
       topY: e4Service.topY,
+      depth: e4Service.d,
       role: 'service_reset_pocket',
     },
     {
       id: 'L5-PUD-SAFE-03',
       encounterId: 'L5-E5',
-      xMin: 62.95,
-      xMax: 64.7,
+      xMin: 62.5,
+      xMax: 64.9,
       topY: e5Crosswalk.topY,
+      depth: e5Crosswalk.d,
       role: 'crosswalk_respite',
     },
   ];
@@ -1921,87 +1927,261 @@ function createElectrifiedPuddleVisual(scene, def) {
     metadata,
   });
   const width = Number((def.xMax - def.xMin).toFixed(3));
+  const productionProfile = def.readProfile === 'single_lane_truth';
   const mats = [];
+  const trayMeshes = [];
+
+  if (productionProfile) {
+    const tray = createDecorBox(scene, `${def.id}_tray`, {
+      x: 0,
+      y: -0.01,
+      z: 0,
+      w: width + 0.18,
+      h: 0.04,
+      d: def.depth * 0.8,
+      rgb: PROFILE.silhouette,
+      parent: root,
+      metadata,
+    });
+    const trayTop = createDecorBox(scene, `${def.id}_tray_top`, {
+      x: 0,
+      y: 0.01,
+      z: 0,
+      w: width + 0.04,
+      h: 0.02,
+      d: def.depth * 0.7,
+      rgb: PROFILE.pipeDark,
+      parent: root,
+      metadata,
+    });
+    trayMeshes.push(tray, trayTop);
+    mats.push(tray.material, trayTop.material);
+  }
+
   const base = BABYLON.MeshBuilder.CreatePlane(`${def.id}_base`, {
     width,
-    height: def.depth * 0.94,
+    height: def.depth * (productionProfile ? 0.72 : 0.94),
   }, scene);
   base.parent = root;
   base.rotation.x = Math.PI * 0.5;
-  base.position.set(0, 0, 0);
-  base.material = createAlphaMaterial(scene, `${def.id}_base_mat`, PROFILE.shockDim, 0.22);
+  base.position.set(0, 0.012, 0);
+  base.material = createAlphaMaterial(
+    scene,
+    `${def.id}_base_mat`,
+    productionProfile ? PROFILE.shockDim : PROFILE.shockDim,
+    productionProfile ? 0.08 : 0.22,
+  );
   applyWorldAlphaRenderPolicy(base);
   markDecor(base, metadata);
   mats.push(base.material);
 
-  const railPlanes = [];
-  for (const side of [-1, 1]) {
-    const rail = BABYLON.MeshBuilder.CreatePlane(`${def.id}_rail_${side}`, {
-      width,
-      height: 0.18,
-    }, scene);
-    rail.parent = root;
-    rail.rotation.x = Math.PI * 0.5;
-    rail.position.set(0, 0.012, side * (def.depth * 0.34));
-    rail.material = createAlphaMaterial(scene, `${def.id}_rail_${side}_mat`, PROFILE.shockRail, 0.18);
-    applyWorldAlphaRenderPolicy(rail);
-    markDecor(rail, metadata);
-    railPlanes.push(rail);
-    mats.push(rail.material);
-  }
-
+  const railMeshes = [];
+  const emitterMeshes = [];
   const cracklePlanes = [];
-  for (const offset of [-0.3, 0, 0.3]) {
-    const crackle = BABYLON.MeshBuilder.CreatePlane(`${def.id}_crackle_${offset}`, {
-      width: Math.max(0.42, width * 0.24),
-      height: def.depth * 0.72,
-    }, scene);
-    crackle.parent = root;
-    crackle.rotation.x = Math.PI * 0.5;
-    crackle.position.set(offset * width, 0.016, 0);
-    crackle.material = createAlphaMaterial(scene, `${def.id}_crackle_${offset}_mat`, PROFILE.shockBright, 0.06);
-    applyWorldAlphaRenderPolicy(crackle);
-    markDecor(crackle, metadata);
-    cracklePlanes.push(crackle);
-    mats.push(crackle.material);
-  }
+  const pulseMeshes = [];
 
   const coreStrip = BABYLON.MeshBuilder.CreatePlane(`${def.id}_core_strip`, {
-    width: Math.max(0.62, width * 0.16),
-    height: def.depth * 0.62,
+    width: Math.max(0.44, width * (productionProfile ? 0.16 : 0.16)),
+    height: def.depth * (productionProfile ? 0.42 : 0.62),
   }, scene);
   coreStrip.parent = root;
   coreStrip.rotation.x = Math.PI * 0.5;
-  coreStrip.position.set(0, 0.018, 0);
-  coreStrip.material = createAlphaMaterial(scene, `${def.id}_core_strip_mat`, PROFILE.shockCore, 0.1);
+  coreStrip.position.set(0, 0.02, 0);
+  coreStrip.material = createAlphaMaterial(
+    scene,
+    `${def.id}_core_strip_mat`,
+    PROFILE.shockCore,
+    productionProfile ? 0.04 : 0.1,
+  );
   applyWorldAlphaRenderPolicy(coreStrip);
   markDecor(coreStrip, metadata);
   mats.push(coreStrip.material);
 
-  let active = false;
-  const setActive = (nextActive = false) => {
-    if (active === nextActive) return;
-    active = nextActive;
-    base.material.alpha = nextActive ? 0.48 : 0.22;
-    base.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockDim).scale(nextActive ? 0.56 : 0.18);
-    coreStrip.material.alpha = nextActive ? 0.66 : 0.1;
-    coreStrip.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockCore).scale(nextActive ? 0.82 : 0.22);
-    for (const rail of railPlanes) {
-      rail.material.alpha = nextActive ? 0.44 : 0.18;
-      rail.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockRail).scale(nextActive ? 0.6 : 0.12);
+  for (const side of [-1, 1]) {
+    if (productionProfile) {
+      const rail = createDecorBox(scene, `${def.id}_rail_${side}`, {
+        x: 0,
+        y: 0.04,
+        z: side * (def.depth * 0.27),
+        w: width + 0.08,
+        h: 0.07,
+        d: 0.14,
+        rgb: PROFILE.pipeLight,
+        parent: root,
+        metadata,
+      });
+      railMeshes.push(rail);
+      mats.push(rail.material);
+
+      const emitterShell = createDecorBox(scene, `${def.id}_emitter_shell_${side}`, {
+        x: side * ((width * 0.5) - 0.16),
+        y: 0.16,
+        z: 0,
+        w: 0.26,
+        h: 0.3,
+        d: 0.92,
+        rgb: PROFILE.pipeDark,
+        parent: root,
+        metadata,
+      });
+      const emitterCore = createDecorBox(scene, `${def.id}_emitter_core_${side}`, {
+        x: side * ((width * 0.5) - 0.16),
+        y: 0.16,
+        z: 0,
+        w: 0.12,
+        h: 0.14,
+        d: 0.48,
+        rgb: PROFILE.warning,
+        parent: root,
+        metadata,
+      });
+      emitterMeshes.push(emitterShell, emitterCore);
+      mats.push(emitterShell.material, emitterCore.material);
+    } else {
+      const rail = BABYLON.MeshBuilder.CreatePlane(`${def.id}_rail_${side}`, {
+        width,
+        height: 0.18,
+      }, scene);
+      rail.parent = root;
+      rail.rotation.x = Math.PI * 0.5;
+      rail.position.set(0, 0.012, side * (def.depth * 0.34));
+      rail.material = createAlphaMaterial(scene, `${def.id}_rail_${side}_mat`, PROFILE.shockRail, 0.18);
+      applyWorldAlphaRenderPolicy(rail);
+      markDecor(rail, metadata);
+      railMeshes.push(rail);
+      mats.push(rail.material);
     }
-    for (const crackle of cracklePlanes) {
-      crackle.material.alpha = nextActive ? 0.68 : 0.06;
-      crackle.material.emissiveColor = makeColor(nextActive ? PROFILE.shockBright : PROFILE.shockDim).scale(nextActive ? 0.92 : 0.1);
+  }
+
+  const crackleOffsets = productionProfile ? [-0.34, -0.1, 0.1, 0.34] : [-0.3, 0, 0.3];
+  for (const offset of crackleOffsets) {
+    const crackle = BABYLON.MeshBuilder.CreatePlane(`${def.id}_crackle_${offset}`, {
+      width: Math.max(productionProfile ? 0.32 : 0.42, width * (productionProfile ? 0.14 : 0.24)),
+      height: def.depth * (productionProfile ? 0.34 : 0.72),
+    }, scene);
+    crackle.parent = root;
+    crackle.rotation.x = Math.PI * 0.5;
+    crackle.position.set(offset * width, 0.022, 0);
+    crackle.material = createAlphaMaterial(
+      scene,
+      `${def.id}_crackle_${offset}_mat`,
+      PROFILE.shockBright,
+      productionProfile ? 0.0 : 0.06,
+    );
+    applyWorldAlphaRenderPolicy(crackle);
+    markDecor(crackle, metadata);
+    cracklePlanes.push(crackle);
+    mats.push(crackle.material);
+    if (productionProfile) pulseMeshes.push(crackle);
+  }
+
+  const setState = (nextState = 'off', progress = 0) => {
+    if (!productionProfile) {
+      const active = nextState === 'active';
+      base.material.alpha = active ? 0.48 : 0.22;
+      base.material.emissiveColor = makeColor(active ? PROFILE.shockBright : PROFILE.shockDim).scale(active ? 0.56 : 0.18);
+      coreStrip.material.alpha = active ? 0.66 : 0.1;
+      coreStrip.material.emissiveColor = makeColor(active ? PROFILE.shockBright : PROFILE.shockCore).scale(active ? 0.82 : 0.22);
+      for (const rail of railMeshes) {
+        rail.material.alpha = active ? 0.44 : 0.18;
+        rail.material.emissiveColor = makeColor(active ? PROFILE.shockBright : PROFILE.shockRail).scale(active ? 0.6 : 0.12);
+      }
+      for (const crackle of cracklePlanes) {
+        crackle.material.alpha = active ? 0.68 : 0.06;
+        crackle.material.emissiveColor = makeColor(active ? PROFILE.shockBright : PROFILE.shockDim).scale(active ? 0.92 : 0.1);
+      }
+      return;
+    }
+
+    const warn = nextState === 'warn';
+    const active = nextState === 'active';
+    base.material.alpha = active ? 0.26 : warn ? 0.16 : 0.05;
+    base.material.emissiveColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : PROFILE.tankDeep).scale(active ? 0.34 : warn ? 0.2 : 0.02);
+    coreStrip.material.alpha = active ? 0.9 : warn ? 0.34 : 0.02;
+    coreStrip.material.emissiveColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : PROFILE.shockCore).scale(active ? 1.34 : warn ? 0.88 : 0.04);
+
+    for (const tray of trayMeshes) {
+      tray.material.diffuseColor = makeColor(active ? PROFILE.shockDim : warn ? PROFILE.pipeDark : PROFILE.silhouette);
+      tray.material.emissiveColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : PROFILE.silhouette).scale(active ? 0.12 : warn ? 0.04 : 0);
+    }
+
+    for (const rail of railMeshes) {
+      rail.material.diffuseColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : PROFILE.pipeLight);
+      rail.material.emissiveColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : PROFILE.pipeLight).scale(active ? 1.2 : warn ? 0.9 : 0.03);
+    }
+    for (const emitter of emitterMeshes) {
+      const core = emitter.name.includes('_core_');
+      emitter.material.emissiveColor = makeColor(active ? PROFILE.shockBright : warn ? PROFILE.warning : core ? PROFILE.warning : PROFILE.pipeDark).scale(active ? (core ? 1.44 : 0.52) : warn ? (core ? 1.1 : 0.34) : core ? 0.08 : 0.02);
+    }
+    for (let index = 0; index < pulseMeshes.length; index += 1) {
+      const pulse = pulseMeshes[index];
+      const edgeIndex = Math.min(index, pulseMeshes.length - 1 - index);
+      const threshold = progress * (pulseMeshes.length * 0.5);
+      const energized = warn && edgeIndex < threshold;
+      pulse.material.alpha = active ? 0.92 : energized ? 0.74 : 0.0;
+      pulse.material.emissiveColor = makeColor(active ? PROFILE.shockBright : PROFILE.warning).scale(active ? 1.36 : energized ? 1.08 : 0.0);
     }
   };
+
+  const setActive = (nextActive = false) => setState(nextActive ? 'active' : 'off', nextActive ? 1 : 0);
+  setState('off', 0);
 
   return {
     root,
     mesh: base,
+    setState,
     setActive,
     mats,
   };
+}
+
+function createElectrifiedSafeIslandVisual(scene, island) {
+  if (island.id !== 'L5-PUD-SAFE-03') return null;
+  const width = Number((island.xMax - island.xMin).toFixed(3));
+  const root = createDecorRoot(scene, `${island.id}_root`, {
+    x: (island.xMin + island.xMax) * 0.5,
+    y: island.topY + 0.034,
+    z: LANE_Z,
+    metadata: {
+      encounterId: island.encounterId,
+      hazardId: island.id,
+      hazardType: 'electrifiedSafeIsland',
+    },
+  });
+  createDecorBox(scene, `${island.id}_pad`, {
+    parent: root,
+    x: 0,
+    y: 0,
+    z: 0,
+    w: width,
+    h: 0.08,
+    d: island.depth * 0.74,
+    rgb: PROFILE.pipeDark,
+    metadata: { encounterId: island.encounterId, visualRole: 'safe_island' },
+  });
+  createDecorBox(scene, `${island.id}_trim`, {
+    parent: root,
+    x: 0,
+    y: 0.045,
+    z: 0,
+    w: width - 0.12,
+    h: 0.03,
+    d: (island.depth * 0.74) - 0.22,
+    rgb: PROFILE.railMetal,
+    metadata: { encounterId: island.encounterId, visualRole: 'safe_island_trim' },
+  });
+  createDecorBox(scene, `${island.id}_warning_edge`, {
+    parent: root,
+    x: 0,
+    y: 0.055,
+    z: 0,
+    w: width - 0.42,
+    h: 0.012,
+    d: (island.depth * 0.74) - 0.52,
+    rgb: PROFILE.warning,
+    metadata: { encounterId: island.encounterId, visualRole: 'safe_island_warning_edge' },
+  });
+  return root;
 }
 
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
@@ -2060,6 +2240,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       xMin: island.xMin,
       xMax: island.xMax,
       topY: island.topY,
+      depth: island.depth,
       role: island.role,
     })),
     bands: electrifiedPuddles.bands.map((band) => ({
@@ -2069,6 +2250,8 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       xMax: band.xMax,
       topY: band.topY,
       laneId: band.laneId,
+      warnMs: band.warnMs ?? 0,
+      readProfile: band.readProfile ?? 'legacy',
       activeMs: band.activeMs,
       safeMs: band.safeMs,
       tell: band.tell,
@@ -2136,15 +2319,21 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       maxY: band.y + 0.34,
       activeMs: band.activeMs,
       safeMs: band.safeMs,
+      warnMs: band.warnMs ?? 0,
       phaseOffsetMs: band.phaseOffsetMs,
       laneId: band.laneId,
+      readProfile: band.readProfile ?? 'legacy',
       tell: band.tell,
+      setState: visual.setState,
       setActive: visual.setActive,
       mesh: visual.mesh,
       visualRoot: visual.root,
     };
   });
   const hazards = [...slickHazards, ...currentJetHazards, ...electrifiedPuddleHazards];
+  for (const island of electrifiedPuddles.safeIslands) {
+    createElectrifiedSafeIslandVisual(scene, island);
+  }
 
   const surfaceVisuals = {};
   const allColliders = [];

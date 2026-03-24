@@ -1802,6 +1802,9 @@ test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet la
     'L5-PUD-04',
     'L5-PUD-05',
   ]);
+  const crosswalkTruthLane = report.layout.electrifiedPuddles.bands.find((band) => band.id === 'L5-PUD-04');
+  expect(crosswalkTruthLane?.warnMs).toBe(600);
+  expect(crosswalkTruthLane?.readProfile).toBe('single_lane_truth');
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
@@ -2053,7 +2056,7 @@ test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose rea
   expect(galleryLane.activeDelta).toBeLessThan(0.25);
 });
 
-test('@level5 runtime: Aquarium Drift electrified puddles in L5-E4 and L5-E5 expose safe windows, safe islands, and greedy-line punishment', async ({ page }) => {
+test('@level5 runtime: Aquarium Drift single-lane puddle truth in L5-E5 exposes off, warn, and active states with fair clear and deserved fail', async ({ page }) => {
   test.setTimeout(120_000);
   await gotoDebugLevel(page, 5);
   await unlockThroughLevel(page, 4);
@@ -2082,16 +2085,16 @@ test('@level5 runtime: Aquarium Drift electrified puddles in L5-E4 and L5-E5 exp
     await page.waitForTimeout(120);
   }
 
-  async function waitForPuddleState(puddleId, active, { maxPhaseMs = null, minPhaseMs = null } = {}) {
-    await page.waitForFunction(({ targetPuddleId, targetActive, targetMaxPhaseMs, targetMinPhaseMs }) => {
+  async function waitForPuddleState(puddleId, stateName, { maxPhaseMs = null, minPhaseMs = null } = {}) {
+    await page.waitForFunction(({ targetPuddleId, targetState, targetMaxPhaseMs, targetMinPhaseMs }) => {
       const puddleState = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
-      if (!puddleState || puddleState.active !== targetActive) return false;
+      if (!puddleState || puddleState.state !== targetState) return false;
       if (typeof targetMinPhaseMs === 'number' && puddleState.phaseMs < targetMinPhaseMs) return false;
       if (typeof targetMaxPhaseMs === 'number' && puddleState.phaseMs > targetMaxPhaseMs) return false;
       return true;
     }, {
       targetPuddleId: puddleId,
-      targetActive: active,
+      targetState: stateName,
       targetMaxPhaseMs: maxPhaseMs,
       targetMinPhaseMs: minPhaseMs,
     });
@@ -2101,41 +2104,66 @@ test('@level5 runtime: Aquarium Drift electrified puddles in L5-E4 and L5-E5 exp
   const respiteIsland = puddles.safeIslands.find((island) => island.id === 'L5-PUD-SAFE-03');
   expect(crosswalkBand).toBeTruthy();
   expect(respiteIsland).toBeTruthy();
+  expect(crosswalkBand?.warnMs).toBe(600);
+  expect(crosswalkBand?.readProfile).toBe('single_lane_truth');
 
   const bandApproachPose = {
-    x: Number((crosswalkBand.xMin - 0.48).toFixed(3)),
+    x: Number((crosswalkBand.xMin - 0.08).toFixed(3)),
     y: Number((crosswalkBand.topY + 0.405).toFixed(3)),
     z: 0,
   };
 
   await settleAt(bandApproachPose);
-  await waitForPuddleState('L5-PUD-04', false, {
-    minPhaseMs: crosswalkBand.activeMs,
-    maxPhaseMs: crosswalkBand.activeMs + 180,
+  await waitForPuddleState('L5-PUD-04', 'off', {
+    minPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 40,
+    maxPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 140,
   });
   await page.keyboard.down('ArrowRight');
-  const safeStartX = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0);
-  await page.waitForTimeout(260);
+  const safeResult = await page.waitForFunction(({ safeIslandXMin }) => {
+    const dbg = window.__DADA_DEBUG__;
+    if ((dbg?.lastRespawnReason ?? '') === 'electrified_puddle') {
+      return { reached: false, respawned: true, x: dbg?.playerPos?.x ?? 0 };
+    }
+    const playerX = dbg?.playerPos?.x ?? 0;
+    if (playerX >= safeIslandXMin + 0.12) {
+      return { reached: true, respawned: false, x: playerX };
+    }
+    return false;
+  }, {
+    safeIslandXMin: respiteIsland.xMin,
+  }, {
+    timeout: 1900,
+  }).then((handle) => handle.jsonValue());
+  await page.keyboard.up('ArrowRight');
   const safeEnd = await page.evaluate(() => ({
     x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
     lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
     activePuddles: window.__DADA_DEBUG__?.activeElectrifiedPuddleIds ?? [],
   }));
-  await page.keyboard.up('ArrowRight');
   expect(safeEnd.lastRespawnReason).toBe('');
-  expect(Number((safeEnd.x - safeStartX).toFixed(3))).toBeGreaterThan(0.2);
+  expect(safeResult).toEqual(expect.objectContaining({
+    reached: true,
+    respawned: false,
+  }));
+  expect(Number(safeEnd.x.toFixed(3))).toBeGreaterThanOrEqual(Number((respiteIsland.xMin + 0.12).toFixed(3)));
 
   await settleAt(bandApproachPose);
-  await waitForPuddleState('L5-PUD-04', true, { maxPhaseMs: 180 });
+  await waitForPuddleState('L5-PUD-04', 'warn', {
+    minPhaseMs: 120,
+    maxPhaseMs: 220,
+  });
+  await page.waitForTimeout(280);
   await page.keyboard.down('ArrowRight');
   await page.waitForFunction(() => (window.__DADA_DEBUG__?.lastRespawnReason ?? '') === 'electrified_puddle');
   const punished = await page.evaluate(() => ({
     lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
     activePuddles: window.__DADA_DEBUG__?.activeElectrifiedPuddleIds ?? [],
+    puddleStates: window.__DADA_DEBUG__?.electrifiedPuddles ?? [],
   }));
   await page.keyboard.up('ArrowRight');
   expect(punished.lastRespawnReason).toBe('electrified_puddle');
   expect(punished.activePuddles).toContain('L5-PUD-04');
+  expect(punished.puddleStates.find((entry) => entry.id === 'L5-PUD-04')?.state).toBe('active');
 
   await settleAt({
     x: Number((((respiteIsland.xMin + respiteIsland.xMax) * 0.5)).toFixed(3)),

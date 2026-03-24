@@ -1276,28 +1276,68 @@ test('capture Level 5 Aquarium Drift electrified-puddle proof screenshots', asyn
 
   const layout = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null);
   expect(layout?.electrifiedPuddles?.bandCount).toBe(5);
+  const crosswalkBand = layout?.electrifiedPuddles?.bands?.find((band) => band.id === 'L5-PUD-04');
+  expect(crosswalkBand?.warnMs).toBe(600);
+  expect(crosswalkBand?.readProfile).toBe('single_lane_truth');
 
-  async function captureBand(path, puddleId, pose) {
+  async function settleAt(pose) {
     await page.evaluate((nextPose) => {
       window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
     }, pose);
-    await page.waitForFunction((targetPuddleId) => {
-      const state = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
-      return !!state && state.active === true;
-    }, puddleId);
+    await page.waitForFunction(({ x }) => {
+      const dbg = window.__DADA_DEBUG__;
+      return !!dbg?.playerController?.grounded
+        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
+        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
+    }, pose);
     await page.waitForTimeout(220);
-    await captureProof(path);
   }
 
-  await captureBand('docs/screenshots/level5-aquarium-puddles-e4.png', 'L5-PUD-02', {
-    x: 47.2,
-    y: Number((2.15 + 0.405).toFixed(3)),
-    z: 0,
-  });
-  await captureBand('docs/screenshots/level5-aquarium-puddles-e5.png', 'L5-PUD-04', {
-    x: 61.8,
+  async function captureBand(path, puddleId, stateName, pose, { minPhaseMs = null, maxPhaseMs = null } = {}) {
+    await settleAt(pose);
+    await page.waitForFunction(({ targetPuddleId, targetState, targetMinPhaseMs, targetMaxPhaseMs }) => {
+      const state = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
+      if (!state || state.state !== targetState) return false;
+      if (typeof targetMinPhaseMs === 'number' && state.phaseMs < targetMinPhaseMs) return false;
+      if (typeof targetMaxPhaseMs === 'number' && state.phaseMs > targetMaxPhaseMs) return false;
+      return true;
+    }, {
+      targetPuddleId: puddleId,
+      targetState: stateName,
+      targetMinPhaseMs: minPhaseMs,
+      targetMaxPhaseMs: maxPhaseMs,
+    });
+    await page.waitForTimeout(520);
+    await page.evaluate(() => {
+      const controller = window.__DADA_DEBUG__?.playerController;
+      controller?.visual?.setEnabled(false);
+      controller?.blobShadow?.setEnabled(false);
+    });
+    await captureProof(path);
+    await page.evaluate(() => {
+      const controller = window.__DADA_DEBUG__?.playerController;
+      controller?.visual?.setEnabled(true);
+      controller?.blobShadow?.setEnabled(true);
+    });
+  }
+
+  const pose = {
+    x: 64.25,
     y: Number((1.55 + 0.405).toFixed(3)),
     z: 0,
+  };
+
+  await captureBand('docs/screenshots/level5-aquarium-puddle-e5-off.png', 'L5-PUD-04', 'off', pose, {
+    minPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 40,
+    maxPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 140,
+  });
+  await captureBand('docs/screenshots/level5-aquarium-puddle-e5-warn.png', 'L5-PUD-04', 'warn', pose, {
+    minPhaseMs: 140,
+    maxPhaseMs: 240,
+  });
+  await captureBand('docs/screenshots/level5-aquarium-puddle-e5-active.png', 'L5-PUD-04', 'active', pose, {
+    minPhaseMs: crosswalkBand.warnMs + 120,
+    maxPhaseMs: crosswalkBand.warnMs + 220,
   });
 });
 
