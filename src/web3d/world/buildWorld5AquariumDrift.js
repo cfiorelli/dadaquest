@@ -11,6 +11,7 @@ import {
   applyWorldOpaqueRenderPolicy,
 } from '../render/renderPolicy.js';
 import { getLevelMeta } from './levelMeta.js';
+import { Level5EnemyRuntime } from './level5EnemyRuntime.js';
 
 const LANE_Z = 0;
 const PLATFORM_H = 0.72;
@@ -2717,6 +2718,9 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     },
   ].map((def) => ({ ...def, collected: false }));
 
+  // B.06: enemy runtime (empty until B.07–B.10 add enemy classes)
+  const enemyRuntime = new Level5EnemyRuntime([]);
+
   const level = {
     id: 5,
     runtimeFamily: '2.5d',
@@ -2755,6 +2759,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     coins: [],
     hazards,
     crumbles,
+    era5Level: enemyRuntime,
     level,
     signs: [sign],
     respawnAnchors: [],
