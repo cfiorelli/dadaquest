@@ -884,49 +884,56 @@ function buildElectrifiedPuddlePlan(layout) {
   const e5Crosswalk = getLayoutSurface(layout, 'e5_crosswalk');
   const e5SideShelf = getLayoutSurface(layout, 'e5_side_shelf');
   const activeMs = 1400;
-  const safeMs = 1600;
+  const safeMs = 2200;
   const bands = [
     {
       id: 'L5-PUD-01',
       encounterId: 'L5-E4',
-      xMin: 43.45,
-      xMax: 44.95,
+      xMin: 43.95,
+      xMax: 44.2,
       topY: e4Gallery.topY,
       y: Number((e4Gallery.topY + 0.405).toFixed(3)),
       depth: e4Gallery.d,
       phaseOffsetMs: 0,
       laneId: 'upper_gallery',
+      readProfile: 'single_lane_truth',
+      warnMs: 540,
       tell: 'charge_strips_and_hum',
     },
     {
       id: 'L5-PUD-02',
       encounterId: 'L5-E4',
-      xMin: 46.55,
-      xMax: 48.75,
+      xMin: 46.8,
+      xMax: 48.2,
       topY: e4Bridge.topY,
       y: Number((e4Bridge.topY + 0.405).toFixed(3)),
       depth: e4Bridge.d,
       phaseOffsetMs: 760,
       laneId: 'upper_gallery',
+      readProfile: 'single_lane_truth',
+      warnMs: 580,
       tell: 'charge_strips_and_hum',
     },
     {
       id: 'L5-PUD-03',
       encounterId: 'L5-E4',
-      xMin: 51.05,
-      xMax: 54.45,
+      xMin: 51.9,
+      xMax: 53.1,
       topY: e4Service.topY,
       y: Number((e4Service.topY + 0.405).toFixed(3)),
       depth: e4Service.d,
       phaseOffsetMs: 1560,
       laneId: 'service_drop_fastline',
+      readProfile: 'single_lane_truth',
+      warnMs: 620,
+      safeIslandId: 'L5-PUD-SAFE-02',
       tell: 'charge_strips_and_hum',
     },
     {
       id: 'L5-PUD-04',
       encounterId: 'L5-E5',
       xMin: 61.2,
-      xMax: 62.5,
+      xMax: 61.7,
       topY: e5Crosswalk.topY,
       y: Number((e5Crosswalk.topY + 0.405).toFixed(3)),
       depth: e5Crosswalk.d,
@@ -940,13 +947,15 @@ function buildElectrifiedPuddlePlan(layout) {
     {
       id: 'L5-PUD-05',
       encounterId: 'L5-E5',
-      xMin: 65.05,
-      xMax: 68.25,
+      xMin: 65.35,
+      xMax: 67.45,
       topY: e5SideShelf.topY,
       y: Number((e5SideShelf.topY + 0.405).toFixed(3)),
       depth: e5SideShelf.d,
       phaseOffsetMs: 1180,
       laneId: 'side_shelf_fastline',
+      readProfile: 'single_lane_truth',
+      warnMs: 640,
       tell: 'charge_strips_and_hum',
     },
   ].map((band) => ({
@@ -968,8 +977,8 @@ function buildElectrifiedPuddlePlan(layout) {
     {
       id: 'L5-PUD-SAFE-02',
       encounterId: 'L5-E4',
-      xMin: 54.45,
-      xMax: 56.15,
+      xMin: 53.1,
+      xMax: 55.45,
       topY: e4Service.topY,
       depth: e4Service.d,
       role: 'service_reset_pocket',
@@ -977,7 +986,7 @@ function buildElectrifiedPuddlePlan(layout) {
     {
       id: 'L5-PUD-SAFE-03',
       encounterId: 'L5-E5',
-      xMin: 62.5,
+      xMin: 61.7,
       xMax: 64.9,
       topY: e5Crosswalk.topY,
       depth: e5Crosswalk.d,
@@ -2136,7 +2145,6 @@ function createElectrifiedPuddleVisual(scene, def) {
 }
 
 function createElectrifiedSafeIslandVisual(scene, island) {
-  if (island.id !== 'L5-PUD-SAFE-03') return null;
   const width = Number((island.xMax - island.xMin).toFixed(3));
   const root = createDecorRoot(scene, `${island.id}_root`, {
     x: (island.xMin + island.xMax) * 0.5,
@@ -2148,6 +2156,11 @@ function createElectrifiedSafeIslandVisual(scene, island) {
       hazardType: 'electrifiedSafeIsland',
     },
   });
+  const isServicePocket = island.role === 'service_reset_pocket';
+  const isWaitPad = island.role === 'gallery_wait_pad';
+  const baseColor = isServicePocket ? PROFILE.pipeDark : isWaitPad ? PROFILE.serviceGround : PROFILE.pipeDark;
+  const topColor = isServicePocket ? PROFILE.railMetal : isWaitPad ? PROFILE.glassGround : PROFILE.railMetal;
+  const warningColor = isServicePocket ? PROFILE.shockBright : PROFILE.warning;
   createDecorBox(scene, `${island.id}_pad`, {
     parent: root,
     x: 0,
@@ -2156,7 +2169,7 @@ function createElectrifiedSafeIslandVisual(scene, island) {
     w: width,
     h: 0.08,
     d: island.depth * 0.74,
-    rgb: PROFILE.pipeDark,
+    rgb: baseColor,
     metadata: { encounterId: island.encounterId, visualRole: 'safe_island' },
   });
   createDecorBox(scene, `${island.id}_trim`, {
@@ -2167,7 +2180,7 @@ function createElectrifiedSafeIslandVisual(scene, island) {
     w: width - 0.12,
     h: 0.03,
     d: (island.depth * 0.74) - 0.22,
-    rgb: PROFILE.railMetal,
+    rgb: topColor,
     metadata: { encounterId: island.encounterId, visualRole: 'safe_island_trim' },
   });
   createDecorBox(scene, `${island.id}_warning_edge`, {
@@ -2178,7 +2191,7 @@ function createElectrifiedSafeIslandVisual(scene, island) {
     w: width - 0.42,
     h: 0.012,
     d: (island.depth * 0.74) - 0.52,
-    rgb: PROFILE.warning,
+    rgb: warningColor,
     metadata: { encounterId: island.encounterId, visualRole: 'safe_island_warning_edge' },
   });
   return root;

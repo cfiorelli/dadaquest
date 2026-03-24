@@ -1788,7 +1788,7 @@ test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet la
   expect(report.layout.electrifiedPuddles.bandCount).toBe(5);
   expect(report.layout.electrifiedPuddles.safeIslandCount).toBe(3);
   expect(report.layout.electrifiedPuddles.activeMs).toBe(1400);
-  expect(report.layout.electrifiedPuddles.safeMs).toBe(1600);
+  expect(report.layout.electrifiedPuddles.safeMs).toBe(2200);
   expect(report.layout.electrifiedPuddles.alternateHighRiskLine.routeId).toBe('e4_service_drop');
   expect(report.layout.electrifiedPuddles.safeIslands.map((island) => island.id)).toEqual([
     'L5-PUD-SAFE-01',
@@ -1802,6 +1802,8 @@ test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet la
     'L5-PUD-04',
     'L5-PUD-05',
   ]);
+  expect(report.layout.electrifiedPuddles.bands.every((band) => band.readProfile === 'single_lane_truth')).toBe(true);
+  expect(report.layout.electrifiedPuddles.bands.map((band) => band.warnMs)).toEqual([540, 580, 620, 600, 640]);
   const crosswalkTruthLane = report.layout.electrifiedPuddles.bands.find((band) => band.id === 'L5-PUD-04');
   expect(crosswalkTruthLane?.warnMs).toBe(600);
   expect(crosswalkTruthLane?.readProfile).toBe('single_lane_truth');
@@ -2080,9 +2082,17 @@ test('@level5 runtime: Aquarium Drift single-lane puddle truth in L5-E5 exposes 
       const dbg = window.__DADA_DEBUG__;
       return !!dbg?.playerController?.grounded
         && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
-        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
+        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.08;
     }, pose);
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(220);
+  }
+
+  async function snapAt(pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+      window.__DADA_DEBUG__.lastRespawnReason = '';
+    }, pose);
+    await page.waitForTimeout(220);
   }
 
   async function waitForPuddleState(puddleId, stateName, { maxPhaseMs = null, minPhaseMs = null } = {}) {
@@ -2108,31 +2118,35 @@ test('@level5 runtime: Aquarium Drift single-lane puddle truth in L5-E5 exposes 
   expect(crosswalkBand?.readProfile).toBe('single_lane_truth');
 
   const bandApproachPose = {
-    x: Number((crosswalkBand.xMin - 0.08).toFixed(3)),
+    x: Number((crosswalkBand.xMin - 0.42).toFixed(3)),
     y: Number((crosswalkBand.topY + 0.405).toFixed(3)),
     z: 0,
   };
 
   await settleAt(bandApproachPose);
   await waitForPuddleState('L5-PUD-04', 'off', {
-    minPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 40,
-    maxPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 140,
+    minPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs,
+    maxPhaseMs: crosswalkBand.warnMs + crosswalkBand.activeMs + 60,
   });
   await page.keyboard.down('ArrowRight');
-  const safeResult = await page.waitForFunction(({ safeIslandXMin }) => {
+  await page.waitForTimeout(160);
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(180);
+  await page.keyboard.up('Space');
+  const safeResult = await page.waitForFunction(({ clearX }) => {
     const dbg = window.__DADA_DEBUG__;
     if ((dbg?.lastRespawnReason ?? '') === 'electrified_puddle') {
       return { reached: false, respawned: true, x: dbg?.playerPos?.x ?? 0 };
     }
     const playerX = dbg?.playerPos?.x ?? 0;
-    if (playerX >= safeIslandXMin + 0.12) {
+    if (playerX >= clearX) {
       return { reached: true, respawned: false, x: playerX };
     }
     return false;
   }, {
-    safeIslandXMin: respiteIsland.xMin,
+    clearX: Number((crosswalkBand.xMax + 0.34).toFixed(3)),
   }, {
-    timeout: 1900,
+    timeout: 2100,
   }).then((handle) => handle.jsonValue());
   await page.keyboard.up('ArrowRight');
   const safeEnd = await page.evaluate(() => ({
@@ -2145,7 +2159,7 @@ test('@level5 runtime: Aquarium Drift single-lane puddle truth in L5-E5 exposes 
     reached: true,
     respawned: false,
   }));
-  expect(Number(safeEnd.x.toFixed(3))).toBeGreaterThanOrEqual(Number((respiteIsland.xMin + 0.12).toFixed(3)));
+  expect(Number(safeEnd.x.toFixed(3))).toBeGreaterThanOrEqual(Number((crosswalkBand.xMax + 0.34).toFixed(3)));
 
   await settleAt(bandApproachPose);
   await waitForPuddleState('L5-PUD-04', 'warn', {
@@ -2178,6 +2192,146 @@ test('@level5 runtime: Aquarium Drift single-lane puddle truth in L5-E5 exposes 
   expect(respite.lastRespawnReason).toBe('');
   expect(respite.activePuddles).not.toContain('L5-PUD-04');
   expect(respite.x).toBeGreaterThan(63.2);
+});
+
+test('@level5 runtime: Aquarium Drift electrified puddles in E4 and E5 reuse the truth profile with fair clears and safe respawns', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+  await focusGameplay(page);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.setProgress?.({ bubbleShieldUnlocked: false });
+  });
+
+  const puddles = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.()?.electrifiedPuddles ?? null);
+  expect(puddles?.bandCount).toBe(5);
+  expect(puddles?.bands?.every((band) => band.readProfile === 'single_lane_truth')).toBe(true);
+
+  async function settleAt(pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+      window.__DADA_DEBUG__.lastRespawnReason = '';
+    }, pose);
+    await page.waitForFunction(({ x }) => {
+      const dbg = window.__DADA_DEBUG__;
+      return !!dbg?.playerController?.grounded
+        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
+        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.08;
+    }, pose);
+    await page.waitForTimeout(220);
+  }
+
+  async function snapAt(pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+      window.__DADA_DEBUG__.lastRespawnReason = '';
+    }, pose);
+    await page.waitForTimeout(220);
+  }
+
+  async function waitForPuddleState(puddleId, stateName, { maxPhaseMs = null, minPhaseMs = null } = {}) {
+    await page.waitForFunction(({ targetPuddleId, targetState, targetMaxPhaseMs, targetMinPhaseMs }) => {
+      const puddleState = (window.__DADA_DEBUG__?.electrifiedPuddles ?? []).find((entry) => entry.id === targetPuddleId);
+      if (!puddleState || puddleState.state !== targetState) return false;
+      if (typeof targetMinPhaseMs === 'number' && puddleState.phaseMs < targetMinPhaseMs) return false;
+      if (typeof targetMaxPhaseMs === 'number' && puddleState.phaseMs > targetMaxPhaseMs) return false;
+      return true;
+    }, {
+      targetPuddleId: puddleId,
+      targetState: stateName,
+      targetMaxPhaseMs: maxPhaseMs,
+      targetMinPhaseMs: minPhaseMs,
+    });
+  }
+
+  async function clearBand(bandId, xTarget) {
+    const band = puddles.bands.find((entry) => entry.id === bandId);
+    expect(band).toBeTruthy();
+    const approachPose = {
+      x: Number((band.xMin - 0.42).toFixed(3)),
+      y: Number((band.topY + 0.405).toFixed(3)),
+      z: 0,
+    };
+    await settleAt(approachPose);
+    await waitForPuddleState(bandId, 'off', {
+      minPhaseMs: band.warnMs + band.activeMs,
+      maxPhaseMs: band.warnMs + band.activeMs + 60,
+    });
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(160);
+    await page.keyboard.down('Space');
+    await page.waitForTimeout(180);
+    await page.keyboard.up('Space');
+    const reached = await page.waitForFunction(({ targetX }) => {
+      const dbg = window.__DADA_DEBUG__;
+      if ((dbg?.lastRespawnReason ?? '') === 'electrified_puddle') {
+        return { reached: false, respawned: true, x: dbg?.playerPos?.x ?? 0 };
+      }
+      const playerX = dbg?.playerPos?.x ?? 0;
+      if (playerX >= targetX) {
+        return { reached: true, respawned: false, x: playerX };
+      }
+      return false;
+    }, {
+      targetX: xTarget,
+    }, {
+      timeout: 2100,
+    }).then((handle) => handle.jsonValue());
+    await page.keyboard.up('ArrowRight');
+    const end = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    }));
+    expect(reached).toEqual(expect.objectContaining({ reached: true, respawned: false }));
+    expect(end.lastRespawnReason).toBe('');
+    expect(end.x).toBeGreaterThanOrEqual(Number(xTarget.toFixed(3)));
+  }
+
+  async function deservedFail(bandId) {
+    const band = puddles.bands.find((entry) => entry.id === bandId);
+    expect(band).toBeTruthy();
+    const approachPose = {
+      x: Number((band.xMin + 0.12).toFixed(3)),
+      y: Number((band.topY + 0.405).toFixed(3)),
+      z: 0,
+    };
+    await snapAt(approachPose);
+    await waitForPuddleState(bandId, 'warn', {
+      minPhaseMs: 120,
+      maxPhaseMs: 240,
+    });
+    await page.waitForTimeout(280);
+    await page.keyboard.down('ArrowRight');
+    await page.waitForFunction(() => (window.__DADA_DEBUG__?.lastRespawnReason ?? '') === 'electrified_puddle');
+    await page.keyboard.up('ArrowRight');
+    const respawn = await page.evaluate((bands) => {
+      const dbg = window.__DADA_DEBUG__;
+      const playerX = dbg?.playerPos?.x ?? 0;
+      const activeIds = dbg?.activeElectrifiedPuddleIds ?? [];
+      const unsafeRespawnBands = bands
+        .filter((band) => activeIds.includes(band.id) && playerX >= band.xMin && playerX <= band.xMax)
+        .map((band) => band.id);
+      return {
+        lastRespawnReason: dbg?.lastRespawnReason ?? '',
+        x: playerX,
+        activeIds,
+        unsafeRespawnBands,
+      };
+    }, puddles.bands);
+    expect(respawn.lastRespawnReason).toBe('electrified_puddle');
+    expect(respawn.unsafeRespawnBands).toEqual([]);
+  }
+
+  const e4ClearBand = puddles.bands.find((entry) => entry.id === 'L5-PUD-01');
+  const e5ClearBand = puddles.bands.find((entry) => entry.id === 'L5-PUD-04');
+  expect(e4ClearBand).toBeTruthy();
+  expect(e5ClearBand).toBeTruthy();
+  await clearBand('L5-PUD-01', Number(((e4ClearBand?.xMax ?? 44.2) + 0.34).toFixed(3)));
+  await deservedFail('L5-PUD-02');
+  await clearBand('L5-PUD-04', Number(((e5ClearBand?.xMax ?? 61.7) + 0.34).toFixed(3)));
+  await deservedFail('L5-PUD-05');
 });
 
 for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {

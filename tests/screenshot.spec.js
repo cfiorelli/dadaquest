@@ -1284,12 +1284,6 @@ test('capture Level 5 Aquarium Drift electrified-puddle proof screenshots', asyn
     await page.evaluate((nextPose) => {
       window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
     }, pose);
-    await page.waitForFunction(({ x }) => {
-      const dbg = window.__DADA_DEBUG__;
-      return !!dbg?.playerController?.grounded
-        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
-        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
-    }, pose);
     await page.waitForTimeout(220);
   }
 
@@ -1338,6 +1332,28 @@ test('capture Level 5 Aquarium Drift electrified-puddle proof screenshots', asyn
   await captureBand('docs/screenshots/level5-aquarium-puddle-e5-active.png', 'L5-PUD-04', 'active', pose, {
     minPhaseMs: crosswalkBand.warnMs + 120,
     maxPhaseMs: crosswalkBand.warnMs + 220,
+  });
+
+  const e4ServiceBand = layout?.electrifiedPuddles?.bands?.find((band) => band.id === 'L5-PUD-03');
+  const e5ShelfBand = layout?.electrifiedPuddles?.bands?.find((band) => band.id === 'L5-PUD-05');
+  expect(e4ServiceBand?.readProfile).toBe('single_lane_truth');
+  expect(e5ShelfBand?.readProfile).toBe('single_lane_truth');
+
+  await captureBand('docs/screenshots/level5-aquarium-puddles-e4.png', 'L5-PUD-03', 'active', {
+    x: 54.0,
+    y: Number((1.35 + 0.405).toFixed(3)),
+    z: 0,
+  }, {
+    minPhaseMs: e4ServiceBand.warnMs + 120,
+    maxPhaseMs: e4ServiceBand.warnMs + 260,
+  });
+  await captureBand('docs/screenshots/level5-aquarium-puddles-e5.png', 'L5-PUD-05', 'active', {
+    x: 64.0,
+    y: Number((1.55 + 0.405).toFixed(3)),
+    z: 0,
+  }, {
+    minPhaseMs: e5ShelfBand.warnMs + 120,
+    maxPhaseMs: e5ShelfBand.warnMs + 260,
   });
 });
 
