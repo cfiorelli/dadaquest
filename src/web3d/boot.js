@@ -1079,6 +1079,9 @@ export async function boot(options = {}) {
   const runtimeFamily = getLevelRuntimeFamily(levelId);
   const themeKey = getLevelThemeKey(levelId);
   const isEra5Level = runtimeFamily === 'era5';
+  // hasEra5Systems: activates weapons/hearts/shield/inventory HUD for Level 5+
+  // without changing movement mode (stays 'lane' for all 2.5D levels).
+  const hasEra5Systems = isEra5Level || levelId >= 5;
   const isLaunchableLevel = isLevelLaunchable(levelId);
   const getLockedMessage = (targetLevelId, state = progression) => {
     if (targetLevelId === 4) {
@@ -3191,7 +3194,7 @@ export async function boot(options = {}) {
 
   function updateBuffHud() {
     ui.hideBuffContainer();
-    if (isEra5Level) return;
+    if (hasEra5Systems) return;
     let onesiePhase = 'IDLE';
     let onesieDisplayMs = 0;
     let onesieDisplayTotal = onesieMaxDurationMs;
@@ -3253,7 +3256,7 @@ export async function boot(options = {}) {
   }
 
   function syncEra5Ui() {
-    if (!isEra5Level) return;
+    if (!hasEra5Systems) return;
     const toolDef = getEquippedEra5ToolDef();
     const weaponDef = getEquippedEra5WeaponDef();
     const meterMax = getEra5MeterMax(toolDef);
@@ -3426,7 +3429,7 @@ export async function boot(options = {}) {
       activeWeaponMesh.dispose();
       activeWeaponMesh = null;
     }
-    if (!isEra5Level || !defId || !player?.babyRig?.weaponAnchor) return;
+    if (!hasEra5Systems || !defId || !player?.babyRig?.weaponAnchor) return;
     activeWeaponMesh = createEra5WeaponMesh(defId);
     activeWeaponMesh.parent = player.babyRig.weaponAnchor;
     activeWeaponMesh.position.setAll(0);
@@ -3476,7 +3479,7 @@ export async function boot(options = {}) {
   }
 
   function openEra5Inventory() {
-    if (!isEra5Level || state !== 'gameplay') return false;
+    if (!hasEra5Systems || state !== 'gameplay') return false;
     era5InventoryOpen = true;
     state = 'inventory';
     input.consumeAll();
@@ -3486,7 +3489,7 @@ export async function boot(options = {}) {
   }
 
   function closeEra5Inventory() {
-    if (!isEra5Level || state !== 'inventory') return false;
+    if (!hasEra5Systems || state !== 'inventory') return false;
     era5InventoryOpen = false;
     state = 'gameplay';
     input.consumeAll();
@@ -3496,19 +3499,19 @@ export async function boot(options = {}) {
   }
 
   function toggleEra5Inventory() {
-    if (!isEra5Level) return false;
+    if (!hasEra5Systems) return false;
     if (state === 'inventory') return closeEra5Inventory();
     return openEra5Inventory();
   }
 
   function refillEra5Oxygen(amountSec) {
-    if (!isEra5Level) return;
+    if (!hasEra5Systems) return;
     era5Oxygen = Math.min(getEra5MeterMax(), era5Oxygen + amountSec);
     syncEra5Ui();
   }
 
   function toggleEra5Tool() {
-    if (!isEra5Level || state !== 'gameplay') return false;
+    if (!hasEra5Systems || state !== 'gameplay') return false;
     const toolDef = getEquippedEra5ToolDef();
     if (!toolDef) return false;
     if (toolDef.defId === 'lantern' || toolDef.defId === 'camp_lantern') {
@@ -3534,7 +3537,7 @@ export async function boot(options = {}) {
   }
 
   function prepareEra5ToolMotion(dt, { jumpHeld = false } = {}) {
-    if (!isEra5Level) return;
+    if (!hasEra5Systems) return;
     const toolDef = getEquippedEra5ToolDef();
     const meterMax = getEra5MeterMax(toolDef);
     const toolId = toolDef?.defId || '';
@@ -3770,7 +3773,7 @@ export async function boot(options = {}) {
   }
 
   function fireEra5Weapon() {
-    if (!isEra5Level || state !== 'gameplay' || era5WeaponCooldownMs > 0) return false;
+    if (!hasEra5Systems || state !== 'gameplay' || era5WeaponCooldownMs > 0) return false;
     const weaponDef = getEquippedEra5WeaponDef();
     if (!weaponDef) return false;
     const launchState = getEra5ProjectileLaunchState();
@@ -3848,7 +3851,7 @@ export async function boot(options = {}) {
   }
 
   function applyEra5Damage(source, hitDirection = { x: 1, z: 0 }, options = {}) {
-    if (!isEra5Level || state !== 'gameplay' || respawnState) return false;
+    if (!hasEra5Systems || state !== 'gameplay' || respawnState) return false;
     if (player.isInvulnerable()) return false;
     const descriptor = describeEra5DamageSource(source);
     const invulnMs = Number.isFinite(options?.invulnMs) ? options.invulnMs : 1000;
@@ -3982,7 +3985,7 @@ export async function boot(options = {}) {
   }
 
   function updateEra5Projectiles(dt) {
-    if (!isEra5Level || !era5Projectiles.length) return;
+    if (!hasEra5Systems || !era5Projectiles.length) return;
     for (let i = era5Projectiles.length - 1; i >= 0; i--) {
       const projectile = era5Projectiles[i];
       projectile.lifeMs = Math.max(0, projectile.lifeMs - (dt * 1000));
@@ -4086,7 +4089,7 @@ export async function boot(options = {}) {
   }
 
   function updateEra5WaterEntry(dt) {
-    if (!isEra5Level) return;
+    if (!hasEra5Systems) return;
     const { halfH } = player.getCollisionHalfExtents();
     const headY = player.mesh.position.y + (halfH * 0.92);
     const waterState = world.level5?.getWaterState?.(player.mesh.position, headY)
@@ -4107,7 +4110,7 @@ export async function boot(options = {}) {
   }
 
   function updateEra5Oxygen(dt) {
-    if (!isEra5Level) return;
+    if (!hasEra5Systems) return;
     const oxygenMax = Math.max(4.0, getEra5MeterMax());
     const toolDef = getEquippedEra5ToolDef();
     const hasScubaTank = toolDef?.defId === 'scuba_tank';
@@ -4659,8 +4662,8 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.sceneKey = 'CribScene';
     ui.hideGameplayMenu();
     ui.hideTitle();
-    ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: isEra5Level, levelId });
-    if (isEra5Level) {
+    ui.showGameplayHud(levelTotals[levelId] ?? coins.length, { era5: hasEra5Systems, levelId });
+    if (hasEra5Systems) {
       console.log('Era5ControllerV2 active');
       // Auto-grant all weapons for testing so number key switcher is usable
       const allWeaponIds = ['bubble_wand', 'foam_blaster', 'paper_fan', 'bookmark_boomerang', 'kite_string_whip'];
@@ -4772,7 +4775,7 @@ export async function boot(options = {}) {
       return true;
     }
     if (code === 'KeyF') {
-      if (isEra5Level) {
+      if (hasEra5Systems) {
         return fireEra5Weapon();
       }
       if (!player.canTriggerAirFlip()) return false;
@@ -4801,7 +4804,7 @@ export async function boot(options = {}) {
       return false;
     }
     if (code === 'KeyE') {
-      if (isEra5Level) {
+      if (hasEra5Systems) {
         if (world.era5Level?.tryInteract?.({
           pos: player.mesh.position.clone(),
           player,
@@ -5414,10 +5417,10 @@ export async function boot(options = {}) {
 
   function triggerReset(reason, direction = -1, overrideSpawn = null) {
     if (respawnState) return;
-    if (!isEra5Level && bubbleShieldGraceMs > 0 && isBubbleShieldEligibleReason(reason)) {
+    if (!hasEra5Systems && bubbleShieldGraceMs > 0 && isBubbleShieldEligibleReason(reason)) {
       return false;
     }
-    if (!isEra5Level && progression.bubbleShieldUnlocked && !bubbleShieldUsedThisRun && isBubbleShieldEligibleReason(reason)) {
+    if (!hasEra5Systems && progression.bubbleShieldUnlocked && !bubbleShieldUsedThisRun && isBubbleShieldEligibleReason(reason)) {
       bubbleShieldUsedThisRun = true;
       bubbleShieldGraceMs = BUBBLE_SHIELD_GRACE_MS;
       player.invulnTimerMs = Math.max(player.invulnTimerMs, BUBBLE_SHIELD_GRACE_MS);
@@ -6078,17 +6081,17 @@ export async function boot(options = {}) {
         const jumpPress = idleSuppressed ? { edge: false, pressId: 0 } : input.consumeJumpPress();
         const jumpHeld = idleSuppressed ? false : input.isJumpHeld();
         const descendHeld = !idleSuppressed && isEra5Level ? input.isDescendHeld() : false;
-        const attackPressed = !idleSuppressed && isEra5Level ? input.consumeAttackPress() : false;
+        const attackPressed = !idleSuppressed && hasEra5Systems ? input.consumeAttackPress() : false;
         const cameraYawInput = !idleSuppressed && isEra5Level ? input.getCameraYawInput() : 0;
         const cameraRecenter = !idleSuppressed && isEra5Level ? input.consumeCameraRecenter() : false;
         const era5ControlDt = Math.min(dt, 1 / 30);
         let moveX = rawMoveX;
         let moveZ = 0;
-        const era5ToolDef = isEra5Level ? getEquippedEra5ToolDef() : null;
-        const era5InDeepWater = !!(isEra5Level && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)));
+        const era5ToolDef = hasEra5Systems ? getEquippedEra5ToolDef() : null;
+        const era5InDeepWater = !!(hasEra5Systems && (world.level5?.isInDeepWater?.(player.mesh.position) || world.era5Level?.isInDeepWater?.(player.mesh.position)));
         const era5HasScuba = era5ToolDef?.defId === 'scuba_tank';
         const era5HasFins = (era5State.stats.waterMoveSpeed ?? 0) > 0;
-        const scubaFloatActive = !!(isEra5Level && era5InDeepWater);
+        const scubaFloatActive = !!(hasEra5Systems && era5InDeepWater);
         const swimYScale = era5HasScuba ? 1.0 : era5HasFins ? 0.62 : 0.48;
         const jumpJustPressed = scubaFloatActive ? false : jumpPress.edge;
         const playerJumpHeld = scubaFloatActive ? false : jumpHeld;
@@ -6121,7 +6124,7 @@ export async function boot(options = {}) {
             era5CameraYawVel = 0;
           }
         }
-        if (isEra5Level) {
+        if (hasEra5Systems) {
           prepareEra5ToolMotion(dt, { jumpHeld });
         }
         if ((isEra5Level || levelId >= 5) && jumpJustPressed && player.canTriggerAirFlip()) {
@@ -6140,7 +6143,7 @@ export async function boot(options = {}) {
         if (attackPressed) {
           fireEra5Weapon();
         }
-        if (isEra5Level && state === 'gameplay' && !idleSuppressed) {
+        if (hasEra5Systems && state === 'gameplay' && !idleSuppressed) {
           const slotKey = input.consumeWeaponSlotPress();
           if (slotKey !== null) {
             switchToEra5WeaponBySlot(slotKey - 1);
@@ -6176,7 +6179,7 @@ export async function boot(options = {}) {
             }
           }
         }
-        if (isEra5Level && era5WeaponCooldownMs > 0) {
+        if (hasEra5Systems && era5WeaponCooldownMs > 0) {
           era5WeaponCooldownMs = Math.max(0, era5WeaponCooldownMs - (dt * 1000));
         }
         if (player.grounded && player.isCapeFloating()) {
