@@ -5729,10 +5729,10 @@ export async function boot(options = {}) {
         }
         if (inside && active && player.grounded && puddleInvulnMs <= 0 && !respawnState) {
           const knockDir = player.mesh.position.x <= ((hazard.minX + hazard.maxX) * 0.5) ? -1 : 1;
-          const resetTriggered = triggerReset('electrified_puddle', knockDir);
-          if (resetTriggered) {
-            puddleInvulnMs = 1500;
-          }
+          const hit = hasEra5Systems
+            ? applyEra5Damage('electrified_puddle', { x: knockDir, z: 0 })
+            : triggerReset('electrified_puddle', knockDir);
+          if (hit) puddleInvulnMs = 1500;
         }
       }
 
