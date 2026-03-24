@@ -1015,6 +1015,37 @@ function buildElectrifiedPuddlePlan(layout) {
   };
 }
 
+function buildSprayBarPlan(layout) {
+  const hub = getLayoutSurface(layout, 'e6_rotunda_hub');
+  const pivotY = hub.topY + 0.38; // just above deck, at knee height
+  const barLength = 1.85;        // half-length: total sweep diameter ~3.7 units
+  const hitRadius = 0.40;
+  const rotationSpeedRad = 0.88; // ~7.1s per revolution
+
+  return [
+    {
+      id: 'L5-SPRAY-01',
+      encounterId: 'L5-E6',
+      pivotX: 75.0,
+      pivotY,
+      barLength,
+      hitRadius,
+      rotationSpeedRad,
+      startAngleRad: 0,
+    },
+    {
+      id: 'L5-SPRAY-02',
+      encounterId: 'L5-E6',
+      pivotX: 78.2,
+      pivotY,
+      barLength,
+      hitRadius,
+      rotationSpeedRad,
+      startAngleRad: Math.PI * 0.72,  // ~130° offset — bars are never in phase
+    },
+  ];
+}
+
 function buildBackdrops(scene, shadowGen, layout, visualPlan) {
   createDecorBox(scene, 'aquarium_void_floor_visual', {
     x: 110,
@@ -2181,6 +2212,83 @@ function createElectrifiedSafeIslandVisual(scene, island) {
   return root;
 }
 
+function createSprayBarVisual(scene, bar) {
+  const metadata = {
+    encounterId: bar.encounterId,
+    hazardId: bar.id,
+    hazardType: 'sprayBar',
+  };
+
+  // Static post at pivot
+  const post = createDecorCylinder(scene, `${bar.id}_post`, {
+    x: bar.pivotX,
+    y: bar.pivotY - 0.18,
+    z: LANE_Z,
+    height: 0.36,
+    diameter: 0.22,
+    rgb: PROFILE.pipeDark,
+    metadata,
+  });
+
+  // Rotating pivot node
+  const armPivot = new BABYLON.TransformNode(`${bar.id}_arm_pivot`, scene);
+  armPivot.position.set(bar.pivotX, bar.pivotY, LANE_Z);
+
+  // Arm bar (extends barLength in each direction from pivot)
+  const arm = createDecorBox(scene, `${bar.id}_arm`, {
+    parent: armPivot,
+    x: 0,
+    y: 0,
+    z: 0,
+    w: bar.barLength * 2,
+    h: 0.14,
+    d: 0.14,
+    rgb: PROFILE.pipeLight,
+    metadata,
+  });
+
+  // Nozzle caps at each end
+  for (const side of [-1, 1]) {
+    createDecorBox(scene, `${bar.id}_nozzle_${side < 0 ? 'a' : 'b'}`, {
+      parent: armPivot,
+      x: side * bar.barLength,
+      y: 0,
+      z: 0,
+      w: 0.22,
+      h: 0.22,
+      d: 0.22,
+      rgb: PROFILE.pumpTrim,
+      metadata,
+    });
+  }
+
+  // Central hub cap (covers post-arm joint)
+  createDecorBox(scene, `${bar.id}_hub_cap`, {
+    parent: armPivot,
+    x: 0,
+    y: 0,
+    z: 0,
+    w: 0.32,
+    h: 0.32,
+    d: 0.32,
+    rgb: PROFILE.pipeDark,
+    metadata,
+  });
+
+  let active = true;
+  const observer = scene.registerBeforeRender(() => {
+    if (!active) return;
+    armPivot.rotation.z = bar.startAngleRad + (performance.now() / 1000) * bar.rotationSpeedRad;
+  });
+
+  const setActive = (nextActive) => {
+    active = nextActive;
+    arm.isVisible = nextActive;
+  };
+
+  return { armPivot, post, setActive };
+}
+
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const meta = getLevelMeta(5);
   const layout = buildLayout();
@@ -2188,6 +2296,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const slickDeck = buildSlickDeckPlan(layout);
   const currentJets = buildCurrentJetPlan(layout);
   const electrifiedPuddles = buildElectrifiedPuddlePlan(layout);
+  const sprayBars = buildSprayBarPlan(layout);
   layout.layoutReport.visualKit = visualPlan.report;
   layout.layoutReport.slickDeck = {
     safeComparison: slickDeck.safeComparison,
@@ -2252,6 +2361,19 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       activeMs: band.activeMs,
       safeMs: band.safeMs,
       tell: band.tell,
+    })),
+  };
+  layout.layoutReport.sprayBars = {
+    barCount: sprayBars.length,
+    bars: sprayBars.map((bar) => ({
+      id: bar.id,
+      encounterId: bar.encounterId,
+      pivotX: bar.pivotX,
+      pivotY: bar.pivotY,
+      barLength: bar.barLength,
+      hitRadius: bar.hitRadius,
+      rotationSpeedRad: bar.rotationSpeedRad,
+      startAngleRad: bar.startAngleRad,
     })),
   };
 
@@ -2327,7 +2449,28 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       visualRoot: visual.root,
     };
   });
-  const hazards = [...slickHazards, ...currentJetHazards, ...electrifiedPuddleHazards];
+  const sprayBarHazards = sprayBars.map((bar) => {
+    const visual = createSprayBarVisual(scene, bar);
+    return {
+      id: bar.id,
+      type: 'sprayBar',
+      encounterId: bar.encounterId,
+      // Bounding box for quick cull (AABB enclosing full rotation)
+      minX: bar.pivotX - bar.barLength - 0.5,
+      maxX: bar.pivotX + bar.barLength + 0.5,
+      minY: bar.pivotY - bar.barLength - 0.5,
+      maxY: bar.pivotY + bar.barLength + 0.5,
+      pivotX: bar.pivotX,
+      pivotY: bar.pivotY,
+      barLength: bar.barLength,
+      hitRadius: bar.hitRadius,
+      rotationSpeedRad: bar.rotationSpeedRad,
+      startAngleRad: bar.startAngleRad,
+      setActive: visual.setActive,
+      visualRoot: visual.armPivot,
+    };
+  });
+  const hazards = [...slickHazards, ...currentJetHazards, ...electrifiedPuddleHazards, ...sprayBarHazards];
   for (const island of electrifiedPuddles.safeIslands) {
     createElectrifiedSafeIslandVisual(scene, island);
   }

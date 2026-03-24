@@ -2605,6 +2605,7 @@ export async function boot(options = {}) {
   let onesieRechargeMs = 0;
   const ONESIE_RECHARGE_DURATION_MS = 8000;
   let puddleInvulnMs = 0;
+  let sprayInvulnMs = 0;
   let coinsCollected = 0;
   let collectiblePickupCooldownMs = 0;
   let capeUsedThisRun = false;
@@ -4523,6 +4524,7 @@ export async function boot(options = {}) {
     respawnPoint = { ...spawnPoint };
     clearRunBuffs({ suppressCape: false, keepCapeUsage: false });
     puddleInvulnMs = 0;
+    sprayInvulnMs = 0;
     coinsCollected = 0;
     window.__DADA_DEBUG__.coinsCollected = coinsCollected;
     collectiblePickupCooldownMs = 0;
@@ -5661,6 +5663,9 @@ export async function boot(options = {}) {
     if (puddleInvulnMs > 0) {
       puddleInvulnMs = Math.max(0, puddleInvulnMs - dt * 1000);
     }
+    if (sprayInvulnMs > 0) {
+      sprayInvulnMs = Math.max(0, sprayInvulnMs - dt * 1000);
+    }
     for (const hazard of hazards) {
       const inside = pos.x >= hazard.minX
         && pos.x <= hazard.maxX
@@ -5733,6 +5738,26 @@ export async function boot(options = {}) {
             ? applyEra5Damage('electrified_puddle', { x: knockDir, z: 0 })
             : triggerReset('electrified_puddle', knockDir);
           if (hit) puddleInvulnMs = 1500;
+        }
+      }
+
+      if (hazard.type === 'sprayBar') {
+        // Rotating bar collision: segment distance test in XY plane
+        const angleRad = hazard.startAngleRad + (hazardClockMs / 1000) * hazard.rotationSpeedRad;
+        const cosA = Math.cos(angleRad);
+        const sinA = Math.sin(angleRad);
+        const dx = pos.x - hazard.pivotX;
+        const dy = pos.y - hazard.pivotY;
+        // Perpendicular distance from player to bar axis
+        const perpDist = Math.abs(dx * sinA - dy * cosA);
+        // Distance along bar from pivot (symmetric bar: check both sides)
+        const alongDist = Math.abs(dx * cosA + dy * sinA);
+        if (perpDist < hazard.hitRadius && alongDist < hazard.barLength) {
+          if (hasEra5Systems && sprayInvulnMs <= 0 && !respawnState) {
+            const knockDir = dx <= 0 ? -1 : 1;
+            const hit = applyEra5Damage('spray_bar', { x: knockDir, z: 0 });
+            if (hit) sprayInvulnMs = 1400;
+          }
         }
       }
 
