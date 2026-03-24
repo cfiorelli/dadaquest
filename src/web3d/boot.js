@@ -6124,7 +6124,7 @@ export async function boot(options = {}) {
         if (isEra5Level) {
           prepareEra5ToolMotion(dt, { jumpHeld });
         }
-        if (isEra5Level && jumpJustPressed && player.canTriggerAirFlip()) {
+        if ((isEra5Level || levelId >= 5) && jumpJustPressed && player.canTriggerAirFlip()) {
           player.triggerBackflip();
           window.__DADA_DEBUG__.backflip = player.getBackflipState();
           updateBuffHud();

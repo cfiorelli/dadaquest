@@ -1444,6 +1444,9 @@ export function createUI(uiRoot, options = {}) {
     if (era5) {
       return `<span>↑ ↓</span>/<span>W S</span> Move &nbsp; <span>← →</span> Turn &nbsp; <span>Alt+← →</span> or <span>A D</span>/<span>, .</span> Strafe &nbsp; <span>Click</span>/<span>F</span> Fire &nbsp; <span>Space/C</span> Float &nbsp; <span>E</span> Tool`;
     }
+    if (levelId >= 5) {
+      return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>F</span> Flip &nbsp; <span>Shift</span> Sprint`;
+    }
     return `<span>A</span>/<span>D</span> Move &nbsp; <span>Space</span> Jump &nbsp; <span>Shift</span> Sprint`;
   }
 
