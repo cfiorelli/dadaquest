@@ -6,6 +6,10 @@ import {
   createWelcomeSign,
   setRenderingGroup,
 } from './buildWorld.js';
+import {
+  applyWorldAlphaRenderPolicy,
+  applyWorldOpaqueRenderPolicy,
+} from '../render/renderPolicy.js';
 import { getLevelMeta } from './levelMeta.js';
 
 const LANE_Z = 0;
@@ -29,6 +33,17 @@ const PROFILE = {
   backMass: [76, 94, 106],
   support: [82, 102, 116],
   accent: [74, 170, 204],
+  glassFrame: [178, 220, 232],
+  glassPanel: [114, 210, 226],
+  tankDeep: [20, 66, 84],
+  tankGlow: [72, 156, 180],
+  silhouette: [18, 40, 48],
+  railMetal: [198, 208, 214],
+  pipeLight: [108, 130, 146],
+  pipeDark: [70, 86, 98],
+  warning: [214, 176, 86],
+  pumpCore: [112, 126, 138],
+  pumpTrim: [72, 168, 196],
 };
 
 const ACTS = [
@@ -225,12 +240,13 @@ function createShadowLight(scene) {
   return shadowGen;
 }
 
-function markDecor(node) {
+function markDecor(node, extraMetadata = {}) {
   if (!node) return;
   node.metadata = {
     ...(node.metadata || {}),
     cameraIgnore: true,
     decor: true,
+    ...extraMetadata,
   };
   const meshes = node instanceof BABYLON.Mesh ? [node] : node.getChildMeshes?.(false) || [];
   for (const mesh of meshes) {
@@ -240,6 +256,7 @@ function markDecor(node) {
       ...(mesh.metadata || {}),
       cameraIgnore: true,
       decor: true,
+      ...extraMetadata,
     };
   }
 }
@@ -252,17 +269,106 @@ function createOpaqueMaterial(scene, name, rgb) {
   return mat;
 }
 
-function createDecorBox(scene, name, { x, y, z, w, h, d, rgb, shadowGen }) {
+function createAlphaMaterial(scene, name, rgb, alpha = 0.48) {
+  const mat = new BABYLON.StandardMaterial(name, scene);
+  mat.diffuseColor = makeColor(rgb);
+  mat.emissiveColor = makeColor(rgb).scale(0.22);
+  mat.specularColor = BABYLON.Color3.Black();
+  mat.alpha = alpha;
+  return mat;
+}
+
+function createDecorRoot(scene, name, {
+  x = 0,
+  y = 0,
+  z = 0,
+  rotY = 0,
+  metadata = {},
+} = {}) {
+  const root = new BABYLON.TransformNode(name, scene);
+  root.position.set(x, y, z);
+  root.rotation.y = rotY;
+  markDecor(root, metadata);
+  return root;
+}
+
+function createDecorBox(scene, name, {
+  x,
+  y,
+  z,
+  w,
+  h,
+  d,
+  rgb,
+  shadowGen,
+  parent = null,
+  metadata = {},
+}) {
   const mesh = BABYLON.MeshBuilder.CreateBox(name, {
     width: w,
     height: h,
     depth: d,
   }, scene);
+  if (parent) mesh.parent = parent;
   mesh.position.set(x, y, z);
   mesh.material = createOpaqueMaterial(scene, `${name}_mat`, rgb);
   mesh.receiveShadows = true;
   if (shadowGen) shadowGen.addShadowCaster(mesh);
-  markDecor(mesh);
+  applyWorldOpaqueRenderPolicy(mesh);
+  markDecor(mesh, metadata);
+  return mesh;
+}
+
+function createDecorCylinder(scene, name, {
+  x,
+  y,
+  z,
+  height,
+  diameter,
+  rgb,
+  shadowGen,
+  parent = null,
+  rotation = null,
+  metadata = {},
+}) {
+  const mesh = BABYLON.MeshBuilder.CreateCylinder(name, {
+    height,
+    diameter,
+    tessellation: 16,
+  }, scene);
+  if (parent) mesh.parent = parent;
+  mesh.position.set(x, y, z);
+  if (rotation) {
+    mesh.rotation.set(rotation.x ?? 0, rotation.y ?? 0, rotation.z ?? 0);
+  }
+  mesh.material = createOpaqueMaterial(scene, `${name}_mat`, rgb);
+  mesh.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(mesh);
+  applyWorldOpaqueRenderPolicy(mesh);
+  markDecor(mesh, metadata);
+  return mesh;
+}
+
+function createAlphaPanel(scene, name, {
+  x,
+  y,
+  z,
+  w,
+  h,
+  rgb,
+  alpha = 0.45,
+  parent = null,
+  metadata = {},
+}) {
+  const mesh = BABYLON.MeshBuilder.CreatePlane(name, {
+    width: w,
+    height: h,
+  }, scene);
+  if (parent) mesh.parent = parent;
+  mesh.position.set(x, y, z);
+  mesh.material = createAlphaMaterial(scene, `${name}_mat`, rgb, alpha);
+  applyWorldAlphaRenderPolicy(mesh);
+  markDecor(mesh, metadata);
   return mesh;
 }
 
@@ -512,7 +618,102 @@ function buildLayout() {
   };
 }
 
-function buildBackdrops(scene, shadowGen, layout) {
+function buildVisualPlan(layout) {
+  const spaces = [...layout.encounters, ...layout.optionalBranches];
+  const moduleCounts = {
+    glassWalls: 5,
+    railings: 4,
+    servicePipes: 4,
+    tankBackgrounds: 3,
+    pumpHeroes: 2,
+  };
+  const modules = {
+    glassWalls: [
+      { id: 'glass_entry_portal', encounterIds: ['L5-E1', 'L5-E2'], x: -2.0, y: 3.0, z: 5.62, w: 20.0, h: 4.8, variant: 'clean' },
+      { id: 'glass_panorama_crack', encounterIds: ['L5-E4'], x: 44.0, y: 4.15, z: 5.66, w: 13.6, h: 5.2, variant: 'cracked' },
+      { id: 'glass_rotunda_arc', encounterIds: ['L5-E6'], x: 74.5, y: 4.35, z: 5.7, w: 13.2, h: 5.0, variant: 'clean' },
+      { id: 'glass_crown_shell_a', encounterIds: ['L5-E12'], x: 200.5, y: 6.0, z: 5.72, w: 12.5, h: 5.6, variant: 'clean' },
+      { id: 'glass_crown_shell_b', encounterIds: ['L5-E13', 'L5-E14', 'L5-OB2'], x: 222.5, y: 6.35, z: 5.76, w: 22.8, h: 5.8, variant: 'cracked' },
+    ],
+    railings: [
+      { id: 'rail_ticket_balcony', encounterIds: ['L5-E1'], x: -16.8, y: 1.18, z: 2.18, length: 8.6 },
+      { id: 'rail_crosswalk_guard', encounterIds: ['L5-E5'], x: 61.8, y: 1.9, z: 1.2, length: 9.8 },
+      { id: 'rail_relay_guard', encounterIds: ['L5-E9'], x: 136.2, y: 2.38, z: 1.35, length: 11.4 },
+      { id: 'rail_crown_exterior', encounterIds: ['L5-E12'], x: 201.0, y: 5.12, z: 2.05, length: 12.4 },
+    ],
+    servicePipes: [
+      { id: 'pipe_drainage_spine', encounterIds: ['L5-E7'], x: 96.0, y: 4.15, z: 5.34, width: 12.8, height: 3.6, variant: 'tall' },
+      { id: 'pipe_quarantine_loop', encounterIds: ['L5-E8', 'L5-OB1'], x: 118.8, y: 2.4, z: 5.18, width: 15.6, height: 2.9, variant: 'low' },
+      { id: 'pipe_intake_manifold', encounterIds: ['L5-E10'], x: 164.2, y: 4.55, z: 5.22, width: 14.0, height: 4.0, variant: 'tall' },
+      { id: 'pipe_pump_bypass', encounterIds: ['L5-E11'], x: 183.8, y: 4.7, z: 5.24, width: 13.2, height: 3.8, variant: 'tall' },
+    ],
+    tankBackgrounds: [
+      { id: 'tank_public_kelp', encounterIds: ['L5-E1', 'L5-E2', 'L5-E3'], x: 2.0, y: 2.8, z: 6.46, w: 34.0, h: 4.8, variant: 'kelp' },
+      { id: 'tank_rotunda_drift', encounterIds: ['L5-E4', 'L5-E5', 'L5-E6'], x: 60.5, y: 3.6, z: 6.5, w: 46.0, h: 5.4, variant: 'shoal' },
+      { id: 'tank_crown_deep', encounterIds: ['L5-E12', 'L5-E13', 'L5-E14', 'L5-OB2'], x: 218.5, y: 5.95, z: 6.54, w: 43.0, h: 6.2, variant: 'crown' },
+    ],
+    pumpHeroes: [
+      { id: 'hero_saw_ray_intake', encounterIds: ['L5-E10'], x: 164.0, y: 3.2, z: 4.0, variant: 'intake_turbine' },
+      { id: 'hero_pump_core_crown', encounterIds: ['L5-E11'], x: 184.0, y: 3.8, z: 4.14, variant: 'pump_crown' },
+    ],
+  };
+
+  const coverage = new Map(spaces.map((space) => {
+    const act = ACTS.find((candidate) => candidate.id === space.act) || ACTS[0];
+    const visualProfile = act.kind === 'service'
+      ? (space.id === 'L5-E10' || space.id === 'L5-E11' ? 'pump_core' : 'service_spine')
+      : (space.id === 'L5-E12' || space.id === 'L5-E13' || space.id === 'L5-E14' || space.id === 'L5-OB2' ? 'crown_tank' : 'public_gallery');
+    const genericTags = act.kind === 'service'
+      ? ['service_bulkhead', 'maintenance_struts']
+      : ['public_window_frame', 'visitor_fascia'];
+    if (space.id === 'L5-E4') genericTags.push('cracked_gallery');
+    if (space.id === 'L5-E8') genericTags.push('filter_drop');
+    if (space.id === 'L5-OB1') genericTags.push('quarantine_loop');
+    if (space.id === 'L5-E10') genericTags.push('intake_chamber');
+    if (space.id === 'L5-E11') genericTags.push('pump_bypass');
+    if (space.id === 'L5-OB2') genericTags.push('skylight_loop');
+    return [space.id, {
+      id: space.id,
+      act: space.act,
+      routeRead: act.kind,
+      visualProfile,
+      genericTags,
+      moduleIds: [],
+      moduleTypes: [],
+    }];
+  }));
+
+  for (const [moduleType, list] of Object.entries(modules)) {
+    for (const def of list) {
+      for (const encounterId of def.encounterIds) {
+        const entry = coverage.get(encounterId);
+        if (!entry) continue;
+        entry.moduleIds.push(def.id);
+        if (!entry.moduleTypes.includes(moduleType)) entry.moduleTypes.push(moduleType);
+      }
+    }
+  }
+
+  return {
+    ...modules,
+    report: {
+      moduleCounts,
+      modules: [
+        ...modules.glassWalls.map(({ id, encounterIds }) => ({ id, type: 'glassWall', encounterIds })),
+        ...modules.railings.map(({ id, encounterIds }) => ({ id, type: 'railing', encounterIds })),
+        ...modules.servicePipes.map(({ id, encounterIds }) => ({ id, type: 'servicePipe', encounterIds })),
+        ...modules.tankBackgrounds.map(({ id, encounterIds }) => ({ id, type: 'tankBackground', encounterIds })),
+        ...modules.pumpHeroes.map(({ id, encounterIds }) => ({ id, type: 'pumpHero', encounterIds })),
+      ],
+      encounterCoverage: Array.from(coverage.values()).map((entry) => ({
+        ...entry,
+        visualTags: [...entry.genericTags, ...entry.moduleTypes],
+      })),
+    },
+  };
+}
+
+function buildBackdrops(scene, shadowGen, layout, visualPlan) {
   createDecorBox(scene, 'aquarium_void_floor_visual', {
     x: 110,
     y: -3.1,
@@ -540,6 +741,7 @@ function buildBackdrops(scene, shadowGen, layout) {
       d: 0.8,
       rgb: backdropColor,
       shadowGen,
+      metadata: { encounterId: encounter.id, visualRole: 'backwall' },
     });
 
     createDecorBox(scene, `${encounter.id}_underdeck`, {
@@ -551,9 +753,43 @@ function buildBackdrops(scene, shadowGen, layout) {
       d: 2.8,
       rgb: PROFILE.backMass,
       shadowGen,
+      metadata: { encounterId: encounter.id, visualRole: 'underdeck' },
     });
 
     if (act.kind === 'public') {
+      createDecorBox(scene, `${encounter.id}_frame_left`, {
+        x: centerX - ((width * 0.5) - 0.55),
+        y: midTop + 1.9,
+        z: 5.92,
+        w: 0.8,
+        h: 5.4,
+        d: 0.42,
+        rgb: PROFILE.glassFrame,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
+      });
+      createDecorBox(scene, `${encounter.id}_frame_right`, {
+        x: centerX + ((width * 0.5) - 0.55),
+        y: midTop + 1.9,
+        z: 5.92,
+        w: 0.8,
+        h: 5.4,
+        d: 0.42,
+        rgb: PROFILE.glassFrame,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
+      });
+      createDecorBox(scene, `${encounter.id}_lintel`, {
+        x: centerX,
+        y: midTop + 4.2,
+        z: 5.9,
+        w: Math.max(4.0, width - 0.9),
+        h: 0.44,
+        d: 0.48,
+        rgb: PROFILE.publicEdge,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'public_lintel' },
+      });
       createDecorBox(scene, `${encounter.id}_window_band`, {
         x: centerX,
         y: midTop + 0.75,
@@ -563,8 +799,55 @@ function buildBackdrops(scene, shadowGen, layout) {
         d: 0.22,
         rgb: PROFILE.accent,
         shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'window_band' },
       });
+      if (encounter.id === 'L5-E4') {
+        createDecorBox(scene, `${encounter.id}_gallery_crack_block`, {
+          x: centerX + 2.2,
+          y: midTop + 1.4,
+          z: 5.54,
+          w: 2.6,
+          h: 3.8,
+          d: 0.58,
+          rgb: PROFILE.publicEdge,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'collapsed_gallery_wall' },
+        });
+      }
     } else {
+      createDecorBox(scene, `${encounter.id}_bulkhead_left`, {
+        x: centerX - ((width * 0.5) - 0.55),
+        y: midTop + 1.85,
+        z: 5.86,
+        w: 0.9,
+        h: 5.6,
+        d: 0.54,
+        rgb: PROFILE.pipeDark,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'service_bulkhead' },
+      });
+      createDecorBox(scene, `${encounter.id}_bulkhead_right`, {
+        x: centerX + ((width * 0.5) - 0.55),
+        y: midTop + 1.85,
+        z: 5.86,
+        w: 0.9,
+        h: 5.6,
+        d: 0.54,
+        rgb: PROFILE.pipeDark,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'service_bulkhead' },
+      });
+      createDecorBox(scene, `${encounter.id}_service_lintel`, {
+        x: centerX,
+        y: midTop + 4.18,
+        z: 5.82,
+        w: Math.max(3.4, width - 1.0),
+        h: 0.52,
+        d: 0.56,
+        rgb: PROFILE.warning,
+        shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'service_lintel' },
+      });
       createDecorBox(scene, `${encounter.id}_pipe_bank`, {
         x: centerX,
         y: midTop + 0.7,
@@ -574,7 +857,21 @@ function buildBackdrops(scene, shadowGen, layout) {
         d: 0.35,
         rgb: PROFILE.support,
         shadowGen,
+        metadata: { encounterId: encounter.id, visualRole: 'pipe_bank' },
       });
+      if (encounter.id === 'L5-E8') {
+        createDecorBox(scene, `${encounter.id}_filter_well`, {
+          x: centerX + 3.8,
+          y: midTop - 0.3,
+          z: 3.6,
+          w: 3.8,
+          h: 2.3,
+          d: 2.4,
+          rgb: PROFILE.pipeDark,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'filter_drop_setpiece' },
+        });
+      }
     }
   }
 
@@ -588,7 +885,57 @@ function buildBackdrops(scene, shadowGen, layout) {
       d: 0.9,
       rgb: PROFILE.checkpointEdge,
       shadowGen,
+      metadata: { checkpointId: checkpoint.id, visualRole: 'checkpoint_bulkhead' },
     });
+  }
+
+  for (const module of visualPlan.tankBackgrounds) {
+    const root = createDecorRoot(scene, module.id, {
+      x: module.x,
+      y: module.y,
+      z: module.z,
+      metadata: {
+        encounterIds: module.encounterIds,
+        visualModuleId: module.id,
+        visualModuleType: 'tankBackground',
+      },
+    });
+    createAlphaPanel(scene, `${module.id}_water`, {
+      parent: root,
+      x: 0,
+      y: 0,
+      z: 0,
+      w: module.w,
+      h: module.h,
+      rgb: PROFILE.tankGlow,
+      alpha: 0.34,
+      metadata: { encounterIds: module.encounterIds, visualRole: 'tank_water' },
+    });
+    createDecorBox(scene, `${module.id}_base`, {
+      parent: root,
+      x: 0,
+      y: -(module.h * 0.45),
+      z: 0.05,
+      w: module.w,
+      h: 0.45,
+      d: 0.2,
+      rgb: PROFILE.silhouette,
+      shadowGen,
+      metadata: { encounterIds: module.encounterIds, visualRole: 'tank_base' },
+    });
+    for (const [index, offset] of [-0.34, 0.0, 0.31].entries()) {
+      createAlphaPanel(scene, `${module.id}_silhouette_${index}`, {
+        parent: root,
+        x: module.w * offset,
+        y: (index === 1 ? 0.28 : -0.12) * module.h,
+        z: -0.02,
+        w: index === 1 ? 2.8 : 1.9,
+        h: index === 1 ? 1.1 : 2.1,
+        rgb: PROFILE.silhouette,
+        alpha: 0.72,
+        metadata: { encounterIds: module.encounterIds, visualRole: 'tank_silhouette' },
+      });
+    }
   }
 }
 
@@ -612,9 +959,310 @@ function addSupportColumns(scene, shadowGen, def) {
   }
 }
 
+function createGlassWallModule(scene, shadowGen, def) {
+  const metadata = {
+    encounterIds: def.encounterIds,
+    visualModuleId: def.id,
+    visualModuleType: 'glassWall',
+  };
+  const root = createDecorRoot(scene, def.id, {
+    x: def.x,
+    y: def.y,
+    z: def.z,
+    metadata,
+  });
+  createDecorBox(scene, `${def.id}_frame_left`, {
+    parent: root,
+    x: -(def.w * 0.5) + 0.28,
+    y: 0,
+    z: 0.02,
+    w: 0.56,
+    h: def.h,
+    d: 0.3,
+    rgb: PROFILE.glassFrame,
+    shadowGen,
+    metadata,
+  });
+  createDecorBox(scene, `${def.id}_frame_right`, {
+    parent: root,
+    x: (def.w * 0.5) - 0.28,
+    y: 0,
+    z: 0.02,
+    w: 0.56,
+    h: def.h,
+    d: 0.3,
+    rgb: PROFILE.glassFrame,
+    shadowGen,
+    metadata,
+  });
+  createDecorBox(scene, `${def.id}_frame_top`, {
+    parent: root,
+    x: 0,
+    y: (def.h * 0.5) - 0.22,
+    z: 0.02,
+    w: def.w,
+    h: 0.44,
+    d: 0.3,
+    rgb: PROFILE.glassFrame,
+    shadowGen,
+    metadata,
+  });
+  createDecorBox(scene, `${def.id}_frame_bottom`, {
+    parent: root,
+    x: 0,
+    y: -(def.h * 0.5) + 0.18,
+    z: 0.02,
+    w: def.w,
+    h: 0.36,
+    d: 0.32,
+    rgb: PROFILE.glassFrame,
+    shadowGen,
+    metadata,
+  });
+  createAlphaPanel(scene, `${def.id}_panel`, {
+    parent: root,
+    x: 0,
+    y: 0,
+    z: -0.08,
+    w: def.w - 0.92,
+    h: def.h - 0.84,
+    rgb: PROFILE.glassPanel,
+    alpha: def.variant === 'cracked' ? 0.38 : 0.44,
+    metadata,
+  });
+  if (def.variant === 'cracked') {
+    for (const [index, slash] of [
+      { x: -1.1, y: 0.6, w: 2.4, rotZ: 0.54 },
+      { x: 1.2, y: -0.2, w: 1.9, rotZ: -0.42 },
+    ].entries()) {
+      const crack = createDecorBox(scene, `${def.id}_crack_${index}`, {
+        parent: root,
+        x: slash.x,
+        y: slash.y,
+        z: 0.06,
+        w: slash.w,
+        h: 0.08,
+        d: 0.06,
+        rgb: PROFILE.railMetal,
+        shadowGen,
+        metadata,
+      });
+      crack.rotation.z = slash.rotZ;
+    }
+  }
+}
+
+function createRailingModule(scene, shadowGen, def) {
+  const metadata = {
+    encounterIds: def.encounterIds,
+    visualModuleId: def.id,
+    visualModuleType: 'railing',
+  };
+  const root = createDecorRoot(scene, def.id, {
+    x: def.x,
+    y: def.y,
+    z: def.z,
+    metadata,
+  });
+  for (const ratio of [-0.5, -0.15, 0.2, 0.5]) {
+    createDecorBox(scene, `${def.id}_post_${ratio}`, {
+      parent: root,
+      x: def.length * ratio,
+      y: 0.42,
+      z: 0,
+      w: 0.16,
+      h: 0.84,
+      d: 0.16,
+      rgb: PROFILE.railMetal,
+      shadowGen,
+      metadata,
+    });
+  }
+  for (const y of [0.26, 0.62]) {
+    createDecorBox(scene, `${def.id}_bar_${y}`, {
+      parent: root,
+      x: 0,
+      y,
+      z: 0,
+      w: def.length,
+      h: 0.1,
+      d: 0.12,
+      rgb: PROFILE.railMetal,
+      shadowGen,
+      metadata,
+    });
+  }
+}
+
+function createServicePipeModule(scene, shadowGen, def) {
+  const metadata = {
+    encounterIds: def.encounterIds,
+    visualModuleId: def.id,
+    visualModuleType: 'servicePipe',
+  };
+  const root = createDecorRoot(scene, def.id, {
+    x: def.x,
+    y: def.y,
+    z: def.z,
+    metadata,
+  });
+  const verticalOffsets = def.variant === 'tall'
+    ? [-0.34, 0.0, 0.34]
+    : [-0.26, 0.12, 0.42];
+  for (const [index, offset] of verticalOffsets.entries()) {
+    createDecorCylinder(scene, `${def.id}_tube_${index}`, {
+      parent: root,
+      x: def.width * offset,
+      y: def.variant === 'tall' ? 0 : -0.18,
+      z: 0,
+      height: def.height,
+      diameter: def.variant === 'tall' ? 0.42 : 0.34,
+      rgb: index === 1 ? PROFILE.pipeLight : PROFILE.pipeDark,
+      shadowGen,
+      metadata,
+    });
+  }
+  for (const [index, y] of [0.0, 0.66].entries()) {
+    createDecorCylinder(scene, `${def.id}_cross_${index}`, {
+      parent: root,
+      x: 0,
+      y,
+      z: 0.06,
+      height: def.width,
+      diameter: 0.22,
+      rgb: PROFILE.pipeLight,
+      shadowGen,
+      rotation: { z: Math.PI * 0.5 },
+      metadata,
+    });
+  }
+  createDecorBox(scene, `${def.id}_manifold`, {
+    parent: root,
+    x: 0,
+    y: -(def.height * 0.5) + 0.36,
+    z: 0.12,
+    w: def.width + 0.6,
+    h: 0.46,
+    d: 0.56,
+    rgb: PROFILE.warning,
+    shadowGen,
+    metadata,
+  });
+}
+
+function createPumpHeroModule(scene, shadowGen, def) {
+  const metadata = {
+    encounterIds: def.encounterIds,
+    visualModuleId: def.id,
+    visualModuleType: 'pumpHero',
+  };
+  const root = createDecorRoot(scene, def.id, {
+    x: def.x,
+    y: def.y,
+    z: def.z,
+    metadata,
+  });
+  if (def.variant === 'intake_turbine') {
+    createDecorCylinder(scene, `${def.id}_drum`, {
+      parent: root,
+      x: 0,
+      y: 0,
+      z: 0,
+      height: 3.6,
+      diameter: 3.0,
+      rgb: PROFILE.pumpCore,
+      shadowGen,
+      rotation: { z: Math.PI * 0.5 },
+      metadata,
+    });
+    for (const x of [-1.0, 1.0]) {
+      createDecorBox(scene, `${def.id}_brace_${x}`, {
+        parent: root,
+        x,
+        y: -0.4,
+        z: 0,
+        w: 0.42,
+        h: 2.8,
+        d: 1.3,
+        rgb: PROFILE.pipeDark,
+        shadowGen,
+        metadata,
+      });
+    }
+    createDecorBox(scene, `${def.id}_intake_mouth`, {
+      parent: root,
+      x: 0,
+      y: 0,
+      z: 0.92,
+      w: 4.4,
+      h: 1.0,
+      d: 0.42,
+      rgb: PROFILE.pumpTrim,
+      shadowGen,
+      metadata,
+    });
+  } else {
+    createDecorBox(scene, `${def.id}_casing`, {
+      parent: root,
+      x: 0,
+      y: 0.5,
+      z: 0,
+      w: 5.6,
+      h: 3.4,
+      d: 1.8,
+      rgb: PROFILE.pumpCore,
+      shadowGen,
+      metadata,
+    });
+    createDecorCylinder(scene, `${def.id}_stack_left`, {
+      parent: root,
+      x: -1.6,
+      y: 1.7,
+      z: 0,
+      height: 2.4,
+      diameter: 0.7,
+      rgb: PROFILE.pipeLight,
+      shadowGen,
+      metadata,
+    });
+    createDecorCylinder(scene, `${def.id}_stack_right`, {
+      parent: root,
+      x: 1.6,
+      y: 1.7,
+      z: 0,
+      height: 2.4,
+      diameter: 0.7,
+      rgb: PROFILE.pipeLight,
+      shadowGen,
+      metadata,
+    });
+    createDecorBox(scene, `${def.id}_crown_band`, {
+      parent: root,
+      x: 0,
+      y: 2.2,
+      z: 0.22,
+      w: 6.1,
+      h: 0.42,
+      d: 0.5,
+      rgb: PROFILE.pumpTrim,
+      shadowGen,
+      metadata,
+    });
+  }
+}
+
+function buildVisualModules(scene, shadowGen, visualPlan) {
+  for (const def of visualPlan.glassWalls) createGlassWallModule(scene, shadowGen, def);
+  for (const def of visualPlan.railings) createRailingModule(scene, shadowGen, def);
+  for (const def of visualPlan.servicePipes) createServicePipeModule(scene, shadowGen, def);
+  for (const def of visualPlan.pumpHeroes) createPumpHeroModule(scene, shadowGen, def);
+}
+
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const meta = getLevelMeta(5);
   const layout = buildLayout();
+  const visualPlan = buildVisualPlan(layout);
+  layout.layoutReport.visualKit = visualPlan.report;
 
   scene.clearColor = new BABYLON.Color4(...PROFILE.clearColor, 1);
 
@@ -623,7 +1271,8 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   hemi.groundColor = new BABYLON.Color3(0.16, 0.14, 0.12);
   const shadowGen = createShadowLight(scene);
 
-  buildBackdrops(scene, shadowGen, layout);
+  buildBackdrops(scene, shadowGen, layout, visualPlan);
+  buildVisualModules(scene, shadowGen, visualPlan);
 
   const surfaceVisuals = {};
   const allColliders = [];

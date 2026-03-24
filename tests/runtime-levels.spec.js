@@ -1688,7 +1688,7 @@ test('@progression runtime: title click plus start for level 6 launches the acti
   });
 });
 
-test('@level5 runtime: Aquarium Drift launches the full structural graybox macro route on the active 2.5D path', async ({ page }) => {
+test('@level5 runtime: Aquarium Drift installs the full visual kit across the active 2.5D route', async ({ page }) => {
   test.setTimeout(120_000);
   expect(LEVEL5_CASE).toBeTruthy();
   await gotoDebugLevel(page, 5);
@@ -1729,6 +1729,28 @@ test('@level5 runtime: Aquarium Drift launches the full structural graybox macro
   expect(report.layout.platformCount).toBeGreaterThan(55);
   expect(report.layout.distinctTopLevels.length).toBeGreaterThan(18);
   expect(report.layout.routeWidth).toBeGreaterThan(250);
+  expect(report.layout.visualKit).not.toBeNull();
+  expect(report.layout.visualKit.moduleCounts).toEqual({
+    glassWalls: 5,
+    railings: 4,
+    servicePipes: 4,
+    tankBackgrounds: 3,
+    pumpHeroes: 2,
+  });
+  expect(report.layout.visualKit.modules).toHaveLength(18);
+  expect(report.layout.visualKit.encounterCoverage).toHaveLength(16);
+  for (const entry of report.layout.visualKit.encounterCoverage) {
+    expect(entry.visualTags.length).toBeGreaterThanOrEqual(2);
+    expect(entry.moduleIds.length).toBeGreaterThanOrEqual(1);
+  }
+  expect(report.layout.visualKit.encounterCoverage.find((entry) => entry.id === 'L5-E10')).toMatchObject({
+    routeRead: 'service',
+    visualProfile: 'pump_core',
+  });
+  expect(report.layout.visualKit.encounterCoverage.find((entry) => entry.id === 'L5-E14')).toMatchObject({
+    routeRead: 'public',
+    visualProfile: 'crown_tank',
+  });
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);

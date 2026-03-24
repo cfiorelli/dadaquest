@@ -1095,10 +1095,10 @@ test('capture scene screenshots', async ({ page }) => {
   }
 });
 
-test('capture Level 5 Aquarium Drift structural graybox proof screenshots', async ({ page }) => {
+test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ page }) => {
   test.setTimeout(240_000);
   await mkdir('docs/screenshots', { recursive: true });
-  await mkdir('docs/proof/level5-aquarium-graybox', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-visual-kit', { recursive: true });
   await page.setViewportSize({ width: 1440, height: 900 });
 
   async function captureProof(path) {
@@ -1106,7 +1106,7 @@ test('capture Level 5 Aquarium Drift structural graybox proof screenshots', asyn
       path,
       clip: { x: 0, y: 0, width: 1440, height: 900 },
     });
-    await copyFile(path, `docs/proof/level5-aquarium-graybox/${path.split('/').pop()}`);
+    await copyFile(path, `docs/proof/level5-aquarium-visual-kit/${path.split('/').pop()}`);
   }
 
   await gotoDebugLevel(page, 5);
@@ -1132,14 +1132,21 @@ test('capture Level 5 Aquarium Drift structural graybox proof screenshots', asyn
   expect(report.layout?.encounterCount).toBe(14);
   expect(report.layout?.optionalBranchCount).toBe(2);
   expect(report.layout?.checkpointCount).toBe(4);
+  expect(report.layout?.visualKit?.moduleCounts).toEqual({
+    glassWalls: 5,
+    railings: 4,
+    servicePipes: 4,
+    tankBackgrounds: 3,
+    pumpHeroes: 2,
+  });
 
-  await captureProof('docs/screenshots/level5-aquarium-graybox-start.png');
+  await captureProof('docs/screenshots/level5-aquarium-visual-start.png');
 
   for (const [key, path] of [
-    ['act2', 'docs/screenshots/level5-aquarium-graybox-act2.png'],
-    ['act3', 'docs/screenshots/level5-aquarium-graybox-act3.png'],
-    ['act4', 'docs/screenshots/level5-aquarium-graybox-act4.png'],
-    ['act5', 'docs/screenshots/level5-aquarium-graybox-act5.png'],
+    ['act2', 'docs/screenshots/level5-aquarium-visual-act2.png'],
+    ['act3', 'docs/screenshots/level5-aquarium-visual-act3.png'],
+    ['act4', 'docs/screenshots/level5-aquarium-visual-act4.png'],
+    ['act5', 'docs/screenshots/level5-aquarium-visual-act5.png'],
   ]) {
     const pose = report.layout?.proofPoses?.[key];
     expect(pose).toBeTruthy();
