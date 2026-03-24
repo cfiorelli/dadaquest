@@ -395,6 +395,7 @@ function topYToCenterY(topY, height) {
 }
 
 function deckDef(name, xMin, xMax, topY, {
+  isCrumbleTile = false,
   depth = 4.6,
   height = PLATFORM_H,
   kind = 'public',
@@ -416,6 +417,7 @@ function deckDef(name, xMin, xMax, topY, {
     kind,
     encounterId,
     branchId,
+    isCrumbleTile,
   };
 }
 
@@ -534,8 +536,8 @@ function buildLayout() {
   addStairRun(surfaces, 'e12_crown_rise', 200.0, 204.0, 4.25, 4.65, { depth: 2.0, kind: 'glass', encounterId: 'L5-E12' });
   add(deckDef('e12_crown_high', 204.0, 208.0, 4.65, { depth: 1.9, kind: 'glass', encounterId: 'L5-E12' }));
 
-  add(deckDef('e13_glass_line_a', 208.0, 214.0, 4.75, { depth: 2.0, kind: 'glass', encounterId: 'L5-E13' }));
-  add(deckDef('e13_glass_line_b', 216.0, 220.0, 5.05, { depth: 2.0, kind: 'glass', encounterId: 'L5-E13' }));
+  add(deckDef('e13_glass_line_a', 208.0, 214.0, 4.75, { depth: 2.0, kind: 'glass', encounterId: 'L5-E13', isCrumbleTile: true }));
+  add(deckDef('e13_glass_line_b', 216.0, 220.0, 5.05, { depth: 2.0, kind: 'glass', encounterId: 'L5-E13', isCrumbleTile: true }));
   add(deckDef('e13_service_under', 210.0, 222.0, 4.05, { depth: 3.0, kind: 'service', encounterId: 'L5-E13' }));
   addStairRun(surfaces, 'ob2_climb', 212.0, 216.0, 4.75, 5.55, { depth: 1.8, kind: 'service', branchId: 'L5-OB2' });
   add(deckDef('ob2_skylight_a', 216.0, 222.0, 5.55, { depth: 1.8, kind: 'service', branchId: 'L5-OB2' }));
@@ -1044,6 +1046,107 @@ function buildSprayBarPlan(layout) {
       startAngleRad: Math.PI * 0.72,  // ~130° offset — bars are never in phase
     },
   ];
+}
+
+function buildGlassCrumblePlan() {
+  const tileH = PLATFORM_H;
+  const tiles = [];
+
+  // e13_glass_line_a: x=208-214, topY=4.75 — 3 tiles × 2 units wide
+  const lineATopY = 4.75;
+  for (let i = 0; i < 3; i++) {
+    const xMin = 208.0 + i * 2.0;
+    const xMax = xMin + 2.0;
+    tiles.push({
+      name: `e13_glass_a_tile${i + 1}`,
+      encounterId: 'L5-E13',
+      x: Number(((xMin + xMax) / 2).toFixed(3)),
+      y: topYToCenterY(lineATopY, tileH),
+      w: 2.0, h: tileH, d: 2.0,
+    });
+  }
+
+  // e13_glass_line_b: x=216-220, topY=5.05 — 2 tiles × 2 units wide
+  const lineBTopY = 5.05;
+  for (let i = 0; i < 2; i++) {
+    const xMin = 216.0 + i * 2.0;
+    const xMax = xMin + 2.0;
+    tiles.push({
+      name: `e13_glass_b_tile${i + 1}`,
+      encounterId: 'L5-E13',
+      x: Number(((xMin + xMax) / 2).toFixed(3)),
+      y: topYToCenterY(lineBTopY, tileH),
+      w: 2.0, h: tileH, d: 2.0,
+    });
+  }
+
+  return tiles;
+}
+
+function createGlassCrumbleTile(scene, tile, shadowGen) {
+  const metadata = {
+    encounterId: tile.encounterId,
+    visualRole: 'crumble_glass',
+  };
+
+  const root = new BABYLON.TransformNode(`${tile.name}_root`, scene);
+  root.position.set(tile.x, tile.y, LANE_Z);
+
+  const edgeH = Math.min(0.10, tile.h * 0.16);
+  const slabH = tile.h - edgeH;
+
+  const slab = BABYLON.MeshBuilder.CreateBox(`${tile.name}_slab`, {
+    width: tile.w, height: slabH, depth: tile.d,
+  }, scene);
+  slab.position.y = edgeH / 2;
+  slab.parent = root;
+  slab.material = createOpaqueMaterial(scene, `${tile.name}_slab_mat`, PROFILE.glassGround);
+  slab.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(slab);
+  applyWorldOpaqueRenderPolicy(slab);
+  markDecor(slab, metadata);
+
+  const edge = BABYLON.MeshBuilder.CreateBox(`${tile.name}_edge`, {
+    width: tile.w + 0.06, height: edgeH, depth: tile.d + 0.06,
+  }, scene);
+  edge.position.y = -(slabH / 2);
+  edge.parent = root;
+  edge.material = createOpaqueMaterial(scene, `${tile.name}_edge_mat`, PROFILE.glassEdge);
+  edge.receiveShadows = true;
+  if (shadowGen) shadowGen.addShadowCaster(edge);
+  applyWorldOpaqueRenderPolicy(edge);
+  markDecor(edge, metadata);
+
+  // Crack overlay planes on top surface to signal fragility
+  const crackMat = new BABYLON.StandardMaterial(`${tile.name}_crack_mat`, scene);
+  crackMat.diffuseColor = makeColor(PROFILE.glassEdge);
+  crackMat.emissiveColor = makeColor(PROFILE.glassPanel).scale(0.28);
+  crackMat.specularColor = BABYLON.Color3.Black();
+  crackMat.alpha = 0.50;
+  for (let ci = 0; ci < 3; ci++) {
+    const crack = BABYLON.MeshBuilder.CreateBox(`${tile.name}_crack_${ci}`, {
+      width: tile.w * (0.26 + ci * 0.14),
+      height: 0.008,
+      depth: 0.07,
+    }, scene);
+    crack.rotation.y = ci * 0.58;
+    crack.position.y = (tile.h * 0.5) + 0.004;
+    crack.parent = root;
+    crack.material = crackMat;
+    applyWorldAlphaRenderPolicy(crack);
+    markDecor(crack, metadata);
+  }
+
+  // Invisible collider positioned absolutely (not parented to root, so it stays
+  // in place while the visual root shakes or falls)
+  const colliderMesh = BABYLON.MeshBuilder.CreateBox(`${tile.name}_col`, {
+    width: tile.w, height: tile.h, depth: tile.d,
+  }, scene);
+  colliderMesh.position.set(tile.x, tile.y, LANE_Z);
+  colliderMesh.visibility = 0;
+  colliderMesh.isPickable = false;
+
+  return { root, colliderMesh };
 }
 
 function buildBackdrops(scene, shadowGen, layout, visualPlan) {
@@ -2297,6 +2400,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const currentJets = buildCurrentJetPlan(layout);
   const electrifiedPuddles = buildElectrifiedPuddlePlan(layout);
   const sprayBars = buildSprayBarPlan(layout);
+  const glassCrumbleTiles = buildGlassCrumblePlan();
   layout.layoutReport.visualKit = visualPlan.report;
   layout.layoutReport.slickDeck = {
     safeComparison: slickDeck.safeComparison,
@@ -2498,6 +2602,8 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   addSupportColumns(scene, shadowGen, layout.ground);
 
   for (const def of layout.platforms) {
+    // Crumble tiles are built separately below — skip standard platform creation
+    if (def.isCrumbleTile) continue;
     const colors = getKindColors(def.kind);
     const visual = createCardboardPlatform(scene, `level5_${def.name}`, {
       x: def.x,
@@ -2515,6 +2621,19 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     allColliders.push(createPlatformCollider(scene, `level5_${def.name}`, def));
     addSupportColumns(scene, shadowGen, def);
   }
+
+  const crumbles = glassCrumbleTiles.map((tile) => {
+    const { root, colliderMesh } = createGlassCrumbleTile(scene, tile, shadowGen);
+    setRenderingGroup(root, 2);
+    allColliders.push(colliderMesh);
+    return {
+      name: tile.name,
+      root,
+      colliderMesh,
+      x: tile.x, y: tile.y, z: LANE_Z,
+      w: tile.w, h: tile.h,
+    };
+  });
 
   const sign = createWelcomeSign(scene, {
     name: 'level5_theme_sign',
@@ -2635,7 +2754,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     pickups: pickupDefs,
     coins: [],
     hazards,
-    crumbles: [],
+    crumbles,
     level,
     signs: [sign],
     respawnAnchors: [],
