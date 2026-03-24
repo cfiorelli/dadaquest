@@ -1860,14 +1860,6 @@ export function createUI(uiRoot, options = {}) {
           <div class="dada-buff-note">Locked. Beat Level 5 to unlock</div>
         </div>
       </div>
-      <div class="dada-buff-card" data-buff="wind">
-        <div class="dada-buff-icon cape">WND</div>
-        <div class="dada-buff-copy">
-          <div class="dada-buff-label">Glide <span class="dada-buff-state">LOCKED</span></div>
-          <div class="dada-buff-track"><div class="dada-buff-fill cape" style="width:0%"></div></div>
-          <div class="dada-buff-note">Locked. Beat Level 7 to unlock</div>
-        </div>
-      </div>
     </div>
   `;
   uiRoot.appendChild(buffEl);
@@ -1883,10 +1875,7 @@ export function createUI(uiRoot, options = {}) {
   const shieldFill = shieldCard.querySelector('.dada-buff-fill.shield');
   const shieldState = shieldCard.querySelector('.dada-buff-state');
   const shieldNote = shieldCard.querySelector('.dada-buff-note');
-  const windCard = buffEl.querySelector('[data-buff="wind"]');
-  const windFill = windCard.querySelector('.dada-buff-fill.cape');
-  const windState = windCard.querySelector('.dada-buff-state');
-  const windNote = windCard.querySelector('.dada-buff-note');
+
 
   const ctrlHintEl = document.createElement('div');
   ctrlHintEl.className = 'dada-ctrl-hint';
@@ -2531,23 +2520,8 @@ export function createUI(uiRoot, options = {}) {
       shieldState.textContent = 'READY';
       if (shieldNote) shieldNote.textContent = 'Auto-pops on the first hazard hit each run';
     },
-    updateWindGlideBuff({ unlocked = false, used = false, active = false, remainingMs = 0, totalMs = 3000 } = {}) {
-      if (!unlocked || (used && !active)) {
-        windCard.style.display = 'none';
-        return;
-      }
-      windCard.style.display = '';
-      buffEl.style.display = 'block';
-      const pct = totalMs > 0 ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
-      windCard.classList.toggle('active', !used || active);
-      windFill.style.width = active ? `${pct}%` : '100%';
-      if (active) {
-        windState.textContent = `${Math.max(1, Math.ceil(remainingMs / 1000))}s`;
-        if (windNote) windNote.textContent = 'Glide active';
-      } else {
-        windState.textContent = 'READY';
-        if (windNote) windNote.textContent = 'Press G while airborne to slow your fall';
-      }
+    updateWindGlideBuff(_opts = {}) {
+      // WND/Glide not yet active in Level 5+; kept as no-op until Level 7 contract ships.
     },
     updateFlourPuff({ visible = false, remainingMs = 0, totalMs = 6000 } = {}) {
       if (!visible) {
