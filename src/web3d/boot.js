@@ -2773,6 +2773,7 @@ export async function boot(options = {}) {
       }
       a.interactables.forEach(item => console.log(`[lane-audit]   ${item.type}[${item.id}] (${item.x.toFixed(2)},${item.y.toFixed(2)},${item.z?.toFixed(3) ?? 0})`));
     };
+    window.__DADA_DEBUG__.levelLayoutReport = () => world.level?.layoutReport ?? null;
   }
 
   function updateActorDebug() {

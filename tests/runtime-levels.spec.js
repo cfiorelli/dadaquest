@@ -16,6 +16,8 @@ const LEVEL5PLUS_CASES = [5, 6, 7, 8, 9].map((id) => ({
   meta: getLevelMeta(id),
   themeKey: getLevelThemeKey(id),
 }));
+const LEVEL5_CASE = LEVEL5PLUS_CASES.find(({ id }) => id === 5);
+const LEVEL5PLUS_PLACEHOLDER_CASES = LEVEL5PLUS_CASES.filter(({ id }) => id >= 6);
 const LEVEL5_DOORWAY_START_POSE = {
   x: 45.4,
   y: 0.42,
@@ -126,6 +128,21 @@ function expectLevel5PlusPlaceholderReport(report, { id, themeKey }) {
   expect(report.underConstructionLevelId).toBeNull();
   expect(report.playerPos).not.toBeNull();
   expect(report.goalGate?.minX ?? null).not.toBeNull();
+}
+
+async function getLevel5AquariumLayoutReport(page) {
+  return page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    runtimeFamily: window.__DADA_DEBUG__?.levelRuntimeFamily ?? null,
+    themeKey: window.__DADA_DEBUG__?.levelThemeKey ?? null,
+    musicLevelId: window.__DADA_DEBUG__?.musicLevelId ?? null,
+    floorTopY: window.__DADA_DEBUG__?.floorTopY ?? null,
+    playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+    goalGate: window.__DADA_DEBUG__?.goalGate ?? null,
+    layout: window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null,
+    laneAudit: window.__DADA_DEBUG__?.laneAudit?.() ?? null,
+  }));
 }
 
 async function getUnderConstructionReport(page) {
@@ -1671,7 +1688,86 @@ test('@progression runtime: title click plus start for level 6 launches the acti
   });
 });
 
-for (const { id, meta, themeKey } of LEVEL5PLUS_CASES) {
+test('@level5 runtime: Aquarium Drift launches the full structural graybox macro route on the active 2.5D path', async ({ page }) => {
+  test.setTimeout(120_000);
+  expect(LEVEL5_CASE).toBeTruthy();
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+
+  const report = await getLevel5AquariumLayoutReport(page);
+  expect(report.sceneKey).toBe('CribScene');
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.runtimeFamily).toBe('2.5d');
+  expect(report.themeKey).toBe('aquarium');
+  expect(report.musicLevelId).toBe(5);
+  expect(report.layout).not.toBeNull();
+  expect(report.layout.encounterCount).toBe(14);
+  expect(report.layout.optionalBranchCount).toBe(2);
+  expect(report.layout.checkpointCount).toBe(4);
+  expect(report.layout.eliteEncounterId).toBe('L5-E10');
+  expect(report.layout.finalMasteryEncounterId).toBe('L5-E14');
+  expect(report.layout.encounters.map((encounter) => encounter.id)).toEqual([
+    'L5-E1',
+    'L5-E2',
+    'L5-E3',
+    'L5-E4',
+    'L5-E5',
+    'L5-E6',
+    'L5-E7',
+    'L5-E8',
+    'L5-E9',
+    'L5-E10',
+    'L5-E11',
+    'L5-E12',
+    'L5-E13',
+    'L5-E14',
+  ]);
+  expect(report.layout.optionalBranches.map((branch) => branch.id)).toEqual(['L5-OB1', 'L5-OB2']);
+  expect(report.layout.checkpoints.map((checkpoint) => checkpoint.id)).toEqual(['CP1', 'CP2', 'CP3', 'CP4']);
+  expect(report.layout.platformCount).toBeGreaterThan(55);
+  expect(report.layout.distinctTopLevels.length).toBeGreaterThan(18);
+  expect(report.layout.routeWidth).toBeGreaterThan(250);
+  expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
+  expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(0);
+});
+
+test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples across all acts and optional branches', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+
+  const layout = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null);
+  expect(layout).not.toBeNull();
+  const samples = [
+    ...layout.encounters.map((encounter) => ({ id: encounter.id, sample: encounter.safeSample })),
+    ...layout.optionalBranches.map((branch) => ({ id: branch.id, sample: branch.safeSample })),
+    ...layout.checkpoints.map((checkpoint) => ({ id: checkpoint.id, sample: checkpoint.spawn })),
+  ];
+
+  for (const { id, sample } of samples) {
+    await page.evaluate((nextSample) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextSample.x, nextSample.y, nextSample.z ?? 0);
+    }, sample);
+    await page.waitForTimeout(220);
+    const state = await page.evaluate(() => ({
+      playerPos: window.__DADA_DEBUG__?.playerPos ?? null,
+      grounded: !!window.__DADA_DEBUG__?.playerController?.grounded,
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? null,
+    }));
+    expect(state.playerPos).not.toBeNull();
+    expect(state.grounded).toBe(true);
+    expect(state.lastRespawnReason).toBe('');
+    expect(state.playerPos.y).toBeGreaterThan(sample.y - 0.02);
+  }
+});
+
+for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {
   test(`@progression runtime: level ${id} launches the active 2.5D placeholder for ${meta.title}`, async ({ page }) => {
     test.setTimeout(120_000);
     await gotoDebugLevel(page, id);

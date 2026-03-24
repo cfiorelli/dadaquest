@@ -16,6 +16,7 @@ const LEVEL5PLUS_CASES = [5, 6, 7, 8, 9].map((id) => ({
   meta: getLevelMeta(id),
   themeKey: getLevelThemeKey(id),
 }));
+const LEVEL5PLUS_PLACEHOLDER_CASES = LEVEL5PLUS_CASES.filter(({ id }) => id >= 6);
 const LEVEL5_DOORWAY_START_POSE = {
   x: 45.4,
   y: 0.42,
@@ -1094,7 +1095,63 @@ test('capture scene screenshots', async ({ page }) => {
   }
 });
 
-test('capture Level 5 through 9 2.5D placeholder proof screenshots', async ({ page }) => {
+test('capture Level 5 Aquarium Drift structural graybox proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-graybox', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-aquarium-graybox/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1200);
+  await hideGameplayUi(page);
+
+  const report = await page.evaluate(() => ({
+    sceneKey: window.__DADA_DEBUG__?.sceneKey ?? null,
+    lastRuntimeError: window.__DADA_DEBUG__?.lastRuntimeError ?? null,
+    runtimeFamily: window.__DADA_DEBUG__?.levelRuntimeFamily ?? null,
+    themeKey: window.__DADA_DEBUG__?.levelThemeKey ?? null,
+    layout: window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null,
+  }));
+  expect(report.sceneKey).toBe('CribScene');
+  expect(report.lastRuntimeError).toBeNull();
+  expect(report.runtimeFamily).toBe('2.5d');
+  expect(report.themeKey).toBe('aquarium');
+  expect(report.layout?.encounterCount).toBe(14);
+  expect(report.layout?.optionalBranchCount).toBe(2);
+  expect(report.layout?.checkpointCount).toBe(4);
+
+  await captureProof('docs/screenshots/level5-aquarium-graybox-start.png');
+
+  for (const [key, path] of [
+    ['act2', 'docs/screenshots/level5-aquarium-graybox-act2.png'],
+    ['act3', 'docs/screenshots/level5-aquarium-graybox-act3.png'],
+    ['act4', 'docs/screenshots/level5-aquarium-graybox-act4.png'],
+    ['act5', 'docs/screenshots/level5-aquarium-graybox-act5.png'],
+  ]) {
+    const pose = report.layout?.proofPoses?.[key];
+    expect(pose).toBeTruthy();
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+    }, pose);
+    await page.waitForTimeout(350);
+    await captureProof(path);
+  }
+});
+
+test('capture Level 6 through 9 2.5D placeholder proof screenshots', async ({ page }) => {
   test.setTimeout(240_000);
   await mkdir('docs/screenshots', { recursive: true });
   await mkdir('docs/proof/level5plus-2d-placeholders', { recursive: true });
@@ -1117,7 +1174,7 @@ test('capture Level 5 through 9 2.5D placeholder proof screenshots', async ({ pa
   await expect(page.locator('#titlePreviewTitle')).toHaveText('Aquarium Drift');
   await captureProof('docs/screenshots/level5plus-2d-title-menu.png');
 
-  for (const { id, meta, themeKey } of LEVEL5PLUS_CASES) {
+  for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {
     await gotoDebugLevel(page, id);
     await unlockThroughLevel(page, Math.max(4, id - 1));
     await page.evaluate((targetLevelId) => {

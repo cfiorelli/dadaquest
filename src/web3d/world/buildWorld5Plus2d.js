@@ -6,6 +6,7 @@ import {
   createWelcomeSign,
   setRenderingGroup,
 } from './buildWorld.js';
+import { buildWorld5AquariumDrift } from './buildWorld5AquariumDrift.js';
 import { getLevelMeta, getLevelThemeKey } from './levelMeta.js';
 
 const LANE_Z = 0;
@@ -249,6 +250,10 @@ function createGroundVisual(scene, layout, profile, shadowGen) {
 }
 
 export function buildWorld5Plus2d(scene, levelId, { animateGoal = true } = {}) {
+  if (Number(levelId) === 5) {
+    return buildWorld5AquariumDrift(scene, { animateGoal });
+  }
+
   const meta = getLevelMeta(levelId);
   const themeKey = getLevelThemeKey(levelId);
   const profile = THEME_PROFILES[themeKey];
