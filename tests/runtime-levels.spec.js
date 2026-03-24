@@ -1688,7 +1688,7 @@ test('@progression runtime: title click plus start for level 6 launches the acti
   });
 });
 
-test('@level5 runtime: Aquarium Drift visual kit and slick-deck teaching spaces are authored on the active 2.5D route', async ({ page }) => {
+test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet lanes are authored on the active 2.5D route', async ({ page }) => {
   test.setTimeout(120_000);
   expect(LEVEL5_CASE).toBeTruthy();
   await gotoDebugLevel(page, 5);
@@ -1767,10 +1767,27 @@ test('@level5 runtime: Aquarium Drift visual kit and slick-deck teaching spaces 
     'upper_gap',
     'narrow_merge',
   ]);
+  expect(report.layout.currentJets).not.toBeNull();
+  expect(report.layout.currentJets.laneCount).toBe(4);
+  expect(report.layout.currentJets.bridgeCrossingCount).toBe(2);
+  expect(report.layout.currentJets.checkpointLeadInLaneId).toBe('L5-JET-02');
+  expect(report.layout.currentJets.lanes.map((lane) => lane.id)).toEqual([
+    'L5-JET-01',
+    'L5-JET-02',
+    'L5-JET-03',
+    'L5-JET-04',
+  ]);
+  expect(report.layout.currentJets.lanes.map((lane) => lane.laneType)).toEqual([
+    'narrow_bridge',
+    'checkpoint_leadin',
+    'narrow_bridge',
+    'service_lane',
+  ]);
+  expect(report.layout.currentJets.lanes.every((lane) => lane.directionX === -1 && lane.directionLabel === 'west')).toBe(true);
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
-  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(3);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(7);
 });
 
 test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples across all acts and optional branches', async ({ page }) => {
@@ -1910,6 +1927,113 @@ test('@level5 runtime: Aquarium Drift slick deck changes traction in the Act 1 t
   expect(slickMinDecel).toBeLessThan(0.2);
   expect(slick.lastRespawnReason).toBe('');
   expect(slick.glideDistance).toBeGreaterThan(safe.glideDistance + 0.1);
+});
+
+test('@level5 runtime: Aquarium Drift current jets in L5-E3 and L5-E4 expose readable push windows with recovery lines', async ({ page }) => {
+  test.setTimeout(120_000);
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await startDebugLevel(page, 5);
+  await page.waitForTimeout(900);
+  await focusGameplay(page);
+
+  const currentJets = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.()?.currentJets ?? null);
+  expect(currentJets?.laneCount).toBe(4);
+
+  async function settleAt(pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+    }, pose);
+    await page.waitForFunction(({ x }) => {
+      const dbg = window.__DADA_DEBUG__;
+      return !!dbg?.playerController?.grounded
+        && Math.abs(dbg?.playerVelocity?.x ?? 0) < 0.02
+        && Math.abs((dbg?.playerPos?.x ?? 0) - x) < 0.05;
+    }, pose);
+    await page.waitForTimeout(120);
+  }
+
+  async function waitForJetState(laneId, active, { maxPhaseMs = null, minPhaseMs = null } = {}) {
+    await page.waitForFunction(({ targetLaneId, targetActive, targetMaxPhaseMs, targetMinPhaseMs }) => {
+      const laneState = (window.__DADA_DEBUG__?.jetHazards ?? []).find((entry) => entry.id === targetLaneId);
+      if (!laneState || laneState.active !== targetActive) return false;
+      if (typeof targetMinPhaseMs === 'number' && laneState.phaseMs < targetMinPhaseMs) return false;
+      if (typeof targetMaxPhaseMs === 'number' && laneState.phaseMs > targetMaxPhaseMs) return false;
+      return true;
+    }, {
+      targetLaneId: laneId,
+      targetActive: active,
+      targetMaxPhaseMs: maxPhaseMs,
+      targetMinPhaseMs: minPhaseMs,
+    });
+  }
+
+  async function sampleJetDrift(laneId) {
+    const lane = currentJets.lanes.find((entry) => entry.id === laneId);
+    expect(lane).toBeTruthy();
+    const pose = {
+      x: Number(((lane.xMin + lane.xMax) * 0.5).toFixed(3)),
+      y: Number((lane.topY + 0.405).toFixed(3)),
+      z: 0,
+    };
+
+    await waitForJetState(laneId, false, {
+      minPhaseMs: lane.activeMs,
+      maxPhaseMs: lane.activeMs + 140,
+    });
+    await settleAt(pose);
+    await page.keyboard.down('ArrowRight');
+    const safeStart = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0);
+    await page.waitForTimeout(650);
+    const safeEnd = await page.evaluate(() => window.__DADA_DEBUG__?.playerPos?.x ?? 0);
+    await page.keyboard.up('ArrowRight');
+
+    await waitForJetState(laneId, false, {
+      minPhaseMs: lane.activeMs,
+      maxPhaseMs: lane.activeMs + 140,
+    });
+    await settleAt(pose);
+    await waitForJetState(laneId, true, { maxPhaseMs: 140 });
+    await page.keyboard.down('ArrowRight');
+    const activeStart = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      activeJetIds: window.__DADA_DEBUG__?.activeCurrentJetHazardIds ?? [],
+    }));
+    await page.waitForTimeout(650);
+    const activeEnd = await page.evaluate(() => ({
+      x: window.__DADA_DEBUG__?.playerPos?.x ?? 0,
+      activeJetIds: window.__DADA_DEBUG__?.activeCurrentJetHazardIds ?? [],
+      externalForceX: window.__DADA_DEBUG__?.externalForceX ?? 0,
+      jetHazards: window.__DADA_DEBUG__?.jetHazards ?? [],
+      lastRespawnReason: window.__DADA_DEBUG__?.lastRespawnReason ?? '',
+    }));
+    await page.keyboard.up('ArrowRight');
+
+    return {
+      laneId,
+      safeDelta: Number((safeEnd - safeStart).toFixed(3)),
+      activeDelta: Number((activeEnd.x - activeStart.x).toFixed(3)),
+      activeJetIds: activeEnd.activeJetIds,
+      externalForceX: activeEnd.externalForceX,
+      jetHazards: activeEnd.jetHazards,
+      lastRespawnReason: activeEnd.lastRespawnReason,
+    };
+  }
+
+  const checkpointLeadIn = await sampleJetDrift('L5-JET-02');
+  const galleryLane = await sampleJetDrift('L5-JET-04');
+  expect(checkpointLeadIn.activeJetIds).toContain('L5-JET-02');
+  expect(checkpointLeadIn.externalForceX).toBeLessThan(-50);
+  expect(checkpointLeadIn.jetHazards.find((lane) => lane.id === 'L5-JET-02')?.active).toBe(true);
+  expect(checkpointLeadIn.lastRespawnReason).toBe('');
+
+  expect(galleryLane.safeDelta).toBeGreaterThan(0.65);
+  expect(galleryLane.activeDelta).toBeLessThan(galleryLane.safeDelta - 0.35);
+  expect(galleryLane.activeDelta).toBeLessThan(0.25);
+  expect(galleryLane.activeJetIds).toContain('L5-JET-04');
+  expect(galleryLane.externalForceX).toBeLessThan(-40);
+  expect(galleryLane.jetHazards.find((lane) => lane.id === 'L5-JET-04')?.active).toBe(true);
+  expect(galleryLane.lastRespawnReason).toBe('');
 });
 
 for (const { id, meta, themeKey } of LEVEL5PLUS_PLACEHOLDER_CASES) {

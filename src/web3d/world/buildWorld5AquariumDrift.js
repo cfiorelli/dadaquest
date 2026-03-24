@@ -478,8 +478,9 @@ function buildLayout() {
   add(deckDef('cp1_pocket', 36.6, 40.4, 1.85, { depth: 4.8, kind: 'checkpoint', encounterId: 'L5-E3' }));
 
   addStairRun(surfaces, 'e4_gallery_entry', 40.4, 42.8, 1.85, 2.15, { depth: 3.6, encounterId: 'L5-E4' });
-  add(deckDef('e4_public_gallery', 42.8, 50.0, 2.15, { depth: 4.8, encounterId: 'L5-E4' }));
-  add(deckDef('e4_service_drop', 49.5, 56.5, 1.35, { depth: 3.2, kind: 'service', encounterId: 'L5-E4' }));
+  add(deckDef('e4_gallery_overlook', 42.8, 46.0, 2.15, { depth: 4.8, encounterId: 'L5-E4' }));
+  add(deckDef('e4_panorama_bridge', 46.0, 49.8, 2.15, { depth: 1.8, kind: 'glass', encounterId: 'L5-E4' }));
+  add(deckDef('e4_service_drop', 46.4, 56.5, 1.35, { depth: 3.2, kind: 'service', encounterId: 'L5-E4' }));
   addStairRun(surfaces, 'e4_exit_rise', 56.5, 60.0, 1.35, 1.55, { depth: 3.2, kind: 'service', encounterId: 'L5-E4' });
   add(deckDef('e5_crosswalk', 60.0, 67.0, 1.55, { depth: 2.2, kind: 'public', encounterId: 'L5-E5' }));
   add(deckDef('e5_side_shelf', 62.0, 70.5, 1.25, { depth: 3.0, kind: 'service', encounterId: 'L5-E5' }));
@@ -776,6 +777,93 @@ function buildSlickDeckPlan(layout) {
   return {
     safeComparison,
     patches,
+  };
+}
+
+function buildCurrentJetPlan(layout) {
+  const e3Bridge = getLayoutSurface(layout, 'e3_bridge_high');
+  const e3Exit = getLayoutSurface(layout, 'e3_bridge_exit');
+  const e4Bridge = getLayoutSurface(layout, 'e4_panorama_bridge');
+  const e4Service = getLayoutSurface(layout, 'e4_service_drop');
+  const lanes = [
+    {
+      id: 'L5-JET-01',
+      encounterId: 'L5-E3',
+      xMin: 19.1,
+      xMax: 22.8,
+      topY: e3Bridge.topY,
+      y: Number((e3Bridge.topY + 0.405).toFixed(3)),
+      depth: e3Bridge.d,
+      directionX: -1,
+      directionLabel: 'west',
+      forceX: -58.0,
+      activeMs: 1200,
+      safeMs: 1000,
+      phaseOffsetMs: 0,
+      laneType: 'narrow_bridge',
+      recoveryLine: 'e3_maintenance_line',
+      tell: 'floor_arrows_nozzle_lights',
+    },
+    {
+      id: 'L5-JET-02',
+      encounterId: 'L5-E3',
+      xMin: 28.0,
+      xMax: 33.4,
+      topY: e3Exit.topY,
+      y: Number((e3Exit.topY + 0.405).toFixed(3)),
+      depth: e3Exit.d,
+      directionX: -1,
+      directionLabel: 'west',
+      forceX: -62.0,
+      activeMs: 1200,
+      safeMs: 1000,
+      phaseOffsetMs: 680,
+      laneType: 'checkpoint_leadin',
+      recoveryLine: 'e3_bridge_exit',
+      checkpointLeadIn: true,
+      tell: 'floor_arrows_nozzle_lights',
+    },
+    {
+      id: 'L5-JET-03',
+      encounterId: 'L5-E4',
+      xMin: 46.2,
+      xMax: 49.2,
+      topY: e4Bridge.topY,
+      y: Number((e4Bridge.topY + 0.405).toFixed(3)),
+      depth: e4Bridge.d,
+      directionX: -1,
+      directionLabel: 'west',
+      forceX: -56.0,
+      activeMs: 1200,
+      safeMs: 1000,
+      phaseOffsetMs: 340,
+      laneType: 'narrow_bridge',
+      recoveryLine: 'e4_service_drop',
+      tell: 'floor_arrows_nozzle_lights',
+    },
+    {
+      id: 'L5-JET-04',
+      encounterId: 'L5-E4',
+      xMin: 51.0,
+      xMax: 55.6,
+      topY: e4Service.topY,
+      y: Number((e4Service.topY + 0.405).toFixed(3)),
+      depth: e4Service.d,
+      directionX: -1,
+      directionLabel: 'west',
+      forceX: -52.0,
+      activeMs: 1200,
+      safeMs: 1000,
+      phaseOffsetMs: 1080,
+      laneType: 'service_lane',
+      recoveryLine: 'e4_service_drop',
+      tell: 'floor_arrows_nozzle_lights',
+    },
+  ];
+  return {
+    bridgeCrossingCount: lanes.filter((lane) => lane.laneType === 'narrow_bridge').length,
+    checkpointLeadInLaneId: lanes.find((lane) => lane.checkpointLeadIn)?.id ?? null,
+    lanes,
   };
 }
 
@@ -1378,11 +1466,111 @@ function createSlickPatchVisual(scene, def) {
   };
 }
 
+function createCurrentJetVisual(scene, def) {
+  const metadata = {
+    encounterId: def.encounterId,
+    hazardId: def.id,
+    hazardType: 'currentJet',
+  };
+  const root = createDecorRoot(scene, `${def.id}_root`, {
+    x: (def.xMin + def.xMax) * 0.5,
+    y: def.topY + 0.04,
+    z: LANE_Z,
+    metadata,
+  });
+  const width = Number((def.xMax - def.xMin).toFixed(3));
+  const mats = [];
+  const floorStrip = BABYLON.MeshBuilder.CreatePlane(`${def.id}_floor_strip`, {
+    width,
+    height: def.depth * 0.92,
+  }, scene);
+  floorStrip.parent = root;
+  floorStrip.rotation.x = Math.PI * 0.5;
+  floorStrip.position.set(0, 0, 0);
+  floorStrip.material = createAlphaMaterial(scene, `${def.id}_floor_strip_mat`, PROFILE.tankGlow, 0.28);
+  applyWorldAlphaRenderPolicy(floorStrip);
+  markDecor(floorStrip, metadata);
+  mats.push(floorStrip.material);
+
+  const nozzleDirection = def.directionX < 0 ? 1 : -1;
+  for (const side of [-1, 1]) {
+    const nozzle = createDecorBox(scene, `${def.id}_nozzle_${side < 0 ? 'north' : 'south'}`, {
+      x: width * 0.5 * nozzleDirection,
+      y: 0.22,
+      z: side * (def.depth * 0.36),
+      w: 0.36,
+      h: 0.42,
+      d: 0.28,
+      rgb: PROFILE.pipeDark,
+      parent: root,
+      metadata,
+    });
+    nozzle.material = createOpaqueMaterial(scene, `${def.id}_nozzle_${side < 0 ? 'north' : 'south'}_mat`, PROFILE.pipeDark);
+    applyWorldOpaqueRenderPolicy(nozzle);
+    mats.push(nozzle.material);
+  }
+
+  const bubblePlanes = [];
+  for (const offset of [-0.28, 0, 0.28]) {
+    const bubble = BABYLON.MeshBuilder.CreatePlane(`${def.id}_bubble_${offset}`, {
+      width: Math.max(0.8, width * 0.24),
+      height: def.depth * 0.74,
+    }, scene);
+    bubble.parent = root;
+    bubble.rotation.y = def.directionX < 0 ? Math.PI : 0;
+    bubble.position.set(offset * width, 0.62, 0);
+    bubble.material = createAlphaMaterial(scene, `${def.id}_bubble_mat_${offset}`, PROFILE.glassPanel, 0.0);
+    applyWorldAlphaRenderPolicy(bubble);
+    markDecor(bubble, metadata);
+    bubblePlanes.push(bubble);
+    mats.push(bubble.material);
+  }
+
+  const arrowPlanes = [];
+  for (const offset of [-0.32, 0, 0.32]) {
+    const arrow = BABYLON.MeshBuilder.CreatePlane(`${def.id}_arrow_${offset}`, {
+      width: Math.max(0.54, width * 0.16),
+      height: def.depth * 0.42,
+    }, scene);
+    arrow.parent = root;
+    arrow.rotation.x = Math.PI * 0.5;
+    arrow.position.set(offset * width, 0.018, 0);
+    arrow.material = createAlphaMaterial(scene, `${def.id}_arrow_mat_${offset}`, PROFILE.warning, 0.36);
+    applyWorldAlphaRenderPolicy(arrow);
+    markDecor(arrow, metadata);
+    arrowPlanes.push(arrow);
+    mats.push(arrow.material);
+  }
+
+  let active = false;
+  const setActive = (nextActive = false) => {
+    if (active === nextActive) return;
+    active = nextActive;
+    for (const bubble of bubblePlanes) {
+      bubble.material.alpha = nextActive ? 0.42 : 0.0;
+      bubble.material.emissiveColor = makeColor(nextActive ? PROFILE.tankGlow : PROFILE.glassPanel).scale(nextActive ? 0.46 : 0.16);
+    }
+    for (const arrow of arrowPlanes) {
+      arrow.material.alpha = nextActive ? 0.7 : 0.36;
+      arrow.material.emissiveColor = makeColor(nextActive ? PROFILE.warning : PROFILE.railMetal).scale(nextActive ? 0.56 : 0.18);
+    }
+    floorStrip.material.alpha = nextActive ? 0.42 : 0.28;
+    floorStrip.material.emissiveColor = makeColor(nextActive ? PROFILE.tankGlow : PROFILE.glassPanel).scale(nextActive ? 0.4 : 0.2);
+  };
+
+  return {
+    root,
+    setActive,
+    mats,
+  };
+}
+
 export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   const meta = getLevelMeta(5);
   const layout = buildLayout();
   const visualPlan = buildVisualPlan(layout);
   const slickDeck = buildSlickDeckPlan(layout);
+  const currentJets = buildCurrentJetPlan(layout);
   layout.layoutReport.visualKit = visualPlan.report;
   layout.layoutReport.slickDeck = {
     safeComparison: slickDeck.safeComparison,
@@ -1399,6 +1587,26 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       decelMultiplier: patch.decelMultiplier,
     })),
   };
+  layout.layoutReport.currentJets = {
+    laneCount: currentJets.lanes.length,
+    bridgeCrossingCount: currentJets.bridgeCrossingCount,
+    checkpointLeadInLaneId: currentJets.checkpointLeadInLaneId,
+    lanes: currentJets.lanes.map((lane) => ({
+      id: lane.id,
+      encounterId: lane.encounterId,
+      xMin: lane.xMin,
+      xMax: lane.xMax,
+      topY: lane.topY,
+      directionX: lane.directionX,
+      directionLabel: lane.directionLabel,
+      activeMs: lane.activeMs,
+      safeMs: lane.safeMs,
+      laneType: lane.laneType,
+      recoveryLine: lane.recoveryLine,
+      checkpointLeadIn: !!lane.checkpointLeadIn,
+      tell: lane.tell,
+    })),
+  };
 
   scene.clearColor = new BABYLON.Color4(...PROFILE.clearColor, 1);
 
@@ -1410,7 +1618,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   buildBackdrops(scene, shadowGen, layout, visualPlan);
   buildVisualModules(scene, shadowGen, visualPlan);
 
-  const hazards = slickDeck.patches.map((patch) => {
+  const slickHazards = slickDeck.patches.map((patch) => {
     const visual = createSlickPatchVisual(scene, patch);
     return {
       id: patch.id,
@@ -1425,6 +1633,30 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       mesh: visual.mesh,
     };
   });
+  const currentJetHazards = currentJets.lanes.map((lane) => {
+    const visual = createCurrentJetVisual(scene, lane);
+    return {
+      id: lane.id,
+      type: 'currentJet',
+      encounterId: lane.encounterId,
+      minX: lane.xMin,
+      maxX: lane.xMax,
+      minY: lane.y - 0.34,
+      maxY: lane.y + 0.34,
+      forceX: lane.forceX,
+      directionX: lane.directionX,
+      directionLabel: lane.directionLabel,
+      activeMs: lane.activeMs,
+      safeMs: lane.safeMs,
+      phaseOffsetMs: lane.phaseOffsetMs,
+      laneType: lane.laneType,
+      recoveryLine: lane.recoveryLine,
+      checkpointLeadIn: !!lane.checkpointLeadIn,
+      setActive: visual.setActive,
+      visualRoot: visual.root,
+    };
+  });
+  const hazards = [...slickHazards, ...currentJetHazards];
 
   const surfaceVisuals = {};
   const allColliders = [];

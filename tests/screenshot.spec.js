@@ -1140,6 +1140,7 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
     pumpHeroes: 2,
   });
   expect(report.layout?.slickDeck?.patchCount).toBe(3);
+  expect(report.layout?.currentJets?.laneCount).toBe(4);
 
   await captureProof('docs/screenshots/level5-aquarium-visual-start.png');
 
@@ -1196,6 +1197,56 @@ test('capture Level 5 Aquarium Drift slick-deck proof screenshots', async ({ pag
   }, { x: 1.0, y: 1.755, z: 0 });
   await page.waitForTimeout(350);
   await captureProof('docs/screenshots/level5-aquarium-slick-e2.png');
+});
+
+test('capture Level 5 Aquarium Drift current-jet proof screenshots', async ({ page }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-current-jets', { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  async function captureProof(path) {
+    await page.screenshot({
+      path,
+      clip: { x: 0, y: 0, width: 1440, height: 900 },
+    });
+    await copyFile(path, `docs/proof/level5-aquarium-current-jets/${path.split('/').pop()}`);
+  }
+
+  await gotoDebugLevel(page, 5);
+  await unlockThroughLevel(page, 4);
+  await page.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await page.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await page.waitForTimeout(1200);
+  await hideGameplayUi(page);
+
+  const layout = await page.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null);
+  expect(layout?.currentJets?.laneCount).toBe(4);
+
+  async function captureLane(path, laneId, pose) {
+    await page.evaluate((nextPose) => {
+      window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+    }, pose);
+    await page.waitForFunction((targetLaneId) => {
+      const laneState = (window.__DADA_DEBUG__?.jetHazards ?? []).find((entry) => entry.id === targetLaneId);
+      return !!laneState && laneState.active === true;
+    }, laneId);
+    await page.waitForTimeout(200);
+    await captureProof(path);
+  }
+
+  await captureLane('docs/screenshots/level5-aquarium-jets-e3.png', 'L5-JET-01', {
+    x: 20.6,
+    y: Number((1.75 + 0.405).toFixed(3)),
+    z: 0,
+  });
+  await captureLane('docs/screenshots/level5-aquarium-jets-e4.png', 'L5-JET-03', {
+    x: 47.6,
+    y: Number((2.15 + 0.405).toFixed(3)),
+    z: 0,
+  });
 });
 
 test('capture Level 6 through 9 2.5D placeholder proof screenshots', async ({ page }) => {

@@ -121,6 +121,8 @@ export class PlayerController {
     // Gameplay modifiers (set by world/hazards)
     this.surfaceAccelMultiplier = 1;
     this.surfaceDecelMultiplier = 1;
+    this.externalForceX = 0;
+    this.externalForceZ = 0;
     this.jumpVelocityMultiplier = 1;
     this.maxAirJumps = 0;
     this.airJumpsUsed = 0;
@@ -181,6 +183,8 @@ export class PlayerController {
   setMovementModifiers({
     surfaceAccelMultiplier = 1,
     surfaceDecelMultiplier = 1,
+    externalForceX = 0,
+    externalForceZ = 0,
     jumpVelocityMultiplier = 1,
     maxAirJumps = 0,
     turnResponsiveness = 1,
@@ -193,6 +197,8 @@ export class PlayerController {
   } = {}) {
     this.surfaceAccelMultiplier = surfaceAccelMultiplier;
     this.surfaceDecelMultiplier = surfaceDecelMultiplier;
+    this.externalForceX = Number.isFinite(externalForceX) ? externalForceX : 0;
+    this.externalForceZ = Number.isFinite(externalForceZ) ? externalForceZ : 0;
     this.jumpVelocityMultiplier = jumpVelocityMultiplier;
     this.maxAirJumps = Math.max(0, maxAirJumps | 0);
     this.turnResponsiveness = clamp(turnResponsiveness, 0.2, 1);
@@ -538,6 +544,13 @@ export class PlayerController {
       this.vz += clamp(diffZ, -maxStep, maxStep);
     } else {
       this.vz = 0;
+    }
+
+    if (this.externalForceX !== 0) {
+      this.vx += this.externalForceX * dt;
+    }
+    if (freeMove && this.externalForceZ !== 0) {
+      this.vz += this.externalForceZ * dt;
     }
 
     if (floatActive) {

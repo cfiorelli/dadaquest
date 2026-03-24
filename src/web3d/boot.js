@@ -5654,6 +5654,10 @@ export async function boot(options = {}) {
     let surfaceAccelMultiplier = 1;
     let surfaceDecelMultiplier = 1;
     let activeSlickHazardId = '';
+    let externalForceX = 0;
+    const currentJetStates = [];
+    const activeCurrentJetHazardIds = [];
+    const hazardClockMs = performance.now();
 
     // Puddle hazard: touching it resets player to spawn start.
     if (puddleInvulnMs > 0) {
@@ -5666,6 +5670,31 @@ export async function boot(options = {}) {
         && pos.y <= hazard.maxY;
 
       if (hazard.handledByLevelRuntime) continue;
+
+      if (hazard.type === 'currentJet') {
+        const activeMs = Math.max(0, hazard.activeMs ?? 1200);
+        const safeMs = Math.max(0, hazard.safeMs ?? 1000);
+        const cycleMs = Math.max(1, activeMs + safeMs);
+        const phaseMs = (hazardClockMs + (hazard.phaseOffsetMs ?? 0)) % cycleMs;
+        const active = phaseMs < activeMs;
+        hazard.setActive?.(active);
+        currentJetStates.push({
+          id: hazard.id,
+          encounterId: hazard.encounterId ?? null,
+          active,
+          phaseMs: Number(phaseMs.toFixed(1)),
+          activeMs,
+          safeMs,
+          directionX: hazard.directionX ?? (Math.sign(hazard.forceX ?? 0) || 0),
+          forceX: hazard.forceX ?? 0,
+          laneType: hazard.laneType ?? null,
+          checkpointLeadIn: !!hazard.checkpointLeadIn,
+        });
+        if (inside && active) {
+          externalForceX += hazard.forceX ?? 0;
+          activeCurrentJetHazardIds.push(hazard.id || '');
+        }
+      }
 
       if (inside && hazard.type === 'slick' && player.grounded) {
         surfaceAccelMultiplier = Math.min(surfaceAccelMultiplier, hazard.accelMultiplier ?? 0.58);
@@ -5687,6 +5716,9 @@ export async function boot(options = {}) {
     window.__DADA_DEBUG__.activeSlickHazardId = activeSlickHazardId;
     window.__DADA_DEBUG__.surfaceAccelMultiplier = surfaceAccelMultiplier;
     window.__DADA_DEBUG__.surfaceDecelMultiplier = surfaceDecelMultiplier;
+    window.__DADA_DEBUG__.jetHazards = currentJetStates;
+    window.__DADA_DEBUG__.activeCurrentJetHazardIds = activeCurrentJetHazardIds.filter(Boolean);
+    window.__DADA_DEBUG__.externalForceX = externalForceX;
 
     let speedMultiplier = isEra5Level ? Math.max(0.8, era5State.stats.moveSpeed ?? 1.15) : 1;
     let accelBonusMultiplier = isEra5Level ? 1.08 : 1;
@@ -5713,6 +5745,7 @@ export async function boot(options = {}) {
     player.setMovementModifiers({
       surfaceAccelMultiplier,
       surfaceDecelMultiplier,
+      externalForceX,
       jumpVelocityMultiplier: onesieJumpBoost * (isEra5Level ? (ERA5_JUMP_MULTIPLIER * Math.max(0.9, era5State.stats.jumpMultiplier ?? 1)) : 1),
       maxAirJumps: onesieBuffTimerMs > 0 ? 1 : 0,
       speedMultiplier,
