@@ -11,7 +11,7 @@ import {
   applyWorldOpaqueRenderPolicy,
 } from '../render/renderPolicy.js';
 import { getLevelMeta } from './levelMeta.js';
-import { Level5EnemyRuntime } from './level5EnemyRuntime.js';
+import { Level5EnemyRuntime, ShockJelly, ServiceSkaterBot, MoraySnapper } from './level5EnemyRuntime.js';
 
 const LANE_Z = 0;
 const PLATFORM_H = 0.72;
@@ -1148,6 +1148,77 @@ function createGlassCrumbleTile(scene, tile, shadowGen) {
   colliderMesh.isPickable = false;
 
   return { root, colliderMesh };
+}
+
+function buildLevel5Enemies(scene) {
+  const LANE_Z_E = 0;
+  const enemies = [];
+
+  // ── B.07: Shock Jelly — bobs above E5 and E9 ──────────────────────────────
+  // E5 Eel Grate Crosswalk: jellies float above the electrified crosswalk
+  enemies.push(new ShockJelly('jelly_e5_a', {
+    x: 57.0, y: 2.82, z: LANE_Z_E,
+    bobAmp: 0.42, bobSpeed: 1.0, bobPhase: 0,
+    encounterId: 'L5-E5',
+  }, scene));
+  enemies.push(new ShockJelly('jelly_e5_b', {
+    x: 64.8, y: 2.65, z: LANE_Z_E,
+    bobAmp: 0.38, bobSpeed: 1.15, bobPhase: Math.PI * 0.7,
+    encounterId: 'L5-E5',
+  }, scene));
+
+  // E9 Wet Relay Gantry: jelly blocks the tight relay climb
+  enemies.push(new ShockJelly('jelly_e9_a', {
+    x: 127.5, y: 2.52, z: LANE_Z_E,
+    bobAmp: 0.44, bobSpeed: 0.92, bobPhase: Math.PI * 0.4,
+    encounterId: 'L5-E9',
+  }, scene));
+  enemies.push(new ShockJelly('jelly_e9_b', {
+    x: 138.2, y: 3.32, z: LANE_Z_E,
+    bobAmp: 0.36, bobSpeed: 1.08, bobPhase: Math.PI * 1.2,
+    encounterId: 'L5-E9',
+  }, scene));
+
+  // ── B.08: Service Skater Bot — patrols flat sections ──────────────────────
+  // E7 Drainage Spine Catwalk: bot patrols the upper service spine
+  enemies.push(new ServiceSkaterBot('bot_e7_a', {
+    x: 92.0, y: 2.61,  // topY of e7_spine_upper = 2.25, +0.36 = center
+    z: LANE_Z_E,
+    patrolMinX: 89.5, patrolMaxX: 95.0, speed: 1.6, startDir: 1,
+    encounterId: 'L5-E7',
+  }, scene));
+  enemies.push(new ServiceSkaterBot('bot_e7_b', {
+    x: 97.5, y: 2.61, z: LANE_Z_E,
+    patrolMinX: 95.0, patrolMaxX: 101.0, speed: 1.9, startDir: -1,
+    encounterId: 'L5-E7',
+  }, scene));
+
+  // E8 Filter Drop Gallery: bot patrols the high gallery shelf
+  enemies.push(new ServiceSkaterBot('bot_e8_a', {
+    x: 107.0, y: 3.11, // topY of e8_gallery_high = 2.75, +0.36
+    z: LANE_Z_E,
+    patrolMinX: 104.5, patrolMaxX: 109.5, speed: 1.7, startDir: 1,
+    encounterId: 'L5-E8',
+  }, scene));
+
+  // ── B.09: Moray Snapper — anchored lunge enemies ──────────────────────────
+  // E8 commit shelf edge: snapper lurks at the drop-off
+  enemies.push(new MoraySnapper('moray_e8_a', {
+    x: 113.5, y: 2.91, // topY of e8_commit_shelf = 2.55, +0.36
+    z: LANE_Z_E,
+    lungeDir: -1,  // lurks right, lunges left toward player approach
+    encounterId: 'L5-E8',
+  }, scene));
+
+  // E9 relay mid: snapper guards the relay staircase approach
+  enemies.push(new MoraySnapper('moray_e9_a', {
+    x: 136.0, y: 2.31, // topY of e9_relay_mid_rise = ~1.95, +0.36
+    z: LANE_Z_E,
+    lungeDir: -1,
+    encounterId: 'L5-E9',
+  }, scene));
+
+  return enemies;
 }
 
 function buildBackdrops(scene, shadowGen, layout, visualPlan) {
@@ -2718,8 +2789,9 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     },
   ].map((def) => ({ ...def, collected: false }));
 
-  // B.06: enemy runtime (empty until B.07–B.10 add enemy classes)
-  const enemyRuntime = new Level5EnemyRuntime([]);
+  // B.07–B.09: spawn enemies
+  const enemies = buildLevel5Enemies(scene);
+  const enemyRuntime = new Level5EnemyRuntime(enemies);
 
   const level = {
     id: 5,
