@@ -1,6 +1,6 @@
 # Level 5 — Aquarium Drift: Production Pack
 
-**Status as of BEAD B.01**
+**Status as of BEAD B.12** — all hazard families, enemies, pickups implemented
 
 ---
 
@@ -20,19 +20,19 @@
 
 | ID | Act | xMin | xMax | topY range | Name | Hazard family |
 |----|-----|------|------|------------|------|---------------|
-| L5-E1  | 1 | -24 | -8  | 0.55–0.95 | Ticket Hall Drip Apron     | slick deck (low) |
-| L5-E2  | 1 | -8  | 10  | 0.75–1.35 | Voltage Mop Walk           | electrified puddles |
-| L5-E3  | 1 | 10  | 34  | 1.15–1.75 | Stingrail Jet Bridge       | current jets |
-| L5-E4  | 2 | 36  | 52  | 1.35–2.15 | Cracked Panorama Gallery   | current jets + puddles |
-| L5-E5  | 2 | 52  | 66  | 1.25–1.85 | Eel Grate Crosswalk        | electrified puddles |
-| L5-E6  | 2 | 66  | 82  | 2.15–2.45 | Rotunda Spray Bridge       | (none — breathing room) |
-| L5-E7  | 3 | 88  | 104 | 2.25      | Drainage Spine Catwalk     | (none — service traverse) |
-| L5-E8  | 3 | 104 | 120 | 2.75      | Filter Drop Gallery        | (none — gap/drop) |
-| L5-E9  | 3 | 120 | 138 | 1.25      | Wet Relay Gantry           | (none — vertical climb) |
-| L5-E10 | 4 | 154 | 174 | 3.15      | Saw Ray Intake Chamber     | enemy slot: Saw Ray elite |
+| L5-E1  | 1 | -24 | -8  | 0.55–0.95 | Ticket Hall Drip Apron     | slick deck ✓ |
+| L5-E2  | 1 | -8  | 10  | 0.75–1.35 | Voltage Mop Walk           | electrified puddles ✓ |
+| L5-E3  | 1 | 10  | 34  | 1.15–1.75 | Stingrail Jet Bridge       | current jets ✓ |
+| L5-E4  | 2 | 36  | 52  | 1.35–2.15 | Cracked Panorama Gallery   | current jets + puddles ✓ |
+| L5-E5  | 2 | 52  | 66  | 1.25–1.85 | Eel Grate Crosswalk        | electrified puddles + Shock Jelly ✓ |
+| L5-E6  | 2 | 66  | 82  | 2.15–2.45 | Rotunda Spray Bridge       | rotating spray bars ✓ |
+| L5-E7  | 3 | 88  | 104 | 2.25      | Drainage Spine Catwalk     | Service Skater Bot ✓ |
+| L5-E8  | 3 | 104 | 120 | 2.75      | Filter Drop Gallery        | Skater Bot + Moray Snapper ✓ |
+| L5-E9  | 3 | 120 | 138 | 1.25      | Wet Relay Gantry           | Shock Jelly + Moray Snapper ✓ |
+| L5-E10 | 4 | 154 | 174 | 3.15      | Saw Ray Intake Chamber     | Saw Ray elite ✓ |
 | L5-E11 | 4 | 174 | 194 | 2.85      | Pump Crown Bypass          | (none — layered platforms) |
 | L5-E12 | 5 | 194 | 208 | 4.25      | Exterior Crown Rail        | (none — exposed verticals) |
-| L5-E13 | 5 | 208 | 220 | 4.75      | Cracked Glass Traverse     | crumbling glass (planned) |
+| L5-E13 | 5 | 208 | 220 | 4.75      | Cracked Glass Traverse     | crumbling glass tiles ✓ |
 | L5-E14 | 5 | 220 | 244 | 5.15      | Overflow Crown Run         | finale mastery chain |
 
 **Optional branches:**
@@ -81,35 +81,61 @@
 | L5-PUD-04 | L5-E5 | 61.2  | 61.7  | 1.55 | 420  | 600 | 1400 | 2200 |
 | L5-PUD-05 | L5-E5 | 65.35 | 67.45 | 1.55 | 1180 | 640 | 1400 | 2200 |
 
+### Rotating spray bars (E6)
+| ID | Encounter | pivotX | pivotY | barLength | hitRadius | rotationSpeedRad | startAngleRad |
+|----|-----------|--------|--------|-----------|-----------|------------------|---------------|
+| L5-SPRAY-01 | L5-E6 | 75.0 | 2.83 | 1.85 | 0.40 | 0.88 | 0 |
+| L5-SPRAY-02 | L5-E6 | 78.2 | 2.83 | 1.85 | 0.40 | 0.88 | 2.26 |
+
+### Crumbling glass tiles (E13)
+| ID | Encounter | x | y | w | h | d |
+|----|-----------|---|---|---|---|---|
+| e13_glass_a_tile1 | L5-E13 | 209.0 | 4.39 | 2.0 | 0.72 | 2.0 |
+| e13_glass_a_tile2 | L5-E13 | 211.0 | 4.39 | 2.0 | 0.72 | 2.0 |
+| e13_glass_a_tile3 | L5-E13 | 213.0 | 4.39 | 2.0 | 0.72 | 2.0 |
+| e13_glass_b_tile1 | L5-E13 | 217.0 | 4.69 | 2.0 | 0.72 | 2.0 |
+| e13_glass_b_tile2 | L5-E13 | 219.0 | 4.69 | 2.0 | 0.72 | 2.0 |
+
 ---
 
 ## Enemy Slots
 
-| Encounter | Enemy | Status |
-|-----------|-------|--------|
-| L5-E10 | Saw Ray (elite) | PLANNED — BEAD B.10 |
-| L5-E5–E9 | Shock Jelly, Service Skater Bot, Moray Snapper | PLANNED — BEADS B.07–B.09 |
+| ID | Encounter | Enemy | HP | Notes |
+|----|-----------|-------|----|-------|
+| jelly_e5_a | L5-E5 | Shock Jelly | 2 | bobs above crosswalk x=57.0, y=2.82 |
+| jelly_e5_b | L5-E5 | Shock Jelly | 2 | bobs above side shelf x=64.8, y=2.65 |
+| bot_e7_a | L5-E7 | Service Skater Bot | 3 | patrols 89.5–95.0 |
+| bot_e7_b | L5-E7 | Service Skater Bot | 3 | patrols 95.0–101.0 |
+| bot_e8_a | L5-E8 | Service Skater Bot | 3 | patrols 104.5–109.5 |
+| moray_e8_a | L5-E8 | Moray Snapper | 3 | anchored x=113.5, lunges left |
+| jelly_e9_a | L5-E9 | Shock Jelly | 2 | bobs above relay low x=127.5, y=2.52 |
+| jelly_e9_b | L5-E9 | Shock Jelly | 2 | bobs above relay mid x=138.2, y=3.32 |
+| moray_e9_a | L5-E9 | Moray Snapper | 3 | anchored x=136.0, lunges left |
+| saw_ray_e10 | L5-E10 | Saw Ray (elite) | 5 | patrols 155–173, surges every 4.2s |
 
 ---
 
 ## Pickup / Reward Slots
 
-| Type | DefId | x | y | Encounter | Teaching |
-|------|-------|---|---|-----------|---------|
-| heart | — | -20.0 | 1.40 | E1 spawn area | Recovery exists |
-| item: foam_blaster | foam_blaster | -13.5 | 1.78 | E1 compare strip | Glass upper route rewards |
-| item: hard_hat | hard_hat | 21.0 | 2.58 | E3 bridge high | Optional bridge route rewards |
-| TBD heart/shield/weapon | — | various | — | E4–E14 | B.11 mastery routing pass |
+| Type | x | y | Encounter | Teaching |
+|------|---|---|-----------|---------|
+| heart | -20.0 | 1.40 | E1 spawn area | Recovery exists |
+| item: foam_blaster | -13.5 | 1.78 | E1 compare strip | Glass upper route rewards |
+| item: hard_hat | 21.0 | 2.58 | E3 bridge high | Optional bridge route rewards |
+| heart | 68.5 | 2.61 | E5 exit | Survive the grate zone |
+| heart | 100.5 | 3.31 | E7 exit | Survive spine catwalk |
+| shield | 151.5 | 3.41 | pre-E10 (CP3) | Before Saw Ray chamber |
+| heart | 176.5 | 3.21 | post-E10 | Saw Ray evasion/defeat reward |
+| shield | 203.5 | 4.81 | E12 crown | Before crumbling glass gauntlet |
 
 ---
 
 ## Hazard Families NOT YET IMPLEMENTED
 
-| Family | Planned encounters | Bead |
-|--------|-------------------|------|
-| Rotating spray bars | L5-E6 (Rotunda) | B.04 |
-| Crumbling glass floors | L5-E13 (Glass Traverse) | B.05 |
-| Enemies (all) | E5–E10 | B.06–B.10 |
+All planned hazard families are now implemented. Remaining items:
+
+- B.13: Ship gate (goal presentation / level completion gate)
+- Not proven yet in live view: all enemy placements, spray bar feel, crumble tile collision registration
 
 ---
 
@@ -133,3 +159,4 @@
 
 `src/web3d/world/buildWorld5AquariumDrift.js` — primary builder
 `src/web3d/world/buildWorld5Plus2d.js` — delegating entry point
+`src/web3d/world/level5EnemyRuntime.js` — enemy classes and runtime
