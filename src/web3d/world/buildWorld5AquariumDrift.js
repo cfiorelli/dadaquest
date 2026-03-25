@@ -11,7 +11,7 @@ import {
   applyWorldOpaqueRenderPolicy,
 } from '../render/renderPolicy.js';
 import { getLevelMeta } from './levelMeta.js';
-import { Level5EnemyRuntime, ShockJelly, ServiceSkaterBot, MoraySnapper } from './level5EnemyRuntime.js';
+import { Level5EnemyRuntime, ShockJelly, ServiceSkaterBot, MoraySnapper, SawRay } from './level5EnemyRuntime.js';
 
 const LANE_Z = 0;
 const PLATFORM_H = 0.72;
@@ -1216,6 +1216,16 @@ function buildLevel5Enemies(scene) {
     z: LANE_Z_E,
     lungeDir: -1,
     encounterId: 'L5-E9',
+  }, scene));
+
+  // ── B.10: Saw Ray elite — patrols E10 Intake Chamber ─────────────────────
+  // Hovers at intake floor level, surges briefly every ~4s (elite mechanic)
+  enemies.push(new SawRay('saw_ray_e10', {
+    x: 163.0, y: 2.72, // topY of e10_intake_floor = 2.35, +0.36
+    z: LANE_Z_E,
+    patrolMinX: 155.0, patrolMaxX: 173.0,
+    speed: 2.2, startDir: 1,
+    encounterId: 'L5-E10',
   }, scene));
 
   return enemies;

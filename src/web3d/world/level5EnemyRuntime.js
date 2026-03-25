@@ -376,6 +376,130 @@ export class MoraySnapper extends EnemyBase {
   }
 }
 
+// ─── B.10: Saw Ray ───────────────────────────────────────────────────────────
+// Elite flat stingray that patrols E10 and periodically surges (rapid burst).
+// During a surge it doubles speed for a short window — the skill check is
+// whether the player can avoid the larger hitbox at surge speed.
+const SAW_RAY_SURGE_COOLDOWN = 4.2;
+const SAW_RAY_SURGE_DURATION = 0.9;
+const SAW_RAY_SURGE_SPEED_MULT = 2.2;
+
+export class SawRay extends EnemyBase {
+  constructor(id, def, scene) {
+    super(id, { type: 'saw_ray', hitRadius: 0.78, maxHp: 5, ...def }, scene);
+    this.patrolMinX = def.patrolMinX ?? def.x - 8.0;
+    this.patrolMaxX = def.patrolMaxX ?? def.x + 8.0;
+    this.speed = def.speed ?? 2.2;
+    this.dir = def.startDir ?? 1;
+    this.surgeTimer = 0;
+    this.surgeCooldown = SAW_RAY_SURGE_COOLDOWN * 0.6; // first surge sooner
+    this.sawBladeNode = null;
+    this.root = this._buildVisual(scene, id);
+    this.root.position.set(def.x, def.y, def.z ?? 0);
+  }
+
+  _buildVisual(scene, id) {
+    const root = new BABYLON.TransformNode(`${id}_root`, scene);
+
+    // Flat disc body (stingray silhouette)
+    const body = BABYLON.MeshBuilder.CreateCylinder(`${id}_body`, {
+      height: 0.22, diameter: 1.6, tessellation: 6,
+    }, scene);
+    body.parent = root;
+    body.position.y = 0.1;
+    body.material = opaqueMat(scene, `${id}_body_mat`, C.pipeDark);
+    applyEnemyAlphaRenderPolicy(body);
+
+    // Wing-fin extensions (elongated wing shape)
+    for (const side of [-1, 1]) {
+      const fin = BABYLON.MeshBuilder.CreateBox(`${id}_fin_${side}`, {
+        width: 0.28, height: 0.14, depth: 0.9,
+      }, scene);
+      fin.parent = root;
+      fin.position.set(side * 0.88, 0.1, 0);
+      fin.material = opaqueMat(scene, `${id}_fin_mat_${side}`, C.pipeLight);
+      applyEnemyAlphaRenderPolicy(fin);
+    }
+
+    // Central saw blade (spinning disc)
+    const blade = BABYLON.MeshBuilder.CreateCylinder(`${id}_blade`, {
+      height: 0.08, diameter: 0.52, tessellation: 8,
+    }, scene);
+    blade.parent = root;
+    blade.position.y = 0.3;
+    blade.material = alphaMat(scene, `${id}_blade_mat`, C.warning, 0.92);
+    applyEnemyAlphaRenderPolicy(blade);
+    this.sawBladeNode = blade;
+
+    // Warning ring (outer glow)
+    const ring = BABYLON.MeshBuilder.CreateTorus(`${id}_ring`, {
+      diameter: 1.72, thickness: 0.08, tessellation: 20,
+    }, scene);
+    ring.parent = root;
+    ring.position.y = 0.12;
+    ring.material = alphaMat(scene, `${id}_ring_mat`, C.shockBright, 0.38);
+    applyEnemyAlphaRenderPolicy(ring);
+
+    // Tail
+    const tail = BABYLON.MeshBuilder.CreateBox(`${id}_tail`, {
+      width: 0.12, height: 0.1, depth: 1.1,
+    }, scene);
+    tail.parent = root;
+    tail.position.set(0, 0.1, 0.78);
+    tail.material = opaqueMat(scene, `${id}_tail_mat`, C.pipeDark);
+    applyEnemyAlphaRenderPolicy(tail);
+
+    return root;
+  }
+
+  update(dt, _playerPos, _options) {
+    // Surge cooldown
+    if (this.surgeTimer > 0) {
+      this.surgeTimer = Math.max(0, this.surgeTimer - dt);
+    } else {
+      this.surgeCooldown = Math.max(0, this.surgeCooldown - dt);
+      if (this.surgeCooldown <= 0) {
+        this.state = 'surging';
+        this.surgeTimer = SAW_RAY_SURGE_DURATION;
+        this.surgeCooldown = SAW_RAY_SURGE_COOLDOWN;
+      } else {
+        this.state = 'patrol';
+      }
+    }
+
+    const currentSpeed = this.state === 'surging'
+      ? this.speed * SAW_RAY_SURGE_SPEED_MULT
+      : this.speed;
+
+    // Patrol
+    this.root.position.x += this.dir * currentSpeed * dt;
+    if (this.root.position.x >= this.patrolMaxX) {
+      this.root.position.x = this.patrolMaxX;
+      this.dir = -1;
+    } else if (this.root.position.x <= this.patrolMinX) {
+      this.root.position.x = this.patrolMinX;
+      this.dir = 1;
+    }
+
+    // Spin blade faster during surge
+    if (this.sawBladeNode) {
+      const spinSpeed = this.state === 'surging' ? 6.0 : 2.5;
+      this.sawBladeNode.rotation.y += spinSpeed * dt;
+    }
+
+    // Face movement direction
+    this.root.rotation.y = this.dir > 0 ? 0 : Math.PI;
+  }
+
+  reset() {
+    super.reset();
+    this.surgeTimer = 0;
+    this.surgeCooldown = SAW_RAY_SURGE_COOLDOWN * 0.6;
+    this.dir = this.def.startDir ?? 1;
+    this.state = 'patrol';
+  }
+}
+
 // ─── Runtime ─────────────────────────────────────────────────────────────────
 export class Level5EnemyRuntime {
   /** @param {EnemyBase[]} enemies */
