@@ -2797,6 +2797,43 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
       radius: 0.72,
       node: createPickupNode('l5_pickup_hard_hat', 21.0, 2.58, LANE_Z, '#66aaff'),
     },
+
+    // ── B.11: mastery routing pickups (E5–E14) ────────────────────────────
+    // Heart: E5 exit — reward for surviving the electrified grate zone
+    {
+      type: 'heart',
+      position: { x: 68.5, y: 2.61, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_heart_e5', 68.5, 2.61, LANE_Z, '#ff4466'),
+    },
+    // Heart: E7 exit — reward for the spine catwalk traverse
+    {
+      type: 'heart',
+      position: { x: 100.5, y: 3.31, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_heart_e7', 100.5, 3.31, LANE_Z, '#ff4466'),
+    },
+    // Shield: pre-E10 — checkpoint locker before the Saw Ray chamber
+    {
+      type: 'shield',
+      position: { x: 151.5, y: 3.41, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_shield_e10', 151.5, 3.41, LANE_Z, '#66ddff'),
+    },
+    // Heart: post-E10 — reward for defeating/evading the Saw Ray
+    {
+      type: 'heart',
+      position: { x: 176.5, y: 3.21, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_heart_e10', 176.5, 3.21, LANE_Z, '#ff4466'),
+    },
+    // Shield: E12/E13 crown — before the crumbling glass gauntlet
+    {
+      type: 'shield',
+      position: { x: 203.5, y: 4.81, z: LANE_Z },
+      radius: 0.72,
+      node: createPickupNode('l5_pickup_shield_e13', 203.5, 4.81, LANE_Z, '#66ddff'),
+    },
   ].map((def) => ({ ...def, collected: false }));
 
   // B.07–B.09: spawn enemies

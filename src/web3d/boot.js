@@ -5639,6 +5639,15 @@ export async function boot(options = {}) {
           } else {
             ui.showStatus('Already full health', 900);
           }
+        } else if (pickup.type === 'shield') {
+          const shieldMax = era5State.stats.shieldMax ?? 1;
+          if (era5Shield < shieldMax) {
+            era5Shield = Math.min(shieldMax, era5Shield + 1);
+            ui.showStatus('🛡 Shield restored', 1200);
+            syncEra5Ui();
+          } else {
+            ui.showStatus('Shield already full', 900);
+          }
         } else if (pickup.type === 'item') {
           grantEra5Item(pickup.defId, {
             autoEquip: pickup.autoEquip !== false,
