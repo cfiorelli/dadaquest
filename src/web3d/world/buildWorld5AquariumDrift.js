@@ -2397,6 +2397,124 @@ function createElectrifiedSafeIslandVisual(scene, island) {
   return root;
 }
 
+// ── B.13: Ship Gate ──────────────────────────────────────────────────────────
+// Aquarium overflow crown exit arch framing the DaDa character at the goal.
+// Positioned with root at deck surface; all parts parented to root.
+function createShipGate(scene, x, deckTopY, shadowGen) {
+  const root = new BABYLON.TransformNode('l5_ship_gate', scene);
+  root.position.set(x, deckTopY, LANE_Z);
+
+  const pillarW = 0.22;
+  const pillarD = 0.32;
+  const pillarH = 2.9;
+  const pillarX = 1.38;
+  const headerH = 0.30;
+  const headerW = pillarX * 2 + pillarW;
+  const headerY = pillarH - headerH * 0.5;
+
+  // Left pillar
+  const pL = BABYLON.MeshBuilder.CreateBox('l5_gate_pillar_l', {
+    width: pillarW, height: pillarH, depth: pillarD,
+  }, scene);
+  pL.position.set(-pillarX, pillarH * 0.5, 0);
+  pL.parent = root;
+  pL.material = createOpaqueMaterial(scene, 'l5_gate_pillar_l_mat', PROFILE.railMetal);
+  pL.receiveShadows = true;
+  shadowGen.addShadowCaster(pL);
+  applyWorldOpaqueRenderPolicy(pL);
+  markDecor(pL);
+
+  // Right pillar
+  const pR = BABYLON.MeshBuilder.CreateBox('l5_gate_pillar_r', {
+    width: pillarW, height: pillarH, depth: pillarD,
+  }, scene);
+  pR.position.set(pillarX, pillarH * 0.5, 0);
+  pR.parent = root;
+  pR.material = pL.material;
+  pR.receiveShadows = true;
+  shadowGen.addShadowCaster(pR);
+  applyWorldOpaqueRenderPolicy(pR);
+  markDecor(pR);
+
+  // Header crossbar
+  const header = BABYLON.MeshBuilder.CreateBox('l5_gate_header', {
+    width: headerW + 0.06, height: headerH, depth: pillarD,
+  }, scene);
+  header.position.set(0, headerY, 0);
+  header.parent = root;
+  header.material = pL.material;
+  header.receiveShadows = true;
+  shadowGen.addShadowCaster(header);
+  applyWorldOpaqueRenderPolicy(header);
+  markDecor(header);
+
+  // Accent trim strips along inner pillar faces (warning yellow)
+  for (const side of [-1, 1]) {
+    const strip = BABYLON.MeshBuilder.CreateBox(`l5_gate_trim_${side < 0 ? 'l' : 'r'}`, {
+      width: 0.06, height: pillarH * 0.72, depth: pillarD + 0.02,
+    }, scene);
+    strip.position.set(side * (pillarX - pillarW * 0.5 - 0.03), pillarH * 0.38, 0);
+    strip.parent = root;
+    const trimMat = createOpaqueMaterial(scene, `l5_gate_trim_${side}_mat`, PROFILE.warning);
+    trimMat.emissiveColor = makeColor(PROFILE.warning).scale(0.28);
+    strip.material = trimMat;
+    applyWorldOpaqueRenderPolicy(strip);
+    markDecor(strip);
+  }
+
+  // Rivet clusters — 3 rivets per pillar at 3 heights
+  const rivetRgb = PROFILE.pipeDark;
+  const rivetHeights = [0.52, 1.44, 2.32];
+  for (const side of [-1, 1]) {
+    for (const ry of rivetHeights) {
+      const rivet = BABYLON.MeshBuilder.CreateSphere(`l5_gate_rivet_${side}_${ry}`, {
+        diameter: 0.07, segments: 6,
+      }, scene);
+      rivet.position.set(side * (pillarX - pillarW * 0.5 - 0.035), ry, -(pillarD * 0.5 + 0.01));
+      rivet.parent = root;
+      rivet.material = createOpaqueMaterial(scene, `l5_gate_rivet_${side}_${ry}_mat`, rivetRgb);
+      applyWorldOpaqueRenderPolicy(rivet);
+      markDecor(rivet);
+    }
+  }
+
+  // Porthole ring — emissive teal torus centered in the arch opening
+  const ring = BABYLON.MeshBuilder.CreateTorus('l5_gate_ring', {
+    diameter: 1.36,
+    thickness: 0.11,
+    tessellation: 28,
+  }, scene);
+  ring.position.set(0, 1.68, 0);
+  ring.parent = root;
+  const ringMat = new BABYLON.StandardMaterial('l5_gate_ring_mat', scene);
+  ringMat.diffuseColor = makeColor(PROFILE.accent);
+  ringMat.emissiveColor = makeColor(PROFILE.accent).scale(0.58);
+  ringMat.specularColor = BABYLON.Color3.Black();
+  ring.material = ringMat;
+  shadowGen.addShadowCaster(ring);
+  applyWorldOpaqueRenderPolicy(ring);
+  markDecor(ring);
+
+  // Inner glow disc — translucent teal plane inside the ring
+  const glowDisc = BABYLON.MeshBuilder.CreateDisc('l5_gate_glow', {
+    radius: 0.62,
+    tessellation: 32,
+  }, scene);
+  glowDisc.position.set(0, 1.68, 0.02);
+  glowDisc.parent = root;
+  const glowMat = new BABYLON.StandardMaterial('l5_gate_glow_mat', scene);
+  glowMat.diffuseColor = makeColor(PROFILE.tankGlow);
+  glowMat.emissiveColor = makeColor(PROFILE.tankGlow).scale(0.38);
+  glowMat.specularColor = BABYLON.Color3.Black();
+  glowMat.alpha = 0.22;
+  glowDisc.material = glowMat;
+  applyWorldAlphaRenderPolicy(glowDisc);
+  markDecor(glowDisc);
+
+  markDecor(root);
+  return root;
+}
+
 function createSprayBarVisual(scene, bar) {
   const metadata = {
     encounterId: bar.encounterId,
@@ -2754,6 +2872,9 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
   });
 
   const finalDeck = layout.platforms.find((surface) => surface.name === 'e14_goal_lock') || layout.platforms[layout.platforms.length - 1];
+
+  const shipGate = createShipGate(scene, layout.goal.x, finalDeck.topY, shadowGen);
+  setRenderingGroup(shipGate, 2);
 
   // --- Pickups ---
   function createPickupNode(name, x, y, z, rgbHex) {
