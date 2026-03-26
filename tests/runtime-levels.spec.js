@@ -1810,7 +1810,7 @@ test('@level5 runtime: Aquarium Drift visual kit, slick deck, and current-jet la
   expect(report.playerPos.x).toBeLessThan(report.goalGate.minX);
   expect(report.laneAudit?.outOfLane ?? []).toEqual([]);
   expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'checkpoint')).toHaveLength(4);
-  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(12);
+  expect((report.laneAudit?.interactables || []).filter((item) => item.type === 'hazard')).toHaveLength(14);
 });
 
 test('@level5 runtime: Aquarium Drift graybox exposes grounded safe samples across all acts and optional branches', async ({ page }) => {

@@ -51,6 +51,13 @@ const PROFILE = {
   shockDim: [76, 122, 148],
   shockRail: [188, 220, 228],
   shockCore: [28, 108, 144],
+  spawnRouteTop: [216, 232, 238],
+  spawnRouteTrim: [238, 244, 246],
+  spawnGlassTop: [124, 164, 182],
+  spawnGlassFrame: [194, 224, 236],
+  spawnBackdrop: [20, 46, 58],
+  spawnLandmark: [86, 118, 136],
+  spawnLandmarkGlow: [96, 210, 232],
 };
 
 const ACTS = [
@@ -379,6 +386,30 @@ function createAlphaPanel(scene, name, {
   return mesh;
 }
 
+function createTopPanel(scene, name, {
+  x,
+  y,
+  z,
+  w,
+  d,
+  rgb,
+  alpha = 0.44,
+  parent = null,
+  metadata = {},
+}) {
+  const mesh = BABYLON.MeshBuilder.CreatePlane(name, {
+    width: w,
+    height: d,
+  }, scene);
+  if (parent) mesh.parent = parent;
+  mesh.position.set(x, y, z);
+  mesh.rotation.x = Math.PI * 0.5;
+  mesh.material = createAlphaMaterial(scene, `${name}_mat`, rgb, alpha);
+  applyWorldAlphaRenderPolicy(mesh);
+  markDecor(mesh, metadata);
+  return mesh;
+}
+
 function createPlatformCollider(scene, name, def) {
   const collider = BABYLON.MeshBuilder.CreateBox(`${name}_col`, {
     width: def.w,
@@ -619,6 +650,9 @@ function buildLayout() {
       platformCount: surfaces.length,
       distinctTopLevels,
       proofPoses: {
+        spawnWide: { x: -17.0, y: Number((0.55 + 0.405).toFixed(3)), z: LANE_Z },
+        routeMid: { x: -2.0, y: Number((1.35 + 0.405).toFixed(3)), z: LANE_Z },
+        landmarkClose: { x: 8.8, y: Number((1.35 + 0.405).toFixed(3)), z: LANE_Z },
         act1: { x: 2.0, y: Number((1.35 + 0.405).toFixed(3)), z: LANE_Z },
         act2: { x: 74.0, y: Number((2.45 + 0.405).toFixed(3)), z: LANE_Z },
         act3: { x: 126.0, y: Number((1.25 + 0.405).toFixed(3)), z: LANE_Z },
@@ -1245,7 +1279,10 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
 
   for (const encounter of [...layout.encounters, ...layout.optionalBranches]) {
     const act = ACTS.find((candidate) => candidate.id === encounter.act) || ACTS[0];
-    const backdropColor = act.kind === 'service' ? PROFILE.backdropService : PROFILE.backdropPublic;
+    const spawnReadSlice = encounter.id === 'L5-E1' || encounter.id === 'L5-E2' || encounter.id === 'L5-E3';
+    const backdropColor = spawnReadSlice
+      ? PROFILE.spawnBackdrop
+      : (act.kind === 'service' ? PROFILE.backdropService : PROFILE.backdropPublic);
     const centerX = (encounter.xMin + encounter.xMax) * 0.5;
     const width = (encounter.xMax - encounter.xMin) + 2.8;
     const midTop = encounter.sample.topY;
@@ -1275,62 +1312,50 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
     });
 
     if (act.kind === 'public') {
-      const spawnReadSlice = encounter.id === 'L5-E1' || encounter.id === 'L5-E2' || encounter.id === 'L5-E3';
-      createDecorBox(scene, `${encounter.id}_frame_left`, {
-        x: centerX - ((width * 0.5) - 0.55),
-        y: midTop + 1.9,
-        z: 5.92,
-        w: 0.8,
-        h: 5.4,
-        d: 0.42,
-        rgb: PROFILE.glassFrame,
-        shadowGen,
-        metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
-      });
-      createDecorBox(scene, `${encounter.id}_frame_right`, {
-        x: centerX + ((width * 0.5) - 0.55),
-        y: midTop + 1.9,
-        z: 5.92,
-        w: 0.8,
-        h: 5.4,
-        d: 0.42,
-        rgb: PROFILE.glassFrame,
-        shadowGen,
-        metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
-      });
-      createDecorBox(scene, `${encounter.id}_lintel`, {
-        x: centerX,
-        y: midTop + 4.2,
-        z: 5.9,
-        w: Math.max(4.0, width - 0.9),
-        h: 0.44,
-        d: 0.48,
-        rgb: PROFILE.publicEdge,
-        shadowGen,
-        metadata: { encounterId: encounter.id, visualRole: 'public_lintel' },
-      });
-      createDecorBox(scene, `${encounter.id}_window_band`, {
-        x: centerX,
-        y: spawnReadSlice ? midTop + 2.15 : midTop + 0.75,
-        z: 5.78,
-        w: Math.max(4.0, width - 1.4),
-        h: spawnReadSlice ? 0.58 : 1.3,
-        d: 0.22,
-        rgb: spawnReadSlice ? PROFILE.pipeDark : PROFILE.accent,
-        shadowGen,
-        metadata: { encounterId: encounter.id, visualRole: 'window_band' },
-      });
-      if (spawnReadSlice) {
-        createDecorBox(scene, `${encounter.id}_route_shadow_band`, {
-          x: centerX,
-          y: midTop + 0.2,
-          z: 5.52,
-          w: Math.max(4.0, width - 1.8),
-          h: 1.1,
+      if (!spawnReadSlice) {
+        createDecorBox(scene, `${encounter.id}_frame_left`, {
+          x: centerX - ((width * 0.5) - 0.55),
+          y: midTop + 1.9,
+          z: 5.92,
+          w: 0.8,
+          h: 5.4,
           d: 0.42,
-          rgb: PROFILE.silhouette,
+          rgb: PROFILE.glassFrame,
           shadowGen,
-          metadata: { encounterId: encounter.id, visualRole: 'route_shadow_band' },
+          metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
+        });
+        createDecorBox(scene, `${encounter.id}_frame_right`, {
+          x: centerX + ((width * 0.5) - 0.55),
+          y: midTop + 1.9,
+          z: 5.92,
+          w: 0.8,
+          h: 5.4,
+          d: 0.42,
+          rgb: PROFILE.glassFrame,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'public_frame' },
+        });
+        createDecorBox(scene, `${encounter.id}_lintel`, {
+          x: centerX,
+          y: midTop + 4.2,
+          z: 5.9,
+          w: Math.max(4.0, width - 0.9),
+          h: 0.44,
+          d: 0.48,
+          rgb: PROFILE.publicEdge,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'public_lintel' },
+        });
+        createDecorBox(scene, `${encounter.id}_window_band`, {
+          x: centerX,
+          y: midTop + 0.75,
+          z: 5.78,
+          w: Math.max(4.0, width - 1.4),
+          h: 1.3,
+          d: 0.22,
+          rgb: PROFILE.accent,
+          shadowGen,
+          metadata: { encounterId: encounter.id, visualRole: 'window_band' },
         });
       }
       if (encounter.id === 'L5-E4') {
@@ -1516,6 +1541,52 @@ function buildBackdrops(scene, shadowGen, layout, visualPlan) {
 }
 
 function buildSpawnSliceReadability(scene, shadowGen) {
+  createDecorBox(scene, 'l5_spawn_tank_bay_top', {
+    x: 3.8,
+    y: 5.52,
+    z: 5.88,
+    w: 42.8,
+    h: 0.54,
+    d: 0.44,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2', 'L5-E3'], visualRole: 'spawn_tank_bay_frame' },
+  });
+  createDecorBox(scene, 'l5_spawn_tank_bay_bottom', {
+    x: 3.8,
+    y: 1.02,
+    z: 5.82,
+    w: 42.8,
+    h: 0.34,
+    d: 0.42,
+    rgb: PROFILE.silhouette,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2', 'L5-E3'], visualRole: 'spawn_tank_bay_frame' },
+  });
+  for (const x of [-13.6, 4.2, 20.8]) {
+    createDecorBox(scene, `l5_spawn_tank_bay_mullion_${x}`, {
+      x,
+      y: 3.2,
+      z: 5.9,
+      w: 0.42,
+      h: 4.9,
+      d: 0.34,
+      rgb: PROFILE.spawnGlassFrame,
+      shadowGen,
+      metadata: { encounterIds: ['L5-E1', 'L5-E2', 'L5-E3'], visualRole: 'spawn_tank_bay_frame' },
+    });
+  }
+  createDecorBox(scene, 'l5_spawn_tank_bay_shadow', {
+    x: 3.8,
+    y: 1.7,
+    z: 5.52,
+    w: 40.2,
+    h: 1.5,
+    d: 0.36,
+    rgb: PROFILE.silhouette,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2', 'L5-E3'], visualRole: 'spawn_tank_bay_shadow' },
+  });
   createDecorBox(scene, 'l5_spawn_foreground_frame', {
     x: -27.4,
     y: 3.25,
@@ -1528,12 +1599,12 @@ function buildSpawnSliceReadability(scene, shadowGen) {
     metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_foreground_frame' },
   });
   createDecorBox(scene, 'l5_spawn_foreground_brace', {
-    x: -25.8,
-    y: 4.78,
-    z: 1.68,
-    w: 3.4,
-    h: 0.42,
-    d: 0.6,
+    x: -25.9,
+    y: 4.92,
+    z: 1.56,
+    w: 1.9,
+    h: 0.34,
+    d: 0.42,
     rgb: PROFILE.support,
     shadowGen,
     metadata: { encounterIds: ['L5-E1'], visualRole: 'spawn_foreground_brace' },
@@ -1550,33 +1621,44 @@ function buildSpawnSliceReadability(scene, shadowGen) {
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_ceiling_mass' },
   });
   createDecorBox(scene, 'l5_spawn_canopy_lintel', {
-    x: -4.6,
+    x: -3.8,
     y: 5.98,
     z: 3.06,
-    w: 27.5,
+    w: 25.2,
     h: 0.56,
     d: 1.14,
     rgb: PROFILE.pipeDark,
     shadowGen,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_canopy_lintel' },
   });
-  for (const [index, y] of [5.18, 5.62].entries()) {
+  createDecorBox(scene, 'l5_spawn_pipe_tray', {
+    x: -2.2,
+    y: 5.34,
+    z: 3.24,
+    w: 28.4,
+    h: 0.52,
+    d: 0.82,
+    rgb: PROFILE.pipeDark,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_pipe_bundle' },
+  });
+  for (const [index, y] of [5.14, 5.48].entries()) {
     createDecorCylinder(scene, `l5_spawn_pipe_run_${index}`, {
-      x: -4.0,
+      x: -2.2,
       y,
-      z: 3.26,
-      height: 28.0,
-      diameter: index === 0 ? 0.48 : 0.34,
-      rgb: index === 0 ? PROFILE.pipeDark : PROFILE.pipeLight,
+      z: 3.18,
+      height: 27.6,
+      diameter: index === 0 ? 0.42 : 0.28,
+      rgb: index === 0 ? PROFILE.pipeLight : PROFILE.support,
       shadowGen,
       rotation: { z: Math.PI * 0.5 },
-      metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_pipe_run' },
+      metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_pipe_bundle' },
     });
   }
   const landmark = createDecorRoot(scene, 'l5_spawn_filter_tower', {
-    x: 2.8,
-    y: 3.25,
-    z: 4.56,
+    x: 7.2,
+    y: 3.65,
+    z: 4.72,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark' },
   });
   createDecorBox(scene, 'l5_spawn_filter_tower_body', {
@@ -1584,21 +1666,21 @@ function buildSpawnSliceReadability(scene, shadowGen) {
     x: 0,
     y: 0,
     z: 0,
-    w: 4.2,
-    h: 6.7,
-    d: 1.28,
-    rgb: PROFILE.backMass,
+    w: 5.1,
+    h: 7.8,
+    d: 1.54,
+    rgb: PROFILE.spawnLandmark,
     shadowGen,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_body' },
   });
   createDecorBox(scene, 'l5_spawn_filter_tower_cap', {
     parent: landmark,
     x: 0,
-    y: 2.72,
+    y: 3.1,
     z: 0,
-    w: 4.7,
-    h: 0.62,
-    d: 1.5,
+    w: 5.6,
+    h: 0.7,
+    d: 1.8,
     rgb: PROFILE.pipeDark,
     shadowGen,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_cap' },
@@ -1606,10 +1688,10 @@ function buildSpawnSliceReadability(scene, shadowGen) {
   createDecorBox(scene, 'l5_spawn_filter_tower_trim', {
     parent: landmark,
     x: 0,
-    y: 0.92,
-    z: -0.52,
-    w: 4.34,
-    h: 0.28,
+    y: 1.12,
+    z: -0.66,
+    w: 5.24,
+    h: 0.34,
     d: 0.24,
     rgb: PROFILE.warning,
     shadowGen,
@@ -1617,38 +1699,137 @@ function buildSpawnSliceReadability(scene, shadowGen) {
   });
   createAlphaPanel(scene, 'l5_spawn_filter_tower_glow', {
     parent: landmark,
-    x: -0.42,
-    y: 0.1,
-    z: -0.68,
-    w: 1.06,
-    h: 4.0,
-    rgb: PROFILE.tankGlow,
-    alpha: 0.46,
+    x: -0.32,
+    y: 0.22,
+    z: -0.86,
+    w: 1.28,
+    h: 5.2,
+    rgb: PROFILE.spawnLandmarkGlow,
+    alpha: 0.58,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_glow' },
   });
   createAlphaPanel(scene, 'l5_spawn_filter_tower_glow_b', {
     parent: landmark,
-    x: 0.62,
-    y: -0.18,
-    z: -0.68,
-    w: 0.72,
-    h: 2.6,
+    x: 0.86,
+    y: -0.08,
+    z: -0.86,
+    w: 0.84,
+    h: 3.4,
     rgb: PROFILE.glassPanel,
-    alpha: 0.28,
+    alpha: 0.34,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_glow' },
   });
   createDecorBox(scene, 'l5_spawn_filter_tower_pipe', {
     parent: landmark,
-    x: -1.1,
-    y: 1.5,
-    z: -0.72,
-    w: 0.34,
-    h: 3.2,
-    d: 0.34,
+    x: -1.42,
+    y: 1.88,
+    z: -0.86,
+    w: 0.42,
+    h: 4.2,
+    d: 0.38,
     rgb: PROFILE.pipeLight,
     shadowGen,
     metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_pipe' },
   });
+  createDecorBox(scene, 'l5_spawn_filter_tower_beacon', {
+    parent: landmark,
+    x: 0.9,
+    y: 2.78,
+    z: -0.82,
+    w: 1.2,
+    h: 0.38,
+    d: 0.24,
+    rgb: PROFILE.pumpTrim,
+    shadowGen,
+    metadata: { encounterIds: ['L5-E1', 'L5-E2'], visualRole: 'spawn_landmark_beacon' },
+  });
+}
+
+function tintPbrMaterial(mesh, rgb, emissiveScale = 0) {
+  const mat = mesh?.material;
+  if (!mat) return;
+  const color = makeColor(rgb);
+  if ('albedoColor' in mat) mat.albedoColor = color;
+  if ('diffuseColor' in mat) mat.diffuseColor = color;
+  if ('emissiveColor' in mat) mat.emissiveColor = color.scale(emissiveScale);
+}
+
+function retonePlatformVisual(root, { slabRgb, edgeRgb, topHiRgb, topHiAlpha = 0.44, shadowAlpha = 0.16 }) {
+  const childMeshes = root?.getChildMeshes?.(false) || [];
+  const topHi = childMeshes.find((mesh) => mesh.name.endsWith('_topHi'));
+  const dirtShadow = childMeshes.find((mesh) => mesh.name.endsWith('_dirtShadow'));
+  tintPbrMaterial(topHi, topHiRgb ?? slabRgb ?? edgeRgb ?? PROFILE.publicGround, 0.05);
+  if (topHi?.material) topHi.material.alpha = topHiAlpha;
+  if (dirtShadow?.material) dirtShadow.material.alpha = shadowAlpha;
+}
+
+function buildSpawnRouteHierarchy(scene, shadowGen, layout, surfaceVisuals) {
+  const spawnSliceDefs = [layout.ground, ...layout.platforms].filter((def) => ['L5-E1', 'L5-E2', 'L5-E3'].includes(def.encounterId));
+  for (const def of spawnSliceDefs) {
+    const visual = surfaceVisuals[def.name === layout.ground.name ? 'ground' : def.name];
+    if (!visual) continue;
+    if (def.kind === 'glass') {
+      retonePlatformVisual(visual, {
+        topHiRgb: PROFILE.spawnGlassFrame,
+        topHiAlpha: 0.12,
+        shadowAlpha: 0.08,
+      });
+      createTopPanel(scene, `${def.name}_glass_inset`, {
+        parent: visual,
+        x: 0,
+        y: (def.h * 0.5) + 0.02,
+        z: 0,
+        w: Math.max(0.46, def.w - 0.28),
+        d: Math.max(0.42, def.d * 0.54),
+        rgb: PROFILE.spawnGlassTop,
+        alpha: 0.34,
+        metadata: { encounterId: def.encounterId, visualRole: 'spawn_glass_inset' },
+      });
+      for (const side of [-1, 1]) {
+        createTopPanel(scene, `${def.name}_glass_rail_${side < 0 ? 'north' : 'south'}`, {
+          parent: visual,
+          x: 0,
+          y: (def.h * 0.5) + 0.028,
+          z: side * Math.max(0.18, (def.d * 0.5) - 0.12),
+          w: Math.max(0.42, def.w - 0.22),
+          d: 0.08,
+          rgb: PROFILE.spawnGlassFrame,
+          alpha: 0.62,
+          metadata: { encounterId: def.encounterId, visualRole: 'spawn_glass_rail' },
+        });
+      }
+    } else {
+      retonePlatformVisual(visual, {
+        topHiRgb: PROFILE.spawnRouteTrim,
+        topHiAlpha: 0.58,
+        shadowAlpha: 0.12,
+      });
+      createTopPanel(scene, `${def.name}_route_cap`, {
+        parent: visual,
+        x: 0,
+        y: (def.h * 0.5) + 0.024,
+        z: 0,
+        w: Math.max(0.52, def.w - 0.32),
+        d: Math.max(0.46, def.d * 0.42),
+        rgb: PROFILE.spawnRouteTrim,
+        alpha: 0.46,
+        metadata: { encounterId: def.encounterId, visualRole: 'spawn_route_cap' },
+      });
+      for (const side of [-1, 1]) {
+        createTopPanel(scene, `${def.name}_route_nosing_${side < 0 ? 'north' : 'south'}`, {
+          parent: visual,
+          x: 0,
+          y: (def.h * 0.5) + 0.012,
+          z: side * Math.max(0.18, (def.d * 0.5) - 0.08),
+          w: Math.max(0.44, def.w - 0.16),
+          d: 0.06,
+          rgb: PROFILE.warning,
+          alpha: 0.84,
+          metadata: { encounterId: def.encounterId, visualRole: 'spawn_route_nosing' },
+        });
+      }
+    }
+  }
 }
 
 function addSupportColumns(scene, shadowGen, def) {
@@ -2821,6 +3002,7 @@ export function buildWorld5AquariumDrift(scene, { animateGoal = true } = {}) {
     allColliders.push(createPlatformCollider(scene, `level5_${def.name}`, def));
     addSupportColumns(scene, shadowGen, def);
   }
+  buildSpawnRouteHierarchy(scene, shadowGen, layout, surfaceVisuals);
 
   const crumbles = glassCrumbleTiles.map((tile) => {
     const { root, colliderMesh } = createGlassCrumbleTile(scene, tile, shadowGen);

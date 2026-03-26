@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, rm } from 'node:fs/promises';
 import { getLevelMeta, getLevelRuntimeFamily, getLevelThemeKey } from '../src/web3d/world/levelMeta.js';
 
 const SHOT_SCENES = [
@@ -1143,7 +1143,31 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
   expect(report.layout?.currentJets?.laneCount).toBe(4);
   expect(report.layout?.electrifiedPuddles?.bandCount).toBe(5);
 
+  const spawnWidePose = report.layout?.proofPoses?.spawnWide;
+  const routeMidPose = report.layout?.proofPoses?.routeMid;
+  const landmarkClosePose = report.layout?.proofPoses?.landmarkClose;
+  expect(spawnWidePose).toBeTruthy();
+  expect(routeMidPose).toBeTruthy();
+  expect(landmarkClosePose).toBeTruthy();
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+  }, spawnWidePose);
+  await page.waitForTimeout(350);
   await captureProof('docs/screenshots/level5-aquarium-visual-start.png');
+  await captureProof('docs/screenshots/level5-aquarium-visual-spawn-wide.png');
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+  }, routeMidPose);
+  await page.waitForTimeout(350);
+  await captureProof('docs/screenshots/level5-aquarium-visual-route-mid.png');
+
+  await page.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+  }, landmarkClosePose);
+  await page.waitForTimeout(350);
+  await captureProof('docs/screenshots/level5-aquarium-visual-landmark-close.png');
 
   for (const [key, path] of [
     ['act2', 'docs/screenshots/level5-aquarium-visual-act2.png'],
@@ -1159,6 +1183,59 @@ test('capture Level 5 Aquarium Drift visual kit proof screenshots', async ({ pag
     await page.waitForTimeout(350);
     await captureProof(path);
   }
+});
+
+test('capture Level 5 Aquarium Drift visual hierarchy traversal clip', async ({ browser }) => {
+  test.setTimeout(240_000);
+  await mkdir('docs/screenshots', { recursive: true });
+  await mkdir('docs/proof/level5-aquarium-visual-kit', { recursive: true });
+  await mkdir('docs/screenshots/.tmp-level5-visual-video', { recursive: true });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+    recordVideo: {
+      dir: 'docs/screenshots/.tmp-level5-visual-video',
+      size: { width: 1280, height: 720 },
+    },
+  });
+  const videoPage = await context.newPage();
+  const video = videoPage.video();
+
+  await gotoDebugLevel(videoPage, 5);
+  await unlockThroughLevel(videoPage, 4);
+  await videoPage.evaluate(() => {
+    window.__DADA_DEBUG__?.startLevel?.(5);
+  });
+  await videoPage.waitForFunction(() => window.__DADA_DEBUG__?.sceneKey === 'CribScene', { timeout: 30_000 });
+  await videoPage.waitForTimeout(1200);
+  await hideGameplayUi(videoPage);
+
+  const report = await videoPage.evaluate(() => window.__DADA_DEBUG__?.levelLayoutReport?.() ?? null);
+  const spawnWidePose = report?.proofPoses?.spawnWide;
+  expect(spawnWidePose).toBeTruthy();
+  await videoPage.evaluate((nextPose) => {
+    window.__DADA_DEBUG__?.teleportPlayer?.(nextPose.x, nextPose.y, nextPose.z ?? 0);
+  }, spawnWidePose);
+  await videoPage.waitForTimeout(300);
+  await videoPage.mouse.click(640, 360);
+  await videoPage.waitForTimeout(120);
+  await videoPage.keyboard.down('ArrowRight');
+  await videoPage.waitForTimeout(2000);
+  await videoPage.keyboard.down('Space');
+  await videoPage.waitForTimeout(140);
+  await videoPage.keyboard.up('Space');
+  await videoPage.waitForTimeout(1700);
+  await videoPage.keyboard.down('Space');
+  await videoPage.waitForTimeout(140);
+  await videoPage.keyboard.up('Space');
+  await videoPage.waitForTimeout(2200);
+  await videoPage.keyboard.up('ArrowRight');
+  await videoPage.waitForTimeout(500);
+
+  await context.close();
+  const videoPath = await video.path();
+  await copyFile(videoPath, 'docs/screenshots/level5-aquarium-visual-traversal.webm');
+  await copyFile(videoPath, 'docs/proof/level5-aquarium-visual-kit/level5-aquarium-visual-traversal.webm');
+  await rm('docs/screenshots/.tmp-level5-visual-video', { recursive: true, force: true });
 });
 
 test('capture Level 5 Aquarium Drift slick-deck proof screenshots', async ({ page }) => {
